@@ -1,0 +1,66 @@
+BOLETIM NCNAVES — v36 (25/08/2026)
+
+NOVIDADE DESTA VERSÃO
+• Mão de obra reorganizada pela lógica de gestão: o gerente lança
+  POR FUNÇÃO (seletor que sobe na tela: desbrota, capina, colheita,
+  arranquio de corda-de-viola etc. + "Outra"), informando próprios,
+  diaristas e horas extras de cada turma. O APP CALCULA os totais:
+  "🧮 Total do dia: 25 próprios + 7 diaristas = 32 pessoas na
+  fazenda · 2h extras". Os campos de total ficam travados (soma
+  automática). Sem funções lançadas, os totais seguem manuais.
+• As funções saem no resumo de WhatsApp, no detalhe do boletim
+  e na exportação CSV (coluna "Funções").
+
+TAMBÉM INCLUI (v28)
+• Cadastro oficial de talhões do AgroGestão (25/08/2026).
+• "Cachoeira do Rio Preto — Lagamar" unificada · "Lagamar Café
+  (Rodrigo)" separada · Estreito fora (administração própria).
+• Fazendas novas: Água Santa, Capoeira Grande, Chapada, Chapadão,
+  Confins, Cra Cra, Ferragem, Floramill, Gameleira.
+• Migração automática sem perda de dados.
+
+NOVIDADES (v36)
+• Chuva conferida pela estação: no cartão Clima, se a estação
+  iCrop mediu chuva, aparece "Estação mediu X mm [usar]" — um
+  toque preenche. Se o gerente digitou igual, mostra "Confere ✔".
+• Robô-vigia: se a medição automática parar de chegar, o painel
+  da Diretoria mostra aviso amarelo com a última data e o que
+  verificar (token na Vision / avisar o Nilo).
+
+NOVIDADE (v36) — PAINEL iCROP COMPLETO
+• Clima: se a estação mediu chuva, o app sugere o valor —
+  um toque em "usar" e o número entra certinho.
+• Cartão do gerente ganhou a linha agronômica: quanto a
+  planta pediu (ETc), déficit acumulado e dias de atraso.
+• Painel da Diretoria: custo estimado da irrigação de ontem
+  (lâmina × área × R$/mm da iCrop), aviso discreto quando o
+  boletim e a medição divergem, alerta de parcela vencendo
+  ou fazenda sem parcela ativa na iCrop, e vigia do robô
+  (avisa se a madrugada falhar).
+• Resumo de WhatsApp: linha "💧 iCrop (medido)".
+• IMPORTANTE: rodar o arquivo SEGURANCA-ICROP no SQL Editor
+  (tranca as tabelas novas e libera só a leitura).
+
+NOVIDADE (v35) — INTEGRAÇÃO iCROP AO VIVO
+• O robô do Supabase busca toda madrugada a irrigação medida
+  (lâmina por setor) e a chuva da estação, direto da API da iCrop.
+• No boletim do gerente (Rio Preto, Vereda, FloraMil, Capoeira
+  Grande): cartão verde "💧 iCrop — medição automática do dia",
+  com chuva da estação e lâmina por pivô/projeto. Só conferir.
+• No painel da Diretoria: cartão "💧 iCrop — medição de ontem"
+  com o resumo por fazenda.
+• Funciona offline: a última medição baixada fica guardada.
+
+MELHORIAS DE TELA (v34)
+• Todos os cartões nascem FECHADOS ao abrir a fazenda (Clima e
+  Colheita inclusive) — a tela abre limpa; cada cartão abre no toque.
+  Cartões com dados já lançados no rascunho reabrem sozinhos.
+• Mão de obra com bloco "TOTAIS DO DIA" separado e explicado
+  ("o app soma sozinho quando você lança as funções").
+
+COMO PUBLICAR
+1. Netlify → projeto boletim-ncnaves → Deploys
+2. Arraste este ZIP (ou "browse to upload")
+3. Peça aos gerentes para fechar e abrir o app 2x
+
+Dúvidas: falar com Nilo.
