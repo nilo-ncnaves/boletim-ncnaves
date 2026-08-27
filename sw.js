@@ -1,5 +1,5 @@
 /* Service worker do Boletim LGS — abre mesmo sem internet */
-const CACHE = "boletim-lgs-v36";
+const CACHE = "boletim-lgs-v37";
 const ARQUIVOS = ["./", "index.html", "manifest.webmanifest", "icone-192.png", "icone-512.png"];
 
 self.addEventListener("install", e => {
