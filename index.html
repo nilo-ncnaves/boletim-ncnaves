@@ -60,6 +60,14 @@ h3{font-size:.95rem;font-weight:700}
 .farol.espera{background:var(--amarelo)}
 .farol.critico{background:var(--cereja)}
 .farol.vazio{background:var(--linha)}
+/* Farol de completude (painel da diretoria) */
+.farol7 li{display:flex;align-items:center;gap:8px;font-size:.82rem}
+.farol7 .nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.farol7 .dias{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem;letter-spacing:2px}
+.farol7 .d-sim{color:var(--verde)}
+.farol7 .d-nao{color:var(--linha)}
+.farol7 .d-dom{color:var(--tinta-2);opacity:.55}
+.farol7 .placar{flex:none;min-width:34px;text-align:right;font-weight:700}
 /* Etiquetas */
 .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700}
 .tag.verde{background:var(--verde-claro);color:var(--verde-esc)}
@@ -1214,7 +1222,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v37</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v39</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -1604,6 +1612,32 @@ function comprimirFoto(arquivo){
   });
 }
 
+/* ---------- Cartão: farol de completude — boletins dos últimos 7 dias ---------- */
+function cartaoFarol7(){
+  const iso=dt=>dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+  const dias=[];
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); dias.push({iso:iso(d), dom:d.getDay()===0}); }
+  const uteis=dias.filter(d=>!d.dom).length;
+  const linhas=D.fazendas.map(f=>{
+    const marcas=dias.map(d=> boletimDoDia(d.iso,f.id)
+      ? '<span class="d-sim">●</span>'
+      : d.dom ? '<span class="d-dom">–</span>' : '<span class="d-nao">○</span>').join("");
+    const env=dias.filter(d=>!d.dom && boletimDoDia(d.iso,f.id)).length;
+    /* em dia = enviou ontem ou hoje; se ontem foi domingo, vale o de sábado */
+    const emDia=!!(boletimDoDia(dias[6].iso,f.id) || boletimDoDia(dias[5].iso,f.id)
+      || (dias[5].dom && boletimDoDia(dias[4].iso,f.id)));
+    return {f,marcas,env,emDia};
+  });
+  linhas.sort((a,b)=>(a.env-b.env)||a.f.nome.localeCompare(b.f.nome,"pt-BR"));
+  const emDiaN=linhas.filter(l=>l.emDia).length, todas=emDiaN===linhas.length;
+  return `<details class="secao" ${todas?"":"open"}><summary><span class="ico">📋</span>Boletins dos últimos 7 dias<span class="seta">›</span></summary>
+    <div class="corpo"><ul class="lista-limpa farol7">
+      ${linhas.map(l=>`<li><span class="nome">${esc(l.f.nome)}</span><span class="dias">${l.marcas}</span><span class="placar num">${l.env}/${uteis}</span></li>`).join("")}
+    </ul>
+    <p class="mut" style="font-size:.72rem;margin-top:10px">● enviado · ○ sem boletim · – domingo (não conta como falta) · dias do mais antigo até hoje</p></div></details>
+    <p class="mut" style="font-size:.8rem;margin:0 2px 12px">${emDiaN} de ${linhas.length} fazendas em dia (enviaram o boletim de ontem ou de hoje)</p>`;
+}
+
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
@@ -1615,6 +1649,7 @@ function vPainel(){
       <div class="cresce"><h2>${enviadasHoje} de ${D.fazendas.length} fazendas enviaram hoje</h2>
       <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
+    ${cartaoFarol7()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
       const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
