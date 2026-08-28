@@ -1000,6 +1000,25 @@ async function baixarIcrop(){
     await salvarDados();
   }catch(e){}
 }
+/* --- Solinftec automático (robô do Supabase gravará em solinftec_diario) --- */
+function solinftecDo(data,fz){
+  if(!SOLINFTEC_AUTO) return null;
+  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && l.fazenda_id===fz);
+  return linhas.length?linhas:null;
+}
+async function baixarSolinftec(){
+  if(!SOLINFTEC_AUTO || !syncAtivo()) return;
+  try{
+    const d=new Date(); d.setDate(d.getDate()-3);
+    const de=d.toISOString().slice(0,10);
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    const sel="fazenda_id,data,equipamento,operacao,talhao,horas,area_ha,consumo_l";
+    const r=await fetch(syncCfg.url+"/rest/v1/solinftec_diario?select="+sel+"&data=gte."+de+"&order=data.desc&limit=1500", cab);
+    if(!r.ok) return;
+    const linhas=await r.json();
+    if(Array.isArray(linhas)){ D.solinftecDados=linhas; await salvarDados(); }
+  }catch(e){}
+}
 function icropVencimentos(){
   const fzs=D.icropFaz||[], pcs=D.icropParcelas||[];
   if(!fzs.length) return null;
@@ -1214,7 +1233,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v37</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v40</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -1395,6 +1414,11 @@ function vForm(){
             <span class="cresce">${esc(m?rotuloMaq(m):l.origemNome)}${l.processo?" · "+esc(l.processo):""} — ${horas}${l.ocioso?" · ocioso "+l.ocioso+" h":""}${l.comb?" · "+l.comb+" L":""}${l.operador?" · "+esc(l.operador):""}${l.setorNome?" · "+esc(l.setorNome):""}</span>
             ${usado?`<span class="mut">✔ no boletim</span>`:`<button class="btn mini" data-usartel="${i}">Usar</button>`}</div>`;}).join("")}
           <p class="mut" style="font-size:.75rem;margin-top:6px">Toque em <b>Usar</b>: máquina, horas e serviço já entram na atividade — confira e ajuste o que faltar.</p></div>`;})()}
+      ${(()=>{const sf=solinftecDo(r.data,r.fazendaId);
+        if(!sf) return "";
+        return `<div class="aviso" style="border-color:var(--verde)"><b>📡 Solinftec — medição automática do dia</b>
+          ${sf.map(l=>`<div class="mt" style="font-size:.85rem">${esc(l.equipamento||"Equipamento")}${l.operacao?" · "+esc(l.operacao):""}${l.talhao?" · "+esc(l.talhao):""} — <b>${n0(l.horas).toLocaleString("pt-BR",{maximumFractionDigits:1})} h</b>${n0(l.area_ha)?" · "+n0(l.area_ha).toLocaleString("pt-BR",{maximumFractionDigits:1})+" ha":""}${n0(l.consumo_l)?" · "+n0(l.consumo_l).toLocaleString("pt-BR",{maximumFractionDigits:0})+" L":""}</div>`).join("")}
+          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição automática — só confira, não precisa digitar.</p></div>`;})()}
       <div id="lista-ativ">${r.atividades.map(cardAtividade).join("")}</div>
       <button class="btn suave mt" id="bt-add-ativ">＋ Adicionar atividade</button></div></details>
 
@@ -1652,6 +1676,16 @@ function vPainel(){
             ${v.zeradas.map(n=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(n.replace(/^NC Naves\s*-\s*/,""))}: <b>sem nenhuma parcela ativa</b> na iCrop</p>`).join("")}
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
         <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p></div>`;})()}
+    ${(()=>{const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+      const fzs=D.fazendas.map(f=>({f, sf:solinftecDo(ontem,f.id)})).filter(x=>x.sf);
+      if(!fzs.length) return "";
+      return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
+        ${fzs.map(({f,sf})=>{
+          const horas=sf.reduce((s,l)=>s+n0(l.horas),0);
+          const area=sf.reduce((s,l)=>s+n0(l.area_ha),0);
+          return `<p style="font-size:.85rem;margin:4px 0">${esc(f.nome)}: <b>${horas.toLocaleString("pt-BR",{maximumFractionDigits:1})} h</b>${area?" · "+area.toLocaleString("pt-BR",{maximumFractionDigits:1})+" ha":""}</p>`;
+        }).join("")}
+        <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;})()}
     ${cartaoRemessasPainel()}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
@@ -2056,6 +2090,10 @@ function abrirWhats(id){
 }
 /* ---------- Sincronização entre celulares (Supabase) ---------- */
 const SYNC_PADRAO = { url:"https://syvehtgrbqteyuqhoban.supabase.co", chave:"sb_publishable_-FOT9xpA63j8_IYRYTAcMA_X1Ov9NH5" }; /* Grupo LGS — banco central */
+/* Solinftec: mudar para true quando o robô da Solinftec começar a gravar
+   na tabela solinftec_diario do Supabase. Enquanto false, o app não busca
+   nem mostra nada — fica exatamente como hoje. */
+const SOLINFTEC_AUTO = false;
 let syncCfg = {...SYNC_PADRAO};
 let syncFila = [];            /* registros aguardando internet: [{t:'b'|'p'|'r', id}] */
 let syncUltima = null, syncOcupado = false;
@@ -2142,7 +2180,7 @@ async function syncBaixar(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarIcrop(); } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarIcrop(); await baixarSolinftec(); } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa"].includes(telaAtual))
     ir(telaAtual, null, true);
 }
