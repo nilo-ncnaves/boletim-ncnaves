@@ -107,6 +107,10 @@ h3{font-size:.95rem;font-weight:700}
 /* Aviso de rascunho / offline */
 .aviso{background:var(--amarelo-claro);border:1px solid #ecd9ad;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:12px}
 .aviso.verde{background:var(--verde-claro);border-color:#cfe0c8}
+/* Conferência antes do envio (cinto de segurança) */
+#conf-envio{position:fixed;inset:0;background:rgba(35,32,26,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:14px}
+.conf-caixa{background:var(--cartao);border:1px solid var(--amarelo);width:100%;max-width:520px;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto}
+.conf-botoes{display:flex;gap:10px;margin-top:12px}
 .foto-mini{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--linha)}
 .foto-grande{width:100%;border-radius:10px;border:1px solid var(--linha);margin-top:8px}
 .lista-limpa{list-style:none}
@@ -1214,7 +1218,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v37</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v38</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -2331,13 +2335,64 @@ function vDetalhePos(id){
     <button class="btn sec mini" data-zappos="${p.id}">📲 WhatsApp</button>`;
 }
 let nomeRespLembrado="";
+/* ---- Cinto de segurança do envio: conferências suaves (avisam, nunca bloqueiam) ---- */
+function boletimVazio(r){
+  const tem=x=>x!==undefined&&x!==null&&x!=="";
+  const c=r.clima||{}, m=r.mo||{}, ir=r.irr||{}, p=r.pos||{};
+  const temClima=tem(c.cond)||tem(c.tmin)||tem(c.tmax)||tem(c.chuvaMm)||c.florada==="Sim"||c.requeima==="Sim"||tem(c.obs);
+  const temMo=tem(m.proprios)||tem(m.diaristas)||tem(m.faltas)||tem(m.horasExtras)||(m.funcoes||[]).length;
+  const temIrr=tem(ir.status)||tem(ir.agua)||tem(ir.fert)||(ir.problemas||[]).length||tem(ir.obs);
+  const temPos=tem(p.terreiro)||tem(p.secLote)||tem(p.secTemp)||tem(p.secHoras)||tem(p.sacasBenef);
+  return !(temClima||temMo||temIrr||temPos||(r.atividades||[]).length||(r.colheita||[]).length
+    ||(r.fito||[]).length||(r.ocorrencias||[]).length||tem(r.obsGeral)||tem(r.pendencias));
+}
+function avisosDoEnvio(r){
+  const avisos=[];
+  const mm=x=>x.toLocaleString("pt-BR");
+  const chuva=n0(r.clima&&r.clima.chuvaMm);
+  if(chuva>150) avisos.push({cod:"chuva_alta", txt:"Chuva de "+mm(chuva)+" mm é incomum. Confirma?"});
+  const ic=icropDo(r.data,r.fazendaId);
+  if(ic && Math.abs(chuva-ic.chuva)>15)
+    avisos.push({cod:"chuva_diverge_icrop", txt:"Você informou "+mm(chuva)+" mm de chuva; a estação iCrop mediu "+mm(ic.chuva)+" mm. Manter o seu valor?"});
+  const pessoasDe=b=>n0(b.mo&&b.mo.proprios)+n0(b.mo&&b.mo.diaristas);
+  const diaSemana=new Date(r.data+"T12:00:00").getDay(); /* 0 = domingo */
+  if(diaSemana!==0 && pessoasDe(r)===0){
+    const d=new Date(r.data+"T12:00:00"); d.setDate(d.getDate()-7);
+    const desde=d.toISOString().slice(0,10);
+    const teveGente=D.boletins.some(b=>!b.exemplo && b.fazendaId===r.fazendaId && b.data>=desde && b.data<r.data && pessoasDe(b)>0);
+    if(teveGente) avisos.push({cod:"sem_pessoas_dia_util", txt:"Nenhuma pessoa trabalhando hoje. Confirma?"});
+  }
+  const colTemDado=c=>["modo","latas","carretas","sacas","passada","destino","cereja","verde","seco"].some(k=>c[k]!==undefined&&c[k]!==null&&c[k]!=="");
+  if((r.colheita||[]).some(c=>!c.talhaoId && colTemDado(c)))
+    avisos.push({cod:"colheita_sem_talhao", txt:"Colheita sem talhão indicado. Deseja indicar antes de enviar?"});
+  if(boletimVazio(r)) avisos.push({cod:"boletim_vazio", txt:"O boletim está vazio. Enviar mesmo assim?"});
+  return avisos;
+}
+function mostrarConferencia(avisos, aoConfirmar){
+  const antiga=document.getElementById("conf-envio"); if(antiga) antiga.remove();
+  const caixa=document.createElement("div");
+  caixa.id="conf-envio";
+  caixa.innerHTML=`<div class="conf-caixa">
+    <h3>Antes de enviar, confira</h3>
+    <p class="mut" style="margin-top:4px">Nada está bloqueado — apenas confirme os pontos abaixo.</p>
+    <div class="mt">${avisos.map(a=>`<div class="aviso">${a.txt}</div>`).join("")}</div>
+    <div class="conf-botoes">
+      <button class="btn sec" id="bt-conf-revisar">Revisar</button>
+      <button class="btn" id="bt-conf-seguir">Confirmar e enviar</button>
+    </div></div>`;
+  document.body.appendChild(caixa);
+  caixa.querySelector("#bt-conf-revisar").onclick=()=>caixa.remove();
+  caixa.querySelector("#bt-conf-seguir").onclick=()=>{ caixa.remove(); aoConfirmar(); };
+}
 function validarEnviar(){
   const r=rascunho;
-  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length){
-    alert("Registre pelo menos o clima ou uma observação do dia."); return;
-  }
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   if(jaExiste){ alert("Já existe boletim para "+fmtData(r.data)+". Abra-o pela lista para corrigir."); return; }
+  const avisos=avisosDoEnvio(r);
+  if(!avisos.length){ delete r.avisosConfirmados; concluirEnvio(r); return; }
+  mostrarConferencia(avisos, ()=>{ r.avisosConfirmados=avisos.map(a=>a.cod); concluirEnvio(r); });
+}
+function concluirEnvio(r){
   D.ultimasDoses = D.ultimasDoses||{};
   D.insumosAprendidos = D.insumosAprendidos||[];
   D.ultimasReceitas = D.ultimasReceitas||{};
