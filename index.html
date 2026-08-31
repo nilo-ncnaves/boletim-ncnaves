@@ -967,32 +967,71 @@ const talhoesPasto = fz => talhoesDa(fz).filter(t=>t.tipo==="PASTO_PECUARIA");
 const cicloAtivo = talhaoId => (D.ciclos||[]).find(c=>c.talhaoId===talhaoId && !c.encerradoEm);
 const CULTURAS_ANUAIS=[["FEIJAO","Feijão"],["SOJA","Soja"],["MILHO_COMERCIAL","Milho comercial"],["MILHO_SEMENTE","Milho semente"]];
 const rotuloCultura = c => { const h=CULTURAS_ANUAIS.find(([k])=>k===c); return h?h[1]:(c||""); };
-/* Catálogos de operações por cultura — mesmo molde do LISTA_FUNCOES do café (que fica intocado) */
-const OPS_FEIJAO_SOJA=["Dessecação pré-plantio","Tratamento de sementes","Plantio","Inoculação (soja)",
-  "Adubação de cobertura","Pulverização fungicida","Pulverização inseticida","Monitoramento de pragas",
-  "Capina química","Dessecação pré-colheita","Colheita mecanizada","Transporte da produção"];
-const OPS_MILHO_COMERCIAL=["Plantio","Adubação de cobertura (N)","Pulverização","Irrigação","Colheita","Transporte","Secagem"];
-const OPS_MILHO_SEMENTE=[...OPS_MILHO_COMERCIAL,"Despendoamento — passe 1","Despendoamento — passe 2","Despendoamento — passe 3",
-  "Roguing / purificação","Conferência de isolamento","Destruição do macho","Colheita em espiga","Visita de fiscalização / sementeira"];
-const LISTA_PECUARIA=["Contagem do lote","Trato de cocho / ração","Sal mineral","Água / aguadas",
-  "Rotação de pasto — entrada","Rotação de pasto — saída","Vacinação","Vermifugação","Mosca / carrapato",
-  "Cura de bicheira","Estação de monta","Diagnóstico de gestação","Nascimento","Desmama","Apartação",
-  "Pesagem","Embarque / venda","Morte (com causa)"];
-function operacoesDa(cultura){
-  if(cultura==="FEIJAO"||cultura==="SOJA") return OPS_FEIJAO_SOJA;
-  if(cultura==="MILHO_COMERCIAL") return OPS_MILHO_COMERCIAL;
-  if(cultura==="MILHO_SEMENTE") return OPS_MILHO_SEMENTE;
+/* ===== Catálogos agronômicos por atividade (o do café, LISTA_ATIV/LISTA_FUNCOES, fica intocado) ===== */
+/* GRÃOS — atividades por fase (feijão, soja e milho comercial) */
+const OPS_GRAOS_FASES=[
+  ["Pré-plantio",["Dessecação de pré-plantio","Calagem","Gessagem","Gradagem / preparo de solo","Manejo da palhada","Amostragem de solo"]],
+  ["Plantio",["Tratamento de sementes","Inoculação (soja/feijão)","Plantio / semeadura","Adubação de plantio (sulco)","Replantio","Avaliação de estande"]],
+  ["Condução",["Adubação de cobertura (N/K)","Herbicida pós-emergente","Fungicida","Inseticida","Aplicação foliar / micronutrientes","Monitoramento de pragas e doenças","Irrigação (lâmina)","Controle de daninhas manual (escape)"]],
+  ["Colheita",["Dessecação de pré-colheita (feijão/soja)","Colheita mecanizada","Transporte ao armazém","Pesagem","Amostragem de umidade / impureza","Secagem / pré-limpeza"]],
+  ["Pós-colheita",["Destruição de restos culturais","Semeadura de cobertura (braquiária/milheto)","Vazio sanitário (soja)"]]
+];
+/* MILHO SEMENTE — tudo de grãos MAIS a fase própria de campo de semente */
+const OPS_MILHO_SEMENTE_EXTRA=["Plantio de fêmea e macho (datas escalonadas)","Avaliação de sincronismo de florescimento",
+  "Despendoamento — 1º passe","Despendoamento — 2º passe","Despendoamento — 3º passe / repasse",
+  "Roguing / purificação genética","Conferência de isolamento","Destruição do macho",
+  "Vistoria da sementeira","Vistoria de fiscalização (MAPA)","Colheita em espiga","Transporte à UBS"];
+function fasesDa(cultura){
+  if(cultura==="MILHO_SEMENTE") return [...OPS_GRAOS_FASES, ["Campo de semente",OPS_MILHO_SEMENTE_EXTRA]];
+  if(cultura==="FEIJAO"||cultura==="SOJA"||cultura==="MILHO_COMERCIAL") return OPS_GRAOS_FASES;
   return [];
 }
-/* Catálogo de mão de obra conforme o perfil: café mantém o LISTA_FUNCOES de sempre;
-   grãos e pecuária usam os catálogos próprios; fazenda mista soma os catálogos */
-const LISTA_FUNCOES_GRAOS=[...new Set([...OPS_FEIJAO_SOJA,...OPS_MILHO_SEMENTE])];
+function operacoesDa(cultura){ return fasesDa(cultura).flatMap(([,ops])=>ops); }
+/* PECUÁRIA — eventos por grupo (ciclo completo, recria e engorda) */
+const OPS_PECUARIA_FASES=[
+  ["Manejo diário",["Contagem","Suplementação (sal mineral / proteinado / ração)","Conferência de água / aguadas","Rotação de pasto — entrada de lote","Rotação de pasto — saída de lote"]],
+  ["Sanitário",["Vacinação (especificar)","Vermifugação","Controle de carrapato / mosca-do-chifre","Cura de bicheira","Cura de umbigo","Tratamento individual (especificar)","Mortalidade (com causa)"]],
+  ["Reprodutivo",["Estação de monta","IATF","Diagnóstico de gestação","Parto / nascimento","Desmama"]],
+  ["Manejo de lote",["Marcação / brincagem","Castração","Apartação","Pesagem","Embarque / venda","Compra / entrada de animais"]],
+  ["Pastagem e estrutura",["Roçada","Adubação de pastagem","Reforma de pasto","Manutenção de cerca / cocho / bebedouro","Controle de formiga"]]
+];
+const LISTA_PECUARIA=OPS_PECUARIA_FASES.flatMap(([,ops])=>ops);
+/* PRAGAS E DOENÇAS — GRÃOS (o SUGESTAO_FITO do café fica intocado) */
+const SUGESTAO_FITO_GRAOS={
+  "Praga":["Percevejo-marrom (soja)","Lagarta Spodoptera / Helicoverpa","Mosca-branca","Cigarrinha-do-milho (enfezamento)","Lagarta-do-cartucho (milho)","Percevejo-barriga-verde (milho)","Vaquinha (feijão)","Nematoides","Formiga","Ataque de pássaros / javali"],
+  "Doença":["Ferrugem-asiática (soja)","Mofo-branco","Oídio","Antracnose","Mancha-branca (milho)","Helmintosporiose (milho)","Ferrugem-polissora (milho)","Grãos ardidos (milho)","Mancha-angular (feijão)","Crestamento bacteriano (feijão)","Mosaico-dourado / mosca-branca (feijão)"],
+  "Planta daninha":["Buva (resistente)","Capim-amargoso (resistente)","Caruru","Trapoeraba","Picão-preto"]
+};
+const sugestaoFitoDa = fz => atividadeDe(fz)==="GRAOS" ? SUGESTAO_FITO_GRAOS : SUGESTAO_FITO;
+/* MÃO DE OBRA por atividade (funções/postos de trabalho, não operações) */
+const LISTA_FUNCOES_GRAOS=["Operador de colheitadeira","Operador de plantadeira","Operador de pulverizador",
+  "Tratorista","Auxiliar de plantio","Aplicador (costal)","Abastecimento / apoio a máquinas",
+  "Monitor de pragas","Despendoador","Roguing / purificação","Auxiliar de armazém / secagem",
+  "Irrigação (pivô)","Manutenção de máquinas","Manutenção de cercas / benfeitorias","Serviços gerais"];
+const LISTA_FUNCOES_PECUARIA=["Vaqueiro","Campeiro","Auxiliar de curral","Tratador (cocho / ração)",
+  "Vacinador","Inseminador","Roçada de pasto","Manutenção de cerca / cocho / bebedouro",
+  "Combate a formiga","Serviços gerais"];
 function funcoesDa(fz){
   const p=fz?perfilDe(fz):["CAFE"], out=[];
   if(p.includes("CAFE")) out.push(...LISTA_FUNCOES);
   if(p.includes("GRAOS")) out.push(...LISTA_FUNCOES_GRAOS);
-  if(p.includes("PECUARIA")) out.push(...LISTA_PECUARIA);
+  if(p.includes("PECUARIA")) out.push(...LISTA_FUNCOES_PECUARIA);
   return out.length?[...new Set(out)]:[...LISTA_FUNCOES];
+}
+/* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária ganha as próprias) */
+const LISTA_OCORR_PECUARIA=["Morte de animal","Fuga de animais","Cerca rompida","Falta de água","Animal doente"];
+const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUARIA, ...LISTA_OCORR] : LISTA_OCORR;
+/* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
+function opcoesAtiv(fz, sel){
+  if(atividadeDe(fz)!=="GRAOS")
+    return ["<option value=''>Selecione…</option>",...LISTA_ATIV.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`),(sel&&!LISTA_ATIV.includes(sel)?`<option selected>${esc(sel)}</option>`:"")].join("");
+  const temSem = talhoesDa(fz).some(t=>t.tipo==="MILHO_SEMENTE" || (cicloAtivo(t.id)||{}).cultura==="MILHO_SEMENTE");
+  const fases = temSem ? [...OPS_GRAOS_FASES, ["Campo de semente",OPS_MILHO_SEMENTE_EXTRA]] : OPS_GRAOS_FASES;
+  const todas = fases.flatMap(([,ops])=>ops);
+  return "<option value=''>Selecione…</option>"
+    + fases.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`).join("")}</optgroup>`).join("")
+    + `<option>Outra</option>`
+    + (sel && sel!=="Outra" && !todas.includes(sel) ? `<option selected>${esc(sel)}</option>` : "");
 }
 function temPecuaria(r){
   const p=r&&r.pecuaria; if(!p) return false;
@@ -1260,7 +1299,13 @@ function confirmarRemessa(id){
 function codDe(nome){ const m=/\(COD\.?:?\s*(\d+)\s*\)/i.exec(nome||""); return m?m[1]:null; }
 function rotuloMaq(m){ const c=codDe(m.nome); const limpo=m.nome.replace(/\s*\(COD[^)]*\)/i,"").trim();
   return c ? c+" · "+limpo : limpo; }
-function maqsVisiveis(fz){ return [...maquinasDa(fz), ...D.maquinas.filter(m=>!(m.fazendas||[]).length)]; }
+/* Máquinas com "café" no nome ou na categoria não aparecem no pool das unidades de grãos/pecuária
+   (as vinculadas explicitamente à unidade continuam valendo) */
+const maqCafe = m => /caf[eé]/i.test((m.cat||"")+" "+(m.nome||""));
+function maqsVisiveis(fz){
+  const soCafe = atividadeDe(fz)==="CAFE";
+  return [...maquinasDa(fz), ...D.maquinas.filter(m=>!(m.fazendas||[]).length && (soCafe||!maqCafe(m)))];
+}
 function opcoesDatalistMaq(fz){ return maqsVisiveis(fz).map(m=>`<option value="${esc(rotuloMaq(m))}">`).join(""); }
 function resolverMaq(fz, texto){
   const t=(texto||"").trim(); if(!t) return t;
@@ -1274,7 +1319,7 @@ function opcoesMaquina(fz, sel){
   /* Regra: máquina vinculada a UMA fazenda só aparece naquela fazenda.
      Máquinas sem vínculo ("Grupo — todas") aparecem para todas. */
   const daFaz=maquinasDa(fz);
-  const doGrupo=D.maquinas.filter(m=>!(m.fazendas||[]).length);
+  const doGrupo=D.maquinas.filter(m=>!(m.fazendas||[]).length && (atividadeDe(fz)==="CAFE"||!maqCafe(m)));
   const cats=[...new Set(doGrupo.map(m=>m.cat))];
   let h="<option value=''>Toque e escolha…</option>";
   if(daFaz.length) h+=`<optgroup label="★ Desta fazenda">${daFaz.map(m=>`<option value="${esc(m.nome)}" ${sel===m.nome?"selected":""}>${esc(m.nome)}</option>`).join("")}</optgroup>`;
@@ -1396,7 +1441,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v40</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v41</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -1509,10 +1554,11 @@ function secaoGraos(r){
           <button class="btn suave mini" data-novo-ciclo="${t.id}">🌱 Novo plantio</button></div>`;
         return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px">
           <b>${esc(t.nome)}</b> <span class="mut">— ${rotuloCultura(c.cultura)}${c.plantio?", plantado "+fmtData(c.plantio):""}${c.colheitaPrevista?" · colheita prevista "+fmtData(c.colheitaPrevista):""}</span>
-          <div class="chips mt">${operacoesDa(c.cultura).map(op=>{
+          ${fasesDa(c.cultura).map(([fase,ops])=>`<p class="mut" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px">${esc(fase)}</p>
+          <div class="chips">${ops.map(op=>{
             const on=(r.atividades||[]).some(a=>a.talhaoId===t.id && a.tipo===op);
             return `<button class="chip ${on?"on":""}" data-opgrao="${t.id}|${esc(op)}">${esc(op)}</button>`;
-          }).join("")}</div></div>`;
+          }).join("")}</div>`).join("")}</div>`;
       }).join(""):`<p class="mut mt">Nenhum talhão de grão cadastrado ainda.</p>`}
       ${semCafe?`<label class="mt">Atividades e máquinas do dia</label>
       <div id="lista-ativ">${r.atividades.map(cardAtividade).join("")}</div>
@@ -1532,11 +1578,18 @@ function cardLotePec(l,i,fz){
     <button class="btn suave mini mt" data-rm-peclote="${i}">remover este lote</button></div>`;
 }
 function cardEventoPec(e2,i){
+  const fz=rascunho?rascunho.fazendaId:"";
+  const pastos=talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
   return `<div class="mt" data-pecev="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
     <label>O que houve</label>
-    <select data-pe="tipo">${["<option value=''>Selecione…</option>",
-      ...LISTA_PECUARIA.map(tp=>`<option ${e2.tipo===tp?"selected":""}>${tp}</option>`)].join("")}</select>
+    <select data-pe="tipo">${"<option value=''>Selecione…</option>"
+      +OPS_PECUARIA_FASES.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(tp=>`<option ${e2.tipo===tp?"selected":""}>${tp}</option>`).join("")}</optgroup>`).join("")
+      +(e2.tipo&&!LISTA_PECUARIA.includes(e2.tipo)?`<option selected>${esc(e2.tipo)}</option>`:"")}</select>
+    <label>Lote / pasto</label>
+    <select data-pe="talhaoId">${["<option value=''>Selecione…</option>",
+      ...pastos.map(t=>`<option value="${t.id}" ${e2.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>
     <label>Quantidade (cabeças)</label><input inputmode="numeric" data-pe="qtd" value="${esc(e2.qtd||"")}">
+    <label>Produto / vacina (quando aplicável)</label><input data-pe="produto" value="${esc(e2.produto||"")}" placeholder="Ex.: vacina aftosa, vermífugo, brinco">
     <label>Observação</label><input data-pe="obs" value="${esc(e2.obs||"")}" placeholder="Ex.: causa da morte, pasto de destino">
     <button class="btn suave mini mt" data-rm-pecev="${i}">remover este evento</button></div>`;
 }
@@ -1617,7 +1670,7 @@ function vForm(){
       ${stepper("Funcionários próprios presentes","proprios",r.mo.proprios)}
       ${stepper("Diaristas / terceiros","diaristas",r.mo.diaristas)}
       ${stepper("Faltas","faltas",r.mo.faltas)}
-      <label>Motivo das faltas</label><input data-mo="motivoFaltas" value="${esc(r.mo.motivoFaltas)}" placeholder="Ex.: 2 faltas na desbrota — atestado">
+      <label>Motivo das faltas</label><input data-mo="motivoFaltas" value="${esc(r.mo.motivoFaltas)}" placeholder="${temCafe?"Ex.: 2 faltas na desbrota — atestado":"Ex.: 2 faltas — atestado"}">
       ${stepper("Horas extras (total)","horasExtras",r.mo.horasExtras)}
       <p class="mut" id="aviso-mo-auto" style="display:${(r.mo.funcoes||[]).length?"block":"none"}">Próprios, diaristas e horas extras somados automaticamente das funções.</p>
     </div></details>
@@ -1651,6 +1704,7 @@ function vForm(){
       <label>Observação</label><input data-irr="obs" value="${esc(r.irr?r.irr.obs:"")}" placeholder="Opcional — ex.: setor 3 parado 2 h">
     </div></details>`}
   ${secaoGraos(r)}
+  ${temGraos?secaoColheitaGraos(r):""}
   ${!temCafe?"":`<details class="secao" ${r.atividades.length?"open":""}><summary><span class="ico">🚜</span>Atividades por talhão
     <span class="resumo" id="res-ativ">${r.atividades.length?r.atividades.length+" registro"+(r.atividades.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
@@ -1674,7 +1728,7 @@ function vForm(){
 
   ${secaoPecuaria(r)}
 
-  ${!temCafe?"":`<details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
+  ${!(temCafe||temGraos)?"":`<details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
     <span class="resumo" id="res-fito">${r.fito.length?r.fito.length+" registro"+(r.fito.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mt" id="bt-add-fito">＋ Registrar ocorrência fitossanitária</button></div></details>`}
@@ -1755,7 +1809,7 @@ function cardAtividade(a){
     <label>Talhão / área</label>
     <select data-a="talhaoId">${opcoesTalhao(rascunho.fazendaId, a.talhaoId)}</select>
     <label>Atividade</label>
-    <select data-a="tipo">${["<option value=''>Selecione…</option>",...LISTA_ATIV.map(t=>`<option ${a.tipo===t?"selected":""}>${t}</option>`),(a.tipo&&!LISTA_ATIV.includes(a.tipo)?`<option selected>${esc(a.tipo)}</option>`:"")].join("")}</select>
+    <select data-a="tipo">${opcoesAtiv(rascunho.fazendaId, a.tipo)}</select>
     <label>Pessoas na atividade</label><input inputmode="numeric" data-a="pessoas" value="${esc(a.pessoas)}">
     <label>Como terminou o dia?</label>
     <div class="chips">
@@ -1820,15 +1874,39 @@ function cardColheita(c){
     </div>
   </div>`;
 }
+/* Colheita de GRÃOS: área, sacas de 60 kg, umidade e destino — sem vocabulário de café */
+function cardColheitaGraos(c){
+  const cic=c.talhaoId?cicloAtivo(c.talhaoId):null;
+  return `<div class="subcartao" data-col="${c.id}">
+    <button class="fechar-sub" data-rm-col="${c.id}">remover</button>
+    <label>Talhão</label>
+    <select data-cc="talhaoId">${opcoesTalhao(rascunho.fazendaId, c.talhaoId)}</select>
+    ${cic?`<p class="mut" style="font-size:.78rem;margin-top:4px">Ciclo: ${rotuloCultura(cic.cultura)}${cic.plantio?", plantado "+fmtData(cic.plantio):""}</p>`:""}
+    <div class="grade2 mt">
+      <div><label>Área colhida (ha)</label><input inputmode="decimal" data-cc="areaHa" value="${esc(c.areaHa||"")}"></div>
+      <div><label>Produção (sacas 60 kg)</label><input inputmode="decimal" data-cc="sacas" value="${esc(c.sacas||"")}"></div>
+    </div>
+    <label>Umidade (%)</label><input inputmode="decimal" data-cc="umidade" value="${esc(c.umidade||"")}" placeholder="Ex.: 13,5">
+    <label>Destino</label>
+    <div class="chips">${["Armazém próprio","Armazém de terceiro","Entrega direta"].map(dd=>`<button class="chip ${c.destino===dd?"on":""}" data-dest="${dd}">${dd}</button>`).join("")}</div>
+    <label>Observação</label><input data-cc="obs" value="${esc(c.obs||"")}" placeholder="Opcional">
+  </div>`;
+}
+function secaoColheitaGraos(r){
+  return `<details class="secao" ${r.colheita.length?"open":""}><summary><span class="ico">⚖️</span>Colheita de grãos
+    <span class="resumo" id="res-col">${r.colheita.length?r.colheita.reduce((s,c)=>s+n0(c.sacas),0)+" sacas":""}</span><span class="seta">›</span></summary>
+    <div class="corpo"><div id="lista-col">${r.colheita.map(cardColheitaGraos).join("")}</div>
+      <button class="btn suave mt" id="bt-add-colg">＋ Registrar colheita de um talhão</button></div></details>`;
+}
 function chipsFitoNome(f){
-  const lista=SUGESTAO_FITO[f.tipo]||[];
+  const lista=(sugestaoFitoDa(rascunho?rascunho.fazendaId:""))[f.tipo]||[];
   const custom=!!f.nome && !lista.includes(f.nome);
   const chips=lista.map(s=>`<button class="chip ${f.nome===s?"on":""}" data-fnome="${s}">${s}</button>`).join("");
   return (f.tipo?chips:`<span class="mut" style="align-self:center">Escolha o tipo acima</span>`)
     +`<button class="chip ${custom?"on":""}" data-fnome-outra="1">Outra…</button>`;
 }
 function cardFito(f){
-  const lista=SUGESTAO_FITO[f.tipo]||[];
+  const lista=(sugestaoFitoDa(rascunho?rascunho.fazendaId:""))[f.tipo]||[];
   const custom=!!f.nome && !lista.includes(f.nome);
   return `<div class="subcartao" data-fito="${f.id}">
     <button class="fechar-sub" data-rm-fito="${f.id}">remover</button>
@@ -1848,7 +1926,7 @@ function cardOcorr(o){
   return `<div class="subcartao" data-oc="${o.id}">
     <button class="fechar-sub" data-rm-oc="${o.id}">remover</button>
     <label>Tipo</label>
-    <select data-o="tipo">${["<option value=''>Selecione…</option>",...LISTA_OCORR.map(t=>`<option ${o.tipo===t?"selected":""}>${t}</option>`)].join("")}</select>
+    <select data-o="tipo">${["<option value=''>Selecione…</option>",...listaOcorrDa(rascunho?rascunho.fazendaId:"").map(t=>`<option ${o.tipo===t?"selected":""}>${t}</option>`),(o.tipo&&!listaOcorrDa(rascunho?rascunho.fazendaId:"").includes(o.tipo)?`<option selected>${esc(o.tipo)}</option>`:"")].join("")}</select>
     <label>Gravidade</label>
     <div class="chips">${["Baixa","Média","Alta"].map(g=>`<button class="chip ${o.grav===g?"on":""}" data-ograv="${g}" data-ograv-id="${o.id}">${g}</button>`).join("")}</div>
     <label>O que aconteceu</label><textarea data-o="texto" placeholder="Conte em poucas linhas">${esc(o.texto)}</textarea>
@@ -2102,7 +2180,9 @@ function vDetalhe(id){
         ${b.irr.fert?`<dt>Fertirrigação</dt><dd>Sim${(b.irr.fertSetores||[]).length?` — ${b.irr.fertSetores.map(id=>esc(talhao(id).nome)).join(", ")}`:""}${b.irr.fertReceita?`<br><span class="mut" style="white-space:pre-wrap">🧪 ${esc(b.irr.fertReceita)}</span>`:""}</dd>`:""}
         ${b.irr.obs?`<dt>Obs.</dt><dd>${esc(b.irr.obs)}</dd>`:""}
       </dl></div>`:""}
-    ${(b.colheita||[]).length?`<div class="cartao"><h3>🍒 Colheita</h3>
+    ${(b.colheita||[]).length && atividadeDe(b.fazendaId)==="GRAOS"?`<div class="cartao"><h3>🌾 Colheita de grãos</h3>
+      ${b.colheita.map(c=>`<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${[n0(c.areaHa)?n0(c.areaHa).toLocaleString("pt-BR")+" ha":"",n0(c.sacas)?n0(c.sacas).toLocaleString("pt-BR")+" sacas (60 kg)":"",n0(c.umidade)?n0(c.umidade).toLocaleString("pt-BR")+"% umidade":"",c.destino?esc(c.destino):""].filter(Boolean).join(" · ")||"—"}${c.obs?`<br><span class="mut">${esc(c.obs)}</span>`:""}</div>`).join("")}</div>`:""}
+    ${(b.colheita||[]).length && atividadeDe(b.fazendaId)!=="GRAOS"?`<div class="cartao"><h3>🍒 Colheita</h3>
       ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.sacas)?n0(c.sacas)+" sacas · ":""}destino: ${esc(c.destino)||"—"}
         ${c.modo?` <span class="tag verde">${esc(c.modo).toLowerCase()}</span>`:""}${c.passada?` <span class="tag terra">${esc(c.passada)}</span>`:""}
         <div class="matura"><div class="mat-cereja" style="width:${s?100*n0(c.cereja)/s:0}%">${n0(c.cereja)}%</div><div class="mat-verde" style="width:${s?100*n0(c.verde)/s:0}%">${n0(c.verde)}%</div><div class="mat-seco" style="width:${s?100*n0(c.seco)/s:0}%">${n0(c.seco)}%</div></div></div>`;}).join("")}</div>`:""}
@@ -2113,7 +2193,7 @@ function vDetalhe(id){
         ${b.pecuaria.sal?`<dt>Sal mineral</dt><dd>${b.pecuaria.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
         ${b.pecuaria.agua?`<dt>Água</dt><dd>${b.pecuaria.agua==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
         ${b.pecuaria.estrutObs?`<dt>Obs.</dt><dd>${esc(b.pecuaria.estrutObs)}</dd>`:""}</dl>`:""}
-      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
+      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
     ${(b.pos&&(b.pos.terreiro||b.pos.secLote||n0(b.pos.sacasBenef)))?`<div class="cartao"><h3>🏭 Pós-colheita</h3><dl class="dl mt">
       ${b.pos.terreiro?`<dt>Terreiro</dt><dd>${esc(b.pos.terreiro)}</dd>`:""}
       ${b.pos.secLote?`<dt>Secador</dt><dd>${esc(b.pos.secLote)} · ${esc(b.pos.secTemp)}°C · ${esc(b.pos.secHoras)} h</dd>`:""}
@@ -2372,6 +2452,10 @@ function resumoWhats(b){
     if(n0(a.tanques)) L.push("🛢️ Gastou "+n0(a.tanques)+" tanque"+(n0(a.tanques)>1?"s":"")+(n0(a.ltanque)?" × "+n0(a.ltanque)+" L = "+(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")+" L":""));
   });
   (b.colheita||[]).forEach(x=>{
+    if(atividadeDe(b.fazendaId)==="GRAOS"){
+      L.push("🌾 Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.areaHa)?n0(x.areaHa).toLocaleString("pt-BR")+" ha":"",n0(x.sacas)?n0(x.sacas).toLocaleString("pt-BR")+" sc (60 kg)":"",n0(x.umidade)?n0(x.umidade).toLocaleString("pt-BR")+"% umidade":"",x.destino||""].filter(Boolean).join(" · ")+(x.obs?" — "+x.obs:""));
+      return;
+    }
     L.push("☕ Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.latas)?n0(x.latas)+" latas":"",n0(x.carretas)?n0(x.carretas)+" carretas":"",n0(x.sacas)?n0(x.sacas)+" sc":"",x.modo?x.modo.toLowerCase():"",x.passada||""].filter(Boolean).join(" · ")
       +((x.cereja!==""&&x.cereja!=null)?" · "+n0(x.cereja)+"% cereja":""));
     if(x.destino==="Outra fazenda 🚚"&&x.destinoFazendaId) L.push("🚚 Café enviado p/ "+fazenda(x.destinoFazendaId).nome+(x.motorista?" · "+x.motorista:"")+" — aguardando confirmação lá");
@@ -2384,7 +2468,7 @@ function resumoWhats(b){
     const probs=[p.cocho==="Problema"?"cocho":"",p.sal==="Problema"?"sal mineral":"",p.agua==="Problema"?"água":""].filter(Boolean);
     if(probs.length) L.push("⚠️ Problema em: "+probs.join(", ")+(p.estrutObs?" — "+p.estrutObs:""));
     else if(p.cocho||p.sal||p.agua) L.push("🐂 Cocho, sal e água: OK");
-    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.obs?" — "+e2.obs:"")); });
+    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto:"")+(e2.obs?" — "+e2.obs:"")); });
   }
   (b.fito||[]).forEach(f=>{ if(f.nome||f.tipo) L.push("🐛 "+(f.nome||f.tipo)+" — "+talhao(f.talhaoId).nome+" · nível "+(f.nivel||"—")+(f.obs?" — "+f.obs:"")); });
   (b.ocorrencias||[]).forEach(o=>{ L.push((o.grav==="Alta"?"🔴 ":"⚠️ ")+(o.tipo||"Ocorrência")+": "+(o.texto||"")); });
@@ -2714,7 +2798,7 @@ function avisosEnvio(r){
       && (n0(b.mo&&b.mo.proprios)+n0(b.mo&&b.mo.diaristas))>0);
     if(teveGente) avisos.push("Dia útil com 0 pessoas — esta fazenda teve gente trabalhando nos últimos 7 dias. Esqueceu a mão de obra?");
   }
-  if((r.colheita||[]).some(c=>!c.talhaoId)) avisos.push("Colheita lançada sem talhão. Diga de qual talhão saiu o café.");
+  if((r.colheita||[]).some(c=>!c.talhaoId)) avisos.push(atividadeDe(r.fazendaId)==="CAFE"?"Colheita lançada sem talhão. Diga de qual talhão saiu o café.":"Colheita lançada sem talhão. Diga de qual talhão saiu a produção.");
   if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length && !temPecuaria(r))
     avisos.push("Boletim praticamente vazio — sem atividades, colheita nem equipe. Confirma que o dia foi assim?");
   return avisos;
@@ -3008,7 +3092,7 @@ function ligarEventos(tela){
       const sp=$("#res-pec"); if(sp){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0); sp.textContent=tot?tot+" cabeças":""; }
       salvarRascunho(); return; }
     if(t.id==="bt-add-ev-pec"){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
-      r.pecuaria.eventos.push({tipo:"",qtd:"",obs:""});
+      r.pecuaria.eventos.push({tipo:"",talhaoId:"",qtd:"",produto:"",obs:""});
       $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
       salvarRascunho(); return; }
     if(d.rmPecev!==undefined){ r.pecuaria.eventos.splice(parseInt(d.rmPecev),1);
@@ -3042,6 +3126,9 @@ function ligarEventos(tela){
     if(t.id==="bt-add-col"){ const c={id:uid(),talhaoId:"",latas:"",sacas:"",destino:"",cereja:"",verde:"",seco:""};
       r.colheita.push(c); $("#lista-col").insertAdjacentHTML("beforeend",cardColheita(c));
       salvarRascunho(); return; }
+    if(t.id==="bt-add-colg"){ const c={id:uid(),talhaoId:"",areaHa:"",sacas:"",umidade:"",destino:"",obs:""};
+      r.colheita.push(c); $("#lista-col").insertAdjacentHTML("beforeend",cardColheitaGraos(c));
+      salvarRascunho(); return; }
     if(d.rmCol){ r.colheita=r.colheita.filter(c=>c.id!==d.rmCol);
       t.closest("[data-col]").remove();
       setResumo("res-col",r.colheita.length?r.colheita.reduce((s,c)=>s+n0(c.sacas),0)+" sacas":"");
@@ -3069,7 +3156,7 @@ function ligarEventos(tela){
       t.closest("[data-fito]").remove(); resumoContagem("res-fito",r.fito.length); salvarRascunho(); return; }
     if(d.ftipo){ const card=t.closest("[data-fito]"); const f=r.fito.find(x=>x.id===card.dataset.fito);
       f.tipo=d.ftipo; marcarChips(card,"ftipo",f.tipo);
-      if(f.nome && !(SUGESTAO_FITO[f.tipo]||[]).includes(f.nome)) f.nome="";
+      if(f.nome && !((sugestaoFitoDa(rascunho.fazendaId))[f.tipo]||[]).includes(f.nome)) f.nome="";
       card.querySelector("[data-fnome-box]").innerHTML=chipsFitoNome(f);
       const inp=card.querySelector('input[data-f="nome"]'); inp.style.display="none"; inp.value="";
       salvarRascunho(); return; }
