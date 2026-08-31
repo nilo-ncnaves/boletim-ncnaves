@@ -91,6 +91,13 @@ h3{font-size:.95rem;font-weight:700}
 .secao[open]>summary .seta{transform:rotate(90deg)}
 .secao .corpo{padding:0 14px 16px;border-top:1px solid var(--linha)}
 .secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
+/* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
+.fase-op{border:1px solid var(--linha);border-radius:10px;margin-top:8px;background:var(--cartao)}
+.fase-op>summary{list-style:none;padding:12px 14px;font-weight:700;cursor:pointer;display:flex;align-items:center}
+.fase-op>summary::-webkit-details-marker{display:none}
+.fase-op>summary::after{content:"›";margin-left:auto;color:var(--tinta-2);transition:transform .15s}
+.fase-op[open]>summary::after{transform:rotate(90deg)}
+.fase-op .chips{padding:0 12px 4px}
 .subcartao{background:var(--papel);border:1px dashed var(--linha);border-radius:10px;padding:12px;margin-top:10px;position:relative}
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
@@ -838,7 +845,7 @@ async function carregarTudo(){
       const base={f19:"f03",f18:"f03",f05:"f14",f15:"f14",f16:"f14"}[t.fazendaId]||t.fazendaId;
       const u=UNIDADES_DESM[base];
       if(!u) return base;
-      if(t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE") return u.GRAOS||u.CAFE;
+      if(t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE"||t.tipo==="ARRENDADO") return u.GRAOS||u.CAFE;
       if(t.tipo==="PASTO_PECUARIA") return u.PECUARIA||u.CAFE;
       return u.CAFE; /* café, estrutura e indefinido ficam na unidade Café */
     };
@@ -859,6 +866,7 @@ async function carregarTudo(){
     const ciclosAntigos = (D.ciclos||[]);
     const dMaq=D.deparaMaq||{}, dTal=D.deparaTal||{}, mImp=D.mapaImport||{};
     const uDoses=D.ultimasDoses||{}, uRec=D.ultimasReceitas||{}, uFert=D.ultimasFert||{}, insApr=D.insumosAprendidos||[];
+    const pivLoc=D.pivosLocais||{}, uOpsTal=D.ultimasOpsTal||{}, uRecTal=D.ultimasReceitasTal||{}, uEvPec=D.ultimoEvPec||{};
     D = semente;
     D.talhoes = [...semente.talhoes, ...talExtras.filter(t=>D.fazendas.some(f=>f.id===t.fazendaId))];
     D.boletins = antigos.length ? antigos.filter(b=>D.fazendas.some(f=>f.id===b.fazendaId)) : semente.boletins;
@@ -867,6 +875,7 @@ async function carregarTudo(){
     D.ciclos = ciclosAntigos.filter(c=>D.talhoes.some(t=>t.id===c.talhaoId));
     D.deparaMaq = dMaq; D.deparaTal = dTal; D.mapaImport = mImp;
     D.ultimasDoses = uDoses; D.ultimasReceitas = uRec; D.ultimasFert = uFert; D.insumosAprendidos = insApr;
+    D.pivosLocais = pivLoc; D.ultimasOpsTal = uOpsTal; D.ultimasReceitasTal = uRecTal; D.ultimoEvPec = uEvPec;
     D.insumos = [...semente.insumos, ...insumosExtras];
     D.maquinas = [...semente.maquinas, ...maqExtras];
     await salvarDados();
@@ -886,6 +895,11 @@ async function carregarTudo(){
   });
   (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=tipoPeloPerfil(t.nome, perfilDe(t.fazendaId)); });
   D.ciclos = D.ciclos||[];
+  /* milho semente = área arrendada a sementeira: o talhão vira ARRENDADO e o ciclo não se aplica */
+  (D.ciclos||[]).forEach(c=>{ if(c.cultura==="MILHO_SEMENTE"){
+    const t=D.talhoes.find(x=>x.id===c.talhaoId); if(t&&t.tipo!=="ARRENDADO") t.tipo="ARRENDADO"; } });
+  (D.talhoes||[]).forEach(t=>{ if(t.tipo==="MILHO_SEMENTE") t.tipo="ARRENDADO"; });
+  D.ciclos = D.ciclos.filter(c=>{ const t=D.talhoes.find(x=>x.id===c.talhaoId); return !(t&&t.tipo==="ARRENDADO"); });
   await syncCarregarCfg();
   window.addEventListener && window.addEventListener("online", ()=>syncTudo());
   setTimeout(()=>syncTudo(), 800);
@@ -920,7 +934,7 @@ const talhoesDa = fz => {
 };
 const maquinasDa = fz => D.maquinas.filter(m=>(m.fazendas||[]).includes(fz));
 /* ---- Multicultura: tipo do talhão, ciclos de cultura anual e catálogos ---- */
-const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["MILHO_SEMENTE","Milho semente"],
+const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["ARRENDADO","Arrendado — sementeira"],
   ["PASTO_PECUARIA","Pasto / pecuária"],["ESTRUTURA","Estrutura"],["INDEFINIDO","Indefinido"]];
 const rotuloTipo = tp => { const h=TIPOS_TALHAO.find(([k])=>k===tp); return h?h[1]:"Indefinido"; };
 /* O que o boletim mostra é decidido pelo PERFIL da fazenda (CAFE, GRAOS, PECUARIA),
@@ -960,33 +974,108 @@ function tipoPeloPerfil(nome, perfil){
   const prim=(perfil&&perfil[0])||"CAFE";
   return prim==="GRAOS"?"GRAO_ANUAL":prim==="PECUARIA"?"PASTO_PECUARIA":"CAFE_PERENE";
 }
-const talhoesAnuais = fz => talhoesDa(fz).filter(t=>t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE");
+const talhoesAnuais = fz => talhoesDa(fz).filter(t=>t.tipo==="GRAO_ANUAL");
+/* Milho semente = área arrendada a sementeira: sem operações, sem irrigação, sem colheita, sem ciclo */
+const talhoesArrendados = fz => talhoesDa(fz).filter(t=>t.tipo==="ARRENDADO");
 const talhoesPasto = fz => talhoesDa(fz).filter(t=>t.tipo==="PASTO_PECUARIA");
 /* A cultura anual vive no CICLO, nunca no talhão (rotação = histórico de ciclos).
    D.ciclos: {id, talhaoId, cultura, plantio, colheitaPrevista?, encerradoEm?} */
 const cicloAtivo = talhaoId => (D.ciclos||[]).find(c=>c.talhaoId===talhaoId && !c.encerradoEm);
-const CULTURAS_ANUAIS=[["FEIJAO","Feijão"],["SOJA","Soja"],["MILHO_COMERCIAL","Milho comercial"],["MILHO_SEMENTE","Milho semente"]];
-const rotuloCultura = c => { const h=CULTURAS_ANUAIS.find(([k])=>k===c); return h?h[1]:(c||""); };
-/* ===== Catálogos agronômicos por atividade (o do café, LISTA_ATIV/LISTA_FUNCOES, fica intocado) ===== */
-/* GRÃOS — atividades por fase (feijão, soja e milho comercial) */
+const CULTURAS_ANUAIS=[["FEIJAO","Feijão"],["SOJA","Soja"],["MILHO_COMERCIAL","Milho comercial"]];
+const rotuloCultura = c => { if(c==="MILHO_SEMENTE") return "Milho semente";
+  const h=CULTURAS_ANUAIS.find(([k])=>k===c); return h?h[1]:(c||""); };
+/* ===== Catálogos agronômicos por atividade (o do café, LISTA_ATIV/LISTA_FUNCOES, fica intocado) =====
+   Fonte oficial do vocabulário: docs/catalogos-por-atividade.md */
+const normTxt = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+/* GRÃOS — operações por fase (feijão, soja e milho comercial). Irrigação NÃO é operação:
+   vive na seção 💧 Irrigação. Milho semente é área arrendada — sem operações. */
 const OPS_GRAOS_FASES=[
   ["Pré-plantio",["Dessecação de pré-plantio","Calagem","Gessagem","Gradagem / preparo de solo","Manejo da palhada","Amostragem de solo"]],
-  ["Plantio",["Tratamento de sementes","Inoculação (soja/feijão)","Plantio / semeadura","Adubação de plantio (sulco)","Replantio","Avaliação de estande"]],
-  ["Condução",["Adubação de cobertura (N/K)","Herbicida pós-emergente","Fungicida","Inseticida","Aplicação foliar / micronutrientes","Monitoramento de pragas e doenças","Irrigação (lâmina)","Controle de daninhas manual (escape)"]],
+  ["Plantio",["Plantio / semeadura","Tratamento de sementes","Inoculação (soja/feijão)","Adubação de plantio (sulco)","Replantio","Avaliação de estande"]],
+  ["Condução",["Adubação de cobertura","Herbicida pós-emergente","Fungicida","Inseticida","Aplicação foliar / micronutrientes","Monitoramento de pragas e doenças","Controle de daninhas manual (escape)"]],
   ["Colheita",["Dessecação de pré-colheita (feijão/soja)","Colheita mecanizada","Transporte ao armazém","Pesagem","Amostragem de umidade / impureza","Secagem / pré-limpeza"]],
-  ["Pós-colheita",["Destruição de restos culturais","Semeadura de cobertura (braquiária/milheto)","Vazio sanitário (soja)"]]
+  ["Pós-colheita",["Destruição de restos culturais","Semeadura de cobertura","Vazio sanitário (soja)"]]
 ];
-/* MILHO SEMENTE — tudo de grãos MAIS a fase própria de campo de semente */
-const OPS_MILHO_SEMENTE_EXTRA=["Plantio de fêmea e macho (datas escalonadas)","Avaliação de sincronismo de florescimento",
-  "Despendoamento — 1º passe","Despendoamento — 2º passe","Despendoamento — 3º passe / repasse",
-  "Roguing / purificação genética","Conferência de isolamento","Destruição do macho",
-  "Vistoria da sementeira","Vistoria de fiscalização (MAPA)","Colheita em espiga","Transporte à UBS"];
 function fasesDa(cultura){
-  if(cultura==="MILHO_SEMENTE") return [...OPS_GRAOS_FASES, ["Campo de semente",OPS_MILHO_SEMENTE_EXTRA]];
   if(cultura==="FEIJAO"||cultura==="SOJA"||cultura==="MILHO_COMERCIAL") return OPS_GRAOS_FASES;
   return [];
 }
 function operacoesDa(cultura){ return fasesDa(cultura).flatMap(([,ops])=>ops); }
+/* Categoria da operação decide os campos do cartão — cada operação tem SÓ os seus campos */
+function opCatDe(nome){
+  const n=normTxt(nome);
+  if(!n) return "";
+  if(/calagem/.test(n)) return "CALAGEM";
+  if(/gessagem/.test(n)) return "GESSAGEM";
+  if(/gradagem|preparo de solo/.test(n)) return "PREPARO";
+  if(/palhada/.test(n)) return "PALHADA";
+  if(/amostragem de solo/.test(n)) return "AMOSTRA_SOLO";
+  if(/tratamento de sementes/.test(n)) return "TRAT_SEMENTES";
+  if(/inoculacao/.test(n)) return "INOCULACAO";
+  if(/adubacao de plantio/.test(n)) return "ADUBO_PLANTIO";
+  if(/adubacao de cobertura/.test(n)) return "ADUBO_COBERTURA";
+  if(/replantio/.test(n)) return "REPLANTIO";
+  if(/estande/.test(n)) return "ESTANDE";
+  if(/monitoramento/.test(n)) return "MONITORAMENTO";
+  if(/daninhas manual/.test(n)) return "DANINHA_MANUAL";
+  if(/colheita mecanizada/.test(n)) return "COLHEITA";
+  if(/transporte/.test(n)) return "TRANSPORTE";
+  if(/pesagem/.test(n)) return "PESAGEM";
+  if(/amostragem de umidade/.test(n)) return "AMOSTRA_GRAO";
+  if(/secagem/.test(n)) return "SECAGEM";
+  if(/destruicao de restos/.test(n)) return "RESTOS";
+  if(/semeadura de cobertura/.test(n)) return "COBERTURA_VERDE";
+  if(/vazio/.test(n)) return "VAZIO";
+  if(/dessecacao|herbicida|fungicida|inseticida|foliar|micronutr/.test(n)) return "APLICACAO";
+  if(/plantio|semeadura/.test(n)) return "PLANTIO";
+  return "OUTRA";
+}
+/* Agrupador para painel e relatórios (ha por tipo de operação) */
+const GRUPO_OP={APLICACAO:"aplicação",CALAGEM:"correção de solo",GESSAGEM:"correção de solo",
+  ADUBO_PLANTIO:"adubação",ADUBO_COBERTURA:"adubação",PLANTIO:"plantio",REPLANTIO:"plantio",
+  TRAT_SEMENTES:"plantio",INOCULACAO:"plantio",ESTANDE:"monitoramento",MONITORAMENTO:"monitoramento",
+  COLHEITA:"colheita",TRANSPORTE:"colheita",PESAGEM:"colheita",AMOSTRA_GRAO:"colheita",SECAGEM:"colheita",
+  PREPARO:"preparo de solo",PALHADA:"preparo de solo",AMOSTRA_SOLO:"amostragem de solo",
+  DANINHA_MANUAL:"capina manual",RESTOS:"pós-colheita",COBERTURA_VERDE:"pós-colheita",VAZIO:"pós-colheita"};
+/* Filtro por cultura: item que cita outra cultura no nome não aparece (o funcionário nunca vê opção de outra cultura) */
+const CHAVE_CULT={SOJA:"soja",FEIJAO:"feijao",MILHO_COMERCIAL:"milho"};
+function valeParaCultura(nome,cultura){
+  if(!cultura) return true;
+  const n=normTxt(nome);
+  const cita=["soja","feijao","milho"].filter(c=>n.includes(c));
+  return !cita.length || cita.includes(CHAVE_CULT[cultura]||"");
+}
+/* Ciclo vigente na data (para boletins antigos) e situação do talhão: cultura, dias após plantio e fase */
+function cicloEm(talhaoId,data){
+  return (D.ciclos||[]).find(c=>c.talhaoId===talhaoId && (!c.plantio||c.plantio<=data) && (!c.encerradoEm||c.encerradoEm>=data));
+}
+const DUR_CICLO={FEIJAO:75,SOJA:100,MILHO_COMERCIAL:115};
+function infoCiclo(talhaoId,data){
+  const c=cicloEm(talhaoId,data||hojeISO())||cicloAtivo(talhaoId);
+  if(!c) return null;
+  const dap=c.plantio?Math.round((new Date((data||hojeISO())+"T12:00:00")-new Date(c.plantio+"T12:00:00"))/864e5):null;
+  let fase="Condução";
+  if(dap!==null){
+    if(dap<0) fase="Pré-plantio";
+    else if(dap<=12) fase="Plantio";
+    else if(dap>=(DUR_CICLO[c.cultura]||100)) fase="Colheita";
+  }
+  return {ciclo:c, cultura:c.cultura, dap, fase};
+}
+/* Alvos sugeridos conforme a operação (herbicida→daninha, fungicida→doença…) e a cultura do ciclo */
+function alvosPara(cultura,tipoOp){
+  const n=normTxt(tipoOp);
+  let tipos;
+  if(/dessec|herbicida|daninha/.test(n)) tipos=["Planta daninha"];
+  else if(/fungicida/.test(n)) tipos=["Doença"];
+  else if(/inseticida/.test(n)) tipos=["Praga"];
+  else tipos=["Praga","Doença","Planta daninha"];
+  return tipos.flatMap(t=>(SUGESTAO_FITO_GRAOS[t]||[])).filter(a=>valeParaCultura(a,cultura));
+}
+const EQUIPS_APLIC=["Autopropelido","Barra","Avião","Quimigação via pivô","Costal"];
+const FORMAS_COBERTURA=["Lanço","Via pivô"];
+const DESTINOS_GRAOS=["Armazém próprio da fazenda","Armazém Geral NC Naves","Armazém de terceiro","Entrega direta (comprador)"];
+const ADUBOS_SUGERIDOS=["Ureia","MAP","KCl (cloreto de potássio)","08-28-16","04-30-16","20-05-20","Super simples","Sulfato de amônio","Calcário dolomítico","Calcário calcítico","Gesso agrícola"];
 /* PECUÁRIA — eventos por grupo (ciclo completo, recria e engorda) */
 const OPS_PECUARIA_FASES=[
   ["Manejo diário",["Contagem","Suplementação (sal mineral / proteinado / ração)","Conferência de água / aguadas","Rotação de pasto — entrada de lote","Rotação de pasto — saída de lote"]],
@@ -1006,7 +1095,7 @@ const sugestaoFitoDa = fz => atividadeDe(fz)==="GRAOS" ? SUGESTAO_FITO_GRAOS : S
 /* MÃO DE OBRA por atividade (funções/postos de trabalho, não operações) */
 const LISTA_FUNCOES_GRAOS=["Operador de colheitadeira","Operador de plantadeira","Operador de pulverizador",
   "Tratorista","Auxiliar de plantio","Aplicador (costal)","Abastecimento / apoio a máquinas",
-  "Monitor de pragas","Despendoador","Roguing / purificação","Auxiliar de armazém / secagem",
+  "Monitor de pragas","Auxiliar de armazém / secagem",
   "Irrigação (pivô)","Manutenção de máquinas","Manutenção de cercas / benfeitorias","Serviços gerais"];
 const LISTA_FUNCOES_PECUARIA=["Vaqueiro","Campeiro","Auxiliar de curral","Tratador (cocho / ração)",
   "Vacinador","Inseminador","Roçada de pasto","Manutenção de cerca / cocho / bebedouro",
@@ -1018,15 +1107,16 @@ function funcoesDa(fz){
   if(p.includes("PECUARIA")) out.push(...LISTA_FUNCOES_PECUARIA);
   return out.length?[...new Set(out)]:[...LISTA_FUNCOES];
 }
-/* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária ganha as próprias) */
+/* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária e grãos ganham as próprias) */
 const LISTA_OCORR_PECUARIA=["Morte de animal","Fuga de animais","Cerca rompida","Falta de água","Animal doente"];
-const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUARIA, ...LISTA_OCORR] : LISTA_OCORR;
+const LISTA_OCORR_GRAOS=["Quebra de máquina","Falta de insumo","Chuva impediu aplicação","Atraso de operação"];
+const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUARIA, ...LISTA_OCORR]
+  : atividadeDe(fz)==="GRAOS" ? [...LISTA_OCORR_GRAOS, ...LISTA_OCORR] : LISTA_OCORR;
 /* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
 function opcoesAtiv(fz, sel){
   if(atividadeDe(fz)!=="GRAOS")
     return ["<option value=''>Selecione…</option>",...LISTA_ATIV.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`),(sel&&!LISTA_ATIV.includes(sel)?`<option selected>${esc(sel)}</option>`:"")].join("");
-  const temSem = talhoesDa(fz).some(t=>t.tipo==="MILHO_SEMENTE" || (cicloAtivo(t.id)||{}).cultura==="MILHO_SEMENTE");
-  const fases = temSem ? [...OPS_GRAOS_FASES, ["Campo de semente",OPS_MILHO_SEMENTE_EXTRA]] : OPS_GRAOS_FASES;
+  const fases = OPS_GRAOS_FASES;
   const todas = fases.flatMap(([,ops])=>ops);
   return "<option value=''>Selecione…</option>"
     + fases.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`).join("")}</optgroup>`).join("")
@@ -1332,7 +1422,8 @@ function opcoesMaquina(fz, sel){
 const insumo = id => D.insumos.find(i=>i.id===id)||{nome:"?",un:""};
 const boletimDoDia = (data,fz) => D.boletins.find(b=>b.data===data && b.fazendaId===fz);
 const opcoesTalhao = (fz,sel) => ["<option value=''>Selecione…</option>",
-  ...talhoesDa(fz).map(t=>`<option value="${t.id}" ${sel===t.id?"selected":""}>${esc(t.nome)} — ${t.area} ha</option>`),
+  /* área arrendada a sementeira não recebe registro operacional */
+  ...talhoesDa(fz).filter(t=>t.tipo!=="ARRENDADO"||sel===t.id).map(t=>`<option value="${t.id}" ${sel===t.id?"selected":""}>${esc(t.nome)} — ${t.area} ha</option>`),
   `<option value="geral" ${sel==="geral"?"selected":""}>Área geral / sede</option>`].join("");
 const boletinsOrdenados = () => [...D.boletins].sort((a,b)=>b.data.localeCompare(a.data));
 const LISTA_ATIV = ["Colheita","Catação","Repasse","Pulverização","Aplicação de herbicida","Adubação via lanço","Adubação orgânica","Aplicação via drench / via solo","Calagem / gessagem","Capina manual","Capina roçadeira / trincha","Arruação / esparramação de cisco","Desbrota","Poda / esqueletamento","Monitoramento de pragas (MIP)","Limpeza do sistema de irrigação","Irrigação","Plantio / renovação","Manutenção de estradas e aceiros","Outra"];
@@ -1395,6 +1486,7 @@ function novoRascunho(dataBase){
     atividades:[], colheita:[],
     pos:{terreiro:"", secLote:"", secTemp:"", secHoras:"", sacasBenef:""},
     fito:[], ocorrencias:[], obsGeral:"", pendencias:"",
+    ...(temCultura(fz,"GRAOS")?{irg:[]}:{}),
     ...(temCultura(fz,"PECUARIA")?{pecuaria:{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]}}:{})
   };
 }
@@ -1441,7 +1533,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v41</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v42</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -1565,6 +1657,367 @@ function secaoGraos(r){
       <button class="btn suave mt" id="bt-add-ativ">＋ Adicionar atividade / máquinas</button>`:""}
     </div></details>`;
 }
+
+/* ===== GRÃOS — Operações do dia (registro estruturado: talhão + operação + campos em cascata) ===== */
+const cardAtivHtml = a => (a && a.gr) ? cardOperacao(a) : cardAtividade(a);
+function linhasProdutos(lista,pref,rotDose){
+  return (lista||[]).map((p,i)=>`<div class="mt" data-prow="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>Produto</label><input data-${pref}="nome" list="dl-prod" value="${esc(p.nome||"")}" placeholder="Nome comercial">
+    <div class="grade2 mt">
+      <div><label>${rotDose||"Dose por ha"}</label><input inputmode="decimal" data-${pref}="dose" value="${esc(p.dose||"")}" placeholder="Ex.: 0,4"></div>
+      <div><label>Unidade</label><select data-${pref}="un">${["L","kg","mL","g"].map(u=>`<option ${((p.un||"L")===u)?"selected":""}>${u}</option>`).join("")}</select></div>
+    </div>
+    ${(lista||[]).length>1?`<button class="btn suave mini mt" data-${pref}-rm="${i}">remover produto</button>`:""}
+  </div>`).join("");
+}
+/* Seletor de operação AGRUPADO POR FASE, com as fases recolhidas (nada de listona aberta):
+   toca na fase → ela expande e mostra só as operações dela. Filtrado pela cultura do ciclo. */
+function seletorOperacaoGraos(a,data){
+  const info=infoCiclo(a.talhaoId,data);
+  const cultura=info?info.cultura:null;
+  let fases;
+  if(cultura){
+    fases=fasesDa(cultura).map(([f,ops])=>[f,ops.filter(o=>valeParaCultura(o,cultura))]).filter(([,ops])=>ops.length);
+    if(info.fase){ const i=fases.findIndex(([f])=>f===info.fase);
+      if(i>0){ const h=fases.splice(i,1)[0]; fases.unshift(h); } }
+  }else{
+    /* sem ciclo aberto: só faz sentido preparar e plantar */
+    fases=[OPS_GRAOS_FASES[0],OPS_GRAOS_FASES[1]];
+  }
+  if(a.tipo) return `<label>Operação</label>
+    <div class="linha-flex"><span class="cresce"><b>${esc(a.tipo)}</b></span>
+      <button class="btn suave mini" data-troca-op="${a.id}">trocar</button></div>`;
+  return `<label>Operação</label>
+    ${fases.map(([f,ops])=>`<details class="fase-op"><summary>${esc(f)}${info&&info.fase===f?` <span class="mut">· fase de agora</span>`:""}</summary>
+      <div class="chips" style="margin:6px 0 8px">${ops.map(o=>`<button class="chip" data-escop="${a.id}|${esc(o)}">${esc(o)}</button>`).join("")}</div>
+    </details>`).join("")}`;
+}
+/* Ao trocar de operação, só sobrevivem talhão e identidade — campo de outra operação não fica no registro */
+function limparCamposOp(a){
+  Object.keys(a).forEach(k=>{ if(!["id","gr","talhaoId"].includes(k)) delete a[k]; });
+  a.tipo=""; a.areaHa=""; a.obs="";
+}
+function camposDaOperacao(a,cat,t,info,ultRec){
+  if(!a.tipo) return "";
+  const areaCampo=rot=>`<div><label>${rot||"Área (ha)"}</label><input inputmode="decimal" data-a="areaHa" value="${esc(a.areaHa||"")}" placeholder="${t&&t.area?String(t.area):""}"></div>`;
+  const obsCampo=`<label>Observação</label><input data-a="obs" value="${esc(a.obs||"")}" placeholder="Opcional">`;
+  const chips=(campo,ops)=>`<div class="chips">${ops.map(v=>`<button class="chip ${a[campo]===v?"on":""}" data-gchip="${campo}:${v}">${esc(v)}</button>`).join("")}</div>`;
+  /* Bloco-padrão APLICAÇÃO: alvo + receita + calda + área + equipamento + condição */
+  const blocoAplicacao=()=>{
+    const alvos=alvosPara(info?info.cultura:null,a.tipo);
+    return `${ultRec?`<button class="btn suave mini mt" data-urec-tal="${a.id}">⚡ usar última receita deste talhão</button>`:""}
+    <label>Alvo (praga / doença / daninha)</label>
+    <input data-a="alvo" list="dl-alvo-${a.id}" value="${esc(a.alvo||"")}" placeholder="Toque e escolha ou escreva">
+    <datalist id="dl-alvo-${a.id}">${alvos.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+    <label class="mt">Receita (produtos e doses)</label>
+    <div data-prods>${linhasProdutos(a.produtos||[],"gp")}</div>
+    <button class="btn suave mini mt" data-gprod-add="${a.id}">＋ produto na receita</button>
+    <div class="grade2 mt">
+      <div><label>Calda (L/ha)</label><input inputmode="decimal" data-a="caldaLha" value="${esc(a.caldaLha||"")}" placeholder="Ex.: 150"></div>
+      ${areaCampo("Área aplicada (ha)")}
+    </div>
+    <label>Equipamento</label>
+    ${chips("equip",EQUIPS_APLIC)}
+    <label>Condição na hora</label>
+    <div class="chips">
+      ${["Vento ok","Vento forte"].map(v=>`<button class="chip ${a.vento===v?"on":""}" data-gchip="vento:${v}">${v}</button>`).join("")}
+      ${["Manhã","Tarde","Noite"].map(h=>`<button class="chip ${a.horario===h?"on":""}" data-gchip="horario:${h}">${h}</button>`).join("")}
+    </div>`;
+  };
+  if(cat==="APLICACAO") return blocoAplicacao();
+  if(cat==="CALAGEM") return `
+    <label>Produto</label>
+    ${chips("produtoAdb",["Calcário calcítico","Calcário dolomítico"])}
+    <div class="grade2 mt">
+      <div><label>Dose (t/ha)</label><input inputmode="decimal" data-a="doseTHa" value="${esc(a.doseTHa||"")}" placeholder="Ex.: 2"></div>
+      ${areaCampo()}
+    </div>
+    <label>Incorporado?</label>
+    ${chips("incorporado",["Sim","Não"])}`;
+  if(cat==="GESSAGEM") return `<div class="grade2 mt">
+      <div><label>Dose (t/ha)</label><input inputmode="decimal" data-a="doseTHa" value="${esc(a.doseTHa||"")}" placeholder="Ex.: 1"></div>
+      ${areaCampo()}
+    </div>`;
+  if(cat==="PREPARO") return `
+    <label>Implemento</label>
+    ${chips("implemento",["Grade","Subsolador","Niveladora"])}
+    <div class="grade2 mt">${areaCampo()}</div>
+    ${obsCampo}`;
+  if(cat==="PALHADA") return `
+    <label>Método</label>
+    ${chips("metodo",["Rolo-faca","Triturador","Roçadora"])}
+    <div class="grade2 mt">${areaCampo()}</div>
+    ${obsCampo}`;
+  if(cat==="AMOSTRA_SOLO") return `
+    <label>Profundidade</label>
+    ${chips("profundidade",["0-20 cm","20-40 cm","Ambas"])}
+    <label>Nº de amostras</label><input inputmode="numeric" data-a="nAmostras" value="${esc(a.nAmostras||"")}">
+    <label>Destino / laboratório</label><input data-a="laboratorio" value="${esc(a.laboratorio||"")}" placeholder="Para onde vão as amostras">`;
+  if(cat==="TRAT_SEMENTES") return `
+    <label>Produto(s)</label>
+    <div data-prods>${linhasProdutos(a.produtos||[],"gp","Dose por 100 kg de sementes")}</div>
+    <button class="btn suave mini mt" data-gprod-add="${a.id}">＋ produto</button>
+    <label class="mt">Cultivar tratada</label><input data-a="cultivar" value="${esc(a.cultivar||"")}" placeholder="Ex.: M 8210">
+    <label>Quantidade de sementes</label><input inputmode="decimal" data-a="qtdSementes" value="${esc(a.qtdSementes||"")}">
+    ${chips("qtdUn",["kg","sacas"])}`;
+  if(cat==="INOCULACAO") return `
+    <label>Produto</label><input data-a="produtoInoc" list="dl-prod" value="${esc(a.produtoInoc||"")}" placeholder="Inoculante">
+    <label>Dose</label><input data-a="doseInoc" value="${esc(a.doseInoc||"")}" placeholder="Ex.: 100 mL / 50 kg">
+    <label>Quantidade de sementes</label><input data-a="qtdSementes" value="${esc(a.qtdSementes||"")}" placeholder="Ex.: 40 sacas">`;
+  if(cat==="PLANTIO") return `
+    <label>Cultura</label>
+    ${info?`<p style="margin:4px 0"><b>${rotuloCultura(info.cultura)}</b> <span class="mut">— do ciclo aberto neste talhão</span></p>`
+      :`<select data-a="culturaPl">${["<option value=''>Escolha…</option>",...CULTURAS_ANUAIS.map(([k,rot])=>`<option value="${k}" ${a.culturaPl===k?"selected":""}>${rot}</option>`)].join("")}</select>
+       <p class="mut" style="font-size:.76rem;margin-top:4px">Ao enviar o boletim, o app oferece abrir o ciclo com a data do plantio.</p>`}
+    <label>Cultivar / híbrido</label><input data-a="cultivar" value="${esc(a.cultivar||"")}" placeholder="Ex.: M 8210, DKB 390">
+    <div class="grade2 mt">
+      <div><label>População</label><input inputmode="decimal" data-a="populacao" value="${esc(a.populacao||"")}" placeholder="Ex.: 14"></div>
+      <div><label>Unidade</label><select data-a="populacaoUn">${["sementes/m","mil plantas/ha"].map(u=>`<option ${((a.populacaoUn||"sementes/m")===u)?"selected":""}>${u}</option>`).join("")}</select></div>
+    </div>
+    <div class="grade2 mt">
+      <div><label>Espaçamento (cm)</label><input inputmode="decimal" data-a="espacamento" value="${esc(a.espacamento||"")}" placeholder="Ex.: 50"></div>
+      ${areaCampo("Área plantada (ha)")}
+    </div>`;
+  if(cat==="ADUBO_PLANTIO") return `
+    <label>Formulação</label>
+    <input data-a="formulacao" list="dl-adubo" value="${esc(a.formulacao||"")}" placeholder="Ex.: 08-28-16">
+    <div class="grade2 mt">
+      <div><label>Dose (kg/ha)</label><input inputmode="decimal" data-a="doseKgHa" value="${esc(a.doseKgHa||"")}"></div>
+      ${areaCampo()}
+    </div>`;
+  if(cat==="REPLANTIO") return `
+    <div class="grade2 mt">${areaCampo("Área replantada (ha)")}</div>
+    <label>Motivo</label>
+    ${chips("motivo",["Falha de estande","Chuva","Praga"])}
+    <label>Cultivar</label><input data-a="cultivar" value="${esc(a.cultivar||"")}">`;
+  if(cat==="ESTANDE") return `
+    <div class="grade2 mt">
+      <div><label>Plantas/m encontradas</label><input inputmode="decimal" data-a="plantasM" value="${esc(a.plantasM||"")}"></div>
+      <div><label>Pontos avaliados</label><input inputmode="numeric" data-a="pontos" value="${esc(a.pontos||"")}"></div>
+    </div>
+    <label>Decisão</label>
+    ${chips("decisao",["OK","Replantar"])}`;
+  if(cat==="ADUBO_COBERTURA") return `
+    <label>Produto</label>
+    ${chips("produtoTipo",["Ureia","KCl","Outro"])}
+    ${a.produtoTipo==="Outro"?`<input data-a="produtoAdb" list="dl-adubo" value="${esc(a.produtoAdb||"")}" placeholder="Qual produto?" style="margin-top:8px">`:""}
+    <div class="grade2 mt">
+      <div><label>Dose (kg/ha)</label><input inputmode="decimal" data-a="doseKgHa" value="${esc(a.doseKgHa||"")}"></div>
+      ${areaCampo()}
+    </div>
+    <label>Forma</label>
+    ${chips("forma",FORMAS_COBERTURA)}`;
+  if(cat==="MONITORAMENTO"){
+    const alvos=alvosPara(info?info.cultura:null,"");
+    return `
+    <label>Alvo encontrado</label>
+    <input data-a="alvo" list="dl-alvo-${a.id}" value="${esc(a.alvo||"")}" placeholder="Toque e escolha ou escreva">
+    <datalist id="dl-alvo-${a.id}">${alvos.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+    <label>Nível</label>
+    ${chips("nivel",["Baixo","Médio","Alto"])}
+    <label>Contagem por ponto (se contou)</label><input data-a="contagem" value="${esc(a.contagem||"")}" placeholder="Ex.: 2 percevejos/pano">
+    <label>Decisão</label>
+    <div class="chips">${["Aplicar","Aguardar","Reavaliar"].map(dc=>`<button class="chip ${a.decisao===dc?"on":""}" data-gchip="decisao:${dc}">${dc==="Reavaliar"?"Reavaliar em X dias":dc}</button>`).join("")}</div>
+    ${a.decisao==="Reavaliar"?`<input inputmode="numeric" data-a="reavaliarDias" value="${esc(a.reavaliarDias||"")}" placeholder="Reavaliar em quantos dias?" style="margin-top:8px">`:""}`;
+  }
+  if(cat==="DANINHA_MANUAL"){
+    const alvos=alvosPara(info?info.cultura:null,"daninha");
+    return `
+    <label>Alvo (daninha)</label>
+    <input data-a="alvo" list="dl-alvo-${a.id}" value="${esc(a.alvo||"")}" placeholder="Toque e escolha ou escreva">
+    <datalist id="dl-alvo-${a.id}">${alvos.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+    <div class="grade2 mt">
+      ${areaCampo()}
+      <div><label>Nº de pessoas</label><input inputmode="numeric" data-a="pessoas" value="${esc(a.pessoas||"")}"></div>
+    </div>`;
+  }
+  if(cat==="COLHEITA") return `
+    <div class="grade2 mt">
+      ${areaCampo("Área colhida (ha)")}
+      <div><label>Produção</label><input inputmode="decimal" data-a="producao" value="${esc(a.producao||"")}"></div>
+    </div>
+    <div class="chips mt">${["sacas 60 kg","kg"].map(u=>`<button class="chip ${(a.producaoUn||"sacas 60 kg")===u?"on":""}" data-gchip="producaoUn:${u}">${u}</button>`).join("")}</div>
+    <div class="grade2 mt">
+      <div><label>Umidade (%)</label><input inputmode="decimal" data-a="umidade" value="${esc(a.umidade||"")}" placeholder="Ex.: 13,5"></div>
+      <div><label>Impureza (%)</label><input inputmode="decimal" data-a="impureza" value="${esc(a.impureza||"")}"></div>
+    </div>
+    <label>Máquina</label>
+    ${chips("maqTipo",["Própria","De terceiro"])}
+    ${a.maqTipo==="Própria"?`<input data-a="maqNome" list="dl-maq" value="${esc(a.maqNome||"")}" placeholder="Nome / nº da máquina" style="margin-top:8px">`:""}
+    ${a.maqTipo==="De terceiro"?`<input data-a="prestador" value="${esc(a.prestador||"")}" placeholder="Nome do prestador" style="margin-top:8px">`:""}
+    <label>Destino</label>
+    ${chips("destino",DESTINOS_GRAOS)}
+    <label>Nº de cargas</label><input inputmode="numeric" data-a="cargas" value="${esc(a.cargas||"")}">`;
+  if(cat==="TRANSPORTE") return `
+    <label>Nº de cargas</label><input inputmode="numeric" data-a="cargas" value="${esc(a.cargas||"")}">
+    <label>Destino</label>
+    ${chips("destino",DESTINOS_GRAOS)}
+    <label>Placa / motorista (opcional)</label><input data-a="placaMotorista" value="${esc(a.placaMotorista||"")}">`;
+  if(cat==="PESAGEM") return `
+    <label>Nº do ticket</label><input data-a="ticket" value="${esc(a.ticket||"")}">
+    <div class="grade2 mt">
+      <div><label>Peso líquido (kg)</label><input inputmode="decimal" data-a="pesoKg" value="${esc(a.pesoKg||"")}"></div>
+      <div><label>Local</label><input data-a="local" value="${esc(a.local||"")}"></div>
+    </div>`;
+  if(cat==="AMOSTRA_GRAO") return `
+    <div class="grade2 mt">
+      <div><label>Umidade (%)</label><input inputmode="decimal" data-a="umidade" value="${esc(a.umidade||"")}"></div>
+      <div><label>Impureza (%)</label><input inputmode="decimal" data-a="impureza" value="${esc(a.impureza||"")}"></div>
+    </div>
+    <label>Local</label><input data-a="local" value="${esc(a.local||"")}">`;
+  if(cat==="SECAGEM") return `
+    <label>Local</label><input data-a="local" value="${esc(a.local||"")}">
+    <div class="grade2 mt">
+      <div><label>Umidade de entrada (%)</label><input inputmode="decimal" data-a="umidEntrada" value="${esc(a.umidEntrada||"")}"></div>
+      <div><label>Umidade de saída (%)</label><input inputmode="decimal" data-a="umidSaida" value="${esc(a.umidSaida||"")}"></div>
+    </div>
+    <label>Quebra (%)</label><input inputmode="decimal" data-a="quebra" value="${esc(a.quebra||"")}">`;
+  if(cat==="RESTOS") return `
+    <label>Método</label>
+    ${chips("metodo",["Roçada","Gradagem","Herbicida"])}
+    ${a.metodo==="Herbicida"?blocoAplicacao():`<div class="grade2 mt">${areaCampo()}</div>`}`;
+  if(cat==="COBERTURA_VERDE") return `
+    <label>Espécie</label>
+    ${chips("especie",["Braquiária","Milheto","Outra"])}
+    ${a.especie==="Outra"?`<input data-a="especieOutra" value="${esc(a.especieOutra||"")}" placeholder="Qual espécie?" style="margin-top:8px">`:""}
+    <div class="grade2 mt">
+      <div><label>Dose (kg/ha)</label><input inputmode="decimal" data-a="doseKgHa" value="${esc(a.doseKgHa||"")}"></div>
+      ${areaCampo()}
+    </div>`;
+  if(cat==="VAZIO") return `
+    <label>Data de início</label><input type="date" data-a="dataInicio" value="${esc(a.dataInicio||"")}">
+    ${obsCampo}`;
+  return `<div class="grade2 mt">${areaCampo()}</div>${obsCampo}`;
+}
+/* Talhões que aceitam operação: só os de grão anual (arrendado a sementeira fica de fora) */
+const opcoesTalhaoGraos = (fz,sel) => ["<option value=''>Selecione…</option>",
+  ...talhoesAnuais(fz).map(t=>`<option value="${t.id}" ${sel===t.id?"selected":""}>${esc(t.nome)} — ${t.area} ha</option>`),
+  `<option value="geral" ${sel==="geral"?"selected":""}>Área geral / sede</option>`].join("");
+function cardOperacao(a){
+  const fz=rascunho.fazendaId;
+  const t=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
+  const info=a.talhaoId?infoCiclo(a.talhaoId,rascunho.data):null;
+  const cat=opCatDe(a.tipo);
+  const ult=a.talhaoId?(D.ultimasOpsTal||{})[a.talhaoId]:null;
+  const ultRec=a.talhaoId?(D.ultimasReceitasTal||{})[a.talhaoId]:null;
+  return `<div class="subcartao" data-ativ="${a.id}">
+    <button class="fechar-sub" data-rm-ativ="${a.id}">remover</button>
+    <label>Talhão / pivô</label>
+    <select data-a="talhaoId">${opcoesTalhaoGraos(fz,a.talhaoId)}</select>
+    ${a.talhaoId?(info
+      ?`<p class="mut" style="font-size:.8rem;margin-top:4px">${t?`<b>${esc(t.nome)}</b> · `:""}${rotuloCultura(info.cultura)}${(info.dap!==null&&info.dap>=0)?" · "+info.dap+" dia"+(info.dap===1?"":"s")+" após plantio":""} · fase <b>${info.fase}</b></p>`
+      :`<p class="mut" style="font-size:.8rem;margin-top:4px">Sem ciclo aberto — em preparo. Lance o plantio para abrir o ciclo.</p>`):""}
+    ${(a.talhaoId&&!a.tipo&&ult)?`<button class="btn suave mini mt" data-rep-op="${a.id}">⚡ repetir a última operação deste talhão: ${esc(ult.tipo||"")}</button>`:""}
+    ${a.talhaoId?seletorOperacaoGraos(a,rascunho.data):""}
+    ${camposDaOperacao(a,cat,t,info,ultRec)}
+  </div>`;
+}
+function secaoOperacoes(r){
+  const n=r.atividades.length;
+  return `<details class="secao"><summary><span class="ico">🚜</span>Operações do dia
+    <span class="resumo" id="res-ativ">${n?n+" registro"+(n>1?"s":""):""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      <p class="mut mt" style="font-size:.78rem">Toque em ＋, escolha o talhão e a operação — os campos certos aparecem sozinhos.</p>
+      <div id="lista-ativ">${r.atividades.map(cardAtivHtml).join("")}</div>
+      <button class="btn suave mt" id="bt-add-ativ">＋ operação</button>
+      ${(arr=>arr.length?`<p class="mut mt" style="font-size:.78rem">${arr.map(t=>`<b>${esc(t.nome)}</b> <span class="tag amarelo">Arrendado — sementeira</span>`).join(" · ")}<br>Área conduzida pela sementeira — sem operações no boletim. Se precisar registrar algo, use as ocorrências.</p>`:"")(talhoesArrendados(r.fazendaId))}
+    </div></details>`;
+}
+/* ===== GRÃOS — Irrigação por pivô (informado pelo gerente × medido pela iCrop) =====
+   Lista de pivôs da unidade = equipamentos que a iCrop entrega para a fazenda
+   (excluindo os com "café" no nome, que pertencem à unidade Café) MAIS o cadastro
+   local (D.pivosLocais, guardado por unidade — para fazendas sem iCrop, como
+   Porto Buriti, ou com pivô fora dela). */
+function pivosIcropDa(fz){
+  const maeId=maeIdDe(fz);
+  const nomes=new Set();
+  (D.icropDados||[]).forEach(l=>{
+    if(icropFazendaId(l.fazenda)!==maeId || !l.equipamento) return;
+    if(normTxt(l.equipamento).includes("cafe")) return; /* pivô de café é da unidade Café */
+    nomes.add(l.equipamento);
+  });
+  return [...nomes].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
+}
+const pivosLocaisDa = fz => ((D.pivosLocais||{})[fz])||[];
+function irgDe(r,chave){
+  r.irg=r.irg||[];
+  let e=r.irg.find(x=>x.k===chave);
+  if(!e){ e={k:chave,nome:"",status:"",lamina:"",percent:"",quimi:"",quimiProdutos:[],problemas:[],obs:""}; r.irg.push(e); }
+  if(!e.nome){ const l=linhasIrgDa(r).find(x=>x.k===chave); if(l) e.nome=l.nome; }
+  return e;
+}
+function icropMedidoPivo(b,nomePivo){
+  const ic=icropDo(b.data,b.fazendaId); if(!ic) return null;
+  const num=s=>{const m=/(\d+)/.exec(String(s||""));return m?parseInt(m[1],10):null;};
+  const alvo=num(nomePivo);
+  const eq=(ic.eqs||[]).find(e=>normTxt(e.nome)===normTxt(nomePivo))
+    || (alvo!==null ? (ic.eqs||[]).find(e=>num(e.nome)===alvo) : null);
+  if(!eq) return null;
+  return {mm:eq.regadas.reduce((s,g)=>s+g.mm,0), regou:eq.regadas.length>0};
+}
+function linhaIrg(r,l){
+  const e=(r.irg||[]).find(x=>x.k===l.k)||{status:"",problemas:[],quimiProdutos:[]};
+  const med=icropMedidoPivo(r,l.nome);
+  const fmtMm=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
+  const rodou=e.status==="Rodou"||e.status==="Parcial";
+  const prob=e.status==="Não rodou"||e.status==="Manutenção";
+  return `<div class="mt" data-irg="${esc(l.k)}" style="border-top:1px dashed var(--linha);padding-top:10px">
+    <b>${esc(l.nome)}</b>${l.area?` <span class="mut">— ${l.area} ha</span>`:""}
+    ${(med&&med.regou)?` <span class="mut" style="font-size:.78rem">· iCrop mediu <b class="num">${fmtMm(med.mm)} mm</b></span>`:""}
+    <div class="chips mt">${["Rodou","Parcial","Não rodou","Manutenção"].map(s=>`<button class="chip ${e.status===s?"on":""}" data-igst="${esc(l.k)}|${s}">${s}</button>`).join("")}</div>
+    ${rodou?`<div class="grade2 mt">
+      <div><label>Lâmina (mm)</label><input inputmode="decimal" data-ig="lamina" value="${esc(e.lamina||"")}" placeholder="${(med&&med.regou)?("iCrop: "+fmtMm(med.mm)):"Ex.: 6"}"></div>
+      <div><label>Percentímetro (%)</label><input inputmode="decimal" data-ig="percent" value="${esc(e.percent||"")}" placeholder="Ex.: 50"></div>
+    </div>
+    <div class="chips mt"><button class="chip ${e.quimi==="Sim"?"on":""}" data-igqm="${esc(l.k)}">🧪 Quimigação / fertirrigação</button></div>
+    ${e.quimi==="Sim"?linhasProdutos(e.quimiProdutos||[],"igp")+`<button class="btn suave mini mt" data-igp-add="${esc(l.k)}">＋ produto</button>`:""}`:""}
+    ${prob?`<label class="mt">Qual foi o problema?</label>
+      <div class="chips">${["Energia","Bomba","Torre / roda","Vazamento","Painel / automação","Outro"].map(p=>`<button class="chip ${(e.problemas||[]).includes(p)?"on":""}" data-igpb="${esc(l.k)}|${p}">${p}</button>`).join("")}</div>
+      <input data-ig="obs" value="${esc(e.obs||"")}" placeholder="Detalhe rápido (opcional)" style="margin-top:8px">`:""}
+  </div>`;
+}
+function linhasIrgDa(r){
+  const ic=pivosIcropDa(r.fazendaId).map(nome=>({k:"ic:"+nome,nome}));
+  const loc=pivosLocaisDa(r.fazendaId)
+    .filter(p=>!ic.some(x=>normTxt(x.nome)===normTxt(p.nome)))
+    .map(p=>({k:p.id,nome:p.nome}));
+  /* boletim antigo com pivô que saiu da lista: a linha continua aparecendo */
+  const extras=(r.irg||[]).filter(e=>e.nome).map(e=>({k:e.k,nome:e.nome}))
+    .filter(e=>!ic.some(x=>x.k===e.k)&&!loc.some(x=>x.k===e.k));
+  return [...ic,...loc,...extras];
+}
+function repintarIrg(r){
+  const el=$("#lista-irg"); if(!el) return;
+  el.innerHTML=linhasIrgDa(r).map(l=>linhaIrg(r,l)).join("");
+  const s=$("#res-irg");
+  if(s){ const n=(r.irg||[]).filter(e=>e.status).length; s.textContent=n?n+" pivô"+(n>1?"s":"")+" lançado"+(n>1?"s":""):""; }
+}
+function secaoIrrigacaoGraos(r){
+  const nReg=(r.irg||[]).filter(e=>e.status).length;
+  return `<details class="secao"><summary><span class="ico">💧</span>Irrigação (pivôs)
+    <span class="resumo" id="res-irg">${nReg?nReg+" pivô"+(nReg>1?"s":"")+" lançado"+(nReg>1?"s":""):""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      ${linhasIrgDa(r).length?`<p class="mut mt" style="font-size:.78rem">Toque na situação de cada pivô. Lâmina e quimigação aparecem quando ele rodou.</p>`
+        :`<p class="mut mt" style="font-size:.78rem">Nenhum pivô na lista ainda. Toque no botão abaixo e cadastre os pivôs desta unidade — ficam guardados para os próximos dias.</p>`}
+      <div id="lista-irg">${linhasIrgDa(r).map(l=>linhaIrg(r,l)).join("")}</div>
+      <button class="btn suave mini mt" id="bt-add-pivo">＋ pivô / equipamento</button>
+      ${cartaoIcropDia(r)}
+    </div></details>`;
+}
+/* ===== GRÃOS — Pragas, doenças e ocorrências numa seção só ===== */
+function secaoFitoOcorrGraos(r){
+  const n=r.fito.length+r.ocorrencias.length;
+  return `<details class="secao"><summary><span class="ico">🐛</span>Pragas, doenças e ocorrências
+    <span class="resumo" id="res-fito">${n?n+" registro"+(n>1?"s":""):""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      <label class="mt">Pragas, doenças e daninhas <span class="mut">(lista da cultura do talhão)</span></label>
+      <div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
+      <button class="btn suave mini mt" id="bt-add-fito">＋ praga / doença / daninha</button>
+      <label class="mt">Ocorrências gerais <span class="mut">(quebra, falta de insumo, chuva…)</span></label>
+      <div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
+      <button class="btn suave mini mt" id="bt-add-oc">＋ ocorrência</button>
+    </div></details>`;
+}
 function cardLotePec(l,i,fz){
   const pastos=talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
   return `<div class="mt" data-peclote="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
@@ -1580,6 +2033,12 @@ function cardLotePec(l,i,fz){
 function cardEventoPec(e2,i){
   const fz=rascunho?rascunho.fazendaId:"";
   const pastos=talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
+  /* campos em cascata conforme o tipo do evento: sanitário pede produto+dose,
+     pesagem pede peso médio, venda/compra pede valor e contraparte */
+  const n=normTxt(e2.tipo);
+  const ehSanit=/vacina|vermifug|carrapato|mosca|cura|tratamento|suplementa|formiga|aduba/.test(n);
+  const ehPesagem=/pesagem/.test(n);
+  const ehVenda=/embarque|venda/.test(n), ehCompra=/compra/.test(n);
   return `<div class="mt" data-pecev="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
     <label>O que houve</label>
     <select data-pe="tipo">${"<option value=''>Selecione…</option>"
@@ -1588,8 +2047,18 @@ function cardEventoPec(e2,i){
     <label>Lote / pasto</label>
     <select data-pe="talhaoId">${["<option value=''>Selecione…</option>",
       ...pastos.map(t=>`<option value="${t.id}" ${e2.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>
+    <label>Lote / categoria</label><input data-pe="lote" value="${esc(e2.lote||"")}" placeholder="Ex.: recria 2024, vacas paridas">
     <label>Quantidade (cabeças)</label><input inputmode="numeric" data-pe="qtd" value="${esc(e2.qtd||"")}">
-    <label>Produto / vacina (quando aplicável)</label><input data-pe="produto" value="${esc(e2.produto||"")}" placeholder="Ex.: vacina aftosa, vermífugo, brinco">
+    ${(ehSanit||e2.produto)?`<label>Produto / vacina</label><input data-pe="produto" list="dl-prod" value="${esc(e2.produto||"")}" placeholder="Ex.: vacina aftosa, Ivermectina 1%">
+    <div class="grade2 mt">
+      <div><label>Dose por cabeça</label><input inputmode="decimal" data-pe="dose" value="${esc(e2.dose||"")}" placeholder="Ex.: 5"></div>
+      <div><label>Unidade</label><select data-pe="doseUn">${["mL","g","dose","comprimido"].map(u=>`<option ${((e2.doseUn||"mL")===u)?"selected":""}>${u}</option>`).join("")}</select></div>
+    </div>`:""}
+    ${(ehPesagem||ehVenda||ehCompra)?`<label>Peso médio (kg/cabeça)</label><input inputmode="decimal" data-pe="pesoMedio" value="${esc(e2.pesoMedio||"")}" placeholder="Se pesou">`:""}
+    ${(ehVenda||ehCompra)?`<div class="grade2 mt">
+      <div><label>Valor total (R$)</label><input inputmode="decimal" data-pe="valor" value="${esc(e2.valor||"")}"></div>
+      <div><label>${ehCompra?"Vendedor":"Comprador"}</label><input data-pe="contraparte" value="${esc(e2.contraparte||"")}"></div>
+    </div>`:""}
     <label>Observação</label><input data-pe="obs" value="${esc(e2.obs||"")}" placeholder="Ex.: causa da morte, pasto de destino">
     <button class="btn suave mini mt" data-rm-pecev="${i}">remover este evento</button></div>`;
 }
@@ -1613,6 +2082,7 @@ function secaoPecuaria(r){
       <label class="mt">Eventos do dia</label>
       <div id="lista-pec-ev">${(p.eventos||[]).map((e2,i)=>cardEventoPec(e2,i)).join("")}</div>
       <button class="btn suave mini mt" id="bt-add-ev-pec">＋ evento (vacinação, nascimento, embarque…)</button>
+      ${(D.ultimoEvPec||{})[r.fazendaId]?`<button class="btn suave mini mt" id="bt-uev-pec">⚡ usar o último lançamento (${esc((D.ultimoEvPec[r.fazendaId].tipo||""))})</button>`:""}
     </div></details>`;
 }
 
@@ -1622,20 +2092,23 @@ function vForm(){
   const safra = emSafra();
   const perfil = perfilDe(r.fazendaId);
   const temCafe = perfil.includes("CAFE"), temGraos = perfil.includes("GRAOS"), temPec = perfil.includes("PECUARIA");
+  const soGraos = temGraos && !temCafe; /* unidade só de grãos usa o boletim redesenhado */
   const ontem = boletinsOrdenados().find(b=>b.data<r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   const podeCopiar = !r.id && ontem && !r.atividades.length && r.mo.proprios==="";
   const cats=[...new Set(D.maquinas.map(m=>m.cat))];
   const atForm=atividadeDe(r.fazendaId);
   return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), emojiAtividade(atForm)+" "+rotuloAtividade(atForm)+" · "+(r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente"), true)
   +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`+`
-  <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>`+`
+  <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>
+  ${(soGraos||temPec)?`<datalist id="dl-prod">${[...(D.insumos||[]).map(i2=>i2.nome),...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}
+  ${soGraos?`<datalist id="dl-adubo">${[...ADUBOS_SUGERIDOS,...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}`+`
   <p class="mut mb" style="font-size:.8rem">⏱️ Leva uns 3 minutos. Preencha só o que teve no dia — o que não teve, deixe em branco.</p>
   <div class="cartao" style="padding:10px 14px"><label>Quem está preenchendo</label>
     <input data-r="responsavel" value="${esc(r.responsavel||"")}" placeholder="Seu nome (ex.: João Batista)"></div>
   ${r.pendAnterior?`<div class="aviso verde"><b>Ficou de ontem:</b> ${esc(r.pendAnterior)}</div>`:""}
   ${podeCopiar?`<button class="btn suave mb" id="bt-copiar-ontem">⚡ Começar com base em ontem (${ontem.atividades.length} atividade${ontem.atividades.length!==1?"s":""}, equipe de ${n0(ontem.mo.proprios)+n0(ontem.mo.diaristas)})</button>`:""}
 
-  <details class="secao" ${(r.clima&&(r.clima.cond||n0(r.clima.chuvaMm)||r.clima.florada==="Sim"||r.clima.requeima==="Sim"||r.clima.obs))?"open":""}><summary><span class="ico">🌤️</span>Clima do dia
+  <details class="secao" ${(!soGraos&&r.clima&&(r.clima.cond||n0(r.clima.chuvaMm)||r.clima.florada==="Sim"||r.clima.requeima==="Sim"||r.clima.obs))?"open":""}><summary><span class="ico">🌤️</span>Clima do dia
     <span class="resumo" id="res-clima">${r.clima.cond?esc(r.clima.cond):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
       <label>Condição geral</label>
@@ -1703,8 +2176,9 @@ function vForm(){
       </div>
       <label>Observação</label><input data-irr="obs" value="${esc(r.irr?r.irr.obs:"")}" placeholder="Opcional — ex.: setor 3 parado 2 h">
     </div></details>`}
-  ${secaoGraos(r)}
-  ${temGraos?secaoColheitaGraos(r):""}
+  ${soGraos?secaoOperacoes(r):secaoGraos(r)}
+  ${soGraos?secaoIrrigacaoGraos(r):""}
+  ${(temGraos&&!soGraos)?secaoColheitaGraos(r):""}
   ${!temCafe?"":`<details class="secao" ${r.atividades.length?"open":""}><summary><span class="ico">🚜</span>Atividades por talhão
     <span class="resumo" id="res-ativ">${r.atividades.length?r.atividades.length+" registro"+(r.atividades.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
@@ -1728,15 +2202,15 @@ function vForm(){
 
   ${secaoPecuaria(r)}
 
-  ${!(temCafe||temGraos)?"":`<details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
+  ${soGraos?secaoFitoOcorrGraos(r):!(temCafe||temGraos)?"":`<details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
     <span class="resumo" id="res-fito">${r.fito.length?r.fito.length+" registro"+(r.fito.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mt" id="bt-add-fito">＋ Registrar ocorrência fitossanitária</button></div></details>`}
 
-  <details class="secao" ${r.ocorrencias.length?"open":""}><summary><span class="ico">⚠️</span>${temPec?"Ocorrências e sanidade":"Ocorrências gerais"}
+  ${soGraos?"":`<details class="secao" ${r.ocorrencias.length?"open":""}><summary><span class="ico">⚠️</span>${temPec?"Ocorrências e sanidade":"Ocorrências gerais"}
     <span class="resumo" id="res-oc">${r.ocorrencias.length?r.ocorrencias.length+" registro"+(r.ocorrencias.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
-      <button class="btn suave mt" id="bt-add-oc">＋ Adicionar ocorrência</button></div></details>
+      <button class="btn suave mt" id="bt-add-oc">＋ Adicionar ocorrência</button></div></details>`}
 
   <details class="secao"><summary><span class="ico">📝</span>Observações e pendências<span class="seta">›</span></summary>
     <div class="corpo">
@@ -1899,7 +2373,9 @@ function secaoColheitaGraos(r){
       <button class="btn suave mt" id="bt-add-colg">＋ Registrar colheita de um talhão</button></div></details>`;
 }
 function chipsFitoNome(f){
-  const lista=(sugestaoFitoDa(rascunho?rascunho.fazendaId:""))[f.tipo]||[];
+  let lista=(sugestaoFitoDa(rascunho?rascunho.fazendaId:""))[f.tipo]||[];
+  /* grãos: lista filtrada pela cultura do ciclo do talhão escolhido */
+  if(f.talhaoId&&rascunho){ const ic=infoCiclo(f.talhaoId,rascunho.data); if(ic) lista=lista.filter(x=>valeParaCultura(x,ic.cultura)); }
   const custom=!!f.nome && !lista.includes(f.nome);
   const chips=lista.map(s=>`<button class="chip ${f.nome===s?"on":""}" data-fnome="${s}">${s}</button>`).join("");
   return (f.tipo?chips:`<span class="mut" style="align-self:center">Escolha o tipo acima</span>`)
@@ -1999,6 +2475,59 @@ function cartaoFarolBoletins(){
     </div></details>`;
 }
 
+/* ---------- Painel: grãos ontem por unidade (ha por operação, lâminas informado × medido,
+   colheita acumulada do ciclo e alerta de monitoramento alto sem aplicação) ---------- */
+function cartaoGraosPainel(){
+  if(filtroPainel.atv&&filtroPainel.atv!=="GRAOS") return "";
+  const ontem=ontemISO();
+  const fmt1=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
+  const blocos=D.fazendas.filter(f=>atividadeDe(f.id)==="GRAOS").map(f=>{
+    const b=boletimDoDia(ontem,f.id);
+    const linhas=[];
+    if(b){
+      const porCat={};
+      (b.atividades||[]).forEach(a=>{ if(!a.gr||!a.tipo) return; const c=GRUPO_OP[opCatDe(a.tipo)]||"outras";
+        porCat[c]=(porCat[c]||0)+n0(a.areaHa); });
+      const ha=Object.entries(porCat).filter(([,v])=>v>0).map(([k,v])=>k+" "+fmt1(v)+" ha");
+      if(ha.length) linhas.push("🚜 "+ha.join(" · "));
+      const lam=(b.irg||[]).filter(e2=>e2.status).map(e2=>{
+        const nome=e2.nome||talhao(e2.k).nome, med=icropMedidoPivo(b,nome), inf=n0(e2.lamina);
+        return nome+": "+(inf?fmt1(inf)+" mm":e2.status.toLowerCase())+((med&&med.regou)?" (mediu "+fmt1(med.mm)+")":"");
+      });
+      if(lam.length) linhas.push("💧 "+lam.join(" · "));
+    }
+    const cols=[];
+    talhoesAnuais(f.id).forEach(t=>{ const c=cicloAtivo(t.id); if(!c) return;
+      let sacas=0, area=0;
+      D.boletins.filter(x=>x.fazendaId===f.id&&x.data>=(c.plantio||"")).forEach(x=>(x.colheita||[]).forEach(cc=>{
+        if(cc.talhaoId===t.id){ sacas+=n0(cc.sacas); area+=n0(cc.areaHa); } }));
+      if(sacas) cols.push(t.nome+" ("+rotuloCultura(c.cultura)+"): "+Math.round(sacas).toLocaleString("pt-BR")+" sc"+(area?" · "+fmt1(sacas/area)+" sc/ha":""));
+    });
+    if(cols.length) linhas.push("⚖️ Ciclo: "+cols.join(" · "));
+    const alertas=[];
+    const d10=(()=>{const d2=new Date();d2.setDate(d2.getDate()-10);return d2.toISOString().slice(0,10);})();
+    D.boletins.filter(x=>x.fazendaId===f.id&&x.data>=d10).forEach(x=>{
+      const altos=[
+        ...(x.atividades||[]).filter(a=>a.gr&&opCatDe(a.tipo)==="MONITORAMENTO"&&a.nivel==="Alto").map(a=>({tal:a.talhaoId,alvo:a.alvo})),
+        ...(x.fito||[]).filter(ft=>ft.nivel==="Alto").map(ft=>({tal:ft.talhaoId,alvo:ft.nome}))];
+      altos.forEach(al=>{
+        const lim=(()=>{const d2=new Date(x.data+"T12:00:00");d2.setDate(d2.getDate()+3);return d2.toISOString().slice(0,10);})();
+        if(lim>hojeISO()) return; /* prazo de 3 dias ainda correndo */
+        const aplicou=D.boletins.some(y=>y.fazendaId===f.id&&y.data>x.data&&y.data<=lim
+          &&(y.atividades||[]).some(a=>opCatDe(a.tipo)==="APLICACAO"&&(!al.tal||a.talhaoId===al.tal)));
+        if(!aplicou) alertas.push((al.alvo||"alvo")+" nível ALTO em "+talhao(al.tal).nome+" ("+fmtDataCurta(x.data)+") sem aplicação nos 3 dias seguintes");
+      });
+    });
+    if(alertas.length) linhas.push("🔴 "+[...new Set(alertas)].slice(0,3).join(" · "));
+    if(!linhas.length) return "";
+    return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:8px"><b>${esc(f.nome)}</b>${b?"":" <span class='mut' style='font-size:.78rem'>· sem boletim ontem</span>"}
+      ${linhas.map(l=>`<p class="mut" style="font-size:.82rem;margin:3px 0">${esc(l)}</p>`).join("")}</div>`;
+  }).filter(Boolean);
+  if(!blocos.length) return "";
+  return `<div class="cartao"><h3>🌾 Grãos — ontem por unidade</h3>${blocos.join("")}
+    <p class="mut" style="font-size:.75rem;margin-top:6px">Hectares por operação, lâmina informado × medido (iCrop) e colheita acumulada do ciclo.</p></div>`;
+}
+
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
@@ -2056,6 +2585,7 @@ function vPainel(){
             ${v.zeradas.map(n=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(n.replace(/^NC Naves\s*-\s*/,""))}: <b>sem nenhuma parcela ativa</b> na iCrop</p>`).join("")}
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
         <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p></div>`;})()}
+    ${cartaoGraosPainel()}
     ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
@@ -2163,8 +2693,12 @@ function vDetalhe(id){
       ${(b.mo.funcoes||[]).length?`<dt>Funções</dt><dd>${(b.mo.funcoes||[]).map(f=>esc(f.nome)+" ("+[(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?" ("+fnPr(f)+"+"+fnDi(f)+"d)":""),n0(f.hx)?n0(f.hx)+"he":""].filter(Boolean).join(" · ")+")").join(" · ")}</dd>`:""}
       <dt>Faltas</dt><dd>${n0(b.mo.faltas)}${b.mo.motivoFaltas?" — "+esc(b.mo.motivoFaltas):""}</dd>
       <dt>Horas extras</dt><dd>${n0(b.mo.horasExtras)}</dd></dl></div>
-    ${(b.atividades||[]).length?`<div class="cartao"><h3>🚜 Atividades</h3>
-      ${b.atividades.map(a=>`<div class="mt"><b>${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
+    ${(b.atividades||[]).length?`<div class="cartao"><h3>🚜 ${atividadeDe(b.fazendaId)==="GRAOS"?"Operações do dia":"Atividades"}</h3>
+      ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
+        ${(()=>{const ps=resumoOpPartes(b,a);return ps.length?`<br><span class="mut">${esc(ps.join(" · "))}</span>`:"";})()}
+        ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
+        ${(a.maquinas||[]).filter(x=>x.nome).map(x=>`<br><span class="tag verde">${esc(x.nome)} — ${n0(x.horas)} h${n0(x.comb)?" · "+n0(x.comb)+" L comb.":""}</span>`).join("")}
+      </div>`:`<div class="mt"><b>${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
         ${a.status==="concluida"?` <span class="tag verde">✔ concluída</span>`:a.status==="continua"?` <span class="tag terra">⏳ continua amanhã</span>`:""}
         ${a.status==="continua"&&a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
@@ -2180,8 +2714,13 @@ function vDetalhe(id){
         ${b.irr.fert?`<dt>Fertirrigação</dt><dd>Sim${(b.irr.fertSetores||[]).length?` — ${b.irr.fertSetores.map(id=>esc(talhao(id).nome)).join(", ")}`:""}${b.irr.fertReceita?`<br><span class="mut" style="white-space:pre-wrap">🧪 ${esc(b.irr.fertReceita)}</span>`:""}</dd>`:""}
         ${b.irr.obs?`<dt>Obs.</dt><dd>${esc(b.irr.obs)}</dd>`:""}
       </dl></div>`:""}
-    ${(b.colheita||[]).length && atividadeDe(b.fazendaId)==="GRAOS"?`<div class="cartao"><h3>🌾 Colheita de grãos</h3>
-      ${b.colheita.map(c=>`<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${[n0(c.areaHa)?n0(c.areaHa).toLocaleString("pt-BR")+" ha":"",n0(c.sacas)?n0(c.sacas).toLocaleString("pt-BR")+" sacas (60 kg)":"",n0(c.umidade)?n0(c.umidade).toLocaleString("pt-BR")+"% umidade":"",c.destino?esc(c.destino):""].filter(Boolean).join(" · ")||"—"}${c.obs?`<br><span class="mut">${esc(c.obs)}</span>`:""}</div>`).join("")}</div>`:""}
+    ${(b.irg||[]).some(e2=>e2.status)?`<div class="cartao"><h3>💧 Irrigação (pivôs)</h3>
+      ${b.irg.filter(e2=>e2.status).map(e2=>{ const nome=e2.nome||talhao(e2.k).nome; const med=icropMedidoPivo(b,nome);
+        const qm=(e2.quimiProdutos||[]).filter(p=>p.nome).map(p=>p.nome+(p.dose?" — "+p.dose+" "+(p.un||"kg")+"/ha":"")).join(" · ");
+        return `<p class="mt"><b>${esc(nome)}</b> — ${esc(e2.status)}${n0(e2.lamina)?" · "+n0(e2.lamina).toLocaleString("pt-BR")+" mm":""}${n0(e2.percent)?" · "+n0(e2.percent).toLocaleString("pt-BR")+"%":""}${(med&&med.regou)?" · iCrop mediu "+med.mm.toLocaleString("pt-BR",{maximumFractionDigits:1})+" mm":""}${(e2.problemas||[]).length?`<br><span class="mut">Problema: ${esc(e2.problemas.join(", "))}</span>`:""}${qm?`<br><span class="mut">🧪 Quimigação: ${esc(qm)}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`;}).join("")}</div>`:""}
+    ${(()=>{const cg=(b.colheita||[]).filter(c=>!String(c.id||"").startsWith("opcol-"));
+      return (cg.length && atividadeDe(b.fazendaId)==="GRAOS")?`<div class="cartao"><h3>🌾 Colheita de grãos</h3>
+      ${cg.map(c=>`<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${[n0(c.areaHa)?n0(c.areaHa).toLocaleString("pt-BR")+" ha":"",n0(c.sacas)?n0(c.sacas).toLocaleString("pt-BR")+" sacas (60 kg)":"",n0(c.umidade)?n0(c.umidade).toLocaleString("pt-BR")+"% umidade":"",c.destino?esc(c.destino):""].filter(Boolean).join(" · ")||"—"}${c.obs?`<br><span class="mut">${esc(c.obs)}</span>`:""}</div>`).join("")}</div>`:"";})()}
     ${(b.colheita||[]).length && atividadeDe(b.fazendaId)!=="GRAOS"?`<div class="cartao"><h3>🍒 Colheita</h3>
       ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.sacas)?n0(c.sacas)+" sacas · ":""}destino: ${esc(c.destino)||"—"}
         ${c.modo?` <span class="tag verde">${esc(c.modo).toLowerCase()}</span>`:""}${c.passada?` <span class="tag terra">${esc(c.passada)}</span>`:""}
@@ -2193,7 +2732,7 @@ function vDetalhe(id){
         ${b.pecuaria.sal?`<dt>Sal mineral</dt><dd>${b.pecuaria.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
         ${b.pecuaria.agua?`<dt>Água</dt><dd>${b.pecuaria.agua==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
         ${b.pecuaria.estrutObs?`<dt>Obs.</dt><dd>${esc(b.pecuaria.estrutObs)}</dd>`:""}</dl>`:""}
-      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
+      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
     ${(b.pos&&(b.pos.terreiro||b.pos.secLote||n0(b.pos.sacasBenef)))?`<div class="cartao"><h3>🏭 Pós-colheita</h3><dl class="dl mt">
       ${b.pos.terreiro?`<dt>Terreiro</dt><dd>${esc(b.pos.terreiro)}</dd>`:""}
       ${b.pos.secLote?`<dt>Secador</dt><dd>${esc(b.pos.secLote)} · ${esc(b.pos.secTemp)}°C · ${esc(b.pos.secHoras)} h</dd>`:""}
@@ -2356,9 +2895,9 @@ function vCadastros(){
     <div class="cartao"><h3>Talhões <span class="mut">· fazenda, tipo de uso e ciclo de cultura</span></h3>
       <p class="mut" style="font-size:.78rem">Nos talhões de grão (anual), a cultura vive no <b>ciclo</b>: use "Novo plantio" ao plantar e "Encerrar colheita" ao terminar. O histórico de ciclos nunca é apagado.</p>
       <ul class="lista-limpa">${D.talhoes.map(t=>{
-        const c=cicloAtivo(t.id), anual=(t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE");
+        const c=cicloAtivo(t.id), anual=(t.tipo==="GRAO_ANUAL");
         return `<li class="linha-flex" style="flex-wrap:wrap;gap:6px">
-        <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">· ${t.area} ha${c?" · "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):(anual?" · em preparo / pousio":"")}</span></span>
+        <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">· ${t.area} ha${c?" · "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):(anual?" · em preparo / pousio":"")}</span>${t.tipo==="ARRENDADO"?` <span class="tag amarelo">Arrendado — sementeira</span>`:""}</span>
         ${selFaz(t.fazendaId,"vinc-tal",t.id)}
         <select data-tipo-tal="${t.id}" class="mini" style="max-width:150px">${TIPOS_TALHAO.map(([k,rot])=>`<option value="${k}" ${t.tipo===k?"selected":""}>${rot}</option>`).join("")}</select>
         ${anual?(c?`<button class="btn suave mini" data-enc-ciclo="${c.id}">Encerrar colheita</button>`
@@ -2415,9 +2954,15 @@ function baixarCSV(){
     lin.push([fmtData(b.data),cel(fazenda(b.fazendaId).nome),cel(b.responsavel),cel([b.clima.cond,b.clima.florada==="Sim"?"florada aberta":"",b.clima.requeima==="Sim"?"requeima de flores":""].filter(Boolean).join(" · ")),n0(b.clima.chuvaMm),
       n0(b.mo.proprios),n0(b.mo.diaristas),n0(b.mo.faltas),n0(b.mo.horasExtras),
       cel((b.mo.funcoes||[]).map(f=>f.nome+":"+(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?"("+fnPr(f)+"pr+"+fnDi(f)+"di)":"")+(n0(f.hx)?"/"+n0(f.hx)+"he":"")).join(" | ")),
-      cel((b.atividades||[]).map(a=>a.tipo+" ("+talhao(a.talhaoId).nome+")"+(n0(a.tanques)?" ["+n0(a.tanques)+" tq]":"")+(a.status==="concluida"?" ✔":a.status==="continua"?" ⏳"+(a.falta?" falta: "+a.falta:""):"")).join(" | ")),
+      cel((b.atividades||[]).map(a=>a.tipo+" ("+talhao(a.talhaoId).nome+")"
+        +(a.gr&&n0(a.areaHa)?" ["+a.areaHa+" ha]":"")
+        +(a.gr&&(a.produtos||[]).some(p=>p.nome)?" {"+a.produtos.filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+p.dose+(p.un||"")+"/ha":"")).join("; ")+"}":"")
+        +(a.gr&&(a.produtoAdb||a.formulacao)?" {"+(a.produtoAdb||a.formulacao)+(n0(a.doseKgHa)?" "+a.doseKgHa+" kg/ha":"")+(n0(a.doseTHa)?" "+a.doseTHa+" t/ha":"")+"}":"")
+        +(n0(a.tanques)?" ["+n0(a.tanques)+" tq]":"")+(a.status==="concluida"?" ✔":a.status==="continua"?" ⏳"+(a.falta?" falta: "+a.falta:""):"")).join(" | ")),
       (b.colheita||[]).reduce((s,c)=>s+n0(c.sacas),0),hm,cb,
-      cel(b.irr?[b.irr.status,(b.irr.problemas||[]).join("/"),b.irr.obs||"",b.irr.fert==="Sim"?("fertirrigação"+((b.irr.fertSetores||[]).length?" ("+b.irr.fertSetores.map(id=>talhao(id).nome).join("/")+")":"")):""].filter(Boolean).join(" · "):""),
+      cel((b.irg||[]).some(e2=>e2.status)
+        ? b.irg.filter(e2=>e2.status).map(e2=>(e2.nome||talhao(e2.k).nome)+": "+e2.status+(n0(e2.lamina)?" "+e2.lamina+" mm":"")+((e2.quimiProdutos||[]).some(p=>p.nome)?" · quimigação "+e2.quimiProdutos.filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+p.dose+(p.un||"")+"/ha":"")).join("+"):"")).join(" | ")
+        : (b.irr?[b.irr.status,(b.irr.problemas||[]).join("/"),b.irr.obs||"",b.irr.fert==="Sim"?("fertirrigação"+((b.irr.fertSetores||[]).length?" ("+b.irr.fertSetores.map(id=>talhao(id).nome).join("/")+")":"")):""].filter(Boolean).join(" · "):"")),
       cel(b.irr?b.irr.agua||"":""),
       cel((b.fito||[]).map(f=>f.nome+" "+f.nivel).join(" | ")),
       cel((b.ocorrencias||[]).map(o=>o.tipo+" ("+o.grav+"): "+o.texto).join(" | ")),
@@ -2430,6 +2975,148 @@ function baixarCSV(){
 }
 
 /* ---------- Validação e envio ---------- */
+/* Partes estruturadas de uma operação de grãos (usadas no WhatsApp e no detalhe) */
+function resumoOpPartes(b,a){
+  const cat=opCatDe(a.tipo), fmt=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:2});
+  const info=infoCiclo(a.talhaoId,b.data);
+  const parts=[];
+  const pAplic=()=>{
+    if(a.alvo) parts.push("alvo: "+a.alvo);
+    const rec=(a.produtos||[]).filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+String(p.dose).replace(".",",")+" "+(p.un||"L")+"/ha":"")).join(" + ");
+    if(rec) parts.push(rec);
+    if(n0(a.caldaLha)) parts.push(fmt(a.caldaLha)+" L/ha");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+    if(a.equip) parts.push(a.equip.toLowerCase());
+    if(a.vento==="Vento forte") parts.push("⚠ vento forte");
+    if(a.horario) parts.push(a.horario.toLowerCase());
+  };
+  if(cat==="APLICACAO") pAplic();
+  else if(cat==="CALAGEM"||cat==="GESSAGEM"){
+    if(a.produtoAdb) parts.push(a.produtoAdb.toLowerCase());
+    if(n0(a.doseTHa)) parts.push(fmt(a.doseTHa)+" t/ha");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+    if(a.incorporado) parts.push(a.incorporado==="Sim"?"incorporado":"não incorporado");
+  }else if(cat==="PREPARO"){
+    if(a.implemento) parts.push(a.implemento.toLowerCase());
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }else if(cat==="PALHADA"){
+    if(a.metodo) parts.push(a.metodo.toLowerCase());
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }else if(cat==="AMOSTRA_SOLO"){
+    if(a.profundidade) parts.push(a.profundidade==="Ambas"?"0-20 e 20-40 cm":a.profundidade);
+    if(n0(a.nAmostras)) parts.push(n0(a.nAmostras)+" amostras");
+    if(a.laboratorio) parts.push("→ "+a.laboratorio);
+  }else if(cat==="TRAT_SEMENTES"){
+    const rec=(a.produtos||[]).filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+String(p.dose).replace(".",",")+" "+(p.un||"mL")+"/100 kg":"")).join(" + ");
+    if(rec) parts.push(rec);
+    if(a.cultivar) parts.push(a.cultivar);
+    if(a.qtdSementes) parts.push(String(a.qtdSementes).replace(".",",")+" "+(a.qtdUn||"kg"));
+  }else if(cat==="INOCULACAO"){
+    if(a.produtoInoc) parts.push(a.produtoInoc);
+    if(a.doseInoc) parts.push(a.doseInoc);
+    if(a.qtdSementes) parts.push(a.qtdSementes+" de sementes");
+  }else if(cat==="PLANTIO"){
+    const cult=info?rotuloCultura(info.cultura):rotuloCultura(a.culturaPl);
+    if(cult) parts.push(cult);
+    if(a.cultivar) parts.push(a.cultivar);
+    if(a.populacao) parts.push(String(a.populacao).replace(".",",")+" "+(a.populacaoUn||"sementes/m"));
+    if(n0(a.espacamento)) parts.push(fmt(a.espacamento)+" cm");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha plantados");
+  }else if(cat==="ADUBO_PLANTIO"){
+    if(a.formulacao) parts.push(a.formulacao);
+    if(n0(a.doseKgHa)) parts.push(fmt(a.doseKgHa)+" kg/ha");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }else if(cat==="ADUBO_COBERTURA"){
+    const prod=a.produtoTipo==="Outro"?a.produtoAdb:a.produtoTipo;
+    if(prod) parts.push(prod);
+    if(n0(a.doseKgHa)) parts.push(fmt(a.doseKgHa)+" kg/ha");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+    if(a.forma) parts.push(a.forma.toLowerCase());
+  }else if(cat==="REPLANTIO"){
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha replantados");
+    if(a.motivo) parts.push("motivo: "+a.motivo.toLowerCase());
+    if(a.cultivar) parts.push(a.cultivar);
+  }else if(cat==="ESTANDE"){
+    if(a.plantasM) parts.push(String(a.plantasM).replace(".",",")+" plantas/m");
+    if(n0(a.pontos)) parts.push(n0(a.pontos)+" pontos");
+    if(a.decisao) parts.push("decisão: "+(a.decisao==="OK"?"ok":"replantar"));
+  }else if(cat==="MONITORAMENTO"){
+    if(a.alvo) parts.push(a.alvo);
+    if(a.nivel) parts.push("nível "+a.nivel.toUpperCase());
+    if(a.contagem) parts.push(a.contagem);
+    if(a.decisao) parts.push("decisão: "+(a.decisao==="Reavaliar"?"reavaliar em "+(a.reavaliarDias||"?")+" dias":a.decisao.toLowerCase()));
+  }else if(cat==="DANINHA_MANUAL"){
+    if(a.alvo) parts.push(a.alvo);
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+    if(n0(a.pessoas)) parts.push(n0(a.pessoas)+" pessoa"+(n0(a.pessoas)>1?"s":""));
+  }else if(cat==="COLHEITA"){
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha colhidos");
+    if(n0(a.producao)) parts.push(fmt(a.producao)+" "+((a.producaoUn==="kg")?"kg":"sc 60 kg"));
+    if(n0(a.umidade)) parts.push(fmt(a.umidade)+"% umidade");
+    if(n0(a.impureza)) parts.push(fmt(a.impureza)+"% impureza");
+    if(a.maqTipo==="Própria"&&a.maqNome) parts.push("máquina "+a.maqNome);
+    else if(a.maqTipo==="De terceiro") parts.push("terceiro"+(a.prestador?" ("+a.prestador+")":""));
+    if(a.destino) parts.push(a.destino.toLowerCase());
+    if(n0(a.cargas)) parts.push(n0(a.cargas)+" carga"+(n0(a.cargas)>1?"s":""));
+  }else if(cat==="TRANSPORTE"){
+    if(n0(a.cargas)) parts.push(n0(a.cargas)+" carga"+(n0(a.cargas)>1?"s":""));
+    if(a.destino) parts.push(a.destino.toLowerCase());
+    if(a.placaMotorista) parts.push(a.placaMotorista);
+  }else if(cat==="PESAGEM"){
+    if(a.ticket) parts.push("ticket "+a.ticket);
+    if(n0(a.pesoKg)) parts.push(fmt(a.pesoKg)+" kg líquidos");
+    if(a.local) parts.push(a.local);
+  }else if(cat==="AMOSTRA_GRAO"){
+    if(n0(a.umidade)) parts.push(fmt(a.umidade)+"% umidade");
+    if(n0(a.impureza)) parts.push(fmt(a.impureza)+"% impureza");
+    if(a.local) parts.push(a.local);
+  }else if(cat==="SECAGEM"){
+    if(a.local) parts.push(a.local);
+    if(n0(a.umidEntrada)||n0(a.umidSaida)) parts.push(fmt(a.umidEntrada)+"% → "+fmt(a.umidSaida)+"%");
+    if(n0(a.quebra)) parts.push(fmt(a.quebra)+"% de quebra");
+  }else if(cat==="RESTOS"){
+    if(a.metodo) parts.push(a.metodo.toLowerCase());
+    if(a.metodo==="Herbicida") pAplic();
+    else if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }else if(cat==="COBERTURA_VERDE"){
+    const espec=a.especie==="Outra"?a.especieOutra:a.especie;
+    if(espec) parts.push(espec);
+    if(n0(a.doseKgHa)) parts.push(fmt(a.doseKgHa)+" kg/ha");
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }else if(cat==="VAZIO"){
+    if(a.dataInicio) parts.push("início "+fmtData(a.dataInicio));
+  }else{
+    if(n0(a.areaHa)) parts.push(fmt(a.areaHa)+" ha");
+  }
+  return parts;
+}
+function linhasWhatsOp(b,a){
+  const info=infoCiclo(a.talhaoId,b.data);
+  const cab="🚜 "+talhao(a.talhaoId).nome
+    +(info?" ("+rotuloCultura(info.cultura)+((info.dap!==null&&info.dap>=0)?", "+info.dap+" DAP":"")+")":"")
+    +": "+(a.tipo||"operação").toLowerCase();
+  const parts=resumoOpPartes(b,a);
+  const maq=(a.maquinas||[]).filter(m=>m.nome).map(m=>m.nome.replace(/\s*\(COD[^)]*\)/,"")+(n0(m.horas)?" "+n0(m.horas)+"h":"")).join(", ");
+  if(maq) parts.push(maq);
+  const linhas=[cab+(parts.length?" — "+parts.join(", "):"")];
+  if(a.obs) linhas.push("📝 "+a.obs);
+  return linhas;
+}
+function linhasWhatsIrg(b){
+  return (b.irg||[]).filter(e2=>e2.status).map(e2=>{
+    const nome=e2.nome||talhao(e2.k).nome;
+    const med=icropMedidoPivo(b,nome);
+    let li="💧 "+nome+": "+e2.status.toLowerCase();
+    if(n0(e2.lamina)) li+=", "+n0(e2.lamina).toLocaleString("pt-BR")+" mm";
+    if(n0(e2.percent)) li+=" ("+n0(e2.percent).toLocaleString("pt-BR")+"%)";
+    if(med&&med.regou) li+=" (iCrop mediu "+med.mm.toLocaleString("pt-BR",{maximumFractionDigits:1})+")";
+    if((e2.problemas||[]).length) li+=" — "+e2.problemas.join(", ").toLowerCase();
+    const qm=(e2.quimiProdutos||[]).filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+String(p.dose).replace(".",",")+" "+(p.un||"kg")+"/ha":"")).join(" + ");
+    if(qm) li+=" · quimigação: "+qm;
+    if(e2.obs) li+=" — "+e2.obs;
+    return li;
+  });
+}
 function resumoWhats(b){
   const L=[];
   L.push("📋 *BOLETIM "+fazenda(b.fazendaId).nome.toUpperCase()+"* — "+fmtData(b.data));
@@ -2444,6 +3131,7 @@ function resumoWhats(b){
   if(fns.length) L.push("🛠️ "+fns.map(f=>{const p=fnPr(f)+fnDi(f);
     return (p?p+" ":"")+f.nome+(fnDi(f)?" ("+fnPr(f)+"p+"+fnDi(f)+"d)":"")+(n0(f.hx)?" ["+n0(f.hx)+"h extra]":"");}).join(" · "));
   (b.atividades||[]).forEach(a=>{
+    if(a.gr){ L.push(...linhasWhatsOp(b,a)); return; }
     const maq=(a.maquinas||[]).filter(m=>m.nome).map(m=>m.nome.replace(/\s*\(COD[^)]*\)/,"")+" "+n0(m.horas)+"h").join(", ");
     const st=a.status==="concluida"?" ✔":a.status==="continua"?" ⏳":"";
     const cic=cicloAtivo(a.talhaoId);
@@ -2451,7 +3139,9 @@ function resumoWhats(b){
     if(a.receita) L.push("🧪 "+a.receita.split(/\n+/).map(s=>s.trim()).filter(Boolean).join(" · "));
     if(n0(a.tanques)) L.push("🛢️ Gastou "+n0(a.tanques)+" tanque"+(n0(a.tanques)>1?"s":"")+(n0(a.ltanque)?" × "+n0(a.ltanque)+" L = "+(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")+" L":""));
   });
+  L.push(...linhasWhatsIrg(b));
   (b.colheita||[]).forEach(x=>{
+    if(String(x.id||"").startsWith("opcol-")) return; /* já saiu na linha da operação de colheita */
     if(atividadeDe(b.fazendaId)==="GRAOS"){
       L.push("🌾 Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.areaHa)?n0(x.areaHa).toLocaleString("pt-BR")+" ha":"",n0(x.sacas)?n0(x.sacas).toLocaleString("pt-BR")+" sc (60 kg)":"",n0(x.umidade)?n0(x.umidade).toLocaleString("pt-BR")+"% umidade":"",x.destino||""].filter(Boolean).join(" · ")+(x.obs?" — "+x.obs:""));
       return;
@@ -2468,7 +3158,7 @@ function resumoWhats(b){
     const probs=[p.cocho==="Problema"?"cocho":"",p.sal==="Problema"?"sal mineral":"",p.agua==="Problema"?"água":""].filter(Boolean);
     if(probs.length) L.push("⚠️ Problema em: "+probs.join(", ")+(p.estrutObs?" — "+p.estrutObs:""));
     else if(p.cocho||p.sal||p.agua) L.push("🐂 Cocho, sal e água: OK");
-    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto:"")+(e2.obs?" — "+e2.obs:"")); });
+    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(e2.lote?" · "+e2.lote:"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto+(e2.dose?" "+String(e2.dose).replace(".",",")+" "+(e2.doseUn||"mL")+"/cab":""):"")+(n0(e2.pesoMedio)?" · peso médio "+n0(e2.pesoMedio).toLocaleString("pt-BR")+" kg":"")+(n0(e2.valor)?" · R$ "+n0(e2.valor).toLocaleString("pt-BR"):"")+(e2.contraparte?" ("+e2.contraparte+")":"")+(e2.obs?" — "+e2.obs:"")); });
   }
   (b.fito||[]).forEach(f=>{ if(f.nome||f.tipo) L.push("🐛 "+(f.nome||f.tipo)+" — "+talhao(f.talhaoId).nome+" · nível "+(f.nivel||"—")+(f.obs?" — "+f.obs:"")); });
   (b.ocorrencias||[]).forEach(o=>{ L.push((o.grav==="Alta"?"🔴 ":"⚠️ ")+(o.tipo||"Ocorrência")+": "+(o.texto||"")); });
@@ -2783,6 +3473,30 @@ function vDetalhePos(id){
     <button class="btn sec mini" data-zappos="${p.id}">📲 WhatsApp</button>`;
 }
 let nomeRespLembrado="";
+/* Colheita lançada como operação vira registro em r.colheita (painel, relatório e CSV continuam valendo).
+   Só as linhas espelhadas (id "opcol-") são recriadas; colheitas antigas ficam intactas. */
+function espelharColheitaGraos(r){
+  const ops=(r.atividades||[]).filter(a=>a.gr&&opCatDe(a.tipo)==="COLHEITA");
+  r.colheita=(r.colheita||[]).filter(c=>!String(c.id||"").startsWith("opcol-"));
+  ops.forEach(a=>{
+    const kg=(a.producaoUn==="kg")?n0(a.producao):n0(a.producao)*60;
+    const sacas=Math.round(kg/60*100)/100;
+    r.colheita.push({id:"opcol-"+a.id, talhaoId:a.talhaoId, areaHa:a.areaHa||"", sacas:sacas||"", kg:kg||"",
+      umidade:a.umidade||"", impureza:a.impureza||"", destino:a.destino||"", cargas:a.cargas||"", obs:a.obs||""});
+  });
+  /* 100% da área colhida? oferece encerrar o ciclo */
+  [...new Set(ops.map(a=>a.talhaoId).filter(Boolean))].forEach(tid=>{
+    const c=cicloAtivo(tid), t=talhao(tid);
+    if(!c||!n0(t.area)) return;
+    const antes=D.boletins.filter(b=>b.fazendaId===r.fazendaId&&b.data>=(c.plantio||"")&&b.id!==r.id)
+      .reduce((s,b)=>s+(b.colheita||[]).filter(x=>x.talhaoId===tid).reduce((x2,cc)=>x2+n0(cc.areaHa),0),0);
+    const hoje2=r.colheita.filter(x=>x.talhaoId===tid).reduce((s,x)=>s+n0(x.areaHa),0);
+    if(antes+hoje2>=n0(t.area)*0.999){
+      if(confirm("Área de "+t.nome+" 100% colhida ("+rotuloCultura(c.cultura)+"). Encerrar o ciclo? Ele fica no histórico."))
+        c.encerradoEm=r.data;
+    }
+  });
+}
 /* Cinto de segurança do envio: junta os avisos que merecem uma conferida antes de mandar */
 function avisosEnvio(r){
   const avisos=[];
@@ -2799,8 +3513,30 @@ function avisosEnvio(r){
     if(teveGente) avisos.push("Dia útil com 0 pessoas — esta fazenda teve gente trabalhando nos últimos 7 dias. Esqueceu a mão de obra?");
   }
   if((r.colheita||[]).some(c=>!c.talhaoId)) avisos.push(atividadeDe(r.fazendaId)==="CAFE"?"Colheita lançada sem talhão. Diga de qual talhão saiu o café.":"Colheita lançada sem talhão. Diga de qual talhão saiu a produção.");
-  if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length && !temPecuaria(r))
+  if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length && !temPecuaria(r) && !(r.irg||[]).some(e2=>e2.status))
     avisos.push("Boletim praticamente vazio — sem atividades, colheita nem equipe. Confirma que o dia foi assim?");
+  /* grãos: rastreabilidade e informado × medido */
+  if(temCultura(r.fazendaId,"GRAOS")&&!temCultura(r.fazendaId,"CAFE")){
+    (r.atividades||[]).forEach(a=>{
+      if(a.gr&&a.tipo&&opCatDe(a.tipo)==="APLICACAO"&&!(a.produtos||[]).some(p=>p.nome))
+        avisos.push("Aplicação \""+a.tipo+"\" em "+talhao(a.talhaoId).nome+" sem produto na receita. Sem produto e dose não dá para fechar custo nem rastrear.");
+      if(a.gr&&a.tipo&&!a.talhaoId)
+        avisos.push("Operação \""+a.tipo+"\" sem talhão. Diga onde foi feita.");
+    });
+    (r.irg||[]).forEach(e2=>{
+      if(!e2.status) return;
+      const nome=e2.nome||talhao(e2.k).nome;
+      const med=icropMedidoPivo(r,nome);
+      const inf=n0(e2.lamina);
+      if(!med) return;
+      if((e2.status==="Rodou"||e2.status==="Parcial")&&inf&&med.regou&&Math.abs(inf-med.mm)>Math.max(2,med.mm*0.25))
+        avisos.push(nome+": lâmina informada ("+inf.toLocaleString("pt-BR")+" mm) difere do que o iCrop mediu ("+med.mm.toLocaleString("pt-BR",{maximumFractionDigits:1})+" mm).");
+      if(e2.status==="Não rodou"&&med.regou)
+        avisos.push(nome+": marcado como \"Não rodou\", mas o iCrop mediu "+med.mm.toLocaleString("pt-BR",{maximumFractionDigits:1})+" mm de lâmina.");
+      if(e2.status==="Rodou"&&!med.regou&&!inf)
+        avisos.push(nome+": marcado como \"Rodou\" sem lâmina informada, e o iCrop não mediu irrigação.");
+    });
+  }
   return avisos;
 }
 function caixaAvisosEnvio(avisos){
@@ -2824,7 +3560,7 @@ function caixaAvisosEnvio(avisos){
 }
 function validarEnviar(){
   const r=rascunho;
-  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length && !temPecuaria(r)){
+  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length && !temPecuaria(r) && !(r.irg||[]).some(e2=>e2.status)){
     alert("Registre pelo menos o clima ou uma observação do dia."); return;
   }
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
@@ -2846,6 +3582,35 @@ function concluirEnvio(){
     if(x.nome){ if(x.dose||x.qtd) D.ultimasDoses[x.nome]={dose:x.dose,qtd:x.qtd};
       if(!(D.insumos||[]).some(i=>i.nome===x.nome) && !D.insumosAprendidos.includes(x.nome)) D.insumosAprendidos.push(x.nome); }
   }));
+  const aprender=nm=>{ if(nm && !(D.insumos||[]).some(i2=>i2.nome===nm) && !D.insumosAprendidos.includes(nm)) D.insumosAprendidos.push(nm); };
+  if(temCultura(r.fazendaId,"GRAOS") && !temCultura(r.fazendaId,"CAFE")){
+    D.ultimasReceitasTal=D.ultimasReceitasTal||{}; D.ultimasOpsTal=D.ultimasOpsTal||{}; D.ciclos=D.ciclos||[];
+    (r.atividades||[]).forEach(a=>{
+      if(!a.gr||!a.talhaoId||!a.tipo) return;
+      const cat=opCatDe(a.tipo);
+      /* memórias de um toque: repetir a última operação e a última receita do talhão */
+      const copia=JSON.parse(JSON.stringify(a)); delete copia.id;
+      D.ultimasOpsTal[a.talhaoId]=copia;
+      if(cat==="APLICACAO"&&(a.produtos||[]).some(p=>p.nome))
+        D.ultimasReceitasTal[a.talhaoId]={tipo:a.tipo,alvo:a.alvo||"",produtos:JSON.parse(JSON.stringify(a.produtos)),caldaLha:a.caldaLha||"",equip:a.equip||""};
+      (a.produtos||[]).forEach(p=>aprender(p.nome));
+      aprender(a.produtoAdb); aprender(a.formulacao); aprender(a.produtoInoc);
+      /* plantio lançado: oferece abrir (ou completar) o ciclo do talhão com a data */
+      if(cat==="PLANTIO"&&a.talhaoId!=="geral"){
+        const c=cicloAtivo(a.talhaoId);
+        if(!c){ if(a.culturaPl && confirm("Abrir o ciclo de "+rotuloCultura(a.culturaPl)+" em "+talhao(a.talhaoId).nome+" com plantio em "+fmtData(r.data)+"?"))
+          D.ciclos.push({id:uid(),talhaoId:a.talhaoId,cultura:a.culturaPl,plantio:r.data}); }
+        else if(!c.plantio && confirm("Atualizar o ciclo de "+rotuloCultura(c.cultura)+" em "+talhao(a.talhaoId).nome+" com a data de plantio "+fmtData(r.data)+"?"))
+          c.plantio=r.data;
+      }
+    });
+    (r.irg||[]).forEach(e2=>(e2.quimiProdutos||[]).forEach(p=>aprender(p.nome)));
+    espelharColheitaGraos(r);
+  }
+  if(r.pecuaria){
+    const evs=(r.pecuaria.eventos||[]).filter(e2=>e2.tipo);
+    if(evs.length){ D.ultimoEvPec=D.ultimoEvPec||{}; D.ultimoEvPec[r.fazendaId]=JSON.parse(JSON.stringify(evs[evs.length-1])); }
+  }
   if(r.id){
     const i=D.boletins.findIndex(b=>b.id===r.id);
     r.editadoEm=fmtData(hojeISO())+" "+agoraHM();
@@ -2977,10 +3742,10 @@ function ligarEventos(tela){
     if(d.rmBen!==undefined){ rascunhoPos.beneficios.splice(parseInt(d.rmBen),1); salvarRascPos(); ir("formpos",null,true); return; }
     if(d.novoCiclo){
       const nomeTal=talhao(d.novoCiclo).nome;
-      const escolha=prompt("Novo plantio em "+nomeTal+" — qual cultura?\n1 = Feijão\n2 = Soja\n3 = Milho comercial\n4 = Milho semente","3");
+      const escolha=prompt("Novo plantio em "+nomeTal+" — qual cultura?\n1 = Feijão\n2 = Soja\n3 = Milho comercial","3");
       if(escolha===null) return;
-      const cult={"1":"FEIJAO","2":"SOJA","3":"MILHO_COMERCIAL","4":"MILHO_SEMENTE"}[String(escolha).trim()];
-      if(!cult){ alert("Digite 1, 2, 3 ou 4."); return; }
+      const cult={"1":"FEIJAO","2":"SOJA","3":"MILHO_COMERCIAL"}[String(escolha).trim()];
+      if(!cult){ alert("Digite 1, 2 ou 3."); return; }
       const dt=prompt("Data do plantio (dia/mês/ano):",fmtData(hojeISO())); if(dt===null) return;
       D.ciclos=D.ciclos||[];
       D.ciclos.push({id:uid(), talhaoId:d.novoCiclo, cultura:cult, plantio:dataNorm(dt)||hojeISO()});
@@ -3110,8 +3875,11 @@ function ligarEventos(tela){
       if(inp) inp.style.display=(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"none";
       salvarRascunho(); return; }
 
-    if(t.id==="bt-add-ativ"){ const a={id:uid(),talhaoId:"",tipo:"",pessoas:"",obs:"",insumos:[],maquinas:[]};
-      r.atividades.push(a); $("#lista-ativ").insertAdjacentHTML("beforeend",cardAtividade(a));
+    if(t.id==="bt-add-ativ"){
+      const soG=temCultura(r.fazendaId,"GRAOS")&&!temCultura(r.fazendaId,"CAFE");
+      const a=soG?{id:uid(),gr:1,talhaoId:"",tipo:"",areaHa:"",obs:""}
+                 :{id:uid(),talhaoId:"",tipo:"",pessoas:"",obs:"",insumos:[],maquinas:[]};
+      r.atividades.push(a); $("#lista-ativ").insertAdjacentHTML("beforeend",cardAtivHtml(a));
       resumoContagem("res-ativ",r.atividades.length); salvarRascunho(); return; }
     if(d.rmAtiv){ r.atividades=r.atividades.filter(a=>a.id!==d.rmAtiv);
       t.closest("[data-ativ]").remove(); resumoContagem("res-ativ",r.atividades.length); salvarRascunho(); return; }
@@ -3121,7 +3889,70 @@ function ligarEventos(tela){
       if(d.addMaq!==undefined) a.maquinas.push({nome:"",horas:"",comb:""});
       if(d.rmIns!==undefined) a.insumos.splice(parseInt(d.rmIns),1);
       if(d.rmMaq!==undefined) a.maquinas.splice(parseInt(d.rmMaq),1);
-      card.outerHTML=cardAtividade(a); salvarRascunho(); return; }
+      card.outerHTML=cardAtivHtml(a); salvarRascunho(); return; }
+    /* ---- grãos: escolher a operação no seletor por fase (cascata) ---- */
+    if(d.escop){ const i=d.escop.indexOf("|"); const a=r.atividades.find(x=>x.id===d.escop.slice(0,i));
+      if(a){ a.tipo=d.escop.slice(i+1);
+        const t2=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
+        if(t2&&t2.area&&!a.areaHa) a.areaHa=String(t2.area); /* área pré-preenchida com a do talhão */
+        const cat2=opCatDe(a.tipo);
+        if((cat2==="APLICACAO"||cat2==="TRAT_SEMENTES")&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:cat2==="TRAT_SEMENTES"?"mL":"L"}];
+        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    if(d.trocaOp){ const a=r.atividades.find(x=>x.id===d.trocaOp);
+      if(a){ limparCamposOp(a);
+        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    /* ---- grãos: chips e receita do cartão de operação ---- */
+    if(d.gchip){ const card=t.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===card.dataset.ativ);
+      if(a){ const i=d.gchip.indexOf(":"); const campo=d.gchip.slice(0,i), val=d.gchip.slice(i+1);
+        a[campo]=(a[campo]===val)?"":val;
+        if(campo==="metodo"&&a.metodo==="Herbicida"&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:"L"}];
+        card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    if(d.gprodAdd){ const a=r.atividades.find(x=>x.id===d.gprodAdd);
+      if(a){ a.produtos=a.produtos||[]; a.produtos.push({nome:"",dose:"",un:"L"});
+        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    if(d.gpRm!==undefined){ const card=t.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===card.dataset.ativ);
+      if(a){ a.produtos.splice(parseInt(d.gpRm),1); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    if(d.urecTal){ const a=r.atividades.find(x=>x.id===d.urecTal);
+      const mem=a&&(D.ultimasReceitasTal||{})[a.talhaoId];
+      if(a&&mem){ a.produtos=JSON.parse(JSON.stringify(mem.produtos||[]));
+        if(mem.caldaLha&&!a.caldaLha) a.caldaLha=mem.caldaLha;
+        if(mem.equip&&!a.equip) a.equip=mem.equip;
+        if(mem.alvo&&!a.alvo) a.alvo=mem.alvo;
+        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    if(d.repOp){ const a=r.atividades.find(x=>x.id===d.repOp);
+      const mem=a&&(D.ultimasOpsTal||{})[a.talhaoId];
+      if(a&&mem){ const copia=JSON.parse(JSON.stringify(mem));
+        delete copia.maquinas; delete copia.insumos; delete copia.status; delete copia.falta;
+        limparCamposOp(a); Object.assign(a,copia,{id:a.id,talhaoId:a.talhaoId,gr:1});
+        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
+    /* ---- grãos: irrigação por pivô ---- */
+    if(d.igst){ const i=d.igst.lastIndexOf("|"); const e2=irgDe(r,d.igst.slice(0,i)); const st=d.igst.slice(i+1);
+      e2.status=(e2.status===st)?"":st;
+      if(e2.status!=="Não rodou"&&e2.status!=="Manutenção") e2.problemas=[];
+      repintarIrg(r); salvarRascunho(); return; }
+    if(d.igqm){ const e2=irgDe(r,d.igqm); e2.quimi=(e2.quimi==="Sim")?"":"Sim";
+      if(e2.quimi==="Sim"&&!(e2.quimiProdutos||[]).length) e2.quimiProdutos=[{nome:"",dose:"",un:"kg"}];
+      repintarIrg(r); salvarRascunho(); return; }
+    if(d.igpb){ const i=d.igpb.lastIndexOf("|"); const e2=irgDe(r,d.igpb.slice(0,i)); const p=d.igpb.slice(i+1);
+      e2.problemas=e2.problemas||[];
+      const ix=e2.problemas.indexOf(p); if(ix>=0) e2.problemas.splice(ix,1); else e2.problemas.push(p);
+      t.classList.toggle("on"); salvarRascunho(); return; }
+    if(d.igpAdd){ const e2=irgDe(r,d.igpAdd); e2.quimiProdutos=e2.quimiProdutos||[]; e2.quimiProdutos.push({nome:"",dose:"",un:"kg"});
+      repintarIrg(r); salvarRascunho(); return; }
+    if(d.igpRm!==undefined){ const row=t.closest("[data-irg]"); const e2=irgDe(r,row.dataset.irg);
+      e2.quimiProdutos.splice(parseInt(d.igpRm),1); repintarIrg(r); salvarRascunho(); return; }
+    if(t.id==="bt-add-pivo"){ const nome=prompt("Nome do pivô / equipamento (ex.: Pivô 01):"); if(!nome) return;
+      /* cadastro local, guardado por unidade — vale para os próximos boletins também */
+      D.pivosLocais=D.pivosLocais||{};
+      const lista=D.pivosLocais[r.fazendaId]=D.pivosLocais[r.fazendaId]||[];
+      if(!lista.some(p=>normTxt(p.nome)===normTxt(nome))) lista.push({id:"eq:"+uid(), nome:String(nome).trim()});
+      salvarDados(); repintarIrg(r); salvarRascunho(); return; }
+    /* ---- pecuária: repetir o último lançamento ---- */
+    if(t.id==="bt-uev-pec"){ const mem=(D.ultimoEvPec||{})[r.fazendaId];
+      if(mem){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+        r.pecuaria.eventos.push(JSON.parse(JSON.stringify(mem)));
+        $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
+        salvarRascunho(); } return; }
 
     if(t.id==="bt-add-col"){ const c={id:uid(),talhaoId:"",latas:"",sacas:"",destino:"",cereja:"",verde:"",seco:""};
       r.colheita.push(c); $("#lista-col").insertAdjacentHTML("beforeend",cardColheita(c));
@@ -3285,6 +4116,13 @@ function ligarEventos(tela){
             if(qtd&&!qtd.value&&mem.qtd){ qtd.placeholder="última: "+mem.qtd; } } } }
       else if(d.m!==undefined){ const c=el.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===c.dataset.ativ);
         const i=parseInt(el.closest("[data-maq]").dataset.maq); a.maquinas[i][d.m]=el.value; }
+      else if(d.gp!==undefined){ const c=el.closest("[data-ativ]"); const a=c&&r.atividades.find(x=>x.id===c.dataset.ativ);
+        const row=el.closest("[data-prow]"); const i=row?parseInt(row.dataset.prow):0;
+        if(a&&a.produtos&&a.produtos[i]) a.produtos[i][d.gp]=el.value; }
+      else if(d.ig!==undefined){ const row=el.closest("[data-irg]"); if(row){ const e3=irgDe(r,row.dataset.irg); e3[d.ig]=el.value; } }
+      else if(d.igp!==undefined){ const row=el.closest("[data-irg]"); if(row){ const e3=irgDe(r,row.dataset.irg);
+        const pr=el.closest("[data-prow]"); const i=pr?parseInt(pr.dataset.prow):0;
+        if(e3.quimiProdutos&&e3.quimiProdutos[i]) e3.quimiProdutos[i][d.igp]=el.value; } }
       else if(d.cc!==undefined){ const card=el.closest("[data-col]"); const c=r.colheita.find(x=>x.id===card.dataset.col);
         c[d.cc]=el.value;
         if(["cereja","verde","seco"].includes(d.cc)) atualizarMatura(card,c);
@@ -3323,6 +4161,22 @@ function ligarEventos(tela){
         const i=parseInt(el.closest("[data-maq]").dataset.maq);
         const v=resolverMaq(rascunho.fazendaId, el.value);
         a.maquinas[i].nome=v; el.value=v; salvarRascunho(); return; } }
+    /* grãos: talhão em cascata — escolher redesenha o cartão (a operação é escolhida por toque nas fases) */
+    if(rascunho && (d.a==="talhaoId"||d.a==="culturaPl")){
+      const card=el.closest("[data-ativ]"); const a=card&&rascunho.atividades.find(x=>x.id===card.dataset.ativ);
+      if(a&&a.gr){
+        if(d.a==="talhaoId"){ limparCamposOp(a); a.talhaoId=el.value; }
+        else a[d.a]=el.value;
+        card.outerHTML=cardOperacao(a); salvarRascunho(); return; } }
+    /* pecuária: o tipo do evento decide os campos (dose, peso, valor…) */
+    if(rascunho && d.pe==="tipo"){ const c=el.closest("[data-pecev]");
+      if(c&&rascunho.pecuaria){ const i=parseInt(c.dataset.pecev); const e3=rascunho.pecuaria.eventos[i];
+        if(e3){ e3.tipo=el.value; c.outerHTML=cardEventoPec(e3,i); salvarRascunho(); return; } } }
+    /* fito: escolhido o talhão, a lista de pragas/doenças filtra pela cultura do ciclo */
+    if(rascunho && d.f==="talhaoId"){ const c=el.closest("[data-fito]");
+      if(c){ const f2=rascunho.fito.find(x=>x.id===c.dataset.fito);
+        if(f2){ f2.talhaoId=el.value; const box=c.querySelector("[data-fnome-box]"); if(box) box.innerHTML=chipsFitoNome(f2);
+          salvarRascunho(); return; } } }
     if(el.id==="rel-faz"){ filtroRel.fazenda=el.value; ir("relatorio",null,true); return; }
     if(el.id==="rel-de"){ filtroRel.de=el.value; ir("relatorio",null,true); return; }
     if(el.id==="rel-ate"){ filtroRel.ate=el.value; ir("relatorio",null,true); return; }

@@ -65,3 +65,15 @@ Perfis de uso: gerente (preenche) e diretoria (painel).
   (node --check) e conferir que o HTML abre sem erro.
 - Cartões novos seguem o padrão dos existentes (classe "cartao",
   avisos com classe "aviso").
+
+## Documentação viva (OBRIGATÓRIO em toda tarefa)
+- ESTADO.md (na raiz) descreve o que o app tem hoje e as pendências.
+  TODA tarefa que mudar comportamento, catálogo, chave ou versão deve
+  ATUALIZAR o ESTADO.md no mesmo pull request.
+- docs/catalogos-por-atividade.md é a fonte oficial do vocabulário de
+  operações e campos por atividade. Mudou catálogo no index.html?
+  Atualize o arquivo junto — os dois nunca podem divergir.
+- Quando uma tarefa exigir tabela nova no Supabase, gerar o arquivo
+  sql/NNN-nome.sql no repositório com o bloco SQL pronto (create
+  table, policies, comentários) e avisar no resumo final que o Nilo
+  precisa rodá-lo no SQL Editor.
