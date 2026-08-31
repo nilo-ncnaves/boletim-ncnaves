@@ -159,7 +159,7 @@ function dadosSemente(){
   const dm = dias => { const d=new Date(); d.setDate(d.getDate()-dias);
     return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
   return {
-    versao:5,
+    versao:6,
     grupo:{ nome:"Grupo LGS", sub:"Boletim Diário das Fazendas" },
     usuarios:[
       {id:"u1", nome:"Gerente", papel:"gerente"},
@@ -171,12 +171,18 @@ function dadosSemente(){
       /* perfil decide o que o boletim mostra: CAFE, GRAOS e/ou PECUARIA.
          Caxico, José Eustáquio e Ernane viraram parte da Fazenda Monte Carmelo (f14);
          a Área do Lico virou parte da Cachoeira do Rio Preto — Lagamar (f03). */
+      /* Fazendas mistas foram desmembradas em UNIDADES por atividade (cada turma
+         preenche a sua). fazendaMae agrupa as unidades no painel, farol e custo. */
       {id:"f01", nome:"Água Limpa", municipio:"Monte Carmelo/MG", perfil:["CAFE"]},
-      {id:"f03", nome:"Cachoeira do Rio Preto — Lagamar", municipio:"Coromandel/MG", perfil:["CAFE","GRAOS"]},
-      {id:"f13", nome:"Mata Preta", municipio:"Monte Carmelo/MG", perfil:["CAFE","PECUARIA"]},
-      {id:"f14", nome:"Monte Carmelo", municipio:"Estrela do Sul/MG", perfil:["CAFE","PECUARIA"]},
+      {id:"f03c", nome:"Rio Preto-Lagamar — Café", municipio:"Coromandel/MG", perfil:["CAFE"], fazendaMae:{id:"f03", nome:"Rio Preto-Lagamar"}},
+      {id:"f03g", nome:"Rio Preto-Lagamar — Grãos", municipio:"Coromandel/MG", perfil:["GRAOS"], fazendaMae:{id:"f03", nome:"Rio Preto-Lagamar"}},
+      {id:"f13c", nome:"Mata Preta — Café", municipio:"Monte Carmelo/MG", perfil:["CAFE"], fazendaMae:{id:"f13", nome:"Mata Preta"}},
+      {id:"f13p", nome:"Mata Preta — Pecuária", municipio:"Monte Carmelo/MG", perfil:["PECUARIA"], fazendaMae:{id:"f13", nome:"Mata Preta"}},
+      {id:"f14c", nome:"Monte Carmelo — Café", municipio:"Estrela do Sul/MG", perfil:["CAFE"], fazendaMae:{id:"f14", nome:"Monte Carmelo"}},
+      {id:"f14p", nome:"Monte Carmelo — Pecuária", municipio:"Estrela do Sul/MG", perfil:["PECUARIA"], fazendaMae:{id:"f14", nome:"Monte Carmelo"}},
       {id:"f21", nome:"São Félix — Arrendamento", municipio:"", perfil:["CAFE"]},
-      {id:"f22", nome:"Vereda", municipio:"Romaria/MG", perfil:["CAFE","GRAOS"]},
+      {id:"f22c", nome:"Vereda — Café", municipio:"Romaria/MG", perfil:["CAFE"], fazendaMae:{id:"f22", nome:"Vereda"}},
+      {id:"f22g", nome:"Vereda — Grãos", municipio:"Romaria/MG", perfil:["GRAOS"], fazendaMae:{id:"f22", nome:"Vereda"}},
       {id:"f23", nome:"Vereda Romaria", municipio:"Romaria/MG", perfil:["CAFE"]},
       {id:"f24", nome:"Vereda Café 5º e 6º", municipio:"Romaria/MG", perfil:["CAFE"]},
       {id:"f20", nome:"Lagamar Café (Rodrigo)", municipio:"Coromandel/MG", perfil:["CAFE"]},
@@ -201,38 +207,38 @@ function dadosSemente(){
       {id:"t006", fazendaId:"f01", nome:"Setor 6 — IPR 100", area:12.12},
       {id:"t007", fazendaId:"f01", nome:"Setor 7 — IPR 100", area:12.1},
       {id:"t008", fazendaId:"f01", nome:"Setor 8 — IPR 100", area:12.27},
-      {id:"t010", fazendaId:"f03", nome:"Área geral (antiga)", area:48.0},
-      {id:"t019", fazendaId:"f14", nome:"Caxico — Área Nova", area:22.0},
-      {id:"t020", fazendaId:"f14", nome:"Caxico — Mundo Novo", area:27.5},
-      {id:"t021", fazendaId:"f14", nome:"Caxico — Topázio", area:27.5},
-      {id:"t045", fazendaId:"f13", nome:"Setor 1", area:19.5},
-      {id:"t046", fazendaId:"f13", nome:"Setor 2", area:19.0},
-      {id:"t047", fazendaId:"f13", nome:"Setor 3", area:20.0},
-      {id:"t048", fazendaId:"f13", nome:"Setor 4", area:20.0},
-      {id:"t049", fazendaId:"f13", nome:"Setor 5", area:20.0},
-      {id:"t050", fazendaId:"f13", nome:"Plantio 2025 (60 ha)", area:60.0},
-      {id:"t051", fazendaId:"f13", nome:"Pastos", area:498.83},
-      {id:"t052", fazendaId:"f14", nome:"Área geral", area:289.65},
-      {id:"t053", fazendaId:"f14", nome:"Café Talhão 1", area:65.6},
-      {id:"t054", fazendaId:"f14", nome:"Café Talhão 2", area:44.84},
-      {id:"t055", fazendaId:"f14", nome:"José Eustáquio — Arrendamento", area:25.0},
-      {id:"t056", fazendaId:"f14", nome:"Ernane — Área geral", area:100.0},
-      {id:"t061", fazendaId:"f03", nome:"Área do Lico", area:10.0},
-      {id:"t062", fazendaId:"f03", nome:"Área 200 — Gleba 1", area:176.0},
-      {id:"t063", fazendaId:"f03", nome:"Cascalho", area:48.0},
-      {id:"t064", fazendaId:"f03", nome:"Setor 1 (café grupo)", area:14.54},
-      {id:"t065", fazendaId:"f03", nome:"Setor 2 (café grupo)", area:15.28},
-      {id:"t066", fazendaId:"f03", nome:"Setor 3 (café grupo)", area:14.74},
-      {id:"t067", fazendaId:"f03", nome:"Setor 4 (café grupo)", area:16.79},
-      {id:"t068", fazendaId:"f03", nome:"Setor 5 (café grupo)", area:16.94},
-      {id:"t069", fazendaId:"f03", nome:"Setor 6 (café grupo)", area:10.0},
-      {id:"t070", fazendaId:"f03", nome:"Setor 7 (café grupo)", area:9.0},
-      {id:"t071", fazendaId:"f03", nome:"Pivô 01", area:134.0},
-      {id:"t072", fazendaId:"f03", nome:"Pivô 02", area:60.1},
-      {id:"t073", fazendaId:"f03", nome:"Pivô 03", area:50.0},
-      {id:"t074", fazendaId:"f03", nome:"Pivô 04", area:74.0},
-      {id:"t075", fazendaId:"f03", nome:"Retiro", area:19.4},
-      {id:"t076", fazendaId:"f03", nome:"Sede Abdala — Café Grupo", area:194.0},
+      {id:"t010", fazendaId:"f03c", nome:"Área geral (antiga)", area:48.0, tipo:"ESTRUTURA"},
+      {id:"t019", fazendaId:"f14c", nome:"Caxico — Área Nova", area:22.0},
+      {id:"t020", fazendaId:"f14c", nome:"Caxico — Mundo Novo", area:27.5},
+      {id:"t021", fazendaId:"f14c", nome:"Caxico — Topázio", area:27.5},
+      {id:"t045", fazendaId:"f13c", nome:"Setor 1", area:19.5},
+      {id:"t046", fazendaId:"f13c", nome:"Setor 2", area:19.0},
+      {id:"t047", fazendaId:"f13c", nome:"Setor 3", area:20.0},
+      {id:"t048", fazendaId:"f13c", nome:"Setor 4", area:20.0},
+      {id:"t049", fazendaId:"f13c", nome:"Setor 5", area:20.0},
+      {id:"t050", fazendaId:"f13c", nome:"Plantio 2025 (60 ha)", area:60.0},
+      {id:"t051", fazendaId:"f13p", nome:"Pastos", area:498.83},
+      {id:"t052", fazendaId:"f14c", nome:"Área geral", area:289.65, tipo:"ESTRUTURA"},
+      {id:"t053", fazendaId:"f14c", nome:"Café Talhão 1", area:65.6},
+      {id:"t054", fazendaId:"f14c", nome:"Café Talhão 2", area:44.84},
+      {id:"t055", fazendaId:"f14c", nome:"José Eustáquio — Arrendamento", area:25.0},
+      {id:"t056", fazendaId:"f14c", nome:"Ernane — Área geral", area:100.0, tipo:"ESTRUTURA"},
+      {id:"t061", fazendaId:"f03c", nome:"Área do Lico", area:10.0},
+      {id:"t062", fazendaId:"f03g", nome:"Área 200 — Gleba 1", area:176.0},
+      {id:"t063", fazendaId:"f03c", nome:"Cascalho", area:48.0},
+      {id:"t064", fazendaId:"f03c", nome:"Setor 1 (café grupo)", area:14.54},
+      {id:"t065", fazendaId:"f03c", nome:"Setor 2 (café grupo)", area:15.28},
+      {id:"t066", fazendaId:"f03c", nome:"Setor 3 (café grupo)", area:14.74},
+      {id:"t067", fazendaId:"f03c", nome:"Setor 4 (café grupo)", area:16.79},
+      {id:"t068", fazendaId:"f03c", nome:"Setor 5 (café grupo)", area:16.94},
+      {id:"t069", fazendaId:"f03c", nome:"Setor 6 (café grupo)", area:10.0},
+      {id:"t070", fazendaId:"f03c", nome:"Setor 7 (café grupo)", area:9.0},
+      {id:"t071", fazendaId:"f03g", nome:"Pivô 01", area:134.0},
+      {id:"t072", fazendaId:"f03g", nome:"Pivô 02", area:60.1},
+      {id:"t073", fazendaId:"f03g", nome:"Pivô 03", area:50.0},
+      {id:"t074", fazendaId:"f03g", nome:"Pivô 04", area:74.0},
+      {id:"t075", fazendaId:"f03c", nome:"Retiro", area:19.4},
+      {id:"t076", fazendaId:"f03c", nome:"Sede Abdala — Café Grupo", area:194.0},
       {id:"t077", fazendaId:"f20", nome:"Café Rodrigo — Setor 1", area:24},
       {id:"t078", fazendaId:"f20", nome:"Café Rodrigo — Setor 2", area:24},
       {id:"t079", fazendaId:"f20", nome:"Café Rodrigo — Setor 3", area:24},
@@ -241,22 +247,22 @@ function dadosSemente(){
       {id:"t082", fazendaId:"f20", nome:"Café Rodrigo — Setor 6", area:20},
       {id:"t083", fazendaId:"f20", nome:"Arrendo João Xavier", area:25.0},
       {id:"t084", fazendaId:"f21", nome:"Arrendamento", area:30.0},
-      {id:"t085", fazendaId:"f22", nome:"Curral Confinamento", area:3.0},
-      {id:"t086", fazendaId:"f22", nome:"Setor 01", area:16},
-      {id:"t087", fazendaId:"f22", nome:"Setor 02", area:23},
-      {id:"t088", fazendaId:"f22", nome:"Setor 03", area:20},
-      {id:"t089", fazendaId:"f22", nome:"Setor 04", area:18},
-      {id:"t090", fazendaId:"f22", nome:"Setor 05", area:18},
-      {id:"t091", fazendaId:"f22", nome:"Setor 06", area:21},
-      {id:"t092", fazendaId:"f22", nome:"Setor 07", area:19},
-      {id:"t093", fazendaId:"f22", nome:"Setor 08", area:60},
-      {id:"t094", fazendaId:"f22", nome:"Setor 09", area:17},
-      {id:"t095", fazendaId:"f22", nome:"Pivô 1", area:103.23},
-      {id:"t096", fazendaId:"f22", nome:"Pivô 2", area:122.0},
-      {id:"t097", fazendaId:"f22", nome:"Pivô 3", area:103.94},
-      {id:"t098", fazendaId:"f22", nome:"Pivô 4", area:120.0},
-      {id:"t099", fazendaId:"f22", nome:"Pivô 5", area:80.0},
-      {id:"t100", fazendaId:"f22", nome:"Pivô 6", area:54.0},
+      {id:"t085", fazendaId:"f22c", nome:"Curral Confinamento", area:3.0},
+      {id:"t086", fazendaId:"f22c", nome:"Setor 01", area:16},
+      {id:"t087", fazendaId:"f22c", nome:"Setor 02", area:23},
+      {id:"t088", fazendaId:"f22c", nome:"Setor 03", area:20},
+      {id:"t089", fazendaId:"f22c", nome:"Setor 04", area:18},
+      {id:"t090", fazendaId:"f22c", nome:"Setor 05", area:18},
+      {id:"t091", fazendaId:"f22c", nome:"Setor 06", area:21},
+      {id:"t092", fazendaId:"f22c", nome:"Setor 07", area:19},
+      {id:"t093", fazendaId:"f22c", nome:"Setor 08", area:60},
+      {id:"t094", fazendaId:"f22c", nome:"Setor 09", area:17},
+      {id:"t095", fazendaId:"f22g", nome:"Pivô 1", area:103.23},
+      {id:"t096", fazendaId:"f22g", nome:"Pivô 2", area:122.0},
+      {id:"t097", fazendaId:"f22g", nome:"Pivô 3", area:103.94},
+      {id:"t098", fazendaId:"f22g", nome:"Pivô 4", area:120.0},
+      {id:"t099", fazendaId:"f22g", nome:"Pivô 5", area:80.0},
+      {id:"t100", fazendaId:"f22g", nome:"Pivô 6", area:54.0},
       {id:"t101", fazendaId:"f23", nome:"Setor 1", area:21.0},
       {id:"t102", fazendaId:"f23", nome:"Setor 2", area:22.15},
       {id:"t103", fazendaId:"f23", nome:"Setor 3", area:22.15},
@@ -268,8 +274,8 @@ function dadosSemente(){
       {id:"t109", fazendaId:"f24", nome:"Café 5º", area:80.0},
       {id:"t110", fazendaId:"f24", nome:"Café 6º", area:50.0},
       {id:"t111", fazendaId:"f25", nome:"Armazém (Casemg)", area:1.0},
-      {id:"t112", fazendaId:"f03", nome:"Área dos 20 (ERP)", area:9.1},
-      {id:"t113", fazendaId:"f03", nome:"Represa (ERP)", area:84.0},
+      {id:"t112", fazendaId:"f03c", nome:"Área dos 20 (ERP)", area:9.1},
+      {id:"t113", fazendaId:"f03c", nome:"Represa (ERP)", area:84.0, tipo:"ESTRUTURA"},
       {id:"t114", fazendaId:"f26", nome:"Pastos", area:333.85},
       {id:"t115", fazendaId:"f27", nome:"Calcinhas", area:53.88},
       {id:"t116", fazendaId:"f27", nome:"Pivô 50", area:49.81},
@@ -766,7 +772,7 @@ function dadosSemente(){
         ocorrencias:[{id:"oc1", tipo:"Quebra de equipamento", grav:"Média", texto:"Mangueira hidráulica da colhedora estourou às 14h; substituída em 1h30.", foto:null}],
         obsGeral:"", pendencias:"Comprar 2 mangueiras reserva."
       },
-      { id:"b3", exemplo:true, data:dm(1), fazendaId:"f22", responsavel:"Gerente Vereda", enviadoEm:dm(1)+" 18:20",
+      { id:"b3", exemplo:true, data:dm(1), fazendaId:"f22c", responsavel:"Gerente Vereda", enviadoEm:dm(1)+" 18:20",
         clima:{cond:"Ensolarado", tmin:13, tmax:27, chuvaMm:0, obs:""},
         mo:{proprios:8, diaristas:0, faltas:0, motivoFaltas:"", horasExtras:0},
         atividades:[{id:"a6", talhaoId:"t086", tipo:"Pulverização", pessoas:2, obs:"Pré-florada",
@@ -820,11 +826,22 @@ async function carregarTudo(){
   D = bruto ? JSON.parse(bruto) : dadosSemente();
   const semente = dadosSemente();
   if(bruto && (D.versao||0) < semente.versao){
-    /* migração v5: perfis por fazenda e unificações — f19 -> f03 (histórico), Área do Lico (f18) -> f03,
-       Caxico (f05), José Eustáquio (f15) e Ernane (f16) -> Fazenda Monte Carmelo (f14).
-       Preserva boletins, pós-colheita, remessas, telemetria, ciclos, estruturas, de-paras e personalizações;
-       nenhum registro se perde (os ids dos talhões não mudam, só o nome ganha prefixo). */
-    const rf = id => ({f19:"f03", f18:"f03", f05:"f14", f15:"f14", f16:"f14"}[id]||id);
+    /* migração v6: unidades operacionais por atividade. Fazendas mistas desmembradas
+       (f03 -> f03c/f03g, f22 -> f22c/f22g, f13 -> f13c/f13p, f14 -> f14c/f14p); histórico
+       (boletins, remessas, pós-colheitas) vai para a unidade Café; talhões extras seguem o
+       próprio tipo; ids antigos e unificações anteriores continuam valendo via FZ_LEGADO.
+       Nenhum registro se perde (os ids dos talhões não mudam). */
+    const rf = fzAtual;
+    const UNIDADES_DESM={ f03:{CAFE:"f03c",GRAOS:"f03g"}, f22:{CAFE:"f22c",GRAOS:"f22g"},
+      f13:{CAFE:"f13c",PECUARIA:"f13p"}, f14:{CAFE:"f14c",PECUARIA:"f14p"} };
+    const rfTal = t => {
+      const base={f19:"f03",f18:"f03",f05:"f14",f15:"f14",f16:"f14"}[t.fazendaId]||t.fazendaId;
+      const u=UNIDADES_DESM[base];
+      if(!u) return base;
+      if(t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE") return u.GRAOS||u.CAFE;
+      if(t.tipo==="PASTO_PECUARIA") return u.PECUARIA||u.CAFE;
+      return u.CAFE; /* café, estrutura e indefinido ficam na unidade Café */
+    };
     const PREFIXO_UNIF = {f05:"Caxico — ", f15:"José Eustáquio — ", f16:"Ernane — ", f18:"Área do Lico — "};
     const antigos = (D.boletins||[]).map(b=>({...b, fazendaId:rf(b.fazendaId)}));
     const posAntigos = (D.posColheitas||[]).map(p=>({...p, fazendaId:rf(p.fazendaId)}));
@@ -838,7 +855,7 @@ async function carregarTudo(){
     const talExtras = (D.talhoes||[]).filter(t=>!semente.talhoes.some(s=>s.id===t.id))
       .map(t=>{ const p=PREFIXO_UNIF[t.fazendaId];
         const nome=(p && !String(t.nome||"").startsWith(p.replace(" — ",""))) ? p+t.nome : t.nome;
-        const novo={...t, fazendaId:rf(t.fazendaId), nome}; delete novo.tipo; return novo; });
+        return {...t, fazendaId:rfTal(t), nome}; });
     const ciclosAntigos = (D.ciclos||[]);
     const dMaq=D.deparaMaq||{}, dTal=D.deparaTal||{}, mImp=D.mapaImport||{};
     const uDoses=D.ultimasDoses||{}, uRec=D.ultimasReceitas||{}, uFert=D.ultimasFert||{}, insApr=D.insumosAprendidos||[];
@@ -894,7 +911,13 @@ function salvarRascunho(){ clearTimeout(rascunhoTimer); rascunhoTimer=setTimeout
 /* ---------- Consultas ---------- */
 const talhao = id => D.talhoes.find(t=>t.id===id)||{nome:"?",area:0};
 const fazenda = id => D.fazendas.find(f=>f.id===id)||{nome:"?"};
-const talhoesDa = fz => D.talhoes.filter(t=>t.fazendaId===fz);
+/* Talhões da unidade; ESTRUTURA (sede, represa, armazém…) aparece em todas as unidades da mesma fazenda física */
+const talhoesDa = fz => {
+  const f=fazenda(fz);
+  if(!f.fazendaMae) return D.talhoes.filter(t=>t.fazendaId===fz);
+  const irmas=D.fazendas.filter(x=>x.fazendaMae && x.fazendaMae.id===f.fazendaMae.id).map(x=>x.id);
+  return D.talhoes.filter(t=>t.fazendaId===fz || (t.tipo==="ESTRUTURA" && t.fazendaId!==fz && irmas.includes(t.fazendaId)));
+};
 const maquinasDa = fz => D.maquinas.filter(m=>(m.fazendas||[]).includes(fz));
 /* ---- Multicultura: tipo do talhão, ciclos de cultura anual e catálogos ---- */
 const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["MILHO_SEMENTE","Milho semente"],
@@ -902,10 +925,24 @@ const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["MIL
 const rotuloTipo = tp => { const h=TIPOS_TALHAO.find(([k])=>k===tp); return h?h[1]:"Indefinido"; };
 /* O que o boletim mostra é decidido pelo PERFIL da fazenda (CAFE, GRAOS, PECUARIA),
    nunca pelo nome do chão. O perfil vem gravado no cadastro de fazendas. */
-const PERFIS_PADRAO={ f01:["CAFE"], f03:["CAFE","GRAOS"], f13:["CAFE","PECUARIA"], f14:["CAFE","PECUARIA"],
-  f20:["CAFE"], f21:["CAFE"], f22:["CAFE","GRAOS"], f23:["CAFE"], f24:["CAFE"], f25:["CAFE"],
-  f26:["PECUARIA"], f27:["GRAOS"], f28:["PECUARIA"], f29:["PECUARIA"], f30:["PECUARIA"],
-  f31:["PECUARIA"], f32:["PECUARIA"], f33:["GRAOS"], f34:["PECUARIA"], f35:["GRAOS"] };
+const PERFIS_PADRAO={ f01:["CAFE"], f03c:["CAFE"], f03g:["GRAOS"], f13c:["CAFE"], f13p:["PECUARIA"],
+  f14c:["CAFE"], f14p:["PECUARIA"], f20:["CAFE"], f21:["CAFE"], f22c:["CAFE"], f22g:["GRAOS"],
+  f23:["CAFE"], f24:["CAFE"], f25:["CAFE"], f26:["PECUARIA"], f27:["GRAOS"], f28:["PECUARIA"],
+  f29:["PECUARIA"], f30:["PECUARIA"], f31:["PECUARIA"], f32:["PECUARIA"], f33:["GRAOS"],
+  f34:["PECUARIA"], f35:["GRAOS"] };
+/* Unidade operacional = fazenda física + atividade. Ids antigos (fazendas mistas e
+   unificadas) continuam aceitos na leitura: caem na unidade Café correspondente. */
+const FZ_LEGADO={ f19:"f03c", f18:"f03c", f05:"f14c", f15:"f14c", f16:"f14c",
+  f03:"f03c", f22:"f22c", f13:"f13c", f14:"f14c" };
+const fzAtual = id => FZ_LEGADO[id]||id;
+const maeDe = f => f.fazendaMae || {id:f.id, nome:f.nome};
+const maeIdDe = fz => { const f=fazenda(fz); return (f.fazendaMae&&f.fazendaMae.id)||f.id||fz; };
+const unidadesDaMae = maeId => D.fazendas.filter(f=>maeDe(f).id===maeId);
+const atividadeDe = fz => (perfilDe(fz)[0])||"CAFE";
+const ATIVIDADES=[["CAFE","☕","Café","var(--cereja)"],["GRAOS","🌾","Grãos","var(--amarelo)"],["PECUARIA","🐂","Pecuária","var(--terra)"]];
+const rotuloAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[2]:""; };
+const emojiAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[1]:""; };
+const corAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[3]:"var(--verde)"; };
 const ROTULO_CULT={CAFE:"Café", GRAOS:"Grãos", PECUARIA:"Pecuária"};
 const perfilDe = fz => { const f=fazenda(fz); return (Array.isArray(f.perfil)&&f.perfil.length)?f.perfil:(PERFIS_PADRAO[fz]||["CAFE"]); };
 const temCultura = (fz,c) => perfilDe(fz).includes(c);
@@ -1040,7 +1077,19 @@ function icropFazendaId(nome){
   return hit?hit[1]:null;
 }
 function icropDo(data,fz){
-  const linhas=(D.icropDados||[]).filter(l=>l.data===data && icropFazendaId(l.fazenda)===fz);
+  /* a estação iCrop é da fazenda física; cada linha vai para a unidade certa:
+     equipamento/parcela com "café" no nome -> unidade Café; demais -> Grãos;
+     fazenda com uma unidade só recebe tudo */
+  const maeId=maeIdDe(fz);
+  const varias=unidadesDaMae(maeId).length>1;
+  const minha=perfilDe(fz);
+  const semAc=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const linhas=(D.icropDados||[]).filter(l=>{
+    if(l.data!==data || icropFazendaId(l.fazenda)!==maeId) return false;
+    if(!varias) return true;
+    const ehCafe=semAc((l.equipamento||"")+" "+(l.parcela||"")).includes("cafe");
+    return ehCafe ? minha.includes("CAFE") : minha.includes("GRAOS");
+  });
   if(!linhas.length) return null;
   const chuva=Math.max(...linhas.map(l=>n0(l.precipitacao_mm)));
   const porEq={};
@@ -1121,7 +1170,7 @@ async function baixarSolinftec(){
 }
 function solinftecDo(data,fz){
   if(!SOLINFTEC_AUTO) return null;
-  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && l.fazenda_id===fz);
+  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && fzAtual(l.fazenda_id)===fz);
   return linhas.length?linhas:null;
 }
 function cartaoSolinftecGerente(fz){
@@ -1136,8 +1185,8 @@ function cartaoSolinftecGerente(fz){
 function cartaoSolinftecPainel(){
   if(!SOLINFTEC_AUTO) return "";
   const ontem=ontemISO(), porFaz={};
-  (D.solinftecDados||[]).filter(l=>l.data===ontem && temCultura(l.fazenda_id,"GRAOS")).forEach(l=>{
-    const o=porFaz[l.fazenda_id]=porFaz[l.fazenda_id]||{horas:0,area:0};
+  (D.solinftecDados||[]).filter(l=>l.data===ontem && temCultura(fzAtual(l.fazenda_id),"GRAOS")).forEach(l=>{
+    const o=porFaz[fzAtual(l.fazenda_id)]=porFaz[fzAtual(l.fazenda_id)]||{horas:0,area:0};
     o.horas+=n0(l.horas); o.area+=n0(l.area_ha);
   });
   const ks=Object.keys(porFaz);
@@ -1821,26 +1870,41 @@ function cartaoFarolBoletins(){
       dom:d.getDay()===0 }); }
   const uteis=dias.filter(x=>!x.dom).length;
   const hoje=hojeISO(), ontem=dias[5].iso;
-  const linhas=D.fazendas.map(f=>{
+  const unidades=D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
+  const linhas=unidades.map(f=>{
     let envUteis=0;
     const marcas=dias.map(x=>{
       if(boletimDoDia(x.iso,f.id)){ if(!x.dom) envUteis++; return "●"; }
       return x.dom?"–":"○";
     }).join(" ");
     const emDia=!!(boletimDoDia(hoje,f.id)||boletimDoDia(ontem,f.id));
-    return {f, marcas, envUteis, emDia};
+    return {f, marcas, envUteis, emDia, mae:maeDe(f)};
   });
-  linhas.sort((a,b)=>a.envUteis-b.envUteis || (a.emDia===b.emDia?0:a.emDia?1:-1) || a.f.nome.localeCompare(b.f.nome));
+  /* agrupa as unidades pela fazenda física */
+  const grupos={}, ordem=[];
+  linhas.forEach(l=>{ const k=l.mae.id; if(!grupos[k]){ grupos[k]={mae:l.mae, uns:[]}; ordem.push(k); } grupos[k].uns.push(l); });
+  const gs=ordem.map(k=>grupos[k]);
+  gs.forEach(g=>{ g.min=Math.min(...g.uns.map(u=>u.envUteis)); g.soma=g.uns.reduce((s,u)=>s+u.envUteis,0);
+    g.emDia=g.uns.every(u=>u.emDia); g.uns.sort((a,b)=>a.envUteis-b.envUteis); });
+  gs.sort((a,b)=>a.min-b.min || (a.emDia===b.emDia?0:a.emDia?1:-1) || a.mae.nome.localeCompare(b.mae.nome));
   const emDiaQtd=linhas.filter(l=>l.emDia).length;
   const tudoEmDia=emDiaQtd===linhas.length;
+  const linhaHtml=(rotulo,l,indent)=>`<div class="linha-flex" style="padding:5px 0${indent?"":";border-top:1px solid var(--linha)"};gap:8px${indent?";padding-left:14px":""}">
+        <span class="cresce" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.emDia?rotulo:"<b>"+rotulo+"</b>"}</span>
+        <span class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2px;flex:none">${l.marcas}</span>
+        <span class="num mut" style="flex:none;min-width:34px;text-align:right">${l.envUteis}/${uteis}</span></div>`;
   return `<details class="secao" ${tudoEmDia?"":"open"}><summary><span class="ico">📋</span>Boletins dos últimos 7 dias
       <span class="resumo">${emDiaQtd} de ${linhas.length} em dia</span><span class="seta">›</span></summary>
     <div class="corpo" style="font-size:.85rem">
-      ${linhas.map(l=>`<div class="linha-flex" style="padding:5px 0;border-bottom:1px solid var(--linha);gap:8px">
-        <span class="cresce" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.emDia?esc(l.f.nome):"<b>"+esc(l.f.nome)+"</b>"}</span>
-        <span class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2px;flex:none">${l.marcas}</span>
-        <span class="num mut" style="flex:none;min-width:34px;text-align:right">${l.envUteis}/${uteis}</span></div>`).join("")}
-      <p class="mt" style="font-weight:700">${emDiaQtd} de ${linhas.length} fazendas em dia <span class="mut" style="font-weight:400">(enviou ontem ou hoje)</span></p>
+      ${gs.map(g=>{
+        if(g.uns.length===1) return linhaHtml(esc(g.uns[0].f.nome), g.uns[0], false);
+        /* fazenda física com sublinhas por unidade; total soma as unidades */
+        return `<div class="linha-flex" style="padding:5px 0;border-top:1px solid var(--linha);gap:8px">
+          <span class="cresce">${g.emDia?esc(g.mae.nome):"<b>"+esc(g.mae.nome)+"</b>"}</span>
+          <span class="num mut" style="flex:none">total ${g.soma}/${uteis*g.uns.length}</span></div>`+
+          g.uns.map(u=>linhaHtml("· "+rotuloAtividade(atividadeDe(u.f.id)), u, true)).join("");
+      }).join("")}
+      <p class="mt" style="font-weight:700">${emDiaQtd} de ${linhas.length} unidades em dia <span class="mut" style="font-weight:400">(enviou ontem ou hoje)</span></p>
       <p class="mut" style="font-size:.72rem">● enviado · ○ faltou · – domingo sem envio</p>
     </div></details>`;
 }
@@ -2407,6 +2471,10 @@ async function syncBaixar(){
       const lista=D[alvo]=D[alvo]||[];
       linhas.forEach(l=>{
         const b=l.payload; if(!b||!b.id) return;
+        /* registros gravados por versões antigas chegam com o id antigo da fazenda:
+           caem na unidade atual correspondente (Café) */
+        if(b.fazendaId) b.fazendaId=fzAtual(b.fazendaId);
+        if(col==="remessas"){ if(b.origem) b.origem=fzAtual(b.origem); if(b.destino) b.destino=fzAtual(b.destino); }
         if(syncFila.some(x=>x.id===b.id)) return; /* edição local ainda não enviada vence */
         const porId = (col==="remessas"||col==="telemetria");
         const i = porId
