@@ -1604,6 +1604,38 @@ function comprimirFoto(arquivo){
   });
 }
 
+/* ---------- Farol de completude: quem mandou boletim nos últimos 7 dias ---------- */
+function cartaoFarolBoletins(){
+  const dias=[];
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i);
+    dias.push({ iso:d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
+      dom:d.getDay()===0 }); }
+  const uteis=dias.filter(x=>!x.dom).length;
+  const hoje=hojeISO(), ontem=dias[5].iso;
+  const linhas=D.fazendas.map(f=>{
+    let envUteis=0;
+    const marcas=dias.map(x=>{
+      if(boletimDoDia(x.iso,f.id)){ if(!x.dom) envUteis++; return "●"; }
+      return x.dom?"–":"○";
+    }).join(" ");
+    const emDia=!!(boletimDoDia(hoje,f.id)||boletimDoDia(ontem,f.id));
+    return {f, marcas, envUteis, emDia};
+  });
+  linhas.sort((a,b)=>a.envUteis-b.envUteis || (a.emDia===b.emDia?0:a.emDia?1:-1) || a.f.nome.localeCompare(b.f.nome));
+  const emDiaQtd=linhas.filter(l=>l.emDia).length;
+  const tudoEmDia=emDiaQtd===linhas.length;
+  return `<details class="secao" ${tudoEmDia?"":"open"}><summary><span class="ico">📋</span>Boletins dos últimos 7 dias
+      <span class="resumo">${emDiaQtd} de ${linhas.length} em dia</span><span class="seta">›</span></summary>
+    <div class="corpo" style="font-size:.85rem">
+      ${linhas.map(l=>`<div class="linha-flex" style="padding:5px 0;border-bottom:1px solid var(--linha);gap:8px">
+        <span class="cresce" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.emDia?esc(l.f.nome):"<b>"+esc(l.f.nome)+"</b>"}</span>
+        <span class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2px;flex:none">${l.marcas}</span>
+        <span class="num mut" style="flex:none;min-width:34px;text-align:right">${l.envUteis}/${uteis}</span></div>`).join("")}
+      <p class="mt" style="font-weight:700">${emDiaQtd} de ${linhas.length} fazendas em dia <span class="mut" style="font-weight:400">(enviou ontem ou hoje)</span></p>
+      <p class="mut" style="font-size:.72rem">● enviado · ○ faltou · – domingo sem envio</p>
+    </div></details>`;
+}
+
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
@@ -1615,6 +1647,7 @@ function vPainel(){
       <div class="cresce"><h2>${enviadasHoje} de ${D.fazendas.length} fazendas enviaram hoje</h2>
       <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
+    ${cartaoFarolBoletins()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
       const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
