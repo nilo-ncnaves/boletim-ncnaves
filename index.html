@@ -817,7 +817,7 @@ let D=null;              // banco de dados do app
 let sessao=null;         // {userId, papel, nome}
 let rascunho=null;       // boletim em edição
 let telaAtual="entrada";
-let filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:""};
+let filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:"", atv:""};
 let salvandoTimer=null, rascunhoTimer=null;
 
 async function carregarTudo(){
@@ -1312,7 +1312,8 @@ const LISTA_DESTINO = ["Terreiro","Direto ao secador","Outra fazenda 🚚","Outr
 function indicadores(dias){
   const lim = new Date(); lim.setDate(lim.getDate()-dias);
   const limISO = lim.getFullYear()+"-"+String(lim.getMonth()+1).padStart(2,"0")+"-"+String(lim.getDate()).padStart(2,"0");
-  const bs = D.boletins.filter(b=>b.data>=limISO && (!filtroPainel.fazenda || b.fazendaId===filtroPainel.fazenda));
+  const bs = D.boletins.filter(b=>b.data>=limISO && (!filtroPainel.fazenda || b.fazendaId===filtroPainel.fazenda)
+    && (!filtroPainel.atv || atividadeDe(b.fazendaId)===filtroPainel.atv));
   let sacas=0, chuva=0, horasMaq=0, ativ=0, fitoAltos=0, ocorrAltas=0;
   bs.forEach(b=>{
     (b.colheita||[]).forEach(c=>sacas+=n0(c.sacas));
@@ -1382,9 +1383,13 @@ function vEntrada(){
     <div class="marca"><div class="grao">☕</div><h1>Boletim Diário das Fazendas</h1>
       <p class="mut">Grupo LGS · informativo diário de campo</p></div>
     ${avisoMem}
-    <p class="mut mb centro">Quem está entrando?</p>
-    <button class="perfil-btn" data-perfil="gerente"><span class="ava">🧑‍🌾</span>
-      <span><b>Gerente de fazenda</b><span class="mut">Preenche o boletim do dia</span></span></button>
+    <p class="mut mb centro">Qual é a sua atividade?</p>
+    <button class="perfil-btn" data-atividade="CAFE" style="border-left:4px solid var(--cereja)"><span class="ava">☕</span>
+      <span><b>Café</b><span class="mut">Boletim das lavouras de café</span></span></button>
+    <button class="perfil-btn" data-atividade="GRAOS" style="border-left:4px solid var(--amarelo)"><span class="ava">🌾</span>
+      <span><b>Grãos</b><span class="mut">Boletim dos pivôs e lavouras anuais</span></span></button>
+    <button class="perfil-btn" data-atividade="PECUARIA" style="border-left:4px solid var(--terra)"><span class="ava">🐂</span>
+      <span><b>Pecuária</b><span class="mut">Boletim do gado e dos pastos</span></span></button>
     <button class="perfil-btn" data-perfil="pos"><span class="ava">🏭</span>
       <span><b>Terreiro / Secador / Benefício</b><span class="mut">Registro diário do pós-colheita</span></span></button>
     <button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
@@ -1395,9 +1400,12 @@ function vEntrada(){
   </div>`;
 }
 function vEscolheFazenda(){
-  return topo("Qual fazenda?","Toque na sua fazenda", true)+
-    D.fazendas.map(f=>`<button class="perfil-btn" data-fazenda="${f.id}">
-      <span class="ava">🌱</span><span><b>${esc(f.nome)}</b><span class="mut">${esc(f.municipio||"")}</span></span></button>`).join("");
+  const atv=(sessao&&sessao.papel==="gerente")?(sessao.atividade||""):"";
+  const lista=D.fazendas.filter(f=>!atv || atividadeDe(f.id)===atv);
+  return topo(atv?emojiAtividade(atv)+" "+rotuloAtividade(atv):"Qual fazenda?", atv?"Toque na sua unidade":"Toque na sua fazenda", true)+
+    lista.map(f=>`<button class="perfil-btn" data-fazenda="${f.id}">
+      <span class="ava">${atv?emojiAtividade(atv):"🌱"}</span><span><b>${esc(f.nome)}</b><span class="mut">${esc(f.municipio||"")}</span></span></button>`).join("")+
+    (atv?`<button class="btn sec mt" data-voltar="1">‹ Trocar atividade</button>`:"");
 }
 /* ---------- Tela: casa do gerente ---------- */
 function vCasaGerente(){
@@ -1407,7 +1415,9 @@ function vCasaGerente(){
   const ontem = boletinsOrdenados().find(x=>x.data<hojeISO() && x.fazendaId===fz);
   const temRasc = rascunho && !rascunho.id && rascunho.fazendaId===fz;
   const rec = envioRecente && (boletimDoDia(hojeISO(),fz)||{}).id===envioRecente ? envioRecente : null;
-  return topo(fazenda(fz).nome,"Gerente")+`
+  const atCasa=atividadeDe(fz);
+  return topo(fazenda(fz).nome, emojiAtividade(atCasa)+" "+rotuloAtividade(atCasa)+" · Gerente")
+  +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`+`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
       <h2>✅ Boletim enviado!</h2>
       <p class="mut">Quer avisar o grupo? Um toque e o resumo já vai pronto.</p>
@@ -1440,7 +1450,7 @@ function vCasaGerente(){
           <span class="mut">›</span></button></li>`).join("")||"<li class='mut'>Nenhum boletim ainda.</li>"}
       </ul></div>
     <button class="btn suave mt" id="bt-ajuda">Como preencher (passo a passo)</button>
-    <button class="btn sec mt" id="bt-trocar-faz">Trocar de fazenda</button>
+    <button class="btn sec mt" id="bt-trocar-faz">Trocar fazenda / atividade</button>
     <button class="btn sec mt" id="bt-sair">Sair</button>`;
 }
 function resumo1linha(b){
@@ -1562,7 +1572,9 @@ function vForm(){
   const ontem = boletinsOrdenados().find(b=>b.data<r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   const podeCopiar = !r.id && ontem && !r.atividades.length && r.mo.proprios==="";
   const cats=[...new Set(D.maquinas.map(m=>m.cat))];
-  return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente", true)+`
+  const atForm=atividadeDe(r.fazendaId);
+  return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), emojiAtividade(atForm)+" "+rotuloAtividade(atForm)+" · "+(r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente"), true)
+  +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`+`
   <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>`+`
   <p class="mut mb" style="font-size:.8rem">⏱️ Leva uns 3 minutos. Preencha só o que teve no dia — o que não teve, deixe em branco.</p>
   <div class="cartao" style="padding:10px 14px"><label>Quem está preenchendo</label>
@@ -1912,12 +1924,17 @@ function cartaoFarolBoletins(){
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
-  const enviadasHoje = D.fazendas.filter(f=>boletimDoDia(hoje,f.id)).length;
+  const unidadesAtv = D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
+  const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
   const i7 = indicadores(7), i30 = indicadores(30);
   const lista = filtrarBoletins();
   return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
+    <div class="chips no-print mb">
+      <button class="chip ${!filtroPainel.atv?"on":""}" data-atv-filtro="">Todas</button>
+      ${ATIVIDADES.map(([k,emo,rot])=>`<button class="chip ${filtroPainel.atv===k?"on":""}" data-atv-filtro="${k}">${emo} ${rot}</button>`).join("")}
+    </div>
     <div class="cartao"><div class="linha-flex"><span class="farol ${enviadasHoje?"ok":"espera"}"></span>
-      <div class="cresce"><h2>${enviadasHoje} de ${D.fazendas.length} fazendas enviaram hoje</h2>
+      <div class="cresce"><h2>${enviadasHoje} de ${unidadesAtv.length} unidades enviaram hoje</h2>
       <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
     ${cartaoFarolBoletins()}
@@ -1935,7 +1952,8 @@ function vPainel(){
     ${(()=>{const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
       /* fazenda sem irrigação (perfil só pecuária) fica fora do custo e da divergência iCrop */
       const fzs=D.fazendas.map(f=>({f, ic:icropDo(ontem,f.id)}))
-        .filter(x=>x.ic && (temCultura(x.f.id,"CAFE")||temCultura(x.f.id,"GRAOS")));
+        .filter(x=>x.ic && (temCultura(x.f.id,"CAFE")||temCultura(x.f.id,"GRAOS"))
+          && (!filtroPainel.atv || atividadeDe(x.f.id)===filtroPainel.atv));
       if(!fzs.length) return "";
       return `<div class="cartao"><h3>💧 iCrop — medição de ontem</h3>
         ${fzs.map(({f,ic})=>{
@@ -1965,7 +1983,7 @@ function vPainel(){
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
-      ${D.fazendas.map(f=>{const b=boletimDoDia(hoje,f.id);
+      ${unidadesAtv.map(f=>{const b=boletimDoDia(hoje,f.id);
         const st=b?(((b.ocorrencias||[]).some(o=>o.grav==="Alta")||(b.fito||[]).some(x=>x.nivel==="Alto")||(b.irr&&(["Baixo","Crítica"].includes(b.irr.agua)||b.irr.status==="Não rodou")))?"critico":"ok"):(tarde?"espera":"vazio");
         const cults=[...new Set(talhoesAnuais(f.id).map(t=>cicloAtivo(t.id)).filter(Boolean).map(c=>rotuloCultura(c.cultura)))];
         return `<button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${filtroPainel.fazenda===f.id?"border-color:var(--verde)":""}" data-fz="${f.id}">
@@ -2035,6 +2053,7 @@ function filtrarBoletins(){
   const f=filtroPainel, q=f.busca.toLowerCase();
   return boletinsOrdenados().filter(b=>{
     if(f.fazenda && b.fazendaId!==f.fazenda) return false;
+    if(f.atv && atividadeDe(b.fazendaId)!==f.atv) return false;
     if(f.de && b.data<f.de) return false;
     if(f.ate && b.data>f.ate) return false;
     if(f.atividade && !(b.atividades||[]).some(a=>a.tipo===f.atividade)) return false;
@@ -2774,12 +2793,19 @@ function ligarEventos(tela){
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
     /* entrada e fazenda */
+    if(d.atividade){ const u=D.usuarios.find(x=>x.papel==="gerente"); if(!u) return;
+      sessao={userId:u.id, papel:"gerente", nome:u.nome, atividade:d.atividade, fazendaId:null};
+      Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
     if(d.perfil){ const u=D.usuarios.find(x=>x.papel===d.perfil); if(!u) return;
       if(d.perfil==="gerente"||d.perfil==="pos"){ sessao={userId:u.id,papel:d.perfil,nome:u.nome,fazendaId:null}; Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("fazendas"); }
       else { sessao={userId:u.id,papel:u.papel,nome:u.nome}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("painel"); } return; }
     if(d.fazenda){ sessao={...sessao, fazendaId:d.fazenda, nome:"Gerente — "+fazenda(d.fazenda).nome};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa"); return; }
-    if(t.id==="bt-trocar-faz"){ rascunho=null; ir("fazendas"); return; }
+    if(t.id==="bt-trocar-faz"){ rascunho=null;
+      if(sessao && sessao.papel==="gerente"){ sessao={...sessao, fazendaId:null};
+        Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("entrada"); }
+      else ir("fazendas");
+      return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
     if(t.id==="bt-sync-salvar"){
       const u=(app.querySelector("#sync-url")||{}).value||"", k=(app.querySelector("#sync-key")||{}).value||"";
@@ -2790,7 +2816,9 @@ function ligarEventos(tela){
         ir("cadastros",null,true); });
       return; }
     if(d.receber){ confirmarRemessa(d.receber); return; }
-    if(d.limparFiltros){ filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:""}; ir(telaAtual,null,true); return; }
+    if(d.limparFiltros){ filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:"", atv:""}; ir(telaAtual,null,true); return; }
+    if(d.atvFiltro!==undefined && sessao && (sessao.papel==="proprietario"||sessao.papel==="admin")){
+      filtroPainel.atv=d.atvFiltro; filtroPainel.fazenda=""; ir("painel",null,true); return; }
     if(d.impfonte){
       impEstado = (impEstado&&impEstado.cab)
         ? {...impEstado, fonte:d.impfonte, mapa:{}, resultado:"", semMaq:[], semTal:[]}
@@ -3337,7 +3365,9 @@ function vHistorico(){ return vPainel(); }
 (async function(){
   try{ await carregarTudo(); }
   catch(e){ D=dadosSemente(); Persist.usaMem=true; }
-  ir(sessao ? "casa" : "entrada");
+  /* abre direto na última unidade usada; a tela de atividades só aparece
+     no primeiro uso ou quando o usuário toca em trocar fazenda/atividade */
+  ir(sessao ? (((sessao.papel==="gerente"||sessao.papel==="pos") && !sessao.fazendaId) ? "entrada" : "casa") : "entrada");
 })();
 </script>
 <script>
