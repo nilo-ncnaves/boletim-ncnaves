@@ -1445,7 +1445,9 @@ function secaoGraos(r){
       <p class="mut mt" style="font-size:.78rem">Toque nas operações feitas hoje em cada talhão. Elas entram como atividades do boletim${semCafe?" — pessoas e máquinas você ajusta logo abaixo":" — pessoas e máquinas você ajusta na seção Atividades"}.</p>
       ${anuais.length?anuais.map(t=>{
         const c=cicloAtivo(t.id);
-        if(!c) return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px"><b>${esc(t.nome)}</b> <span class="mut">— em preparo / pousio</span></div>`;
+        if(!c) return `<div class="linha-flex mt" style="border-top:1px dashed var(--linha);padding-top:10px;flex-wrap:wrap;gap:6px">
+          <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">— em preparo / pousio</span></span>
+          <button class="btn suave mini" data-novo-ciclo="${t.id}">🌱 Novo plantio</button></div>`;
         return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px">
           <b>${esc(t.nome)}</b> <span class="mut">— ${rotuloCultura(c.cultura)}${c.plantio?", plantado "+fmtData(c.plantio):""}${c.colheitaPrevista?" · colheita prevista "+fmtData(c.colheitaPrevista):""}</span>
           <div class="chips mt">${operacoesDa(c.cultura).map(op=>{
@@ -2802,10 +2804,10 @@ function ligarEventos(tela){
       const dt=prompt("Data do plantio (dia/mês/ano):",fmtData(hojeISO())); if(dt===null) return;
       D.ciclos=D.ciclos||[];
       D.ciclos.push({id:uid(), talhaoId:d.novoCiclo, cultura:cult, plantio:dataNorm(dt)||hojeISO()});
-      salvarDados(); ir("cadastros",null,true); return; }
+      salvarDados(); ir(telaAtual,null,true); return; }
     if(d.encCiclo){ const c=(D.ciclos||[]).find(x=>x.id===d.encCiclo); if(!c) return;
       if(!confirm("Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+talhao(c.talhaoId).nome+"? O ciclo fica guardado no histórico.")) return;
-      c.encerradoEm=hojeISO(); salvarDados(); ir("cadastros",null,true); return; }
+      c.encerradoEm=hojeISO(); salvarDados(); ir(telaAtual,null,true); return; }
     if(d.vincAbrir){ vincAberto = (vincAberto===d.vincAbrir) ? "" : d.vincAbrir; ir("cadastros",null,true); return; }
     if(d.vincGrupo){ const m=D.maquinas.find(x=>x.id===d.vincGrupo); if(m){ m.fazendas=[]; salvarDados(); ir("cadastros",null,true); } return; }
     if(d.vincFaz){ const [mid,fid]=d.vincFaz.split(":");
