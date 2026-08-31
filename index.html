@@ -851,6 +851,10 @@ async function carregarTudo(){
     delete m.fazendaId;
     m.fazendas = m.fazendas.filter(fz=>D.fazendas.some(f=>f.id===fz));
   });
+  /* multicultura: classifica talhões sem tipo pelo nome e garante os campos novos */
+  (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=classificarTalhao(t.nome); });
+  (D.fazendas||[]).forEach(f=>{ if(f.entidade===undefined) f.entidade=""; });
+  D.ciclos = D.ciclos||[];
   await syncCarregarCfg();
   window.addEventListener && window.addEventListener("online", ()=>syncTudo());
   setTimeout(()=>syncTudo(), 800);
@@ -878,6 +882,51 @@ const talhao = id => D.talhoes.find(t=>t.id===id)||{nome:"?",area:0};
 const fazenda = id => D.fazendas.find(f=>f.id===id)||{nome:"?"};
 const talhoesDa = fz => D.talhoes.filter(t=>t.fazendaId===fz);
 const maquinasDa = fz => D.maquinas.filter(m=>(m.fazendas||[]).includes(fz));
+/* ---- Multicultura: tipo do talhão, ciclos de cultura anual e catálogos ---- */
+const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["MILHO_SEMENTE","Milho semente"],
+  ["PASTO_PECUARIA","Pasto / pecuária"],["ESTRUTURA","Estrutura"],["INDEFINIDO","Indefinido"]];
+const rotuloTipo = tp => { const h=TIPOS_TALHAO.find(([k])=>k===tp); return h?h[1]:"Indefinido"; };
+function classificarTalhao(nome){
+  const n=String(nome||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(/pivo|gleba|sequeiro/.test(n)) return "GRAO_ANUAL";
+  if(/pasto|retiro|curral/.test(n)) return "PASTO_PECUARIA";
+  if(/cafe|setor|catuai|ipr|ibc|mundo novo|topazio/.test(n)) return "CAFE_PERENE";
+  if(/sede|represa|area geral|armazem/.test(n)) return "ESTRUTURA";
+  return "INDEFINIDO";
+}
+const culturasDa = fz => [...new Set(talhoesDa(fz).map(t=>t.tipo).filter(tp=>tp&&tp!=="ESTRUTURA"&&tp!=="INDEFINIDO"))];
+const talhoesAnuais = fz => talhoesDa(fz).filter(t=>t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE");
+const talhoesPasto = fz => talhoesDa(fz).filter(t=>t.tipo==="PASTO_PECUARIA");
+/* fazenda só de pecuária (pastos + estruturas): esconde as seções de lavoura do boletim */
+const soPecuaria = fz => { const ts=talhoesDa(fz);
+  return ts.length>0 && ts.every(t=>t.tipo==="PASTO_PECUARIA"||t.tipo==="ESTRUTURA") && ts.some(t=>t.tipo==="PASTO_PECUARIA"); };
+/* A cultura anual vive no CICLO, nunca no talhão (rotação = histórico de ciclos).
+   D.ciclos: {id, talhaoId, cultura, plantio, colheitaPrevista?, encerradoEm?} */
+const cicloAtivo = talhaoId => (D.ciclos||[]).find(c=>c.talhaoId===talhaoId && !c.encerradoEm);
+const CULTURAS_ANUAIS=[["FEIJAO","Feijão"],["SOJA","Soja"],["MILHO_COMERCIAL","Milho comercial"],["MILHO_SEMENTE","Milho semente"]];
+const rotuloCultura = c => { const h=CULTURAS_ANUAIS.find(([k])=>k===c); return h?h[1]:(c||""); };
+/* Catálogos de operações por cultura — mesmo molde do LISTA_FUNCOES do café (que fica intocado) */
+const OPS_FEIJAO_SOJA=["Dessecação pré-plantio","Tratamento de sementes","Plantio","Inoculação (soja)",
+  "Adubação de cobertura","Pulverização fungicida","Pulverização inseticida","Monitoramento de pragas",
+  "Capina química","Dessecação pré-colheita","Colheita mecanizada","Transporte da produção"];
+const OPS_MILHO_COMERCIAL=["Plantio","Adubação de cobertura (N)","Pulverização","Irrigação","Colheita","Transporte","Secagem"];
+const OPS_MILHO_SEMENTE=[...OPS_MILHO_COMERCIAL,"Despendoamento — passe 1","Despendoamento — passe 2","Despendoamento — passe 3",
+  "Roguing / purificação","Conferência de isolamento","Destruição do macho","Colheita em espiga","Visita de fiscalização / sementeira"];
+const LISTA_PECUARIA=["Contagem do lote","Trato de cocho / ração","Sal mineral","Água / aguadas",
+  "Rotação de pasto — entrada","Rotação de pasto — saída","Vacinação","Vermifugação","Mosca / carrapato",
+  "Cura de bicheira","Estação de monta","Diagnóstico de gestação","Nascimento","Desmama","Apartação",
+  "Pesagem","Embarque / venda","Morte (com causa)"];
+function operacoesDa(cultura){
+  if(cultura==="FEIJAO"||cultura==="SOJA") return OPS_FEIJAO_SOJA;
+  if(cultura==="MILHO_COMERCIAL") return OPS_MILHO_COMERCIAL;
+  if(cultura==="MILHO_SEMENTE") return OPS_MILHO_SEMENTE;
+  return [];
+}
+function temPecuaria(r){
+  const p=r&&r.pecuaria; if(!p) return false;
+  return (p.lotes||[]).some(l=>l.talhaoId||l.lote||n0(l.cabecas)) ||
+    (p.eventos||[]).some(e=>e.tipo) || !!p.cocho || !!p.sal || !!p.agua;
+}
 /* ---- Estrutura de pós-colheita e remessas entre fazendas ---- */
 const ESTR_ITENS=[["terreiro","☀️ Terreiro"],["secador","🔥 Secador"],["tulha","🏠 Tulha"],["benef","⚙️ Benefício"]];
 const estruturaDe = fz => (D.estruturas||{})[fz]||{};
@@ -1215,7 +1264,8 @@ function novoRascunho(dataBase){
     mo:{proprios:"", diaristas:"", faltas:"", motivoFaltas:"", horasExtras:"", funcoes:[]},
     atividades:[], colheita:[],
     pos:{terreiro:"", secLote:"", secTemp:"", secHoras:"", sacasBenef:""},
-    fito:[], ocorrencias:[], obsGeral:"", pendencias:""
+    fito:[], ocorrencias:[], obsGeral:"", pendencias:"",
+    ...(talhoesPasto(fz).length?{pecuaria:{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]}}:{})
   };
 }
 
@@ -1327,10 +1377,75 @@ function topo(titulo, sub, voltar){
   </div>`;
 }
 
+/* ---------- Seções multicultura do formulário ---------- */
+function secaoGraos(r){
+  const anuais=talhoesAnuais(r.fazendaId);
+  if(!anuais.length) return "";
+  const nAtivos=anuais.filter(t=>cicloAtivo(t.id)).length;
+  return `<details class="secao" ${nAtivos?"open":""}><summary><span class="ico">🌾</span>Lavouras anuais (grãos)
+    <span class="resumo">${nAtivos?nAtivos+" ciclo"+(nAtivos>1?"s":"")+" ativo"+(nAtivos>1?"s":""):""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      <p class="mut mt" style="font-size:.78rem">Toque nas operações feitas hoje em cada talhão. Elas entram como atividades do boletim — pessoas e máquinas você ajusta na seção Atividades.</p>
+      ${anuais.map(t=>{
+        const c=cicloAtivo(t.id);
+        if(!c) return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px"><b>${esc(t.nome)}</b> <span class="mut">— em preparo / pousio</span></div>`;
+        return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px">
+          <b>${esc(t.nome)}</b> <span class="mut">— ${rotuloCultura(c.cultura)}${c.plantio?", plantado "+fmtData(c.plantio):""}${c.colheitaPrevista?" · colheita prevista "+fmtData(c.colheitaPrevista):""}</span>
+          <div class="chips mt">${operacoesDa(c.cultura).map(op=>{
+            const on=(r.atividades||[]).some(a=>a.talhaoId===t.id && a.tipo===op);
+            return `<button class="chip ${on?"on":""}" data-opgrao="${t.id}|${esc(op)}">${esc(op)}</button>`;
+          }).join("")}</div></div>`;
+      }).join("")}
+    </div></details>`;
+}
+function cardLotePec(l,i,fz){
+  return `<div class="mt" data-peclote="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>Pasto / retiro</label>
+    <select data-pl="talhaoId">${["<option value=''>Selecione…</option>",
+      ...talhoesPasto(fz).map(t=>`<option value="${t.id}" ${l.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>
+    <div class="grade2 mt">
+      <div><label>Lote / categoria</label><input data-pl="lote" value="${esc(l.lote||"")}" placeholder="Ex.: recria 2024"></div>
+      <div><label>Cabeças contadas</label><input inputmode="numeric" data-pl="cabecas" value="${esc(l.cabecas||"")}"></div>
+    </div>
+    <button class="btn suave mini mt" data-rm-peclote="${i}">remover este lote</button></div>`;
+}
+function cardEventoPec(e2,i){
+  return `<div class="mt" data-pecev="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>O que houve</label>
+    <select data-pe="tipo">${["<option value=''>Selecione…</option>",
+      ...LISTA_PECUARIA.map(tp=>`<option ${e2.tipo===tp?"selected":""}>${tp}</option>`)].join("")}</select>
+    <label>Quantidade (cabeças)</label><input inputmode="numeric" data-pe="qtd" value="${esc(e2.qtd||"")}">
+    <label>Observação</label><input data-pe="obs" value="${esc(e2.obs||"")}" placeholder="Ex.: causa da morte, pasto de destino">
+    <button class="btn suave mini mt" data-rm-pecev="${i}">remover este evento</button></div>`;
+}
+function secaoPecuaria(r){
+  if(!talhoesPasto(r.fazendaId).length) return "";
+  if(!r.pecuaria) r.pecuaria={lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+  const p=r.pecuaria;
+  const tot=(p.lotes||[]).reduce((s,l)=>s+n0(l.cabecas),0);
+  const chips=(k,attr)=>["OK","Problema"].map(v=>`<button class="chip ${p[k]===v?"on":""}" data-${attr}="${v}">${v==="OK"?"✔ OK":"⚠ Problema"}</button>`).join("");
+  return `<details class="secao" ${temPecuaria(r)?"open":""}><summary><span class="ico">🐂</span>Retiro (pecuária)
+    <span class="resumo" id="res-pec">${tot?tot+" cabeças":""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      <label>Contagem por lote / pasto</label>
+      <div id="lista-pec-lotes">${(p.lotes||[]).map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("")}</div>
+      <button class="btn suave mini mt" id="bt-add-lote-pec">＋ lote / pasto</button>
+      <label class="mt">Cocho / ração</label><div class="chips">${chips("cocho","pec-cocho")}</div>
+      <label>Sal mineral</label><div class="chips">${chips("sal","pec-sal")}</div>
+      <label>Água / aguadas</label><div class="chips">${chips("agua","pec-agua")}</div>
+      <input data-pec="estrutObs" value="${esc(p.estrutObs||"")}" placeholder="Se houve problema, conte aqui"
+        style="margin-top:8px;${(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"display:none"}">
+      <label class="mt">Eventos do dia</label>
+      <div id="lista-pec-ev">${(p.eventos||[]).map((e2,i)=>cardEventoPec(e2,i)).join("")}</div>
+      <button class="btn suave mini mt" id="bt-add-ev-pec">＋ evento (vacinação, nascimento, embarque…)</button>
+    </div></details>`;
+}
+
 /* ---------- Tela: formulário do boletim ---------- */
 function vForm(){
   const r = rascunho;
   const safra = emSafra();
+  const pecSo = soPecuaria(r.fazendaId);
   const ontem = boletinsOrdenados().find(b=>b.data<r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   const podeCopiar = !r.id && ontem && !r.atividades.length && r.mo.proprios==="";
   const cats=[...new Set(D.maquinas.map(m=>m.cat))];
@@ -1383,7 +1498,7 @@ function vForm(){
     </div></details>
 
 
-  <details class="secao" ${(r.irr&&(r.irr.status||r.irr.agua))?"open":""}><summary><span class="ico">💧</span>Irrigação (gotejo)
+  <details class="secao" ${pecSo?'style="display:none" ':""}${(r.irr&&(r.irr.status||r.irr.agua))?"open":""}><summary><span class="ico">💧</span>Irrigação (gotejo)
     <span class="resumo" id="res-irr">${r.irr&&r.irr.status?esc(r.irr.status):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
       ${(()=>{const ic=icropDo(r.data,r.fazendaId);
@@ -1426,7 +1541,8 @@ function vForm(){
       </div>
       <label>Observação</label><input data-irr="obs" value="${esc(r.irr?r.irr.obs:"")}" placeholder="Opcional — ex.: setor 3 parado 2 h">
     </div></details>
-  <details class="secao" ${r.atividades.length?"open":""}><summary><span class="ico">🚜</span>Atividades por talhão
+  ${secaoGraos(r)}
+  <details class="secao" ${pecSo?'style="display:none" ':""}${r.atividades.length?"open":""}><summary><span class="ico">🚜</span>Atividades por talhão
     <span class="resumo" id="res-ativ">${r.atividades.length?r.atividades.length+" registro"+(r.atividades.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
       ${(()=>{const tel=telemetriaDo(r.data,r.fazendaId);
@@ -1442,14 +1558,14 @@ function vForm(){
       <div id="lista-ativ">${r.atividades.map(cardAtividade).join("")}</div>
       <button class="btn suave mt" id="bt-add-ativ">＋ Adicionar atividade</button></div></details>
 
-  <details class="secao" ${r.colheita.length?"open":""}><summary><span class="ico">🍒</span>Colheita ${safra?'<span class="tag cereja" style="margin-left:6px">Safra</span>':""}
+  <details class="secao" ${pecSo?'style="display:none" ':""}${r.colheita.length?"open":""}><summary><span class="ico">🍒</span>Colheita ${safra?'<span class="tag cereja" style="margin-left:6px">Safra</span>':""}
     <span class="resumo" id="res-col">${r.colheita.length?r.colheita.reduce((s,c)=>s+n0(c.sacas),0)+" sacas":""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-col">${r.colheita.map(cardColheita).join("")}</div>
       <button class="btn suave mt" id="bt-add-col">＋ Registrar colheita de um talhão</button></div></details>
 
+  ${secaoPecuaria(r)}
 
-
-  <details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
+  <details class="secao" ${pecSo?'style="display:none" ':""}${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
     <span class="resumo" id="res-fito">${r.fito.length?r.fito.length+" registro"+(r.fito.length>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mt" id="bt-add-fito">＋ Registrar ocorrência fitossanitária</button></div></details>
@@ -1736,9 +1852,10 @@ function vPainel(){
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
       ${D.fazendas.map(f=>{const b=boletimDoDia(hoje,f.id);
         const st=b?(((b.ocorrencias||[]).some(o=>o.grav==="Alta")||(b.fito||[]).some(x=>x.nivel==="Alto")||(b.irr&&(["Baixo","Crítica"].includes(b.irr.agua)||b.irr.status==="Não rodou")))?"critico":"ok"):(tarde?"espera":"vazio");
+        const cults=[...new Set(talhoesAnuais(f.id).map(t=>cicloAtivo(t.id)).filter(Boolean).map(c=>rotuloCultura(c.cultura)))];
         return `<button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${filtroPainel.fazenda===f.id?"border-color:var(--verde)":""}" data-fz="${f.id}">
         <span class="linha-flex" style="gap:7px"><span class="farol ${st}"></span>
-        <b style="font-size:.8rem;white-space:nowrap">${esc(f.nome)}</b></span></button>`;}).join("")}
+        <b style="font-size:.8rem;white-space:nowrap">${esc(f.nome)}</b>${cults.length?`<span class="mut" style="font-size:.7rem;white-space:nowrap">🌾 ${cults.join(" · ")}</span>`:""}</span></button>`;}).join("")}
     </div>
     ${filtroPainel.fazenda?(()=>{ const f=fazenda(filtroPainel.fazenda);
       const bh=boletimDoDia(hoje,f.id);
@@ -1855,6 +1972,14 @@ function vDetalhe(id){
       ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.sacas)?n0(c.sacas)+" sacas · ":""}destino: ${esc(c.destino)||"—"}
         ${c.modo?` <span class="tag verde">${esc(c.modo).toLowerCase()}</span>`:""}${c.passada?` <span class="tag terra">${esc(c.passada)}</span>`:""}
         <div class="matura"><div class="mat-cereja" style="width:${s?100*n0(c.cereja)/s:0}%">${n0(c.cereja)}%</div><div class="mat-verde" style="width:${s?100*n0(c.verde)/s:0}%">${n0(c.verde)}%</div><div class="mat-seco" style="width:${s?100*n0(c.seco)/s:0}%">${n0(c.seco)}%</div></div></div>`;}).join("")}</div>`:""}
+    ${temPecuaria(b)?`<div class="cartao"><h3>🐂 Retiro</h3>
+      ${(b.pecuaria.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas)).map(l=>`<p class="mt"><b>${esc(talhao(l.talhaoId).nome==="?"?(l.lote||"Lote"):talhao(l.talhaoId).nome)}</b>${l.lote&&talhao(l.talhaoId).nome!=="?"?" · "+esc(l.lote):""} — <b class="num">${n0(l.cabecas)}</b> cabeças</p>`).join("")}
+      ${(b.pecuaria.cocho||b.pecuaria.sal||b.pecuaria.agua)?`<dl class="dl mt">
+        ${b.pecuaria.cocho?`<dt>Cocho</dt><dd>${b.pecuaria.cocho==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+        ${b.pecuaria.sal?`<dt>Sal mineral</dt><dd>${b.pecuaria.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+        ${b.pecuaria.agua?`<dt>Água</dt><dd>${b.pecuaria.agua==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+        ${b.pecuaria.estrutObs?`<dt>Obs.</dt><dd>${esc(b.pecuaria.estrutObs)}</dd>`:""}</dl>`:""}
+      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
     ${(b.pos&&(b.pos.terreiro||b.pos.secLote||n0(b.pos.sacasBenef)))?`<div class="cartao"><h3>🏭 Pós-colheita</h3><dl class="dl mt">
       ${b.pos.terreiro?`<dt>Terreiro</dt><dd>${esc(b.pos.terreiro)}</dd>`:""}
       ${b.pos.secLote?`<dt>Secador</dt><dd>${esc(b.pos.secLote)} · ${esc(b.pos.secTemp)}°C · ${esc(b.pos.secHoras)} h</dd>`:""}
@@ -2005,11 +2130,17 @@ function vCadastros(){
       <ul class="lista-limpa">${D.fazendas.map(f=>`<li style="padding:8px 0;border-bottom:1px solid var(--linha)">
         <b>${esc(f.nome)}</b>
         <div class="chips mt">${ESTR_ITENS.map(([k,r])=>`<button class="chip ${estruturaDe(f.id)[k]?"on":""}" data-estr="${f.id}:${k}">${r}</button>`).join("")}</div></li>`).join("")}</ul></div>
-    <div class="cartao"><h3>Talhões <span class="mut">· vincule cada um à sua fazenda</span></h3>
-      <ul class="lista-limpa">${D.talhoes.map(t=>`<li class="linha-flex" style="flex-wrap:wrap;gap:6px">
-        <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">· ${t.area} ha</span></span>
+    <div class="cartao"><h3>Talhões <span class="mut">· fazenda, tipo de uso e ciclo de cultura</span></h3>
+      <p class="mut" style="font-size:.78rem">Nos talhões de grão (anual), a cultura vive no <b>ciclo</b>: use "Novo plantio" ao plantar e "Encerrar colheita" ao terminar. O histórico de ciclos nunca é apagado.</p>
+      <ul class="lista-limpa">${D.talhoes.map(t=>{
+        const c=cicloAtivo(t.id), anual=(t.tipo==="GRAO_ANUAL"||t.tipo==="MILHO_SEMENTE");
+        return `<li class="linha-flex" style="flex-wrap:wrap;gap:6px">
+        <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">· ${t.area} ha${c?" · "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):(anual?" · em preparo / pousio":"")}</span></span>
         ${selFaz(t.fazendaId,"vinc-tal",t.id)}
-        <button class="btn suave mini" data-rm-cad="talhao:${t.id}">remover</button></li>`).join("")}</ul>
+        <select data-tipo-tal="${t.id}" class="mini" style="max-width:150px">${TIPOS_TALHAO.map(([k,rot])=>`<option value="${k}" ${t.tipo===k?"selected":""}>${rot}</option>`).join("")}</select>
+        ${anual?(c?`<button class="btn suave mini" data-enc-ciclo="${c.id}">Encerrar colheita</button>`
+                  :`<button class="btn suave mini" data-novo-ciclo="${t.id}">Novo plantio</button>`):""}
+        <button class="btn suave mini" data-rm-cad="talhao:${t.id}">remover</button></li>`;}).join("")}</ul>
       <button class="btn suave mini mt" data-add-cad="talhao">＋ adicionar talhão</button></div>
     <div class="cartao"><h3>Máquinas e equipamentos <span class="mut">· ${maqs.length} de ${D.maquinas.length}</span></h3>
       <input id="cad-busca-maq" placeholder="Filtrar por nome, COD ou categoria…" value="${esc(filtroCadMaq||"")}" class="mb">
@@ -2092,7 +2223,8 @@ function resumoWhats(b){
   (b.atividades||[]).forEach(a=>{
     const maq=(a.maquinas||[]).filter(m=>m.nome).map(m=>m.nome.replace(/\s*\(COD[^)]*\)/,"")+" "+n0(m.horas)+"h").join(", ");
     const st=a.status==="concluida"?" ✔":a.status==="continua"?" ⏳":"";
-    L.push("🔧 "+(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(n0(a.pessoas)?" · "+n0(a.pessoas)+"p":"")+(maq?" · "+maq:"")+st+(a.obs?" — "+a.obs:""));
+    const cic=cicloAtivo(a.talhaoId);
+    L.push("🔧 "+(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(cic?" ("+rotuloCultura(cic.cultura)+")":"")+(n0(a.pessoas)?" · "+n0(a.pessoas)+"p":"")+(maq?" · "+maq:"")+st+(a.obs?" — "+a.obs:""));
     if(a.receita) L.push("🧪 "+a.receita.split(/\n+/).map(s=>s.trim()).filter(Boolean).join(" · "));
     if(n0(a.tanques)) L.push("🛢️ Gastou "+n0(a.tanques)+" tanque"+(n0(a.tanques)>1?"s":"")+(n0(a.ltanque)?" × "+n0(a.ltanque)+" L = "+(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")+" L":""));
   });
@@ -2101,6 +2233,16 @@ function resumoWhats(b){
       +((x.cereja!==""&&x.cereja!=null)?" · "+n0(x.cereja)+"% cereja":""));
     if(x.destino==="Outra fazenda 🚚"&&x.destinoFazendaId) L.push("🚚 Café enviado p/ "+fazenda(x.destinoFazendaId).nome+(x.motorista?" · "+x.motorista:"")+" — aguardando confirmação lá");
   });
+  if(temPecuaria(b)){
+    const p=b.pecuaria;
+    const lotes=(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas));
+    const tot=lotes.reduce((s,l)=>s+n0(l.cabecas),0);
+    if(lotes.length) L.push("🐂 Contagem: "+tot+" cabeças ("+lotes.map(l=>(talhao(l.talhaoId).nome!=="?"?talhao(l.talhaoId).nome:(l.lote||"lote"))+" "+n0(l.cabecas)).join(" · ")+")");
+    const probs=[p.cocho==="Problema"?"cocho":"",p.sal==="Problema"?"sal mineral":"",p.agua==="Problema"?"água":""].filter(Boolean);
+    if(probs.length) L.push("⚠️ Problema em: "+probs.join(", ")+(p.estrutObs?" — "+p.estrutObs:""));
+    else if(p.cocho||p.sal||p.agua) L.push("🐂 Cocho, sal e água: OK");
+    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.obs?" — "+e2.obs:"")); });
+  }
   (b.fito||[]).forEach(f=>{ if(f.nome||f.tipo) L.push("🐛 "+(f.nome||f.tipo)+" — "+talhao(f.talhaoId).nome+" · nível "+(f.nivel||"—")+(f.obs?" — "+f.obs:"")); });
   (b.ocorrencias||[]).forEach(o=>{ L.push((o.grav==="Alta"?"🔴 ":"⚠️ ")+(o.tipo||"Ocorrência")+": "+(o.texto||"")); });
   const ir=b.irr||{};
@@ -2426,7 +2568,7 @@ function avisosEnvio(r){
     if(teveGente) avisos.push("Dia útil com 0 pessoas — esta fazenda teve gente trabalhando nos últimos 7 dias. Esqueceu a mão de obra?");
   }
   if((r.colheita||[]).some(c=>!c.talhaoId)) avisos.push("Colheita lançada sem talhão. Diga de qual talhão saiu o café.");
-  if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length)
+  if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length && !temPecuaria(r))
     avisos.push("Boletim praticamente vazio — sem atividades, colheita nem equipe. Confirma que o dia foi assim?");
   return avisos;
 }
@@ -2451,7 +2593,7 @@ function caixaAvisosEnvio(avisos){
 }
 function validarEnviar(){
   const r=rascunho;
-  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length){
+  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length && !temPecuaria(r)){
     alert("Registre pelo menos o clima ou uma observação do dia."); return;
   }
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
@@ -2593,6 +2735,19 @@ function ligarEventos(tela){
     if(d.rmTul!==undefined){ rascunhoPos.tulhas.splice(parseInt(d.rmTul),1); salvarRascPos(); ir("formpos",null,true); return; }
     if(d.addBen){ rascunhoPos.beneficios.push({lote:"",sacas:"",obs:""}); salvarRascPos(); ir("formpos",null,true); return; }
     if(d.rmBen!==undefined){ rascunhoPos.beneficios.splice(parseInt(d.rmBen),1); salvarRascPos(); ir("formpos",null,true); return; }
+    if(d.novoCiclo){
+      const nomeTal=talhao(d.novoCiclo).nome;
+      const escolha=prompt("Novo plantio em "+nomeTal+" — qual cultura?\n1 = Feijão\n2 = Soja\n3 = Milho comercial\n4 = Milho semente","3");
+      if(escolha===null) return;
+      const cult={"1":"FEIJAO","2":"SOJA","3":"MILHO_COMERCIAL","4":"MILHO_SEMENTE"}[String(escolha).trim()];
+      if(!cult){ alert("Digite 1, 2, 3 ou 4."); return; }
+      const dt=prompt("Data do plantio (dia/mês/ano):",fmtData(hojeISO())); if(dt===null) return;
+      D.ciclos=D.ciclos||[];
+      D.ciclos.push({id:uid(), talhaoId:d.novoCiclo, cultura:cult, plantio:dataNorm(dt)||hojeISO()});
+      salvarDados(); ir("cadastros",null,true); return; }
+    if(d.encCiclo){ const c=(D.ciclos||[]).find(x=>x.id===d.encCiclo); if(!c) return;
+      if(!confirm("Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+talhao(c.talhaoId).nome+"? O ciclo fica guardado no histórico.")) return;
+      c.encerradoEm=hojeISO(); salvarDados(); ir("cadastros",null,true); return; }
     if(d.vincAbrir){ vincAberto = (vincAberto===d.vincAbrir) ? "" : d.vincAbrir; ir("cadastros",null,true); return; }
     if(d.vincGrupo){ const m=D.maquinas.find(x=>x.id===d.vincGrupo); if(m){ m.fazendas=[]; salvarDados(); ir("cadastros",null,true); } return; }
     if(d.vincFaz){ const [mid,fid]=d.vincFaz.split(":");
@@ -2682,6 +2837,38 @@ function ligarEventos(tela){
       r.mo.funcoes.splice(parseInt(d.rmFn),1);
       pintarFuncoes(app,r); salvarRascunho(); return; }
 
+
+    if(d.opgrao){ const [tid,op]=d.opgrao.split("|");
+      const i=r.atividades.findIndex(a=>a.talhaoId===tid && a.tipo===op);
+      if(i>=0) r.atividades.splice(i,1);
+      else r.atividades.push({id:uid(),talhaoId:tid,tipo:op,pessoas:"",obs:"",status:"",falta:"",receita:"",tanques:"",ltanque:"",insumos:[],maquinas:[]});
+      salvarRascunho(); ir("form",null,true); return; }
+    if(t.id==="bt-add-lote-pec"){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+      r.pecuaria.lotes.push({talhaoId:"",lote:"",cabecas:""});
+      $("#lista-pec-lotes").innerHTML=r.pecuaria.lotes.map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPeclote!==undefined){ r.pecuaria.lotes.splice(parseInt(d.rmPeclote),1);
+      $("#lista-pec-lotes").innerHTML=r.pecuaria.lotes.map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("");
+      const sp=$("#res-pec"); if(sp){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0); sp.textContent=tot?tot+" cabeças":""; }
+      salvarRascunho(); return; }
+    if(t.id==="bt-add-ev-pec"){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+      r.pecuaria.eventos.push({tipo:"",qtd:"",obs:""});
+      $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPecev!==undefined){ r.pecuaria.eventos.splice(parseInt(d.rmPecev),1);
+      $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
+      salvarRascunho(); return; }
+    if(d.pecCocho!==undefined||d.pecSal!==undefined||d.pecAgua!==undefined){
+      const p=r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+      const k=d.pecCocho!==undefined?"cocho":(d.pecSal!==undefined?"sal":"agua");
+      const v=d.pecCocho!==undefined?d.pecCocho:(d.pecSal!==undefined?d.pecSal:d.pecAgua);
+      p[k]=(p[k]===v)?"":v;
+      t.parentElement.querySelectorAll("button").forEach(ch=>{
+        const cv=ch.dataset.pecCocho!==undefined?ch.dataset.pecCocho:(ch.dataset.pecSal!==undefined?ch.dataset.pecSal:ch.dataset.pecAgua);
+        ch.classList.toggle("on",cv===p[k]); });
+      const inp=app.querySelector('input[data-pec="estrutObs"]');
+      if(inp) inp.style.display=(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"none";
+      salvarRascunho(); return; }
 
     if(t.id==="bt-add-ativ"){ const a={id:uid(),talhaoId:"",tipo:"",pessoas:"",obs:"",insumos:[],maquinas:[]};
       r.atividades.push(a); $("#lista-ativ").insertAdjacentHTML("beforeend",cardAtividade(a));
@@ -2861,6 +3048,11 @@ function ligarEventos(tela){
         if(d.cc==="sacas"){ const s=$("#res-col"); if(s) s.textContent=r.colheita.reduce((x,y)=>x+n0(y.sacas),0)+" sacas"; } }
       else if(d.f!==undefined){ const c=el.closest("[data-fito]"); r.fito.find(x=>x.id===c.dataset.fito)[d.f]=el.value; }
       else if(d.o!==undefined){ const c=el.closest("[data-oc]"); r.ocorrencias.find(x=>x.id===c.dataset.oc)[d.o]=el.value; }
+      else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]}; r.pecuaria[d.pec]=el.value; }
+      else if(d.pl!==undefined){ const c=el.closest("[data-peclote]"); const l=r.pecuaria.lotes[parseInt(c.dataset.peclote)];
+        if(l){ l[d.pl]=el.value;
+          if(d.pl==="cabecas"){ const sp=$("#res-pec"); if(sp){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0); sp.textContent=tot?tot+" cabeças":""; } } } }
+      else if(d.pe!==undefined){ const c=el.closest("[data-pecev]"); const e3=r.pecuaria.eventos[parseInt(c.dataset.pecev)]; if(e3) e3[d.pe]=el.value; }
       salvarRascunho(); return;
     }
     if(telaAtual==="casa" && sessao && sessao.papel!=="gerente"){
@@ -2892,6 +3084,7 @@ function ligarEventos(tela){
     if(el.id==="rel-de"){ filtroRel.de=el.value; ir("relatorio",null,true); return; }
     if(el.id==="rel-ate"){ filtroRel.ate=el.value; ir("relatorio",null,true); return; }
     if(d.vincTal){ const t2=D.talhoes.find(x=>x.id===d.vincTal); if(t2){ t2.fazendaId=el.value||null; salvarDados(); } return; }
+    if(d.tipoTal){ const t2=D.talhoes.find(x=>x.id===d.tipoTal); if(t2){ t2.tipo=el.value; salvarDados(); ir("cadastros",null,true); } return; }
     if(rascunho && telaAtual==="form"){ app.oninput(ev); return; }
     if(telaAtual==="casa" && sessao && sessao.papel!=="gerente") app.oninput(ev);
   };
@@ -2982,7 +3175,7 @@ function cadastroClique(d,t){
       const area=n0(prompt("Área (ha):")||0);
       const nf=prompt("Fazenda (digite parte do nome):")||"";
       const fz=D.fazendas.find(f=>f.nome.toLowerCase().includes(nf.toLowerCase()));
-      D.talhoes.push({id:uid(),nome,area,fazendaId:fz?fz.id:null}); }
+      D.talhoes.push({id:uid(),nome,area,fazendaId:fz?fz.id:null,tipo:classificarTalhao(nome)}); }
     if(tipo==="maquina"){ const nome=prompt("Nome da máquina (com COD, se tiver):"); if(!nome) return;
       const cat=prompt("Categoria (ex.: Tratores café):","Outros")||"Outros";
       const nf=prompt("Fazendas que ela atende, separadas por vírgula (vazio = grupo todo):")||"";
