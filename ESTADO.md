@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v42** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v43** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -51,6 +51,12 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   madrugada; o app LÊ (icropDo) e mostra medição do dia, compara
   lâmina informada × medida e alerta parcela vencida (icrop_fazendas
   e icrop_parcelas).
+- Vigia iCrop com autodiagnóstico (v43): quando falta dado novo, o
+  app sonda a última data gravada no banco (baixarIcrop grava em
+  D.icropBanco; icropDiagBanco compara) e o aviso do painel diz se o
+  problema é do aplicativo ("banco tem dados de DD/MM mas o app não
+  baixou") ou do robô/token ("banco sem dados desde DD/MM → rodar
+  sql/002-diagnostico-robo-icrop.sql").
 - Solinftec: garagem pronta no código, DESLIGADA.
 
 ## Chaves ligadas/desligadas
@@ -67,6 +73,10 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   SOLINFTEC_AUTO.
 - Token da iCrop (tabela segredos do Supabase) pendente de troca
   (rotação) — trocar direto no SQL Editor, nunca no código.
+- Robô iCrop sem gravar medição nova desde 27/08/2026 (o pg_cron
+  roda — atualizado_em segue avançando — mas a iCrop não devolve
+  dado novo; provável token vencido). Diagnóstico e conserto:
+  Nilo rodar sql/002-diagnostico-robo-icrop.sql no SQL Editor.
 - Porto Buriti (f35): talhões reais a cadastrar (hoje só "Área geral
   (a cadastrar)"); pivôs entram pelo cadastro local da seção
   Irrigação.

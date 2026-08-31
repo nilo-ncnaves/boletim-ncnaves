@@ -1240,12 +1240,29 @@ function icropDo(data,fz){
   });
   return { chuva, eqs, qtd:linhas.length, custoDia };
 }
+function icropDiagBanco(ontem){
+  /* compara a sonda do banco (D.icropBanco, gravada em baixarIcrop) com o dia
+     esperado; só opina com sonda feita hoje — offline volta null e o vigia
+     mantém o texto genérico */
+  const bc=D.icropBanco||{};
+  if(bc.visto!==hojeISO()) return null;
+  const fmt=x=>new Date(x+"T12:00:00").toLocaleDateString("pt-BR");
+  if(!bc.data) return "Banco sem nenhum dado → robô/token: rodar sql/002-diagnostico-robo-icrop.sql no SQL Editor.";
+  if(bc.data>=ontem) return "Banco tem dados de "+fmt(bc.data)+" mas o app não baixou → problema no aplicativo; avisar o Nilo.";
+  return "Banco sem dados novos desde "+fmt(bc.data)+" → robô/token: rodar sql/002-diagnostico-robo-icrop.sql no SQL Editor.";
+}
 async function baixarIcrop(){
   if(!syncAtivo()) return;
   try{
     const d=new Date(); d.setDate(d.getDate()-3);
     const de=d.toISOString().slice(0,10);
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    try{ /* sonda: última data gravada no banco, sem o corte de 3 dias — o vigia do
+            painel usa isso para dizer se a falta de dado é do robô ou do app */
+      const ru=await fetch(syncCfg.url+"/rest/v1/icrop_manejo?select=data&order=data.desc&limit=1", cab);
+      if(ru.ok){ const u=await ru.json();
+        D.icropBanco={ data:(Array.isArray(u)&&u[0]&&u[0].data)||null, visto:hojeISO() }; }
+    }catch(e){}
     const sel="fazenda,equipamento,parcela,data,irrigacao_mm,precipitacao_mm,etc,eto,"
       +"custo_mm:bruto->>reais_mm_ha,deficit:bruto->>deficit_consolidado,"
       +"atraso:bruto->>dias_em_atraso,area:bruto->>area_da_parcela";
@@ -1533,7 +1550,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
     <button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v42</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v43</p>
   </div>`;
 }
 function vEscolheFazenda(){
@@ -2551,9 +2568,10 @@ function vPainel(){
       const ultima=dados.length?dados.map(l=>l.data).sort().slice(-1)[0]:null;
       if(!ultima || ultima<ontem){
         const desde=ultima?new Date(ultima+"T12:00:00").toLocaleDateString("pt-BR"):null;
+        const diag=icropDiagBanco(ontem);
         return `<div class="aviso" style="border-color:var(--amarelo)"><b>⚠️ Robô iCrop sem dados novos</b>
-          <p class="mut" style="margin:4px 0 0;font-size:.8rem">${desde?"Última medição: "+desde+".":"Nenhuma medição baixada ainda."}
-          Se persistir por 2 dias: verificar o token na Vision e avisar o Nilo.</p></div>`;
+          <p class="mut" style="margin:4px 0 0;font-size:.8rem">${desde?"Última medição no app: "+desde+".":"Nenhuma medição baixada ainda."}
+          ${diag?esc(diag):"Se persistir por 2 dias: verificar o token na Vision e avisar o Nilo."}</p></div>`;
       }
       return ""; })()}
     ${(()=>{const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
