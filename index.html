@@ -1020,6 +1020,49 @@ function icropVencimentos(){
   out.vencendo.sort((a,b)=>a.dias-b.dias);
   return (out.vencendo.length||out.zeradas.length)?out:null;
 }
+/* --- Solinftec automático (garagem): só funciona quando SOLINFTEC_AUTO for true
+       e a tabela solinftec_diario existir no Supabase. Com a chave em false,
+       nada é buscado e nada aparece na tela. --- */
+async function baixarSolinftec(){
+  if(!SOLINFTEC_AUTO || !syncAtivo()) return;
+  try{
+    const d=new Date(); d.setDate(d.getDate()-3);
+    const de=d.toISOString().slice(0,10);
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    const r=await fetch(syncCfg.url+"/rest/v1/solinftec_diario?select=fazenda_id,data,equipamento,operacao,talhao,horas,area_ha,consumo_l&data=gte."+de+"&order=data.desc&limit=1500", cab);
+    if(!r.ok) return;
+    const linhas=await r.json();
+    if(Array.isArray(linhas)){ D.solinftecDados=linhas; await salvarDados(); }
+  }catch(e){}
+}
+function solinftecDo(data,fz){
+  if(!SOLINFTEC_AUTO) return null;
+  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && l.fazenda_id===fz);
+  return linhas.length?linhas:null;
+}
+function cartaoSolinftecGerente(fz){
+  if(!SOLINFTEC_AUTO) return "";
+  const linhas=solinftecDo(hojeISO(),fz);
+  if(!linhas) return "";
+  const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
+  return `<div class="cartao"><h3>📡 Solinftec — medição automática do dia</h3>
+    ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
+    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p></div>`;
+}
+function cartaoSolinftecPainel(){
+  if(!SOLINFTEC_AUTO) return "";
+  const ontem=ontemISO(), porFaz={};
+  (D.solinftecDados||[]).filter(l=>l.data===ontem).forEach(l=>{
+    const o=porFaz[l.fazenda_id]=porFaz[l.fazenda_id]||{horas:0,area:0};
+    o.horas+=n0(l.horas); o.area+=n0(l.area_ha);
+  });
+  const ks=Object.keys(porFaz);
+  if(!ks.length) return "";
+  const num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
+  return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
+    ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
+    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
+}
 function telemetriaDo(data,fz){
   const out={maquinas:[],lamina:[]};
   (D.telemetria||[]).filter(b=>b.data===data).forEach(b=>(b.linhas||[]).forEach(l=>{
@@ -1246,6 +1289,7 @@ function vCasaGerente(){
       </div>
     </div>
     ${cartaoCargas(fz)}
+    ${cartaoSolinftecGerente(fz)}
     ${syncFila.length?`<div class="aviso">${syncStatus()}</div>`:""}
     ${temRasc?`<div class="aviso">📝 Você tem um rascunho de ${fmtData(rascunho.data)} guardado neste aparelho. Ele não se perde sem internet.</div>`:""}
     <button class="btn" id="bt-preencher">${b?"Ver / corrigir boletim de hoje":temRasc?"Continuar rascunho":"Preencher boletim de hoje"}</button>
@@ -1685,6 +1729,7 @@ function vPainel(){
             ${v.zeradas.map(n=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(n.replace(/^NC Naves\s*-\s*/,""))}: <b>sem nenhuma parcela ativa</b> na iCrop</p>`).join("")}
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
         <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p></div>`;})()}
+    ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
@@ -2089,6 +2134,7 @@ function abrirWhats(id){
 }
 /* ---------- Sincronização entre celulares (Supabase) ---------- */
 const SYNC_PADRAO = { url:"https://syvehtgrbqteyuqhoban.supabase.co", chave:"sb_publishable_-FOT9xpA63j8_IYRYTAcMA_X1Ov9NH5" }; /* Grupo LGS — banco central */
+const SOLINFTEC_AUTO = false; /* garagem Solinftec: só virar true quando a tabela solinftec_diario existir no Supabase */
 let syncCfg = {...SYNC_PADRAO};
 let syncFila = [];            /* registros aguardando internet: [{t:'b'|'p'|'r', id}] */
 let syncUltima = null, syncOcupado = false;
@@ -2175,7 +2221,7 @@ async function syncBaixar(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarIcrop(); } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa"].includes(telaAtual))
     ir(telaAtual, null, true);
 }
