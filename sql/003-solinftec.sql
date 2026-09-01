@@ -111,8 +111,14 @@ insert into public.solinftec_depara (padrao, fazenda_id) values
   ('confins',       'f30'),
   ('cra cra',       'f31'),
   ('ferragem',      'f32'),
-  ('gameleira',     'f34')
+  ('gameleira',     'f34'),
+  ('quinto',        'f24'),  -- "Cafe Quinto" na Solinftec = Vereda Café 5º e 6º
+  ('caxico',        'f14c')  -- Caxico é uma área da Faz. Monte Carmelo
 on conflict (padrao) do nothing;
+-- Ficam de fora do de-para, de propósito (confirmado com o Nilo):
+--   "Estreito" (fora da administração do grupo, mas divide máquinas) e
+--   "-1" (apontamento sem fazenda no cadastro da Solinftec) — os dados
+--   ficam gravados em solinftec_diario, só não aparecem no app.
 
 -- De-para: código da operação -> nome amigável. A API só devolve o
 -- código (cdOperacao); pedir a lista à Solinftec e preencher aqui.
