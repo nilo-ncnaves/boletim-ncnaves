@@ -821,7 +821,7 @@ const Persist = {
 
 /* ---------- Estado ---------- */
 let D=null;              // banco de dados do app
-let acesso=null;         // {codigo, tipo:"unidade"|"diretoria"|"admin", fazendaId} — código gravado no aparelho
+let acesso=null;         // {codigo, chave} — código gravado no aparelho; a chave define o escopo (ver escopoDaChave)
 let sessao=null;         // {userId, papel, nome}
 let rascunho=null;       // boletim em edição
 let telaAtual="entrada";
@@ -919,13 +919,19 @@ async function carregarTudo(){
   const r = await Persist.get("bdf:rascunho");
   rascunho = r ? JSON.parse(r) : null;
   try{ const ac = await Persist.get("bdf:acesso"); acesso = ac ? JSON.parse(ac) : null; }catch(e){ acesso=null; }
-  if(acesso && codigoDe(chaveDoAcesso())!==acesso.codigo){ acesso=null; Persist.del("bdf:acesso"); }
+  /* aparelhos da versão anterior guardavam {tipo, fazendaId}: vira chave de escopo */
+  if(acesso && !acesso.chave && acesso.tipo){
+    acesso={codigo:acesso.codigo, chave:acesso.tipo==="admin"?"ADMIN":acesso.tipo==="diretoria"?"DIRETORIA":acesso.fazendaId};
+    Persist.set("bdf:acesso",JSON.stringify(acesso));
+  }
+  if(acesso && (!escopoDaChave(acesso.chave) || codigoDe(acesso.chave)!==acesso.codigo)){ acesso=null; Persist.del("bdf:acesso"); }
   /* sessão gravada tem que caber no escopo do código deste aparelho */
   if(!acesso) sessao=null;
   else if(sessao){
     if(sessao.papel==="admin" && !podeCadastros()) sessao=null;
     else if(sessao.papel==="proprietario" && !podePainel()) sessao=null;
     else if((sessao.papel==="gerente"||sessao.papel==="pos") && sessao.fazendaId && !podeVer(sessao.fazendaId)) sessao=null;
+    else if(sessao.papel==="gerente" && sessao.atividade && !unidadesPermitidas().some(f=>atividadeDe(f.id)===sessao.atividade)) sessao=null;
   }
 }
 async function salvarDados(){ await Persist.set("bdf:dados", JSON.stringify(D)); }
@@ -971,64 +977,127 @@ const ROTULO_CULT={CAFE:"Café", GRAOS:"Grãos", PECUARIA:"Pecuária"};
 const perfilDe = fz => { const f=fazenda(fz); return (Array.isArray(f.perfil)&&f.perfil.length)?f.perfil:(PERFIS_PADRAO[fz]||["CAFE"]); };
 const temCultura = (fz,c) => perfilDe(fz).includes(c);
 
-/* ---------- Controle de acesso por código de unidade ----------
-   Um código por unidade (formato XX-NNNN); DIRETORIA abre o painel e a leitura de
-   todas as unidades; ADMIN abre tudo, inclusive Cadastros. O admin pode gerar um
-   código novo em Cadastros: o novo vale na hora, o antigo cai nos outros aparelhos
-   na próxima sincronização (tabela codigos_acesso no Supabase; sem internet vale a
-   tabela abaixo). */
+/* ---------- Controle de acesso por código (escopos por unidade, atividade e combinados) ----------
+   Cada código (prefixo-NNNN) aponta para uma CHAVE, e a chave define o escopo:
+   lista de atividades e/ou lista de unidades + permissões (painel, cadastros).
+   Chaves aceitas:
+   - id de unidade (f01, f22g, …)          → só aquela unidade
+   - ATV:CAFE / ATV:GRAOS / ATV:PECUARIA   → todas as unidades da atividade
+   - ATV:CAFE+GRAOS (e demais combinações) → todas as unidades das atividades
+   - MIX:<atividades>:<unidades>           → combinado criado pelo admin em Cadastros
+   - DIRETORIA                             → painel + leitura de tudo, sem Cadastros
+   - ADMIN                                 → tudo, inclusive Cadastros e códigos
+   Unidade criada no futuro entra sozinha nos escopos por atividade (o escopo é
+   calculado na hora pelo perfil da fazenda). O admin pode gerar um código novo em
+   Cadastros: o novo vale na hora, o antigo cai nos outros aparelhos na próxima
+   sincronização (tabela codigos_acesso no Supabase; sem internet vale a tabela
+   abaixo). É fechadura de porta, não cofre — ver ESTADO.md. */
 const CODIGOS_PADRAO={
   f01:"AL-4172", f03c:"RC-8305", f03g:"RG-2657", f13c:"MC-7914", f13p:"MP-3548",
   f14c:"CC-6081", f14p:"CP-1739", f20:"LR-8447", f21:"SF-9426", f22c:"VC-5883",
   f22g:"VG-2496", f23:"VR-7061", f24:"VQ-3215", f25:"NC-1690",
   f26:"AS-6754", f27:"CG-5372", f28:"CH-2381", f29:"CD-8196", f30:"CF-3907",
   f31:"CR-5240", f32:"FE-7623", f33:"FM-9028", f34:"GA-1058", f35:"PB-4519",
-  DIRETORIA:"LG-9351", ADMIN:"AD-4786"
+  "ATV:CAFE":"CAFE-2740", "ATV:GRAOS":"GRAOS-3815", "ATV:PECUARIA":"PECU-5926",
+  "ATV:CAFE+GRAOS":"CAFEGRAOS-4157", "ATV:CAFE+PECUARIA":"CAFEPECU-6283",
+  "ATV:GRAOS+PECUARIA":"GRAOSPECU-7492",
+  DIRETORIA:"DIRETORIA-8034", ADMIN:"ADMIN-9561"
 };
+const CHAVES_ATV=["ATV:CAFE","ATV:GRAOS","ATV:PECUARIA","ATV:CAFE+GRAOS","ATV:CAFE+PECUARIA","ATV:GRAOS+PECUARIA"];
+const ABREV_ATV={CAFE:"CAFE", GRAOS:"GRAOS", PECUARIA:"PECU"};
 const codigoDe = chave => (((D&&D.codigosAcesso)||{})[chave] || CODIGOS_PADRAO[chave] || "");
+/* chave → escopo {ativs, unidades, tudo?, painel?, cadastros?, soLe?} (null = chave inválida) */
+function escopoDaChave(chave){
+  if(!chave) return null;
+  if(chave==="ADMIN") return {chave, tudo:true, painel:true, cadastros:true, ativs:[], unidades:[]};
+  if(chave==="DIRETORIA") return {chave, tudo:true, painel:true, soLe:true, ativs:[], unidades:[]};
+  if(/^(ATV|MIX):/.test(chave)){
+    const p=chave.split(":");
+    const ativs=(p[1]||"").split("+").filter(a=>ROTULO_CULT[a]);
+    const unidades=(p[2]||"").split("+").filter(fz=>(D.fazendas||[]).some(f=>f.id===fz));
+    return (ativs.length||unidades.length) ? {chave, ativs, unidades} : null;
+  }
+  return (D.fazendas||[]).some(f=>f.id===chave) ? {chave, ativs:[], unidades:[chave]} : null;
+}
+const chavesConhecidas = () => [...new Set(["ADMIN","DIRETORIA"].concat(CHAVES_ATV, (D.fazendas||[]).map(f=>f.id), Object.keys(D.codigosAcesso||{})))];
 function escopoDoCodigo(cod){
   let c=String(cod||"").toUpperCase().replace(/\s+/g,"");
-  if(/^[A-Z]{2}\d{4}$/.test(c)) c=c.slice(0,2)+"-"+c.slice(2); /* aceita sem o traço */
+  const m=c.match(/^([A-Z]+)-?(\d{4})$/); if(m) c=m[1]+"-"+m[2]; /* aceita sem o traço */
   if(!c) return null;
-  if(c===codigoDe("ADMIN")) return {codigo:c, tipo:"admin"};
-  if(c===codigoDe("DIRETORIA")) return {codigo:c, tipo:"diretoria"};
-  const f=(D.fazendas||[]).find(x=>codigoDe(x.id)===c);
-  return f ? {codigo:c, tipo:"unidade", fazendaId:f.id} : null;
+  const chave=chavesConhecidas().find(k=>codigoDe(k)===c && escopoDaChave(k));
+  return chave ? {codigo:c, chave} : null;
 }
-const unidadesPermitidas = () => !acesso ? [] : (acesso.tipo==="unidade" ? D.fazendas.filter(f=>f.id===acesso.fazendaId) : D.fazendas);
-const podeVer = fz => !!acesso && (acesso.tipo!=="unidade" || acesso.fazendaId===fz);
-const podePainel = () => !!acesso && acesso.tipo!=="unidade";
-const podeCadastros = () => !!acesso && acesso.tipo==="admin";
-const chaveDoAcesso = () => !acesso ? null : (acesso.tipo==="admin"?"ADMIN":acesso.tipo==="diretoria"?"DIRETORIA":acesso.fazendaId);
+const escopoAtual = () => acesso ? escopoDaChave(acesso.chave) : null;
+const unidadesPermitidas = () => { const e=escopoAtual(); if(!e) return [];
+  if(e.tudo) return D.fazendas;
+  return D.fazendas.filter(f=>e.unidades.includes(f.id) || perfilDe(f.id).some(a=>e.ativs.includes(a)));
+};
+const podeVer = fz => { const e=escopoAtual(); return !!e && (e.tudo || unidadesPermitidas().some(f=>f.id===fz)); };
+const podePainel = () => { const e=escopoAtual(); return !!(e && e.painel); };
+const podeCadastros = () => { const e=escopoAtual(); return !!(e && e.cadastros); };
+const soLeitura = () => { const e=escopoAtual(); return !!(e && e.soLe); };
+const chaveDoAcesso = () => acesso ? acesso.chave : null;
+/* rótulo e descrição do escopo de uma chave (usados só nas telas de ADMIN) */
+function rotuloDaChave(chave){
+  if(chave==="ADMIN") return "Administrador";
+  if(chave==="DIRETORIA") return "Diretoria";
+  if(/^(ATV|MIX):/.test(chave)){
+    const e=escopoDaChave(chave)||{ativs:[],unidades:[]};
+    return e.ativs.map(a=>ROTULO_CULT[a]||a).concat(e.unidades.map(fz=>fazenda(fz).nome)).join(" + ")||chave;
+  }
+  return fazenda(chave).nome;
+}
+function escopoRotulo(chave){
+  if(chave==="ADMIN") return "abre tudo, inclusive Cadastros e códigos";
+  if(chave==="DIRETORIA") return "painel e leitura de todas as unidades, sem Cadastros";
+  if(/^(ATV|MIX):/.test(chave)){
+    const e=escopoDaChave(chave)||{ativs:[],unidades:[]};
+    return e.ativs.map(a=>"todas as unidades de "+(ROTULO_CULT[a]||a).toLowerCase())
+      .concat(e.unidades.map(fz=>fazenda(fz).nome)).join(" + ");
+  }
+  return "só esta unidade";
+}
 /* código do aparelho foi trocado pelo admin? cai fora na próxima sincronização */
 function conferirAcesso(){
-  if(acesso && codigoDe(chaveDoAcesso())!==acesso.codigo) sairDoAparelho();
+  if(acesso && (codigoDe(acesso.chave)!==acesso.codigo || !escopoDaChave(acesso.chave))) sairDoAparelho();
 }
 function sairDoAparelho(){
   acesso=null; sessao=null; rascunho=null;
   Persist.del("bdf:acesso"); Persist.del("bdf:sessao"); Persist.del("bdf:rascunho");
   ir("codigo");
 }
-/* depois de validar o código, cada perfil abre na sua tela */
+/* depois de validar o código, cada escopo abre na sua tela: admin escolhe tudo;
+   diretoria cai no painel; escopo com uma atividade só pula para a lista de
+   unidades; com uma unidade só abre direto o boletim dela */
 function entrarPeloAcesso(){
   if(!acesso){ ir("codigo"); return; }
-  if(acesso.tipo==="admin"){ ir("entrada"); return; }
-  if(acesso.tipo==="diretoria"){ const u=D.usuarios.find(x=>x.papel==="proprietario");
+  const e=escopoDaChave(acesso.chave);
+  if(!e){ sairDoAparelho(); return; }
+  if(e.cadastros){ ir("entrada"); return; }
+  if(e.soLe){ const u=D.usuarios.find(x=>x.papel==="proprietario");
     sessao={userId:u?u.id:"u2", papel:"proprietario", nome:u?u.nome:"Diretoria"};
     Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("painel"); return; }
-  const fz=acesso.fazendaId, u=D.usuarios.find(x=>x.papel==="gerente");
-  sessao={userId:u?u.id:"u1", papel:"gerente", nome:"Gerente — "+fazenda(fz).nome, atividade:atividadeDe(fz), fazendaId:fz};
-  Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa");
+  const uni=unidadesPermitidas(), u=D.usuarios.find(x=>x.papel==="gerente");
+  if(uni.length===1){ const fz=uni[0].id;
+    sessao={userId:u?u.id:"u1", papel:"gerente", nome:"Gerente — "+fazenda(fz).nome, atividade:atividadeDe(fz), fazendaId:fz};
+    Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa"); return; }
+  const ativs=[...new Set(uni.map(f=>atividadeDe(f.id)))];
+  if(ativs.length===1){
+    sessao={userId:u?u.id:"u1", papel:"gerente", nome:u?u.nome:"Gerente", atividade:ativs[0], fazendaId:null};
+    Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
+  ir("entrada");
 }
 function gerarNovoCodigo(chave){
-  const atual=codigoDe(chave);
+  const atual=codigoDe(chave), e=escopoDaChave(chave)||{ativs:[],unidades:[]};
   const pref = atual ? atual.split("-")[0]
+    : (chave==="ADMIN"||chave==="DIRETORIA") ? chave
+    : /^(ATV|MIX):/.test(chave) ? (e.unidades.length ? "MIX" : e.ativs.map(a=>ABREV_ATV[a]||a).join("")||"MIX")
     : String((fazenda(chave).nome||"XX")).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z ]/g," ").trim().split(/\s+/).map(p=>p[0]).join("").slice(0,2).toUpperCase().padEnd(2,"X");
-  const emUso=["ADMIN","DIRETORIA"].concat(D.fazendas.map(f=>f.id)).map(k=>codigoDe(k));
+  const emUso=chavesConhecidas().map(k=>codigoDe(k));
   let novo; do{ novo=pref+"-"+String(Math.floor(1000+Math.random()*9000)); }while(emUso.includes(novo));
   D.codigosAcesso=D.codigosAcesso||{}; D.codigosAcesso[chave]=novo; salvarDados();
   /* trocou o próprio código? o aparelho do admin continua dentro */
-  if(acesso && chaveDoAcesso()===chave){ acesso={...acesso, codigo:novo}; Persist.set("bdf:acesso",JSON.stringify(acesso)); }
+  if(acesso && acesso.chave===chave){ acesso={...acesso, codigo:novo}; Persist.set("bdf:acesso",JSON.stringify(acesso)); }
   syncEnfileirar("c",chave);
   return novo;
 }
@@ -1599,7 +1668,7 @@ function vCodigo(){
     ${avisoMem}
     <div class="cartao">
       <h2>Código de acesso</h2>
-      <p class="mut">Digite o código da sua unidade. Ele fica guardado neste aparelho — só precisa digitar uma vez.</p>
+      <p class="mut">Digite o seu código de acesso. Ele fica guardado neste aparelho — só precisa digitar uma vez.</p>
       <label for="cod-acesso">Código</label>
       <input id="cod-acesso" placeholder="XX-0000" autocomplete="off" autocapitalize="characters" spellcheck="false"
         class="num" style="text-transform:uppercase;letter-spacing:.12em;text-align:center;font-weight:700">
@@ -1607,7 +1676,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v45</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v46</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1615,7 +1684,7 @@ function vEntrada(){
   const avisoMem = Persist.usaMem ? `<div class="aviso">Este dispositivo não liberou o armazenamento permanente. Os dados valem só para esta sessão.</div>` : "";
   /* só aparecem as opções que o código deste aparelho abre
      (diretoria só lê: não preenche boletim nem pós-colheita) */
-  const uni=(acesso&&acesso.tipo==="diretoria")?[]:unidadesPermitidas();
+  const uni=soLeitura()?[]:unidadesPermitidas();
   const temAtv=a=>uni.some(f=>atividadeDe(f.id)===a);
   const temPos=uni.some(f=>perfilDe(f.id).includes("CAFE"));
   return `<div class="entrada">
@@ -1635,7 +1704,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v45 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v46 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3033,14 +3102,29 @@ function vCadastros(){
     <span class="cresce"><b>${esc(rot)}</b>${sub?` <span class="mut">· ${esc(sub)}</span>`:""}</span>
     <span class="num" style="font-weight:700">${esc(codigoDe(chave)||"—")}</span>
     <button class="btn suave mini" data-novo-cod="${chave}">gerar novo</button></li>`;
+  const chavesMix=Object.keys(D.codigosAcesso||{}).filter(k=>k.indexOf("MIX:")===0 && escopoDaChave(k)).sort();
+  const tituloGrupo=r=>`<li class="mut" style="padding:10px 0 2px;font-weight:700;font-size:.78rem;letter-spacing:.04em">${r}</li>`;
   return topo("Cadastros","Administrador",true)+`
-    <div class="cartao"><h3>🔑 Códigos de acesso <span class="mut">· um por unidade</span></h3>
-      <p class="mut" style="font-size:.78rem">Cada aparelho entra com o código da sua unidade e passa a ver só ela. "Gerar novo" invalida o código antigo (código vazou ou funcionário saiu): os aparelhos com o antigo voltam para a tela de código na próxima sincronização. Anote e repasse o código novo.</p>
+    <div class="cartao"><h3>🔑 Códigos de acesso <span class="mut">· código → escopo</span></h3>
+      <p class="mut" style="font-size:.78rem">Cada aparelho entra com um código e passa a ver só o escopo dele: uma unidade, uma atividade inteira (unidades novas entram sozinhas) ou uma combinação. "Gerar novo" invalida o código atual (código vazou ou funcionário saiu): os aparelhos com o antigo voltam para a tela de código na próxima sincronização. Anote e repasse o código novo.</p>
       <ul class="lista-limpa">
+        ${tituloGrupo("POR UNIDADE")}
         ${D.fazendas.map(f=>linhaCod(f.id, f.nome, emojiAtividade(atividadeDe(f.id))+" "+rotuloAtividade(atividadeDe(f.id)))).join("")}
-        ${linhaCod("DIRETORIA","Diretoria","painel, sem Cadastros")}
-        ${linhaCod("ADMIN","Administrador","abre tudo")}
-      </ul></div>
+        ${tituloGrupo("POR ATIVIDADE E COMBINADOS")}
+        ${CHAVES_ATV.map(k=>linhaCod(k, rotuloDaChave(k), escopoRotulo(k))).join("")}
+        ${chavesMix.map(k=>linhaCod(k, rotuloDaChave(k), escopoRotulo(k))).join("")}
+        ${tituloGrupo("DIRETORIA E ADMINISTRADOR")}
+        ${linhaCod("DIRETORIA","Diretoria",escopoRotulo("DIRETORIA"))}
+        ${linhaCod("ADMIN","Administrador",escopoRotulo("ADMIN"))}
+      </ul>
+      ${novoCombo?`<div class="mt" style="border-top:1px solid var(--linha);padding-top:10px">
+        <b>Novo código combinado</b>
+        <p class="mut" style="font-size:.78rem">Marque atividades inteiras (pegam as unidades futuras sozinhas) e/ou unidades avulsas. O código criado abre exatamente essa combinação.</p>
+        <div class="chips mt">${ATIVIDADES.map(([k,em,r])=>`<button class="chip ${novoCombo.ativs.includes(k)?"on":""}" data-combo-atv="${k}">${em} ${r}</button>`).join("")}</div>
+        <div class="chips mt">${D.fazendas.map(f=>`<button class="chip ${novoCombo.unis.includes(f.id)?"on":""}" data-combo-uni="${f.id}">${esc(f.nome)}</button>`).join("")}</div>
+        <button class="btn mt" id="bt-combo-gerar">Gerar código combinado</button>
+        <button class="btn sec mt" id="bt-combo-cancelar">Cancelar</button>
+      </div>`:`<button class="btn suave mini mt" id="bt-novo-combo">＋ novo código combinado</button>`}</div>
     <div class="cartao"><h3>📡 Telemetria — Solinftec / iCrop</h3>
       <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar.</p>
       <button class="btn mt" id="bt-importar">📥 Importar arquivo do dia</button></div>
@@ -3427,9 +3511,10 @@ async function syncEnviar(){
 async function syncBaixar(){
   if(!syncAtivo()) return false;
   let ok=false;
-  /* aparelho com código de unidade recebe só o que a tela dele permite lançar */
-  const soFz = (acesso && acesso.tipo==="unidade") ? acesso.fazendaId : null;
-  const idsFz = soFz ? [soFz].concat(Object.keys(FZ_LEGADO).filter(k=>FZ_LEGADO[k]===soFz)) : null;
+  /* aparelho com código de escopo limitado recebe só o que a tela dele permite lançar */
+  const esc0=escopoAtual();
+  const soFz = (esc0 && !esc0.tudo) ? unidadesPermitidas().map(f=>f.id) : null;
+  const idsFz = soFz ? soFz.concat(Object.keys(FZ_LEGADO).filter(k=>soFz.includes(FZ_LEGADO[k]))) : null;
   for(const [col,alvo] of [["boletins","boletins"],["pos_colheitas","posColheitas"],["remessas","remessas"],["telemetria","telemetria"]]){
     try{
       let url=syncCfg.url+"/rest/v1/"+col+"?select=payload&order=data.desc&limit=2000";
@@ -3449,8 +3534,8 @@ async function syncBaixar(){
         if(b.fazendaId) b.fazendaId=fzAtual(b.fazendaId);
         if(col==="remessas"){ if(b.origem) b.origem=fzAtual(b.origem); if(b.destino) b.destino=fzAtual(b.destino); }
         if(soFz){
-          if(col==="remessas"){ if(b.origem!==soFz && b.destino!==soFz) return; }
-          else if(b.fazendaId && b.fazendaId!==soFz) return;
+          if(col==="remessas"){ if(!soFz.includes(b.origem) && !soFz.includes(b.destino)) return; }
+          else if(b.fazendaId && !soFz.includes(b.fazendaId)) return;
         }
         if(syncFila.some(x=>x.id===b.id)) return; /* edição local ainda não enviada vence */
         const porId = (col==="remessas"||col==="telemetria");
@@ -3860,21 +3945,38 @@ function ligarEventos(tela){
       if(confirm("Esquecer o código deste aparelho? Para entrar de novo vai precisar digitar o código.")) sairDoAparelho();
       return; }
     if(d.novoCod){ if(!podeCadastros()) return;
-      const chave=d.novoCod, nome=chave==="ADMIN"?"Administrador":chave==="DIRETORIA"?"Diretoria":fazenda(chave).nome;
+      const chave=d.novoCod, nome=rotuloDaChave(chave);
       if(!confirm("Gerar novo código para "+nome+"? O código atual ("+codigoDe(chave)+") deixa de valer nos aparelhos na próxima sincronização.")) return;
       const novo=gerarNovoCodigo(chave);
       alert("Novo código de "+nome+": "+novo+"\nAnote e repasse — o antigo não abre mais.");
       ir("cadastros",null,true); return; }
+    /* novo código combinado (só ADMIN): escolhe atividades e/ou unidades */
+    if(t.id==="bt-novo-combo"){ if(!podeCadastros()) return; novoCombo={ativs:[],unis:[]}; ir("cadastros",null,true); return; }
+    if(t.id==="bt-combo-cancelar"){ novoCombo=null; ir("cadastros",null,true); return; }
+    if(d.comboAtv && novoCombo){ const i=novoCombo.ativs.indexOf(d.comboAtv);
+      if(i>=0) novoCombo.ativs.splice(i,1); else novoCombo.ativs.push(d.comboAtv);
+      ir("cadastros",null,true); return; }
+    if(d.comboUni && novoCombo){ const i=novoCombo.unis.indexOf(d.comboUni);
+      if(i>=0) novoCombo.unis.splice(i,1); else novoCombo.unis.push(d.comboUni);
+      ir("cadastros",null,true); return; }
+    if(t.id==="bt-combo-gerar"){ if(!podeCadastros()||!novoCombo) return;
+      if(!novoCombo.ativs.length && !novoCombo.unis.length){ alert("Marque pelo menos uma atividade ou unidade."); return; }
+      const ordem=["CAFE","GRAOS","PECUARIA"];
+      const chave="MIX:"+ordem.filter(a=>novoCombo.ativs.includes(a)).join("+")+":"+novoCombo.unis.slice().sort().join("+");
+      const jaTinha=!!((D.codigosAcesso||{})[chave]);
+      const novo=gerarNovoCodigo(chave);
+      alert("Código combinado ("+rotuloDaChave(chave)+"): "+novo+(jaTinha?"\nJá existia um código com este mesmo escopo — o antigo não abre mais.":"")+"\nAnote e repasse.");
+      novoCombo=null; ir("cadastros",null,true); return; }
     /* entrada e fazenda */
     if(d.atividade){ const u=D.usuarios.find(x=>x.papel==="gerente"); if(!u) return;
-      if(acesso && acesso.tipo==="diretoria") return; /* diretoria só lê */
+      if(soLeitura()) return; /* diretoria só lê */
       if(!unidadesPermitidas().some(f=>atividadeDe(f.id)===d.atividade)) return;
       sessao={userId:u.id, papel:"gerente", nome:u.nome, atividade:d.atividade, fazendaId:null};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
     if(d.perfil){ const u=D.usuarios.find(x=>x.papel===d.perfil); if(!u) return;
       if(d.perfil==="admin" && !podeCadastros()) return;
       if(d.perfil==="proprietario" && !podePainel()) return;
-      if((d.perfil==="pos"||d.perfil==="gerente") && acesso && acesso.tipo==="diretoria") return; /* diretoria só lê */
+      if((d.perfil==="pos"||d.perfil==="gerente") && soLeitura()) return; /* diretoria só lê */
       if(d.perfil==="pos" && !unidadesPermitidas().some(f=>perfilDe(f.id).includes("CAFE"))) return;
       if(d.perfil==="gerente"||d.perfil==="pos"){ sessao={userId:u.id,papel:d.perfil,nome:u.nome,fazendaId:null}; Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("fazendas"); }
       else { sessao={userId:u.id,papel:u.papel,nome:u.nome}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("painel"); } return; }
@@ -3882,8 +3984,14 @@ function ligarEventos(tela){
       sessao={...sessao, fazendaId:d.fazenda, nome:"Gerente — "+fazenda(d.fazenda).nome};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa"); return; }
     if(t.id==="bt-trocar-faz"){ rascunho=null;
-      if(sessao && sessao.papel==="gerente"){ sessao={...sessao, fazendaId:null};
-        Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("entrada"); }
+      if(sessao && sessao.papel==="gerente"){
+        /* escopo com uma atividade só: pula a tela de atividades */
+        const ativs=[...new Set(unidadesPermitidas().map(f=>atividadeDe(f.id)))];
+        if(ativs.length===1){ sessao={...sessao, fazendaId:null, atividade:ativs[0]};
+          Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("fazendas"); }
+        else { sessao={...sessao, fazendaId:null};
+          Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("entrada"); }
+      }
       else ir("fazendas");
       return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
@@ -4443,6 +4551,7 @@ function ligarEventos(tela){
 }
 let filtroTimer=null;
 let filtroCadMaq="";
+let novoCombo=null; /* formulário "novo código combinado" aberto em Cadastros: {ativs:[], unis:[]} */
 let vincAberto="";
 let filtroRel={de:"", ate:"", fazenda:""};
 function vRelatorio(){

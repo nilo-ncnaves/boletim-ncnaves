@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v45** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v46** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -21,26 +21,49 @@ no mesmo pull request (regra no CLAUDE.md).
 Unidades desmembradas compartilham a fazenda-mãe (fazendaMae) no
 painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 
-## Perfis de uso e controle de acesso (v43)
-- O app só abre com um **código de acesso** (formato XX-NNNN), digitado
-  uma vez e gravado no aparelho. Código errado é barrado, sem dica.
-- Código de unidade: o aparelho vira o boletim daquela unidade só —
-  trocar fazenda/atividade navega apenas dentro do escopo; painel e
-  Cadastros não existem; a sincronização baixa/envia só o que a tela
-  permite lançar (pós-colheita aparece se a unidade for de café).
-- Código DIRETORIA: painel e leitura de todas as unidades; não
-  preenche boletim e não vê Cadastros.
-- Código ADMIN: abre tudo, inclusive Cadastros.
+## Perfis de uso e controle de acesso (v43, escopos v46)
+- O app só abre com um **código de acesso** (formato prefixo-NNNN),
+  digitado uma vez e gravado no aparelho. Código errado é barrado,
+  sem dica. "Sair" discreto no rodapé da tela de atividades esquece
+  o código do aparelho.
+- Cada código aponta para uma **chave de escopo** (escopoDaChave no
+  index.html): lista de atividades e/ou lista de unidades +
+  permissões (painel, cadastros). Tipos:
+  - **Por unidade** (XX-NNNN, chave = id da fazenda): abre só ela e
+    vai direto ao boletim.
+  - **Por atividade** (CAFE-NNNN, GRAOS-NNNN, PECU-NNNN; chaves
+    ATV:CAFE etc.): todas as unidades da atividade. Unidade criada
+    no futuro entra sozinha no escopo (calculado na hora pelo perfil
+    da fazenda).
+  - **Combinados de atividades** (CAFEGRAOS-NNNN, CAFEPECU-NNNN,
+    GRAOSPECU-NNNN; chaves ATV:CAFE+GRAOS etc.).
+  - **Combinados livres** (MIX:<atividades>:<unidades>): o admin cria
+    em Cadastros escolhendo atividades inteiras e/ou unidades
+    avulsas; o código nasce com prefixo MIX (ou o das atividades).
+  - **DIRETORIA-NNNN**: painel + leitura de todas as unidades, sem
+    Cadastros; não preenche boletim.
+  - **ADMIN-NNNN**: tudo, inclusive Cadastros e a gestão de códigos.
+- Navegação dentro do escopo: a tela de atividades mostra só as
+  atividades permitidas; com uma atividade só, pula direto para a
+  lista de unidades; com uma unidade só, abre direto o boletim.
+  "Trocar fazenda/atividade" também respeita o escopo. A
+  sincronização baixa/envia só o que o escopo permite lançar
+  (pós-colheita aparece se houver unidade de café no escopo).
 - Fonte dos códigos: constante CODIGOS_PADRAO no index.html + tabela
   codigos_acesso no Supabase (baixada a cada sincronização e na tela
-  de código). Em Cadastros o admin vê a lista e pode "gerar novo
-  código" por unidade — invalida o anterior; os aparelhos com o
-  código antigo caem para a tela de código na próxima sincronização.
-- "Sair" discreto no rodapé da tela de atividades esquece o código do
-  aparelho (troca de aparelho ou de funcionário).
+  de código; chaves MIX criadas pelo admin também chegam por ela).
+  Em Cadastros (só ADMIN) fica a lista completa código → escopo, com
+  "gerar novo" por linha (invalida o anterior; os aparelhos com o
+  código antigo caem para a tela de código na próxima sincronização)
+  e o botão "novo código combinado". Códigos nunca aparecem em telas
+  que não sejam de ADMIN.
 - Perfis: Gerente preenche o boletim da unidade; Diretoria acompanha o
   painel; Escritório/Admin cadastra, importa e tira relatórios;
   Pós-colheita tem boletim próprio de terreiro/secador/tulha (café).
+- Aparelhos que entraram na v45 com código de unidade continuam
+  dentro (migração automática do acesso gravado); os códigos antigos
+  de DIRETORIA (LG-9351) e ADMIN (AD-4786) foram substituídos pelo
+  formato novo — esses aparelhos pedem o código novo uma vez.
 
 ## Seções do boletim por atividade
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
@@ -86,14 +109,19 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   publishable).
 
 ## PENDÊNCIAS
-- **Rodar sql/001-codigos-acesso.sql no SQL Editor do Supabase** (cria
-  a tabela codigos_acesso com os códigos iniciais). Sem ela o app
+- **Rodar sql/001-codigos-acesso.sql e depois
+  sql/002-codigos-escopo.sql no SQL Editor do Supabase** (001 cria a
+  tabela codigos_acesso; 002 insere as chaves de escopo por atividade
+  e troca DIRETORIA/ADMIN para o formato novo). Sem eles o app
   continua funcionando com os códigos de fábrica, mas "gerar novo
-  código" não alcança os outros aparelhos.
-- Controle de acesso é combinado, não cofre: os códigos de fábrica
-  vivem no código do app e um aparelho que nunca sincroniza não fica
-  sabendo de código trocado. Serve para organizar o uso, não para
-  segurança forte.
+  código" e os combinados criados em Cadastros não alcançam os
+  outros aparelhos.
+- **Limitação conhecida**: o controle de acesso é fechadura de porta,
+  não cofre — os códigos de fábrica vivem no código do app (público)
+  e um aparelho que nunca sincroniza não fica sabendo de código
+  trocado. Serve para organizar o uso, não para segurança forte.
+  Degrau futuro: **login por pessoa com Supabase Auth** (cada gerente
+  com usuário e senha próprios, permissões no banco).
 - Ciclos reais de grãos aguardando censo de plantio (o que está
   plantado hoje em cada pivô/talhão) para abrir os ciclos oficiais.
 - solinftec_diario aguardando definição da API/exportação da
