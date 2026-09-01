@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v47** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v48** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -123,11 +123,25 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
     manda os R$), eficiência %, acumulados do ciclo (mm irrigados e
     mm chuva) e alerta âmbar por pivô com dias em atraso ≥ 3 ou
     umidade abaixo da segurança.
-- Solinftec: garagem pronta no código, DESLIGADA.
+- Robô Solinftec (v48 — pg_cron + extensão http no Supabase,
+  sql/003-solinftec.sql): busca na API "Detalhes da Operação V3"
+  (https://scdi.saas-solinftec.com — token de 1 min gerado a cada
+  chamada, /pull paginado, identifier 23) e grava o resumo diário por
+  fazenda/equipamento/operação/talhão em solinftec_diario (horas,
+  motor ligado/ocioso, área, litros). Agenda: 03:05 (Brasília) o dia
+  anterior fechado + de hora em hora (09:35–20:35) o parcial do dia.
+  Usuário/senha vivem SÓ na tabela segredos do Supabase. O app LÊ
+  (baixarSolinftec) e mostra o cartão do gerente ("medição automática
+  do dia", fazendas de grãos) e o do painel ("medição de ontem").
+  De-para de fazenda (solinftec_depara: nome Solinftec → f03g, f22g,
+  f27, f33, f35) e de operação (solinftec_operacoes: código → nome;
+  vazio mostra "Operação NNN") ajustáveis no SQL Editor. A importação
+  manual por arquivo continua como plano B.
 
 ## Chaves ligadas/desligadas
-- SOLINFTEC_AUTO = false (ligar só quando a tabela solinftec_diario
-  existir no Supabase).
+- SOLINFTEC_AUTO = true (v48). Enquanto sql/003-solinftec.sql não
+  rodar no Supabase, o fetch falha em silêncio e nenhum cartão
+  Solinftec aparece — o app segue normal.
 - Sincronização Supabase: ligada por padrão (SYNC_PADRAO com a chave
   publishable).
 
@@ -147,9 +161,13 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   com usuário e senha próprios, permissões no banco).
 - Ciclos reais de grãos aguardando censo de plantio (o que está
   plantado hoje em cada pivô/talhão) para abrir os ciclos oficiais.
-- solinftec_diario aguardando definição da API/exportação da
-  Solinftec; quando existir, criar a tabela (sql/…) e ligar
-  SOLINFTEC_AUTO.
+- **Rodar sql/003-solinftec.sql no SQL Editor do Supabase**, trocando
+  antes o texto COLE_AQUI_A_SENHA pela senha do PDF de configuração da
+  Solinftec (a senha nunca entra no repositório). Depois da primeira
+  carga, conferir se sobrou fazenda sem unidade (consulta pronta no
+  fim do arquivo) e ajustar solinftec_depara.
+- Pedir à Solinftec a lista de operações (código → nome) e preencher
+  solinftec_operacoes; enquanto isso o app mostra "Operação NNN".
 - Token da iCrop (tabela segredos do Supabase) pendente de troca
   (rotação) — trocar direto no SQL Editor, nunca no código.
 - Porto Buriti (f35): talhões reais a cadastrar (hoje só "Área geral
