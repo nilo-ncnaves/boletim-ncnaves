@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v43** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v44** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -48,10 +48,17 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
   (registro por talhão + operação escolhida em seletor agrupado por
   fase, com campos em cascata específicos de cada operação — fonte:
-  docs/catalogos-por-atividade.md); **💧 Irrigação por pivô**
-  (status/lâmina/percentímetro/quimigação/problemas por pivô, lista
-  vinda da iCrop + cadastro local por unidade, comparação informado ×
-  medido); pragas/doenças e ocorrências. Ciclo de cultura abre pelo
+  docs/catalogos-por-atividade.md); **💧 Irrigação por pivô** (v44:
+  sem digitação de nome — cada lançamento usa o mesmo seletor
+  "Talhão / pivô" das Operações do dia; a lista une talhões-pivô do
+  cadastro oficial + equipamentos da iCrop sem "café" no nome +
+  cadastro local da unidade, sem duplicar por grafia; pivô já lançado
+  some da lista; botão "adicionar todos os pivôs" cria um cartão por
+  pivô com situação em branco; fazenda sem pivô na lista, caso Porto
+  Buriti, ganha o campo "Cadastrar pivô desta fazenda" no próprio
+  app — com lista, vira o link "cadastrar outro pivô"; seguem
+  status/lâmina/percentímetro/quimigação/problemas por pivô e a
+  comparação informado × medido); pragas/doenças e ocorrências. Ciclo de cultura abre pelo
   plantio lançado e encerra quando a colheita atinge a área do
   talhão. Talhões ARRENDADO (milho semente → sementeira) aparecem só
   como etiqueta, sem operações/irrigação/colheita.
@@ -91,5 +98,9 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 - Token da iCrop (tabela segredos do Supabase) pendente de troca
   (rotação) — trocar direto no SQL Editor, nunca no código.
 - Porto Buriti (f35): talhões reais a cadastrar (hoje só "Área geral
-  (a cadastrar)"); pivôs entram pelo cadastro local da seção
-  Irrigação.
+  (a cadastrar)"); pivôs entram pelo campo "Cadastrar pivô desta
+  fazenda" da seção Irrigação (cadastro local da unidade).
+- **docs/CAMPOS-LIVRES.md** (v44): mapa de todos os campos de
+  digitação livre que poderiam virar lista (produto, cultivar,
+  prestador, lotes, armazéns, prompts remanescentes…). Decisão campo
+  a campo pendente com o Nilo — nada foi alterado ainda.

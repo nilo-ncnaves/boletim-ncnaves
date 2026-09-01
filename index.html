@@ -1607,7 +1607,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v43</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v44</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1635,7 +1635,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v43 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v44 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -2027,10 +2027,14 @@ function secaoOperacoes(r){
     </div></details>`;
 }
 /* ===== GRÃOS — Irrigação por pivô (informado pelo gerente × medido pela iCrop) =====
-   Lista de pivôs da unidade = equipamentos que a iCrop entrega para a fazenda
-   (excluindo os com "café" no nome, que pertencem à unidade Café) MAIS o cadastro
-   local (D.pivosLocais, guardado por unidade — para fazendas sem iCrop, como
-   Porto Buriti, ou com pivô fora dela). */
+   O gerente NUNCA digita nome de pivô: cada lançamento usa o mesmo seletor
+   "Talhão / pivô" das Operações do dia. A lista oficial da unidade junta:
+   a) talhões do cadastro oficial com "pivô" no nome (fora os arrendados);
+   b) equipamentos que a iCrop entrega para a fazenda (excluindo os com
+      "café" no nome, que pertencem à unidade Café);
+   c) cadastro local (D.pivosLocais, guardado por unidade — para fazendas
+      sem pivô no cadastro nem iCrop, como Porto Buriti),
+   unificados por nome (sem acento, sem zeros à esquerda) e ordenados. */
 function pivosIcropDa(fz){
   const maeId=maeIdDe(fz);
   const nomes=new Set();
@@ -2042,13 +2046,26 @@ function pivosIcropDa(fz){
   return [...nomes].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
 }
 const pivosLocaisDa = fz => ((D.pivosLocais||{})[fz])||[];
-function irgDe(r,chave){
-  r.irg=r.irg||[];
-  let e=r.irg.find(x=>x.k===chave);
-  if(!e){ e={k:chave,nome:"",status:"",lamina:"",percent:"",quimi:"",quimiProdutos:[],problemas:[],obs:""}; r.irg.push(e); }
-  if(!e.nome){ const l=linhasIrgDa(r).find(x=>x.k===chave); if(l) e.nome=l.nome; }
-  return e;
+/* "Pivô 01", "Pivo 1" e "pivô 01" são o MESMO pivô */
+const chavePivo = n => normTxt(n).replace(/[^a-z0-9]+/g," ").trim().replace(/\b0+(\d)/g,"$1");
+function pivosDa(fz){
+  const lista=talhoesDa(fz).filter(t=>t.tipo!=="ARRENDADO" && normTxt(t.nome).includes("pivo"))
+    .map(t=>({k:t.id,nome:t.nome,area:t.area}));
+  const add=(k,nome)=>{ if(!lista.some(x=>chavePivo(x.nome)===chavePivo(nome))) lista.push({k,nome,area:0}); };
+  pivosIcropDa(fz).forEach(nome=>add("ic:"+nome,nome));
+  pivosLocaisDa(fz).forEach(p=>add(p.id,p.nome));
+  return lista.sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR",{numeric:true}));
 }
+/* pivôs ainda não lançados no boletim (o do próprio cartão continua na lista dele) */
+function pivosLivresDa(r,eAtual){
+  const usados=(r.irg||[]).filter(e=>e!==eAtual&&e.k);
+  return pivosDa(r.fazendaId).filter(p=>!usados.some(e=>e.k===p.k||chavePivo(e.nome||"")===chavePivo(p.nome)));
+}
+const irgDe = (r,id) => { r.irg=r.irg||[]; return r.irg.find(x=>x.id===id||x.k===id); };
+const novoIrg = p => ({id:uid(), k:p?p.k:"", nome:p?p.nome:"",
+  status:"",lamina:"",percent:"",quimi:"",quimiProdutos:[],problemas:[],obs:""});
+/* boletins antigos guardavam a linha só pela chave do pivô */
+const migrarIrg = r => (r.irg||[]).forEach(e=>{ if(!e.id) e.id=e.k||uid(); });
 function icropMedidoPivo(b,nomePivo){
   const ic=icropDo(b.data,b.fazendaId); if(!ic) return null;
   const num=s=>{const m=/(\d+)/.exec(String(s||""));return m?parseInt(m[1],10):null;};
@@ -2058,52 +2075,67 @@ function icropMedidoPivo(b,nomePivo){
   if(!eq) return null;
   return {mm:eq.regadas.reduce((s,g)=>s+g.mm,0), regou:eq.regadas.length>0};
 }
-function linhaIrg(r,l){
-  const e=(r.irg||[]).find(x=>x.k===l.k)||{status:"",problemas:[],quimiProdutos:[]};
-  const med=icropMedidoPivo(r,l.nome);
+function cardIrg(r,e){
+  const med=e.nome?icropMedidoPivo(r,e.nome):null;
   const fmtMm=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
   const rodou=e.status==="Rodou"||e.status==="Parcial";
   const prob=e.status==="Não rodou"||e.status==="Manutenção";
-  return `<div class="mt" data-irg="${esc(l.k)}" style="border-top:1px dashed var(--linha);padding-top:10px">
-    <b>${esc(l.nome)}</b>${l.area?` <span class="mut">— ${l.area} ha</span>`:""}
-    ${(med&&med.regou)?` <span class="mut" style="font-size:.78rem">· iCrop mediu <b class="num">${fmtMm(med.mm)} mm</b></span>`:""}
-    <div class="chips mt">${["Rodou","Parcial","Não rodou","Manutenção"].map(s=>`<button class="chip ${e.status===s?"on":""}" data-igst="${esc(l.k)}|${s}">${s}</button>`).join("")}</div>
+  const ops=["<option value=''>Selecione…</option>",
+    ...pivosLivresDa(r,e).map(p=>`<option value="${esc(p.k)}" ${e.k===p.k?"selected":""}>${esc(p.nome)}${p.area?` — ${p.area} ha`:""}</option>`)];
+  /* boletim antigo com pivô que saiu da lista: a opção dele continua no cartão */
+  if(e.k&&!pivosDa(r.fazendaId).some(p=>p.k===e.k)) ops.push(`<option value="${esc(e.k)}" selected>${esc(e.nome||talhao(e.k).nome)}</option>`);
+  return `<div class="subcartao" data-irg="${esc(e.id)}">
+    <button class="fechar-sub" data-rm-irg="${esc(e.id)}">remover</button>
+    <label>Talhão / pivô</label>
+    <select data-igsel="${esc(e.id)}">${ops.join("")}</select>
+    ${e.k?`${(med&&med.regou)?`<p class="mut" style="font-size:.78rem;margin-top:4px">iCrop mediu <b class="num">${fmtMm(med.mm)} mm</b> neste pivô hoje.</p>`:""}
+    <div class="chips mt">${["Rodou","Parcial","Não rodou","Manutenção"].map(s=>`<button class="chip ${e.status===s?"on":""}" data-igst="${esc(e.id)}|${s}">${s}</button>`).join("")}</div>
     ${rodou?`<div class="grade2 mt">
       <div><label>Lâmina (mm)</label><input inputmode="decimal" data-ig="lamina" value="${esc(e.lamina||"")}" placeholder="${(med&&med.regou)?("iCrop: "+fmtMm(med.mm)):"Ex.: 6"}"></div>
       <div><label>Percentímetro (%)</label><input inputmode="decimal" data-ig="percent" value="${esc(e.percent||"")}" placeholder="Ex.: 50"></div>
     </div>
-    <div class="chips mt"><button class="chip ${e.quimi==="Sim"?"on":""}" data-igqm="${esc(l.k)}">🧪 Quimigação / fertirrigação</button></div>
-    ${e.quimi==="Sim"?linhasProdutos(e.quimiProdutos||[],"igp")+`<button class="btn suave mini mt" data-igp-add="${esc(l.k)}">＋ produto</button>`:""}`:""}
+    <div class="chips mt"><button class="chip ${e.quimi==="Sim"?"on":""}" data-igqm="${esc(e.id)}">🧪 Quimigação / fertirrigação</button></div>
+    ${e.quimi==="Sim"?linhasProdutos(e.quimiProdutos||[],"igp")+`<button class="btn suave mini mt" data-igp-add="${esc(e.id)}">＋ produto</button>`:""}`:""}
     ${prob?`<label class="mt">Qual foi o problema?</label>
-      <div class="chips">${["Energia","Bomba","Torre / roda","Vazamento","Painel / automação","Outro"].map(p=>`<button class="chip ${(e.problemas||[]).includes(p)?"on":""}" data-igpb="${esc(l.k)}|${p}">${p}</button>`).join("")}</div>
-      <input data-ig="obs" value="${esc(e.obs||"")}" placeholder="Detalhe rápido (opcional)" style="margin-top:8px">`:""}
+      <div class="chips">${["Energia","Bomba","Torre / roda","Vazamento","Painel / automação","Outro"].map(p=>`<button class="chip ${(e.problemas||[]).includes(p)?"on":""}" data-igpb="${esc(e.id)}|${p}">${p}</button>`).join("")}</div>
+      <input data-ig="obs" value="${esc(e.obs||"")}" placeholder="Detalhe rápido (opcional)" style="margin-top:8px">`:""}`:""}
   </div>`;
 }
-function linhasIrgDa(r){
-  const ic=pivosIcropDa(r.fazendaId).map(nome=>({k:"ic:"+nome,nome}));
-  const loc=pivosLocaisDa(r.fazendaId)
-    .filter(p=>!ic.some(x=>normTxt(x.nome)===normTxt(p.nome)))
-    .map(p=>({k:p.id,nome:p.nome}));
-  /* boletim antigo com pivô que saiu da lista: a linha continua aparecendo */
-  const extras=(r.irg||[]).filter(e=>e.nome).map(e=>({k:e.k,nome:e.nome}))
-    .filter(e=>!ic.some(x=>x.k===e.k)&&!loc.some(x=>x.k===e.k));
-  return [...ic,...loc,...extras];
+function topoIrgHtml(r){
+  if(!pivosDa(r.fazendaId).length)
+    return `<p class="mut mt" style="font-size:.78rem">Nenhum pivô cadastrado nesta unidade ainda. Cadastre abaixo — fica guardado para os próximos dias.</p>`;
+  return `<p class="mut mt" style="font-size:.78rem">Toque em ＋, escolha o pivô na lista e marque a situação. Lâmina e quimigação aparecem quando ele rodou.</p>`
+    +(pivosLivresDa(r,null).length?`<button class="btn suave mini mt" id="bt-add-todos-pivos">＋ adicionar todos os pivôs</button>`:"");
+}
+/* Exceção (lista vazia, caso Porto Buriti): campo do próprio app para cadastrar
+   o pivô da unidade. Com lista, vira um link discreto "cadastrar outro pivô". */
+function blocoCadPivo(r,aberto){
+  if(pivosDa(r.fazendaId).length&&!aberto)
+    return `<p class="mt" style="margin-bottom:0"><button id="bt-abrir-cad-pivo" style="font-size:.78rem;color:var(--tinta-2);text-decoration:underline;background:none;border:none;box-shadow:none;padding:0;min-height:0;display:inline">cadastrar outro pivô</button></p>`;
+  return `<label class="mt">Cadastrar pivô desta fazenda</label>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input id="in-novo-pivo" placeholder="Ex.: Pivô 01" style="flex:1">
+      <button class="btn suave mini" id="bt-salvar-novo-pivo">salvar</button>
+    </div>`;
 }
 function repintarIrg(r){
   const el=$("#lista-irg"); if(!el) return;
-  el.innerHTML=linhasIrgDa(r).map(l=>linhaIrg(r,l)).join("");
+  migrarIrg(r);
+  el.innerHTML=(r.irg||[]).map(e=>cardIrg(r,e)).join("");
+  const topo=$("#topo-irg"); if(topo) topo.innerHTML=topoIrgHtml(r);
   const s=$("#res-irg");
   if(s){ const n=(r.irg||[]).filter(e=>e.status).length; s.textContent=n?n+" pivô"+(n>1?"s":"")+" lançado"+(n>1?"s":""):""; }
 }
 function secaoIrrigacaoGraos(r){
+  migrarIrg(r);
   const nReg=(r.irg||[]).filter(e=>e.status).length;
   return `<details class="secao"><summary><span class="ico">💧</span>Irrigação (pivôs)
     <span class="resumo" id="res-irg">${nReg?nReg+" pivô"+(nReg>1?"s":"")+" lançado"+(nReg>1?"s":""):""}</span><span class="seta">›</span></summary>
     <div class="corpo">
-      ${linhasIrgDa(r).length?`<p class="mut mt" style="font-size:.78rem">Toque na situação de cada pivô. Lâmina e quimigação aparecem quando ele rodou.</p>`
-        :`<p class="mut mt" style="font-size:.78rem">Nenhum pivô na lista ainda. Toque no botão abaixo e cadastre os pivôs desta unidade — ficam guardados para os próximos dias.</p>`}
-      <div id="lista-irg">${linhasIrgDa(r).map(l=>linhaIrg(r,l)).join("")}</div>
-      <button class="btn suave mini mt" id="bt-add-pivo">＋ pivô / equipamento</button>
+      <div id="topo-irg">${topoIrgHtml(r)}</div>
+      <div id="lista-irg">${(r.irg||[]).map(e=>cardIrg(r,e)).join("")}</div>
+      <button class="btn suave mt" id="bt-add-pivo">＋ pivô</button>
+      <div id="bloco-cad-pivo">${blocoCadPivo(r,false)}</div>
       ${cartaoIcropDia(r)}
     </div></details>`;
 }
@@ -4108,27 +4140,38 @@ function ligarEventos(tela){
         limparCamposOp(a); Object.assign(a,copia,{id:a.id,talhaoId:a.talhaoId,gr:1});
         const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
     /* ---- grãos: irrigação por pivô ---- */
-    if(d.igst){ const i=d.igst.lastIndexOf("|"); const e2=irgDe(r,d.igst.slice(0,i)); const st=d.igst.slice(i+1);
+    if(d.igst){ const i=d.igst.lastIndexOf("|"); const e2=irgDe(r,d.igst.slice(0,i)); if(!e2) return; const st=d.igst.slice(i+1);
       e2.status=(e2.status===st)?"":st;
       if(e2.status!=="Não rodou"&&e2.status!=="Manutenção") e2.problemas=[];
       repintarIrg(r); salvarRascunho(); return; }
-    if(d.igqm){ const e2=irgDe(r,d.igqm); e2.quimi=(e2.quimi==="Sim")?"":"Sim";
+    if(d.igqm){ const e2=irgDe(r,d.igqm); if(!e2) return; e2.quimi=(e2.quimi==="Sim")?"":"Sim";
       if(e2.quimi==="Sim"&&!(e2.quimiProdutos||[]).length) e2.quimiProdutos=[{nome:"",dose:"",un:"kg"}];
       repintarIrg(r); salvarRascunho(); return; }
-    if(d.igpb){ const i=d.igpb.lastIndexOf("|"); const e2=irgDe(r,d.igpb.slice(0,i)); const p=d.igpb.slice(i+1);
+    if(d.igpb){ const i=d.igpb.lastIndexOf("|"); const e2=irgDe(r,d.igpb.slice(0,i)); if(!e2) return; const p=d.igpb.slice(i+1);
       e2.problemas=e2.problemas||[];
       const ix=e2.problemas.indexOf(p); if(ix>=0) e2.problemas.splice(ix,1); else e2.problemas.push(p);
       t.classList.toggle("on"); salvarRascunho(); return; }
-    if(d.igpAdd){ const e2=irgDe(r,d.igpAdd); e2.quimiProdutos=e2.quimiProdutos||[]; e2.quimiProdutos.push({nome:"",dose:"",un:"kg"});
+    if(d.igpAdd){ const e2=irgDe(r,d.igpAdd); if(!e2) return; e2.quimiProdutos=e2.quimiProdutos||[]; e2.quimiProdutos.push({nome:"",dose:"",un:"kg"});
       repintarIrg(r); salvarRascunho(); return; }
-    if(d.igpRm!==undefined){ const row=t.closest("[data-irg]"); const e2=irgDe(r,row.dataset.irg);
+    if(d.igpRm!==undefined){ const row=t.closest("[data-irg]"); const e2=row&&irgDe(r,row.dataset.irg); if(!e2) return;
       e2.quimiProdutos.splice(parseInt(d.igpRm),1); repintarIrg(r); salvarRascunho(); return; }
-    if(t.id==="bt-add-pivo"){ const nome=prompt("Nome do pivô / equipamento (ex.: Pivô 01):"); if(!nome) return;
+    if(d.rmIrg){ r.irg=(r.irg||[]).filter(e2=>e2.id!==d.rmIrg); repintarIrg(r); salvarRascunho(); return; }
+    if(t.id==="bt-add-pivo"){ r.irg=r.irg||[]; r.irg.push(novoIrg(null));
+      repintarIrg(r); salvarRascunho(); return; }
+    if(t.id==="bt-add-todos-pivos"){ r.irg=r.irg||[];
+      /* um cartão por pivô ainda não lançado, todos com a situação em branco */
+      pivosLivresDa(r,null).forEach(p=>r.irg.push(novoIrg(p)));
+      r.irg=r.irg.filter(e2=>e2.k); /* some com cartão vazio que tenha sobrado */
+      repintarIrg(r); salvarRascunho(); return; }
+    if(t.id==="bt-abrir-cad-pivo"){ const bx=$("#bloco-cad-pivo");
+      if(bx){ bx.innerHTML=blocoCadPivo(r,true); const i2=$("#in-novo-pivo"); if(i2) i2.focus(); } return; }
+    if(t.id==="bt-salvar-novo-pivo"){ const i2=$("#in-novo-pivo"); const nome=String((i2&&i2.value)||"").trim(); if(!nome) return;
       /* cadastro local, guardado por unidade — vale para os próximos boletins também */
       D.pivosLocais=D.pivosLocais||{};
       const lista=D.pivosLocais[r.fazendaId]=D.pivosLocais[r.fazendaId]||[];
-      if(!lista.some(p=>normTxt(p.nome)===normTxt(nome))) lista.push({id:"eq:"+uid(), nome:String(nome).trim()});
-      salvarDados(); repintarIrg(r); salvarRascunho(); return; }
+      if(!pivosDa(r.fazendaId).some(p=>chavePivo(p.nome)===chavePivo(nome))) lista.push({id:"eq:"+uid(), nome});
+      salvarDados(); const bx=$("#bloco-cad-pivo"); if(bx) bx.innerHTML=blocoCadPivo(r,false);
+      repintarIrg(r); salvarRascunho(); return; }
     /* ---- pecuária: repetir o último lançamento ---- */
     if(t.id==="bt-uev-pec"){ const mem=(D.ultimoEvPec||{})[r.fazendaId];
       if(mem){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
@@ -4301,10 +4344,10 @@ function ligarEventos(tela){
       else if(d.gp!==undefined){ const c=el.closest("[data-ativ]"); const a=c&&r.atividades.find(x=>x.id===c.dataset.ativ);
         const row=el.closest("[data-prow]"); const i=row?parseInt(row.dataset.prow):0;
         if(a&&a.produtos&&a.produtos[i]) a.produtos[i][d.gp]=el.value; }
-      else if(d.ig!==undefined){ const row=el.closest("[data-irg]"); if(row){ const e3=irgDe(r,row.dataset.irg); e3[d.ig]=el.value; } }
-      else if(d.igp!==undefined){ const row=el.closest("[data-irg]"); if(row){ const e3=irgDe(r,row.dataset.irg);
+      else if(d.ig!==undefined){ const row=el.closest("[data-irg]"); const e3=row&&irgDe(r,row.dataset.irg); if(e3) e3[d.ig]=el.value; }
+      else if(d.igp!==undefined){ const row=el.closest("[data-irg]"); const e3=row&&irgDe(r,row.dataset.irg);
         const pr=el.closest("[data-prow]"); const i=pr?parseInt(pr.dataset.prow):0;
-        if(e3.quimiProdutos&&e3.quimiProdutos[i]) e3.quimiProdutos[i][d.igp]=el.value; } }
+        if(e3&&e3.quimiProdutos&&e3.quimiProdutos[i]) e3.quimiProdutos[i][d.igp]=el.value; }
       else if(d.cc!==undefined){ const card=el.closest("[data-col]"); const c=r.colheita.find(x=>x.id===card.dataset.col);
         c[d.cc]=el.value;
         if(["cereja","verde","seco"].includes(d.cc)) atualizarMatura(card,c);
@@ -4343,6 +4386,11 @@ function ligarEventos(tela){
         const i=parseInt(el.closest("[data-maq]").dataset.maq);
         const v=resolverMaq(rascunho.fazendaId, el.value);
         a.maquinas[i].nome=v; el.value=v; salvarRascunho(); return; } }
+    /* grãos: pivô escolhido na lista da irrigação redesenha o cartão */
+    if(rascunho && d.igsel!==undefined){ const e3=irgDe(rascunho,d.igsel);
+      if(e3){ const p=pivosDa(rascunho.fazendaId).find(x=>x.k===el.value);
+        e3.k=el.value; e3.nome=p?p.nome:(el.value?e3.nome:"");
+        repintarIrg(rascunho); salvarRascunho(); } return; }
     /* grãos: talhão em cascata — escolher redesenha o cartão (a operação é escolhida por toque nas fases) */
     if(rascunho && (d.a==="talhaoId"||d.a==="culturaPl")){
       const card=el.closest("[data-ativ]"); const a=card&&rascunho.atividades.find(x=>x.id===card.dataset.ativ);
