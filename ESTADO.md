@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v44** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v45** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -48,17 +48,21 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
   (registro por talhão + operação escolhida em seletor agrupado por
   fase, com campos em cascata específicos de cada operação — fonte:
-  docs/catalogos-por-atividade.md); **💧 Irrigação por pivô** (v44:
-  sem digitação de nome — cada lançamento usa o mesmo seletor
-  "Talhão / pivô" das Operações do dia; a lista une talhões-pivô do
-  cadastro oficial + equipamentos da iCrop sem "café" no nome +
-  cadastro local da unidade, sem duplicar por grafia; pivô já lançado
-  some da lista; botão "adicionar todos os pivôs" cria um cartão por
-  pivô com situação em branco; fazenda sem pivô na lista, caso Porto
-  Buriti, ganha o campo "Cadastrar pivô desta fazenda" no próprio
-  app — com lista, vira o link "cadastrar outro pivô"; seguem
-  status/lâmina/percentímetro/quimigação/problemas por pivô e a
-  comparação informado × medido); pragas/doenças e ocorrências. Ciclo de cultura abre pelo
+  docs/catalogos-por-atividade.md); **💧 Irrigação por pivô** (v44,
+  ajustada na v45: sem digitação de nome — o seletor "Talhão / pivô"
+  aparece só na hora de escolher; pivô escolhido vira LINHA COMPACTA
+  "Nome — área · situação"; a lista une talhões-pivô do cadastro
+  oficial + equipamentos da iCrop sem "café" no nome + cadastro local
+  da unidade, unificados pelo NÚMERO do pivô — o "01" da iCrop e o
+  talhão "Pivô 01" são o mesmo pivô (chavePivo); rascunhos que
+  ficaram com pivô em dobro na v44 são consertados sozinhos ao abrir
+  (migrarIrg); pivô já lançado some da lista; botão "adicionar todos
+  os pivôs" cria uma linha por pivô com situação em branco; fazenda
+  sem pivô na lista, caso Porto Buriti, ganha o campo "Cadastrar
+  pivô desta fazenda" no próprio app — com lista, vira o link
+  "cadastrar outro pivô"; seguem status/lâmina/percentímetro/
+  quimigação/problemas por pivô e a comparação informado × medido);
+  pragas/doenças e ocorrências. Ciclo de cultura abre pelo
   plantio lançado e encerra quando a colheita atinge a área do
   talhão. Talhões ARRENDADO (milho semente → sementeira) aparecem só
   como etiqueta, sem operações/irrigação/colheita.
