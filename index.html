@@ -1459,9 +1459,9 @@ function icropVencimentos(){
   out.vencendo.sort((a,b)=>a.dias-b.dias);
   return (out.vencendo.length||out.zeradas.length)?out:null;
 }
-/* --- Solinftec automático (garagem): só funciona quando SOLINFTEC_AUTO for true
-       e a tabela solinftec_diario existir no Supabase. Com a chave em false,
-       nada é buscado e nada aparece na tela. --- */
+/* --- Solinftec automático (robô do Supabase grava em solinftec_diario a partir
+       da API Detalhes da Operação V3 — sql/003-solinftec.sql). O app só LÊ.
+       Se a tabela ainda não existir, nada é buscado e nada aparece na tela. --- */
 async function baixarSolinftec(){
   if(!SOLINFTEC_AUTO || !syncAtivo()) return;
   try{
@@ -1712,7 +1712,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v47</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v48</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1740,7 +1740,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v47 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v48 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3067,7 +3067,7 @@ function vImportar(){
   const fonte=e?e.fonte:"solinftec";
   const campos=CAMPOS_IMPORT[fonte];
   const mapaSalvo=(D.mapaImport||{})[fonte]||{};
-  return topo("Importar telemetria","Solinftec · iCrop — enquanto a API não chega",true)+`
+  return topo("Importar telemetria","Solinftec · iCrop — plano B se o robô falhar",true)+`
   <div class="cartao">
     <label>De qual sistema é o arquivo?</label>
     <div class="chips">
@@ -3526,7 +3526,7 @@ function abrirWhats(id){
 }
 /* ---------- Sincronização entre celulares (Supabase) ---------- */
 const SYNC_PADRAO = { url:"https://syvehtgrbqteyuqhoban.supabase.co", chave:"sb_publishable_-FOT9xpA63j8_IYRYTAcMA_X1Ov9NH5" }; /* Grupo LGS — banco central */
-const SOLINFTEC_AUTO = false; /* garagem Solinftec: só virar true quando a tabela solinftec_diario existir no Supabase */
+const SOLINFTEC_AUTO = true; /* robô Solinftec ligado (API Detalhes da Operação V3) — exige sql/003-solinftec.sql rodado no Supabase; sem a tabela, o fetch falha em silêncio e nada aparece */
 let syncCfg = {...SYNC_PADRAO};
 let syncFila = [];            /* registros aguardando internet: [{t:'b'|'p'|'r', id}] */
 let syncUltima = null, syncOcupado = false;
