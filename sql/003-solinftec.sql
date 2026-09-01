@@ -88,12 +88,30 @@ create table if not exists public.solinftec_depara (
   padrao     text primary key,  -- pedaço do nome, em minúsculas
   fazenda_id text not null
 );
+-- Padrões em minúsculas e SEM letras acentuadas ("_" casa qualquer
+-- letra: 'f_lix' pega 'félix' e 'felix'). O padrão mais comprido
+-- ganha quando dois casarem no mesmo nome. Nas fazendas desmembradas
+-- vale o id de uma unidade qualquer: o app (v49) mostra o cartão para
+-- todas as unidades irmãs da mesma fazenda física.
 insert into public.solinftec_depara (padrao, fazenda_id) values
-  ('rio preto', 'f03g'), ('lagamar', 'f03g'),
-  ('vereda',    'f22g'),
-  ('capoeira',  'f27'),
-  ('floramil',  'f33'),
-  ('buriti',    'f35'), ('porto', 'f35')
+  ('rio preto',     'f03g'), ('lagamar', 'f03g'),
+  ('vereda',        'f22g'),
+  ('capoeira',      'f27'),
+  ('floramil',      'f33'),
+  ('buriti',        'f35'), ('porto', 'f35'),
+  ('monte carmelo', 'f14c'),
+  ('mata preta',    'f13c'),
+  ('gua limpa',     'f01'),
+  ('gua santa',     'f26'),
+  ('f_lix',         'f21'),
+  ('romaria',       'f23'),
+  ('rodrigo',       'f20'),
+  ('armaz',         'f25'),
+  ('chapad_o',      'f29'), ('chapada', 'f28'),
+  ('confins',       'f30'),
+  ('cra cra',       'f31'),
+  ('ferragem',      'f32'),
+  ('gameleira',     'f34')
 on conflict (padrao) do nothing;
 
 -- De-para: código da operação -> nome amigável. A API só devolve o
@@ -192,17 +210,26 @@ begin
 
   delete from public.solinftec_diario where data = dia;
 
+  -- A API real manda os campos em minúsculas e alguns com nome
+  -- diferente do manual em PDF (vltempo, dtbase, fgtpoperacao...);
+  -- o coalesce aceita as duas grafias.
   with linhas as (
     select
-      coalesce(l ->> 'dsFazenda', '')                                        as fazenda_sol,
-      coalesce(nullif(l ->> 'dsEquipamento', ''), l ->> 'cdEquipamento', '') as equipamento,
-      coalesce(l ->> 'cdOperacao', '')                                       as cd_operacao,
-      coalesce(l ->> 'dsTalhao', '')                                         as talhao,
-      coalesce((l ->> 'vlTempoSegundos')::numeric, 0)                        as seg,
-      coalesce((l ->> 'vlTempoMotorLigado')::numeric, 0)                     as motor,
-      coalesce((l ->> 'vlTempoMotorOcioso')::numeric, 0)                     as ocioso,
-      coalesce((l ->> 'vlAreaOperacional')::numeric, 0)                      as area,
-      coalesce((l ->> 'vlConsumoMedio')::numeric, 0)                         as litros
+      coalesce(l ->> 'dsfazenda', l ->> 'dsFazenda', '')                     as fazenda_sol,
+      coalesce(nullif(l ->> 'dsequipamento', ''), nullif(l ->> 'dsEquipamento', ''),
+               l ->> 'cdequipamento', l ->> 'cdEquipamento', '')             as equipamento,
+      coalesce(l ->> 'cdoperacao', l ->> 'cdOperacao', '')                   as cd_operacao,
+      coalesce(l ->> 'dstalhao', l ->> 'dsTalhao', '')                       as talhao,
+      coalesce((l ->> 'vltempo')::numeric, (l ->> 'vltemposegundos')::numeric,
+               (l ->> 'vlTempoSegundos')::numeric, 0)                        as seg,
+      coalesce((l ->> 'vltempomotorligado')::numeric,
+               (l ->> 'vlTempoMotorLigado')::numeric, 0)                     as motor,
+      coalesce((l ->> 'vltempomotorocioso')::numeric,
+               (l ->> 'vlTempoMotorOcioso')::numeric, 0)                     as ocioso,
+      coalesce((l ->> 'vlareaoperacional')::numeric,
+               (l ->> 'vlAreaOperacional')::numeric, 0)                      as area,
+      coalesce((l ->> 'vlconsumomedio')::numeric,
+               (l ->> 'vlConsumoMedio')::numeric, 0)                         as litros
     from _solinftec_tmp
   ),
   ag as (
@@ -228,6 +255,7 @@ begin
   left join lateral (
     select d.fazenda_id from public.solinftec_depara d
     where lower(ag.fazenda_sol) like '%' || d.padrao || '%'
+    order by length(d.padrao) desc
     limit 1
   ) dp on true
   left join public.solinftec_operacoes op on op.cd = ag.cd_operacao;

@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v48** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v49** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -123,25 +123,31 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
     manda os R$), eficiência %, acumulados do ciclo (mm irrigados e
     mm chuva) e alerta âmbar por pivô com dias em atraso ≥ 3 ou
     umidade abaixo da segurança.
-- Robô Solinftec (v48 — pg_cron + extensão http no Supabase,
+- Robô Solinftec (v48/v49 — pg_cron + extensão http no Supabase,
   sql/003-solinftec.sql): busca na API "Detalhes da Operação V3"
   (https://scdi.saas-solinftec.com — token de 1 min gerado a cada
   chamada, /pull paginado, identifier 23) e grava o resumo diário por
   fazenda/equipamento/operação/talhão em solinftec_diario (horas,
-  motor ligado/ocioso, área, litros). Agenda: 03:05 (Brasília) o dia
-  anterior fechado + de hora em hora (09:35–20:35) o parcial do dia.
-  Usuário/senha vivem SÓ na tabela solinftec_segredos do Supabase
-  (trancada — RLS sem policies; a tabela segredos da iCrop tem outra
-  estrutura e ficou intocada). O app LÊ
-  (baixarSolinftec) e mostra o cartão do gerente ("medição automática
-  do dia", fazendas de grãos) e o do painel ("medição de ontem").
-  De-para de fazenda (solinftec_depara: nome Solinftec → f03g, f22g,
-  f27, f33, f35) e de operação (solinftec_operacoes: código → nome;
-  vazio mostra "Operação NNN") ajustáveis no SQL Editor. A importação
+  motor ligado/ocioso, área, litros). ATENÇÃO: a API real manda os
+  campos em minúsculas e alguns com nome diferente do manual em PDF
+  (vltempo, dtbase, fgtpoperacao…) — o robô aceita as duas grafias.
+  Agenda: 03:05 (Brasília) o dia anterior fechado + de hora em hora
+  (09:35–20:35) o parcial do dia. Usuário/senha vivem SÓ na tabela
+  solinftec_segredos do Supabase (trancada — RLS sem policies; a
+  tabela segredos da iCrop tem outra estrutura e ficou intocada).
+  O app LÊ (baixarSolinftec) e mostra o cartão do gerente ("medição
+  automática do dia") e o do painel ("medição de ontem") em QUALQUER
+  fazenda com máquinas medidas (v49 — a frota atende café, grãos e
+  pecuária; ex.: trator na Faz. Monte Carmelo). Unidades irmãs da
+  mesma fazenda física veem o mesmo cartão (comparação por
+  fazenda-mãe em solinftecDo). De-para de fazenda (solinftec_depara:
+  pedaço do nome Solinftec → id de unidade; o padrão mais comprido
+  ganha) e de operação (solinftec_operacoes: código → nome; vazio
+  mostra "Operação NNN") ajustáveis no SQL Editor. A importação
   manual por arquivo continua como plano B.
 
 ## Chaves ligadas/desligadas
-- SOLINFTEC_AUTO = true (v48). Enquanto sql/003-solinftec.sql não
+- SOLINFTEC_AUTO = true (desde a v48). Enquanto sql/003-solinftec.sql não
   rodar no Supabase, o fetch falha em silêncio e nenhum cartão
   Solinftec aparece — o app segue normal.
 - Sincronização Supabase: ligada por padrão (SYNC_PADRAO com a chave

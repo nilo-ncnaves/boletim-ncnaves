@@ -1476,11 +1476,14 @@ async function baixarSolinftec(){
 }
 function solinftecDo(data,fz){
   if(!SOLINFTEC_AUTO) return null;
-  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && fzAtual(l.fazenda_id)===fz);
+  /* as máquinas são da fazenda física: unidades irmãs (café/grãos/pecuária
+     da mesma fazenda-mãe) veem o mesmo cartão */
+  const linhas=(D.solinftecDados||[]).filter(l=>l.data===data && l.fazenda_id
+    && maeIdDe(fzAtual(l.fazenda_id))===maeIdDe(fz));
   return linhas.length?linhas:null;
 }
 function cartaoSolinftecGerente(fz){
-  if(!SOLINFTEC_AUTO || !temCultura(fz,"GRAOS")) return "";
+  if(!SOLINFTEC_AUTO) return "";
   const linhas=solinftecDo(hojeISO(),fz);
   if(!linhas) return "";
   const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
@@ -1491,7 +1494,7 @@ function cartaoSolinftecGerente(fz){
 function cartaoSolinftecPainel(){
   if(!SOLINFTEC_AUTO) return "";
   const ontem=ontemISO(), porFaz={};
-  (D.solinftecDados||[]).filter(l=>l.data===ontem && temCultura(fzAtual(l.fazenda_id),"GRAOS")).forEach(l=>{
+  (D.solinftecDados||[]).filter(l=>l.data===ontem && l.fazenda_id).forEach(l=>{
     const o=porFaz[fzAtual(l.fazenda_id)]=porFaz[fzAtual(l.fazenda_id)]||{horas:0,area:0};
     o.horas+=n0(l.horas); o.area+=n0(l.area_ha);
   });
@@ -1712,7 +1715,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v48</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v49</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1740,7 +1743,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v48 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v49 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
