@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v42** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v43** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -21,11 +21,26 @@ no mesmo pull request (regra no CLAUDE.md).
 Unidades desmembradas compartilham a fazenda-mãe (fazendaMae) no
 painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 
-## Perfis de uso
-- Gerente: preenche o boletim da sua unidade.
-- Diretoria: painel com farol, indicadores e cartões por atividade.
-- Escritório/Admin: cadastros, importação e relatórios.
-- Pós-colheita: boletim próprio de terreiro/secador/tulha (café).
+## Perfis de uso e controle de acesso (v43)
+- O app só abre com um **código de acesso** (formato XX-NNNN), digitado
+  uma vez e gravado no aparelho. Código errado é barrado, sem dica.
+- Código de unidade: o aparelho vira o boletim daquela unidade só —
+  trocar fazenda/atividade navega apenas dentro do escopo; painel e
+  Cadastros não existem; a sincronização baixa/envia só o que a tela
+  permite lançar (pós-colheita aparece se a unidade for de café).
+- Código DIRETORIA: painel e leitura de todas as unidades; não
+  preenche boletim e não vê Cadastros.
+- Código ADMIN: abre tudo, inclusive Cadastros.
+- Fonte dos códigos: constante CODIGOS_PADRAO no index.html + tabela
+  codigos_acesso no Supabase (baixada a cada sincronização e na tela
+  de código). Em Cadastros o admin vê a lista e pode "gerar novo
+  código" por unidade — invalida o anterior; os aparelhos com o
+  código antigo caem para a tela de código na próxima sincronização.
+- "Sair" discreto no rodapé da tela de atividades esquece o código do
+  aparelho (troca de aparelho ou de funcionário).
+- Perfis: Gerente preenche o boletim da unidade; Diretoria acompanha o
+  painel; Escritório/Admin cadastra, importa e tira relatórios;
+  Pós-colheita tem boletim próprio de terreiro/secador/tulha (café).
 
 ## Seções do boletim por atividade
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
@@ -60,6 +75,14 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   publishable).
 
 ## PENDÊNCIAS
+- **Rodar sql/001-codigos-acesso.sql no SQL Editor do Supabase** (cria
+  a tabela codigos_acesso com os códigos iniciais). Sem ela o app
+  continua funcionando com os códigos de fábrica, mas "gerar novo
+  código" não alcança os outros aparelhos.
+- Controle de acesso é combinado, não cofre: os códigos de fábrica
+  vivem no código do app e um aparelho que nunca sincroniza não fica
+  sabendo de código trocado. Serve para organizar o uso, não para
+  segurança forte.
 - Ciclos reais de grãos aguardando censo de plantio (o que está
   plantado hoje em cada pivô/talhão) para abrir os ciclos oficiais.
 - solinftec_diario aguardando definição da API/exportação da
