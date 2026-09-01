@@ -130,7 +130,9 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   fazenda/equipamento/operação/talhão em solinftec_diario (horas,
   motor ligado/ocioso, área, litros). Agenda: 03:05 (Brasília) o dia
   anterior fechado + de hora em hora (09:35–20:35) o parcial do dia.
-  Usuário/senha vivem SÓ na tabela segredos do Supabase. O app LÊ
+  Usuário/senha vivem SÓ na tabela solinftec_segredos do Supabase
+  (trancada — RLS sem policies; a tabela segredos da iCrop tem outra
+  estrutura e ficou intocada). O app LÊ
   (baixarSolinftec) e mostra o cartão do gerente ("medição automática
   do dia", fazendas de grãos) e o do painel ("medição de ontem").
   De-para de fazenda (solinftec_depara: nome Solinftec → f03g, f22g,

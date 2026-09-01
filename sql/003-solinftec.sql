@@ -4,12 +4,15 @@
 -- ANTES DE RODAR (1 minuto):
 --   Procure abaixo o texto COLE_AQUI_A_SENHA e troque pela senha que
 --   está na página 1 do PDF "Configuração API Integração" da Solinftec
---   (campo "password"). A senha fica SÓ no Supabase (tabela segredos),
---   nunca no código do app nem neste arquivo do repositório.
+--   (campo "password"). A senha fica SÓ no Supabase (tabela
+--   solinftec_segredos, trancada), nunca no código do app nem neste
+--   arquivo do repositório.
 --
 -- O que este arquivo faz:
 --   1. Liga as extensões http (chamada à API) e pg_cron (agendador).
---   2. Guarda usuário e senha da Solinftec na tabela segredos.
+--   2. Guarda usuário e senha da Solinftec na tabela
+--      solinftec_segredos (própria, para não depender da estrutura da
+--      tabela segredos antiga da iCrop).
 --   3. Cria a tabela solinftec_diario (o app só LÊ ela, como faz com
 --      icrop_manejo) + tabelas de-para de fazenda e de operação.
 --   4. Cria as funções do robô: gerar token e buscar/gravar o dia.
@@ -20,24 +23,19 @@
 create extension if not exists http with schema extensions;
 create extension if not exists pg_cron;
 
--- 2. Usuário e senha na tabela segredos ------------------------------
--- (mesma casa do token da iCrop; acessível apenas pelo SQL Editor)
-create table if not exists public.segredos (
+-- 2. Usuário e senha na tabela solinftec_segredos --------------------
+-- Tabela própria (a tabela segredos da iCrop tem outra estrutura).
+-- Trancada: RLS ligado e sem policies — só o SQL Editor alcança.
+create table if not exists public.solinftec_segredos (
   nome text primary key,
   valor text not null
 );
-alter table public.segredos enable row level security; -- sem policies: o app não alcança
+alter table public.solinftec_segredos enable row level security;
 
-do $$
-begin
-  insert into public.segredos (nome, valor) values
-    ('solinftec_cliente', 'ncnaves'),
-    ('solinftec_senha',   'COLE_AQUI_A_SENHA')  -- <<< trocar pela senha do PDF
-  on conflict (nome) do update set valor = excluded.valor;
-exception when undefined_column then
-  raise exception 'A tabela segredos deste projeto usa outros nomes de coluna. '
-    'Confira as colunas dela (menu Table Editor) e ajuste este insert e a função solinftec_token().';
-end $$;
+insert into public.solinftec_segredos (nome, valor) values
+  ('solinftec_cliente', 'ncnaves'),
+  ('solinftec_senha',   'COLE_AQUI_A_SENHA')  -- <<< trocar pela senha do PDF
+on conflict (nome) do update set valor = excluded.valor;
 
 -- 3. Tabelas ---------------------------------------------------------
 -- Resumo diário por fazenda/equipamento/operação/talhão.
@@ -112,10 +110,10 @@ declare
   v_sen text;
   resp  extensions.http_response;
 begin
-  select valor into v_cli from public.segredos where nome = 'solinftec_cliente';
-  select valor into v_sen from public.segredos where nome = 'solinftec_senha';
+  select valor into v_cli from public.solinftec_segredos where nome = 'solinftec_cliente';
+  select valor into v_sen from public.solinftec_segredos where nome = 'solinftec_senha';
   if v_sen is null or v_sen like 'COLE_AQUI%' then
-    raise exception 'Senha da Solinftec ainda não gravada na tabela segredos (nome = solinftec_senha).';
+    raise exception 'Senha da Solinftec ainda não gravada na tabela solinftec_segredos (nome = solinftec_senha).';
   end if;
   select * into resp from extensions.http((
     'POST',
