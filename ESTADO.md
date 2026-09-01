@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v46** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v47** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -100,6 +100,29 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   madrugada; o app LÊ (icropDo) e mostra medição do dia, compara
   lâmina informada × medida e alerta parcela vencida (icrop_fazendas
   e icrop_parcelas).
+- Cartão iCrop enriquecido (v47) com os campos que o robô já grava na
+  coluna bruto (baixarIcrop lê via bruto->>: percentímetro
+  recomendado, tempo de irrigação, umidade/capacidade de campo/
+  umidade de segurança, déficit previsto, lâmina mínima, fase, graus-
+  dia, problemas de irrigação, clima da estação, chuva do
+  pluviômetro, eficiência, acumulados do ciclo, R$ necessário/
+  realizado e dias em atraso). Nada disso exige digitação — tom
+  "só confira":
+  - Gerente (café e grãos): o cartão "iCrop — medição automática do
+    dia" tem 3 linhas fechadas por padrão, abrindo ao toque —
+    **Hoje** (lâmina medida por pivô/parcela, chuva da estação,
+    problemas sinalizados), **Recomendação iCrop** (percentímetro %,
+    tempo h, déficit previsto amanhã, lâmina mínima) e **Solo e
+    planta** (umidade % vs limite de segurança em âmbar se abaixo,
+    fase, graus-dia acumulados, dias em atraso em âmbar se > 0).
+  - Seção Clima: além da chuva já sugerida, mostra a estação iCrop
+    do dia (T mín/máx, UR, vento) como sugestão.
+  - Painel da diretoria (medição de ontem, por unidade irrigada):
+    R$ necessário × R$ realizado com a diferença (a estimativa
+    antiga lâmina × área × R$/mm só aparece quando a iCrop não
+    manda os R$), eficiência %, acumulados do ciclo (mm irrigados e
+    mm chuva) e alerta âmbar por pivô com dias em atraso ≥ 3 ou
+    umidade abaixo da segurança.
 - Solinftec: garagem pronta no código, DESLIGADA.
 
 ## Chaves ligadas/desligadas

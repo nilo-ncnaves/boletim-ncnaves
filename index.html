@@ -1361,6 +1361,17 @@ function icropDo(data,fz){
     return ehCafe ? minha.includes("CAFE") : minha.includes("GRAOS");
   });
   if(!linhas.length) return null;
+  /* o bruto vem como texto (->>); campo ausente/nulo fica fora da conta */
+  const vals=(ls,k)=>ls.map(l=>l[k]).filter(v=>v!=null&&v!=="").map(n0);
+  const maxDe=(ls,k)=>{const v=vals(ls,k);return v.length?Math.max(...v):0;};
+  const minDe=(ls,k)=>{const v=vals(ls,k);return v.length?Math.min(...v):0;};
+  const somaDe=(ls,k)=>vals(ls,k).reduce((s,x)=>s+x,0);
+  const mediaDe=(ls,k)=>{const v=vals(ls,k);return v.length?v.reduce((s,x)=>s+x,0)/v.length:0;};
+  const probsDe=ls=>{const out=[];ls.forEach(l=>{const p=l.probs;
+    if(!p||p==="null"||p==="[]") return;
+    let itens=[p]; try{const j=JSON.parse(p); itens=Array.isArray(j)?j:[j];}catch(e){}
+    itens.forEach(x=>{const s=String((x&&(x.descricao||x.nome))||x||"").trim();
+      if(s&&s!=="[object Object]"&&!out.includes(s)) out.push(s);});});return out;};
   const chuva=Math.max(...linhas.map(l=>n0(l.precipitacao_mm)));
   const porEq={};
   linhas.forEach(l=>{
@@ -1377,9 +1388,23 @@ function icropDo(data,fz){
       total:ls.length, custo,
       etc:Math.max(...ls.map(l=>n0(l.etc))),
       deficit:Math.max(...ls.map(l=>n0(l.deficit))),
-      atraso:Math.max(...ls.map(l=>n0(l.atraso))) };
+      atraso:Math.max(...ls.map(l=>n0(l.atraso))),
+      percent:maxDe(ls,"percentimetro"), tempo:maxDe(ls,"tempo_irr"),
+      deficitPrev:maxDe(ls,"deficit_prev"), laminaMin:maxDe(ls,"lamina_min"),
+      umid:minDe(ls,"umidade"), umidSeg:maxDe(ls,"umid_seg"), capCampo:maxDe(ls,"cap_campo"),
+      umidBaixa:ls.some(l=>l.umidade!=null&&l.umidade!==""&&l.umid_seg!=null&&l.umid_seg!==""
+        &&n0(l.umidade)<n0(l.umid_seg)),
+      fase:String(ls.map(l=>l.fase).find(v=>v!=null&&v!==""&&v!=="null")||""),
+      gd:maxDe(ls,"gd"), probs:probsDe(ls) };
   });
-  return { chuva, eqs, qtd:linhas.length, custoDia };
+  /* clima da estação (é da fazenda física; qualquer linha do dia serve) */
+  const temClima=linhas.some(l=>["t_min","t_max","ur","vento"].some(k=>l[k]!=null&&l[k]!==""));
+  const clima=temClima?{ tmin:minDe(linhas,"t_min"), tmax:maxDe(linhas,"t_max"),
+    ur:maxDe(linhas,"ur"), vento:maxDe(linhas,"vento") }:null;
+  return { chuva, eqs, qtd:linhas.length, custoDia, clima,
+    chuvaPluv:maxDe(linhas,"chuva_pluv"), eficiencia:mediaDe(linhas,"eficiencia"),
+    acumIrr:mediaDe(linhas,"acum_irr"), acumChuva:mediaDe(linhas,"acum_chuva"),
+    reaisNec:somaDe(linhas,"reais_nec"), reaisReal:somaDe(linhas,"reais_real") };
 }
 async function baixarIcrop(){
   if(!syncAtivo()) return;
@@ -1389,7 +1414,18 @@ async function baixarIcrop(){
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
     const sel="fazenda,equipamento,parcela,data,irrigacao_mm,precipitacao_mm,etc,eto,"
       +"custo_mm:bruto->>reais_mm_ha,deficit:bruto->>deficit_consolidado,"
-      +"atraso:bruto->>dias_em_atraso,area:bruto->>area_da_parcela";
+      +"atraso:bruto->>dias_em_atraso,area:bruto->>area_da_parcela,"
+      /* campos ricos que o robô já grava no bruto (nomes da própria iCrop) */
+      +"percentimetro:bruto->>percentimetro_recomendado,tempo_irr:bruto->>tempo_de_irrigacao,"
+      +"umidade:bruto->>umidade,cap_campo:bruto->>capacidade_de_campo,"
+      +"umid_seg:bruto->>umidade_de_seguranca,deficit_prev:bruto->>deficit_previsto,"
+      +"lamina_min:bruto->>lamina_minima,fase:bruto->>fase_atual,gd:bruto->>gd_dia_acumulado,"
+      +"probs:bruto->>problemas_irrigacao,t_min:bruto->>temperatura_minima,"
+      +"t_max:bruto->>temperatura_maxima,ur:bruto->>umidade_relativa_do_ar,"
+      +"vento:bruto->>velocidade_do_vento,chuva_pluv:bruto->>chuva_pluviometro,"
+      +"eficiencia:bruto->>eficiencia_irrigacao,acum_irr:bruto->>acumulado_irrigacao,"
+      +"acum_chuva:bruto->>acumulado_precipitacao,reais_nec:bruto->>reais_por_irrigacao_necessaria,"
+      +"reais_real:bruto->>reais_por_irrigacao_realizada";
     const r=await fetch(syncCfg.url+"/rest/v1/icrop_manejo?select="+sel+"&data=gte."+de+"&order=data.desc&limit=1500", cab);
     if(!r.ok) return;
     const linhas=await r.json();
@@ -1676,7 +1712,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v46</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v47</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1704,7 +1740,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v46 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v47 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -1784,20 +1820,49 @@ function topo(titulo, sub, voltar){
 function cartaoIcropDia(r){
   const ic=icropDo(r.data,r.fazendaId);
   if(!ic) return "";
-  const linhasEq=ic.eqs.map(e=>{
-    const det=e.regadas.length
-      ? e.regadas.map(g=>"<b>"+g.mm.toLocaleString("pt-BR")+" mm</b>"+(g.parcela?" ("+esc(g.parcela)+")":"")).join(" · ")
-      : "sem irrigação medida";
-    const agro=(e.etc||e.deficit)
-      ? "<div class='mut' style='font-size:.75rem;margin-left:8px'>🌱 planta pediu "+e.etc.toLocaleString("pt-BR",{maximumFractionDigits:1})
-        +" mm · déficit "+e.deficit.toLocaleString("pt-BR",{maximumFractionDigits:1})+" mm"
-        +(e.atraso?" · <b>"+e.atraso+" dia"+(e.atraso>1?"s":"")+" de atraso</b>":"")+"</div>"
-      : "";
-    return "<div class='mt' style='font-size:.85rem'>"+esc(e.nome)+" — "+det+"</div>"+agro;
-  }).join("");
+  const num=(v,d)=>v.toLocaleString("pt-BR",{maximumFractionDigits:d==null?1:d});
+  const linhaDet=(rotulo,resumo,corpo)=>`<details class="mt" style="font-size:.85rem">
+    <summary style="cursor:pointer;list-style-position:inside"><b>${rotulo}</b>${resumo?` <span class="mut" style="font-size:.78rem">· ${resumo}</span>`:""}</summary>
+    <div style="margin:4px 0 2px 8px">${corpo}</div></details>`;
+  /* linha "Hoje": lâmina medida por pivô/parcela, chuva da estação e problemas */
+  const hojeCorpo=(ic.chuva?`<div style="margin:2px 0">🌧️ Chuva na estação: <b>${num(ic.chuva)} mm</b>${(ic.chuvaPluv&&ic.chuvaPluv!==ic.chuva)?` <span class="mut">(pluviômetro ${num(ic.chuvaPluv)} mm)</span>`:""}</div>`:"")
+    +ic.eqs.map(e=>{
+      const det=e.regadas.length
+        ? e.regadas.map(g=>"<b>"+num(g.mm)+" mm</b>"+(g.parcela?" ("+esc(g.parcela)+")":"")).join(" · ")
+        : "sem irrigação medida";
+      const pb=(e.probs||[]).length?` <span style="color:var(--amarelo)">· ⚠ ${esc(e.probs.join(", "))}</span>`:"";
+      return `<div style="margin:2px 0">${esc(e.nome)} — ${det}${pb}</div>`;
+    }).join("");
+  const regou=ic.eqs.filter(e=>e.regadas.length).length;
+  const hojeRes=(regou?regou+(regou>1?" regaram":" regou"):"sem irrigação medida")
+    +(ic.chuva?` · chuva ${num(ic.chuva)} mm`:"");
+  /* linha "Recomendação iCrop": o que o sistema pede para amanhã */
+  const eqsRec=ic.eqs.filter(e=>e.percent||e.tempo||e.deficitPrev||e.laminaMin);
+  const recCorpo=eqsRec.map(e=>`<div style="margin:2px 0">${esc(e.nome)} — ${[
+      e.percent?`percentímetro <b>${num(e.percent,0)}%</b>`:"",
+      e.tempo?`tempo <b>${num(e.tempo)} h</b>`:"",
+      e.deficitPrev?`déficit previsto amanhã <b>${num(e.deficitPrev)} mm</b>`:"",
+      e.laminaMin?`lâmina mínima <b>${num(e.laminaMin)} mm</b>`:""
+    ].filter(Boolean).join(" · ")}</div>`).join("");
+  const maxPct=Math.max(0,...eqsRec.map(e=>e.percent));
+  /* linha "Solo e planta": umidade × segurança, fase, graus-dia e atraso */
+  const eqsSolo=ic.eqs.filter(e=>e.umid||e.umidSeg||e.fase||e.gd||e.atraso);
+  const soloCorpo=eqsSolo.map(e=>{
+    const umid=(e.umid||e.umidSeg)?(e.umidBaixa
+      ?`umidade <b style="color:var(--amarelo)">${num(e.umid)}%</b> <span style="color:var(--amarelo)">⚠ abaixo da segurança (${num(e.umidSeg)}%)</span>`
+      :`umidade <b>${num(e.umid)}%</b>${e.umidSeg?` (segurança ${num(e.umidSeg)}%)`:""}`):"";
+    return `<div style="margin:2px 0">${esc(e.nome)} — ${[umid,
+      e.fase?`fase ${esc(e.fase)}`:"",
+      e.gd?`<b class="num">${num(e.gd,0)}</b> graus-dia`:"",
+      e.atraso?`<b style="color:var(--amarelo)">${e.atraso} dia${e.atraso>1?"s":""} de atraso</b>`:""
+    ].filter(Boolean).join(" · ")}</div>`;}).join("");
+  const nBaixa=eqsSolo.filter(e=>e.umidBaixa).length, nAtraso=eqsSolo.filter(e=>e.atraso>0).length;
+  const soloRes=nBaixa?`<span style="color:var(--amarelo)">⚠ ${nBaixa} abaixo da segurança</span>`
+    :nAtraso?`<span style="color:var(--amarelo)">⚠ ${nAtraso} em atraso</span>`:"umidade ok";
   return `<div class="aviso" style="border-color:var(--verde)"><b>💧 iCrop — medição automática do dia</b>
-          ${ic.chuva?`<div class="mt" style="font-size:.85rem">🌧️ Chuva na estação: <b>${ic.chuva.toLocaleString("pt-BR")} mm</b></div>`:""}
-          ${linhasEq}
+          ${linhaDet("Hoje",hojeRes,hojeCorpo)}
+          ${recCorpo?linhaDet("Recomendação iCrop",maxPct?`percentímetro até ${num(maxPct,0)}%`:"",recCorpo):""}
+          ${soloCorpo?linhaDet("Solo e planta",soloRes,soloCorpo):""}
           <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p></div>`;
 }
 function secaoGraos(r){
@@ -2340,10 +2405,19 @@ function vForm(){
       <div class="grade3">
         <div><label>Chuva (mm)</label><input inputmode="decimal" data-c="chuvaMm" value="${esc(r.clima.chuvaMm)}" placeholder="0"></div>
         ${(!temCafe&&!temGraos)?"":(()=>{const ic=icropDo(r.data,r.fazendaId);
-          if(!ic||!ic.chuva) return "";
-          if(n0(r.clima.chuvaMm)===ic.chuva) return `<p class="mut" style="grid-column:1/-1;margin:0;font-size:.78rem">🌧️ Confere com a estação iCrop ✔</p>`;
-          return `<p class="mut" style="grid-column:1/-1;margin:0;font-size:.82rem">🌧️ Estação iCrop mediu <b>${ic.chuva.toLocaleString("pt-BR")} mm</b>
-            <button class="btn suave mini" id="bt-chuva-icrop" data-mm="${ic.chuva}" style="display:inline-flex;margin-left:6px;padding:2px 8px">usar</button></p>`;})()}
+          if(!ic) return "";
+          let out="";
+          if(ic.chuva){
+            if(n0(r.clima.chuvaMm)===ic.chuva) out=`<p class="mut" style="grid-column:1/-1;margin:0;font-size:.78rem">🌧️ Confere com a estação iCrop ✔</p>`;
+            else out=`<p class="mut" style="grid-column:1/-1;margin:0;font-size:.82rem">🌧️ Estação iCrop mediu <b>${ic.chuva.toLocaleString("pt-BR")} mm</b>
+            <button class="btn suave mini" id="bt-chuva-icrop" data-mm="${ic.chuva}" style="display:inline-flex;margin-left:6px;padding:2px 8px">usar</button></p>`;
+          }
+          if(ic.clima){ const c=ic.clima, num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
+            const pts=[(c.tmin||c.tmax)?`mín <b>${num(c.tmin)}°</b> · máx <b>${num(c.tmax)}°</b>`:"",
+              c.ur?`UR <b>${num(c.ur)}%</b>`:"", c.vento?`vento <b>${num(c.vento)} km/h</b>`:""].filter(Boolean);
+            if(pts.length) out+=`<p class="mut" style="grid-column:1/-1;margin:0;font-size:.78rem">🌤️ Estação iCrop hoje: ${pts.join(" · ")} — só confira</p>`;
+          }
+          return out;})()}
       </div>
       ${temCafe?`<label>Na lavoura hoje (toque se aconteceu)</label>
       <div class="chips">
@@ -2792,7 +2866,8 @@ function vPainel(){
           const resumo=regadas.length
             ? regadas.map(e=>esc(e.nome.replace(/^Faz\.[^-]*-\s*/,""))+" "+e.regadas.reduce((s,g)=>s+g.mm,0).toLocaleString("pt-BR",{maximumFractionDigits:1})+"mm").join(" · ")
             : "sem irrigação";
-          const custo=ic.custoDia>0?" · 💰 ~R$ "+ic.custoDia.toLocaleString("pt-BR",{maximumFractionDigits:0}):"";
+          /* com os R$ da própria iCrop, a estimativa antiga (lâmina × área × R$/mm) sai de cena */
+          const custo=(ic.custoDia>0&&!ic.reaisReal)?" · 💰 ~R$ "+ic.custoDia.toLocaleString("pt-BR",{maximumFractionDigits:0}):"";
           const b=boletimDoDia(ontem,f.id); let div="";
           if(b&&b.irr&&b.irr.status){
             const st=b.irr.status, regou=regadas.length>0;
@@ -2801,7 +2876,15 @@ function vPainel(){
             else if(st==="Rodou normal"&&!regou&&ic.chuva<2)
               div=`<span style="color:var(--amarelo)"> · ⚠ boletim disse "Rodou" e iCrop não mediu lâmina</span>`;
           }
-          return `<p style="font-size:.85rem;margin:4px 0">${esc(f.nome)}: ${resumo}${custo}${ic.chuva?" · 🌧️ "+ic.chuva.toLocaleString("pt-BR")+"mm":""}${div}</p>`;
+          const num=(v,d)=>v.toLocaleString("pt-BR",{maximumFractionDigits:d==null?0:d});
+          const dif=ic.reaisReal-ic.reaisNec;
+          const dinheiro=(ic.reaisNec||ic.reaisReal)?`<p class="mut" style="font-size:.8rem;margin:0 0 2px 10px">💰 necessário <b class="num">R$ ${num(ic.reaisNec)}</b> × realizado <b class="num">R$ ${num(ic.reaisReal)}</b> (${dif>=0?"+":"−"}R$ ${num(Math.abs(dif))})${ic.eficiencia?` · eficiência <b class="num">${num(ic.eficiencia)}%</b>`:""}</p>`:"";
+          const ciclo=(ic.acumIrr||ic.acumChuva)?`<p class="mut" style="font-size:.8rem;margin:0 0 2px 10px">ciclo: <b class="num">${num(ic.acumIrr)} mm</b> irrigados · <b class="num">${num(ic.acumChuva)} mm</b> chuva</p>`:"";
+          const alertas=ic.eqs.filter(e=>e.atraso>=3||e.umidBaixa).map(e=>{
+            const m=[e.atraso>=3?e.atraso+" dias de atraso":"",
+              e.umidBaixa?"umidade "+num(e.umid,1)+"% abaixo da segurança ("+num(e.umidSeg,1)+"%)":""].filter(Boolean).join(" · ");
+            return `<p style="font-size:.78rem;margin:0 0 2px 10px;color:var(--amarelo)">⚠ ${esc(e.nome.replace(/^Faz\.[^-]*-\s*/,""))}: ${m}</p>`;}).join("");
+          return `<p style="font-size:.85rem;margin:4px 0 2px">${esc(f.nome)}: ${resumo}${custo}${ic.chuva?" · 🌧️ "+ic.chuva.toLocaleString("pt-BR")+"mm":""}${div}</p>${dinheiro}${ciclo}${alertas}`;
         }).join("")}
         ${(()=>{const v=icropVencimentos(); if(!v) return "";
           return `<div class="aviso" style="border-color:var(--amarelo);margin-top:8px"><b>📋 Cadastro na iCrop precisa de atenção</b>
