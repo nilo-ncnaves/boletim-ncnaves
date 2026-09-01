@@ -4,12 +4,15 @@
 -- ANTES DE RODAR (1 minuto):
 --   Procure abaixo o texto COLE_AQUI_A_SENHA e troque pela senha que
 --   está na página 1 do PDF "Configuração API Integração" da Solinftec
---   (campo "password"). A senha fica SÓ no Supabase (tabela segredos),
---   nunca no código do app nem neste arquivo do repositório.
+--   (campo "password"). A senha fica SÓ no Supabase (tabela
+--   solinftec_segredos, trancada), nunca no código do app nem neste
+--   arquivo do repositório.
 --
 -- O que este arquivo faz:
 --   1. Liga as extensões http (chamada à API) e pg_cron (agendador).
---   2. Guarda usuário e senha da Solinftec na tabela segredos.
+--   2. Guarda usuário e senha da Solinftec na tabela
+--      solinftec_segredos (própria, para não depender da estrutura da
+--      tabela segredos antiga da iCrop).
 --   3. Cria a tabela solinftec_diario (o app só LÊ ela, como faz com
 --      icrop_manejo) + tabelas de-para de fazenda e de operação.
 --   4. Cria as funções do robô: gerar token e buscar/gravar o dia.
@@ -20,24 +23,19 @@
 create extension if not exists http with schema extensions;
 create extension if not exists pg_cron;
 
--- 2. Usuário e senha na tabela segredos ------------------------------
--- (mesma casa do token da iCrop; acessível apenas pelo SQL Editor)
-create table if not exists public.segredos (
+-- 2. Usuário e senha na tabela solinftec_segredos --------------------
+-- Tabela própria (a tabela segredos da iCrop tem outra estrutura).
+-- Trancada: RLS ligado e sem policies — só o SQL Editor alcança.
+create table if not exists public.solinftec_segredos (
   nome text primary key,
   valor text not null
 );
-alter table public.segredos enable row level security; -- sem policies: o app não alcança
+alter table public.solinftec_segredos enable row level security;
 
-do $$
-begin
-  insert into public.segredos (nome, valor) values
-    ('solinftec_cliente', 'ncnaves'),
-    ('solinftec_senha',   'COLE_AQUI_A_SENHA')  -- <<< trocar pela senha do PDF
-  on conflict (nome) do update set valor = excluded.valor;
-exception when undefined_column then
-  raise exception 'A tabela segredos deste projeto usa outros nomes de coluna. '
-    'Confira as colunas dela (menu Table Editor) e ajuste este insert e a função solinftec_token().';
-end $$;
+insert into public.solinftec_segredos (nome, valor) values
+  ('solinftec_cliente', 'ncnaves'),
+  ('solinftec_senha',   'COLE_AQUI_A_SENHA')  -- <<< trocar pela senha do PDF
+on conflict (nome) do update set valor = excluded.valor;
 
 -- 3. Tabelas ---------------------------------------------------------
 -- Resumo diário por fazenda/equipamento/operação/talhão.
@@ -62,6 +60,21 @@ create table if not exists public.solinftec_diario (
 comment on table public.solinftec_diario is
   'Resumo diário das máquinas (API Solinftec Detalhes da Operação V3). Gravado pelo robô; o app só lê.';
 
+-- Migração: se a tabela já existia de uma etapa antiga (a "garagem"
+-- criada antes da API), garante as colunas novas sem perder dados.
+alter table public.solinftec_diario add column if not exists fazenda_sol  text not null default '';
+alter table public.solinftec_diario add column if not exists fazenda_id   text;
+alter table public.solinftec_diario add column if not exists equipamento  text not null default '';
+alter table public.solinftec_diario add column if not exists cd_operacao  text not null default '';
+alter table public.solinftec_diario add column if not exists operacao     text not null default '';
+alter table public.solinftec_diario add column if not exists talhao       text not null default '';
+alter table public.solinftec_diario add column if not exists horas        numeric;
+alter table public.solinftec_diario add column if not exists motor_h      numeric;
+alter table public.solinftec_diario add column if not exists ocioso_h     numeric;
+alter table public.solinftec_diario add column if not exists area_ha      numeric;
+alter table public.solinftec_diario add column if not exists consumo_l    numeric;
+alter table public.solinftec_diario add column if not exists atualizado_em timestamptz not null default now();
+
 alter table public.solinftec_diario enable row level security;
 drop policy if exists "solinftec_diario leitura" on public.solinftec_diario;
 create policy "solinftec_diario leitura" on public.solinftec_diario
@@ -75,13 +88,37 @@ create table if not exists public.solinftec_depara (
   padrao     text primary key,  -- pedaço do nome, em minúsculas
   fazenda_id text not null
 );
+-- Padrões em minúsculas e SEM letras acentuadas ("_" casa qualquer
+-- letra: 'f_lix' pega 'félix' e 'felix'). O padrão mais comprido
+-- ganha quando dois casarem no mesmo nome. Nas fazendas desmembradas
+-- vale o id de uma unidade qualquer: o app (v49) mostra o cartão para
+-- todas as unidades irmãs da mesma fazenda física.
 insert into public.solinftec_depara (padrao, fazenda_id) values
-  ('rio preto', 'f03g'), ('lagamar', 'f03g'),
-  ('vereda',    'f22g'),
-  ('capoeira',  'f27'),
-  ('floramil',  'f33'),
-  ('buriti',    'f35'), ('porto', 'f35')
+  ('rio preto',     'f03g'), ('lagamar', 'f03g'),
+  ('vereda',        'f22g'),
+  ('capoeira',      'f27'),
+  ('floramil',      'f33'),
+  ('buriti',        'f35'), ('porto', 'f35'),
+  ('monte carmelo', 'f14c'),
+  ('mata preta',    'f13c'),
+  ('gua limpa',     'f01'),
+  ('gua santa',     'f26'),
+  ('f_lix',         'f21'),
+  ('romaria',       'f23'),
+  ('rodrigo',       'f20'),
+  ('armaz',         'f25'),
+  ('chapad_o',      'f29'), ('chapada', 'f28'),
+  ('confins',       'f30'),
+  ('cra cra',       'f31'),
+  ('ferragem',      'f32'),
+  ('gameleira',     'f34'),
+  ('quinto',        'f24'),  -- "Cafe Quinto" na Solinftec = Vereda Café 5º e 6º
+  ('caxico',        'f14c')  -- Caxico é uma área da Faz. Monte Carmelo
 on conflict (padrao) do nothing;
+-- Ficam de fora do de-para, de propósito (confirmado com o Nilo):
+--   "Estreito" (fora da administração do grupo, mas divide máquinas) e
+--   "-1" (apontamento sem fazenda no cadastro da Solinftec) — os dados
+--   ficam gravados em solinftec_diario, só não aparecem no app.
 
 -- De-para: código da operação -> nome amigável. A API só devolve o
 -- código (cdOperacao); pedir a lista à Solinftec e preencher aqui.
@@ -112,10 +149,10 @@ declare
   v_sen text;
   resp  extensions.http_response;
 begin
-  select valor into v_cli from public.segredos where nome = 'solinftec_cliente';
-  select valor into v_sen from public.segredos where nome = 'solinftec_senha';
+  select valor into v_cli from public.solinftec_segredos where nome = 'solinftec_cliente';
+  select valor into v_sen from public.solinftec_segredos where nome = 'solinftec_senha';
   if v_sen is null or v_sen like 'COLE_AQUI%' then
-    raise exception 'Senha da Solinftec ainda não gravada na tabela segredos (nome = solinftec_senha).';
+    raise exception 'Senha da Solinftec ainda não gravada na tabela solinftec_segredos (nome = solinftec_senha).';
   end if;
   select * into resp from extensions.http((
     'POST',
@@ -179,17 +216,26 @@ begin
 
   delete from public.solinftec_diario where data = dia;
 
+  -- A API real manda os campos em minúsculas e alguns com nome
+  -- diferente do manual em PDF (vltempo, dtbase, fgtpoperacao...);
+  -- o coalesce aceita as duas grafias.
   with linhas as (
     select
-      coalesce(l ->> 'dsFazenda', '')                                        as fazenda_sol,
-      coalesce(nullif(l ->> 'dsEquipamento', ''), l ->> 'cdEquipamento', '') as equipamento,
-      coalesce(l ->> 'cdOperacao', '')                                       as cd_operacao,
-      coalesce(l ->> 'dsTalhao', '')                                         as talhao,
-      coalesce((l ->> 'vlTempoSegundos')::numeric, 0)                        as seg,
-      coalesce((l ->> 'vlTempoMotorLigado')::numeric, 0)                     as motor,
-      coalesce((l ->> 'vlTempoMotorOcioso')::numeric, 0)                     as ocioso,
-      coalesce((l ->> 'vlAreaOperacional')::numeric, 0)                      as area,
-      coalesce((l ->> 'vlConsumoMedio')::numeric, 0)                         as litros
+      coalesce(l ->> 'dsfazenda', l ->> 'dsFazenda', '')                     as fazenda_sol,
+      coalesce(nullif(l ->> 'dsequipamento', ''), nullif(l ->> 'dsEquipamento', ''),
+               l ->> 'cdequipamento', l ->> 'cdEquipamento', '')             as equipamento,
+      coalesce(l ->> 'cdoperacao', l ->> 'cdOperacao', '')                   as cd_operacao,
+      coalesce(l ->> 'dstalhao', l ->> 'dsTalhao', '')                       as talhao,
+      coalesce((l ->> 'vltempo')::numeric, (l ->> 'vltemposegundos')::numeric,
+               (l ->> 'vlTempoSegundos')::numeric, 0)                        as seg,
+      coalesce((l ->> 'vltempomotorligado')::numeric,
+               (l ->> 'vlTempoMotorLigado')::numeric, 0)                     as motor,
+      coalesce((l ->> 'vltempomotorocioso')::numeric,
+               (l ->> 'vlTempoMotorOcioso')::numeric, 0)                     as ocioso,
+      coalesce((l ->> 'vlareaoperacional')::numeric,
+               (l ->> 'vlAreaOperacional')::numeric, 0)                      as area,
+      coalesce((l ->> 'vlconsumomedio')::numeric,
+               (l ->> 'vlConsumoMedio')::numeric, 0)                         as litros
     from _solinftec_tmp
   ),
   ag as (
@@ -215,6 +261,7 @@ begin
   left join lateral (
     select d.fazenda_id from public.solinftec_depara d
     where lower(ag.fazenda_sol) like '%' || d.padrao || '%'
+    order by length(d.padrao) desc
     limit 1
   ) dp on true
   left join public.solinftec_operacoes op on op.cd = ag.cd_operacao;
