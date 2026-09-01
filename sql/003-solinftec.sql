@@ -60,6 +60,21 @@ create table if not exists public.solinftec_diario (
 comment on table public.solinftec_diario is
   'Resumo diário das máquinas (API Solinftec Detalhes da Operação V3). Gravado pelo robô; o app só lê.';
 
+-- Migração: se a tabela já existia de uma etapa antiga (a "garagem"
+-- criada antes da API), garante as colunas novas sem perder dados.
+alter table public.solinftec_diario add column if not exists fazenda_sol  text not null default '';
+alter table public.solinftec_diario add column if not exists fazenda_id   text;
+alter table public.solinftec_diario add column if not exists equipamento  text not null default '';
+alter table public.solinftec_diario add column if not exists cd_operacao  text not null default '';
+alter table public.solinftec_diario add column if not exists operacao     text not null default '';
+alter table public.solinftec_diario add column if not exists talhao       text not null default '';
+alter table public.solinftec_diario add column if not exists horas        numeric;
+alter table public.solinftec_diario add column if not exists motor_h      numeric;
+alter table public.solinftec_diario add column if not exists ocioso_h     numeric;
+alter table public.solinftec_diario add column if not exists area_ha      numeric;
+alter table public.solinftec_diario add column if not exists consumo_l    numeric;
+alter table public.solinftec_diario add column if not exists atualizado_em timestamptz not null default now();
+
 alter table public.solinftec_diario enable row level security;
 drop policy if exists "solinftec_diario leitura" on public.solinftec_diario;
 create policy "solinftec_diario leitura" on public.solinftec_diario
