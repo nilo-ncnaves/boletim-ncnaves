@@ -144,8 +144,13 @@ Catálogo original do app (LISTA_ATIV, LISTA_FUNCOES, SUGESTAO_FITO)
   fechado, nada no resumo. Meta: preencher em até 3 minutos.
 - Chips grandes, teclado numérico, mínimo de digitação. Linguagem do
   campo: cabeça, cocho, sal, berro, bicheira.
-- Retiros/pastos/currais = os talhões tipo PASTO_PECUARIA da fazenda
-  (cadastro já existente); não há lista paralela.
+- Retiros/pastos (v51): os selects "Pasto / retiro" listam o cadastro
+  PASTOS_POR_FAZENDA do index.html — nomes reais de pasto por fazenda
+  (já cadastradas: Mata Preta, Água Santa e Cracrá). Fazenda ainda sem
+  lista mostra só "Selecione…" e "Outro…"; "Outro…" abre campo de
+  texto livre e o texto digitado é o valor salvo. Para incluir uma
+  fazenda, basta acrescentar a chave dela na constante. Boletins
+  antigos gravados com id de talhão continuam abrindo normalmente.
 - Categorias animais padronizadas em TODO o módulo
   (CATEGORIAS_ANIMAIS): bezerro(a) mamando, desmamado(a), garrote,
   novilha, boi magro, boi gordo, vaca, vaca descarte, touro.

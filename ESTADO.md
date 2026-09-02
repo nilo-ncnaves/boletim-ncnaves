@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v50** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v51** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -108,8 +108,18 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   visitas — chuva e equipe seguem nas seções Clima e Mão de obra);
   **🔧 Outros manejos** (catálogo OPS_PECUARIA_FASES da v41: pesagem,
   castração, embarque etc., com campos em cascata) e **📝 Observações
-  de pecuária**. Pastos/retiros = talhões tipo PASTO_PECUARIA (sem
-  lista paralela); categorias animais na constante CATEGORIAS_ANIMAIS;
+  de pecuária**. Pastos/retiros (v51): todos os selects "Pasto /
+  retiro" listam o cadastro **PASTOS_POR_FAZENDA** do index.html —
+  nomes reais de pasto por fazenda (já cadastradas: Mata Preta,
+  Água Santa e Cracrá). Fazenda ainda sem lista mostra só
+  "Selecione…" e "Outro…"; "Outro…" abre campo de texto livre e o
+  texto digitado é o valor salvo. Para incluir uma fazenda, basta
+  acrescentar a chave dela na constante (o nome casa sem
+  acento/espaços e ignora a palavra "fazenda" — "Cracrá" acha a
+  unidade "Cra Cra", e unidades desmembradas casam pela
+  fazenda-mãe). Boletins antigos gravados com id de talhão
+  continuam abrindo e exibindo o nome certo. Categorias animais na
+  constante CATEGORIAS_ANIMAIS;
   demais catálogos nas constantes PEC_* do index.html. Confinamento
   ficou fora de propósito (engorda do grupo é a pasto). Tudo que for
   preenchido sai no bloco 🐂 PECUÁRIA do resumo WhatsApp e no cartão

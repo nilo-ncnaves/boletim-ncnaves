@@ -1236,9 +1236,66 @@ const OPS_PECUARIA_FASES=[
 const LISTA_PECUARIA=OPS_PECUARIA_FASES.flatMap(([,ops])=>ops);
 /* PECUÁRIA v50 — catálogos do módulo de campo (movimentação, sanidade,
    reprodução, cocho). Tudo configurável aqui, no mesmo padrão das
-   outras listas. Retiros/pastos/currais NÃO são lista nova: são os
-   talhões tipo PASTO_PECUARIA de cada fazenda (talhoesPasto — cadastro
-   já existente em Cadastros). */
+   outras listas. */
+/* PECUÁRIA v51 — cadastro de pastos/retiros por fazenda. Os selects
+   "Pasto / retiro" do boletim listam os pastos da fazenda ativa a
+   partir desta constante. Fazenda sem lista aqui mostra só
+   "Selecione…" e "Outro…" (campo livre) — para incluir uma fazenda,
+   basta acrescentar a chave dela abaixo (o nome casa sem acento, sem
+   espaços e sem a palavra "fazenda": "Cracrá" acha "Cra Cra"). */
+const PASTOS_POR_FAZENDA = {
+  "Mata Preta": [
+    "Pasto serrado 1",
+    "Pasto serrado 2",
+    "Pasto ponte",
+    "Pasto olaria",
+    "Pasto ginipapo",
+    "Pasto forma nova",
+    "Pasto fundão mundinho",
+    "Pasto café",
+    "Pasto Wilson",
+    "Pasto tomate",
+    "Pasto soninho 1",
+    "Pasto soninho 2",
+    "Pasto represa"
+  ],
+  "Água Santa": [
+    "Pasto Quinca esquerdo",
+    "Pasto Quinca direito",
+    "Pasto Meio de cima",
+    "Pasto meio de baixo",
+    "Pasto do bambu",
+    "Pasto da Serra",
+    "Pasto da braquiarinha",
+    "Pasto da cascalheira",
+    "Pasto da porta",
+    "Pasto Piquete"
+  ],
+  "Cracrá": [
+    "Pasto da ponte",
+    "Pasto do meio",
+    "Pasto do mato",
+    "Pasto 108 de baixo 1",
+    "Pasto 108 de baixo 2",
+    "Pasto 108 de cima",
+    "Pasto do Garimpo",
+    "Pasto da Guapeva",
+    "Pasto da Onça 1",
+    "Pasto da Onça 2",
+    "Pasto do Café de Cima",
+    "Pasto do Café 1",
+    "Pasto do Café de baixo",
+    "Pasto da horta"
+  ]
+};
+const chavePastoFaz = s => normTxt(s).replace(/fazenda/g,"").replace(/[^a-z0-9]/g,"");
+const pastosCadastrados = fzId => {
+  const f=fazenda(fzId);
+  const alvos=[f.nome,(f.fazendaMae||{}).nome].filter(Boolean).map(chavePastoFaz);
+  const k=Object.keys(PASTOS_POR_FAZENDA).find(c=>{ const n=chavePastoFaz(c);
+    return alvos.some(a=>a===n||a.indexOf(n)===0); });
+  return k?PASTOS_POR_FAZENDA[k]:[];
+};
 const CATEGORIAS_ANIMAIS=["Bezerro(a) mamando","Desmamado(a)","Garrote","Novilha","Boi magro","Boi gordo","Vaca","Vaca descarte","Touro"];
 const PEC_MOV_TIPOS=["Nascimento","Morte","Desmama","Mudança de pasto","Entrada","Saída"];
 const PEC_TIPOS_PARTO=["Normal","Assistido"];
@@ -1767,7 +1824,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v50</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v51</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1795,7 +1852,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v50 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v51 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -2363,11 +2420,9 @@ function secaoFitoOcorrGraos(r){
     </div></details>`;
 }
 function cardLotePec(l,i,fz){
-  const pastos=talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
   return `<div class="mt" data-peclote="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
     <label>Pasto / retiro</label>
-    <select data-pl="talhaoId">${["<option value=''>Selecione…</option>",
-      ...pastos.map(t=>`<option value="${t.id}" ${l.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>
+    ${selPastoLivre("pl","talhaoId",l.talhaoId,fz)}
     <div class="grade2 mt">
       <div><label>Lote / categoria</label><input data-pl="lote" value="${esc(l.lote||"")}" placeholder="Ex.: recria 2024"></div>
       <div><label>Cabeças contadas</label><input inputmode="numeric" data-pl="cabecas" value="${esc(l.cabecas||"")}"></div>
@@ -2376,7 +2431,6 @@ function cardLotePec(l,i,fz){
 }
 function cardEventoPec(e2,i){
   const fz=rascunho?rascunho.fazendaId:"";
-  const pastos=talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
   /* campos em cascata conforme o tipo do evento: sanitário pede produto+dose,
      pesagem pede peso médio, venda/compra pede valor e contraparte */
   const n=normTxt(e2.tipo);
@@ -2389,8 +2443,7 @@ function cardEventoPec(e2,i){
       +OPS_PECUARIA_FASES.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(tp=>`<option ${e2.tipo===tp?"selected":""}>${tp}</option>`).join("")}</optgroup>`).join("")
       +(e2.tipo&&!LISTA_PECUARIA.includes(e2.tipo)?`<option selected>${esc(e2.tipo)}</option>`:"")}</select>
     <label>Lote / pasto</label>
-    <select data-pe="talhaoId">${["<option value=''>Selecione…</option>",
-      ...pastos.map(t=>`<option value="${t.id}" ${e2.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>
+    ${selPastoLivre("pe","talhaoId",e2.talhaoId,fz)}
     <label>Lote / categoria</label><input data-pe="lote" value="${esc(e2.lote||"")}" placeholder="Ex.: recria 2024, vacas paridas">
     <label>Quantidade (cabeças)</label><input inputmode="numeric" data-pe="qtd" value="${esc(e2.qtd||"")}">
     ${(ehSanit||e2.produto)?`<label>Produto / vacina</label><input data-pe="produto" list="dl-prod" value="${esc(e2.produto||"")}" placeholder="Ex.: vacina aftosa, Ivermectina 1%">
@@ -2407,10 +2460,24 @@ function cardEventoPec(e2,i){
     <button class="btn suave mini mt" data-rm-pecev="${i}">remover este evento</button></div>`;
 }
 /* ---- Pecuária v50: cartões do módulo de campo ---- */
-const pastosDe = fz => talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
+/* v51: os selects de pasto listam o cadastro PASTOS_POR_FAZENDA da
+   fazenda ativa. O valor gravado é o NOME do pasto (ou o texto do
+   campo livre de "Outro…"); boletins antigos com id de talhão
+   continuam abrindo e exibindo certo (opção legada preservada). */
+const nomePastoPec=v=>{ if(!v) return ""; const t=talhao(v); return t.nome!=="?"?t.nome:String(v); };
+const selPastoLivre=(attr,campo,valor,fz)=>{
+  const lista=pastosCadastrados(fz);
+  const legado=(valor&&talhao(valor).nome!=="?")?talhao(valor).nome:null;
+  const livre=(valor&&!legado&&lista.indexOf(valor)<0)?valor:null;
+  return `<select data-${attr}="${campo}" data-pastosel>${[
+    "<option value=''>Selecione…</option>",
+    ...lista.map(nm=>`<option value="${esc(nm)}" ${valor===nm?"selected":""}>${esc(nm)}</option>`),
+    legado?`<option value="${esc(valor)}" selected>${esc(legado)}</option>`:"",
+    `<option value="__outro" ${livre?"selected":""}>Outro…</option>`
+  ].join("")}</select><input data-${attr}="${campo}" data-pastotxt value="${esc(livre||"")}" placeholder="Nome do pasto" style="margin-top:8px;${livre?"":"display:none"}">`;
+};
 const selPastoPec=(attr,campo,valor,rot,fz)=>`<label class="mt">${rot}</label>
-  <select data-${attr}="${campo}">${["<option value=''>Selecione…</option>",
-    ...pastosDe(fz).map(t=>`<option value="${t.id}" ${valor===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>`;
+  ${selPastoLivre(attr,campo,valor,fz)}`;
 const chipsPecIdx=(obj,attr,i,campo,lista)=>`<div class="chips">${lista.map(v=>
   `<button class="chip ${obj[campo]===v?"on":""}" data-${attr}="${i}|${campo}|${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
 /* movimentação do rebanho: cada movimento = tipo + categoria + qtd + origem/destino */
@@ -3189,7 +3256,7 @@ function filtrarBoletins(){
 function blocoPainelPec(b){
   if(!temPecuaria(b)) return "";
   const p=pecMigrar(b.pecuaria);
-  const nomeTal=id=>(id&&talhao(id).nome!=="?")?talhao(id).nome:"";
+  const nomeTal=nomePastoPec; /* v51: pasto pode ser nome do cadastro, texto livre ou id de talhão antigo */
   const contMov=contadorMovPec(p);
   const rep=p.rep||{}, ps=p.pasto||{};
   const algo=o=>!!o&&Object.values(o).some(v=>v!==""&&v!=null);
@@ -3221,7 +3288,7 @@ function blocoPainelPec(b){
         u.insumo?esc(u.insumo.toLowerCase())+(u.produto?" ("+esc(u.produto)+")":"")+(n0(u.qtd)?" — "+esc(String(u.qtd).replace(".",","))+" "+esc(u.un||"sacos"):""):"",
         u.cocho?"cocho "+esc(u.cocho.toLowerCase()):"", u.agua?"água "+esc(u.agua.toLowerCase()):""
       ].filter(Boolean).join(" · ")||"—"}</p>`).join("")}
-    ${(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas)).map(l=>`<p class="mt"><b>${esc(talhao(l.talhaoId).nome==="?"?(l.lote||"Lote"):talhao(l.talhaoId).nome)}</b>${l.lote&&talhao(l.talhaoId).nome!=="?"?" · "+esc(l.lote):""} — <b class="num">${n0(l.cabecas)}</b> cabeças</p>`).join("")}
+    ${(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas)).map(l=>`<p class="mt"><b>${esc(l.talhaoId?nomePastoPec(l.talhaoId):(l.lote||"Lote"))}</b>${l.lote&&l.talhaoId?" · "+esc(l.lote):""} — <b class="num">${n0(l.cabecas)}</b> cabeças</p>`).join("")}
     ${(p.cocho||p.sal||p.agua)?`<dl class="dl mt">
       ${p.cocho?`<dt>Cocho</dt><dd>${p.cocho==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
       ${p.sal?`<dt>Sal mineral</dt><dd>${p.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
@@ -3231,7 +3298,7 @@ function blocoPainelPec(b){
         ps.condicao?esc(ps.condicao.toLowerCase()):"", ps.cerca?"cerca/porteira: "+esc(ps.cerca):"",
         ps.visita?"visita: "+esc(ps.visita.toLowerCase())+(ps.visitaObs?" ("+esc(ps.visitaObs)+")":""):""
       ].filter(Boolean).join(" · ")}</p>`:""}
-    ${(p.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}
+    ${(p.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId?" · "+esc(nomePastoPec(e2.talhaoId)):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}
     ${p.obs?`<p class="mt">📝 ${esc(p.obs)}</p>`:""}</div>`;
 }
 function vDetalhe(id){
@@ -3732,7 +3799,7 @@ function resumoWhats(b){
   if(temPecuaria(b)){
     /* bloco 🐂 PECUÁRIA: TODO campo preenchido aparece; seção vazia fica de fora */
     const p=pecMigrar(b.pecuaria);
-    const nomeTal=id=>(id&&talhao(id).nome!=="?")?talhao(id).nome:"";
+    const nomeTal=nomePastoPec; /* v51: pasto pode ser nome do cadastro, texto livre ou id de talhão antigo */
     const contMov=contadorMovPec(p);
     L.push("🐂 *PECUÁRIA*"+(contMov?" — "+contMov:""));
     (p.mov||[]).forEach(m=>{ if(!m.tipo) return;
@@ -3776,7 +3843,7 @@ function resumoWhats(b){
     });
     const lotes=(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas));
     const tot=lotes.reduce((s,l)=>s+n0(l.cabecas),0);
-    if(lotes.length) L.push("🐮 Contagem: "+tot+" cabeças ("+lotes.map(l=>(talhao(l.talhaoId).nome!=="?"?talhao(l.talhaoId).nome:(l.lote||"lote"))+" "+n0(l.cabecas)).join(" · ")+")");
+    if(lotes.length) L.push("🐮 Contagem: "+tot+" cabeças ("+lotes.map(l=>(l.talhaoId?nomeTal(l.talhaoId):(l.lote||"lote"))+" "+n0(l.cabecas)).join(" · ")+")");
     const probs=[p.cocho==="Problema"?"cocho":"",p.sal==="Problema"?"sal mineral":"",p.agua==="Problema"?"água":""].filter(Boolean);
     if(probs.length) L.push("⚠️ Problema em: "+probs.join(", ")+(p.estrutObs?" — "+p.estrutObs:""));
     else if(p.cocho||p.sal||p.agua) L.push("🧂 Cocho, sal e água: OK"+(p.estrutObs?" — "+p.estrutObs:""));
@@ -3787,7 +3854,7 @@ function resumoWhats(b){
         ps.visita?"visita: "+ps.visita.toLowerCase()+(ps.visitaObs?" ("+ps.visitaObs+")":""):""
       ].filter(Boolean).join(" · "));
     }
-    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🔧 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(e2.lote?" · "+e2.lote:"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto+(e2.dose?" "+String(e2.dose).replace(".",",")+" "+(e2.doseUn||"mL")+"/cab":""):"")+(n0(e2.pesoMedio)?" · peso médio "+n0(e2.pesoMedio).toLocaleString("pt-BR")+" kg":"")+(n0(e2.valor)?" · R$ "+n0(e2.valor).toLocaleString("pt-BR"):"")+(e2.contraparte?" ("+e2.contraparte+")":"")+(e2.obs?" — "+e2.obs:"")); });
+    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🔧 "+e2.tipo+(e2.talhaoId?" ("+nomeTal(e2.talhaoId)+")":"")+(e2.lote?" · "+e2.lote:"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto+(e2.dose?" "+String(e2.dose).replace(".",",")+" "+(e2.doseUn||"mL")+"/cab":""):"")+(n0(e2.pesoMedio)?" · peso médio "+n0(e2.pesoMedio).toLocaleString("pt-BR")+" kg":"")+(n0(e2.valor)?" · R$ "+n0(e2.valor).toLocaleString("pt-BR"):"")+(e2.contraparte?" ("+e2.contraparte+")":"")+(e2.obs?" — "+e2.obs:"")); });
     if(p.obs) L.push("📝 Pecuária: "+p.obs);
   }
   (b.fito||[]).forEach(f=>{ if(f.nome||f.tipo) L.push("🐛 "+(f.nome||f.tipo)+" — "+talhao(f.talhaoId).nome+" · nível "+(f.nivel||"—")+(f.obs?" — "+f.obs:"")); });
@@ -4927,6 +4994,15 @@ function ligarEventos(tela){
       else if(d.f!==undefined){ const c=el.closest("[data-fito]"); r.fito.find(x=>x.id===c.dataset.fito)[d.f]=el.value; }
       else if(d.o!==undefined){ const c=el.closest("[data-oc]"); r.ocorrencias.find(x=>x.id===c.dataset.oc)[d.o]=el.value; }
       else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||pecVazia(); r.pecuaria[d.pec]=el.value; }
+      else if(d.pastosel!==undefined){ /* v51: select de pasto do cadastro — "Outro…" abre o campo livre ao lado */
+        const tx=el.nextElementSibling;
+        const v=(el.value==="__outro")?((tx&&tx.value)||""):el.value;
+        if(tx){ if(el.value==="__outro"){ tx.style.display="block"; tx.focus(); }
+          else { tx.style.display="none"; tx.value=""; } }
+        if(d.pl!==undefined){ const c=el.closest("[data-peclote]"); const l=r.pecuaria.lotes[parseInt(c.dataset.peclote)]; if(l) l[d.pl]=v; }
+        else if(d.pe!==undefined){ const c=el.closest("[data-pecev]"); const e3=r.pecuaria.eventos[parseInt(c.dataset.pecev)]; if(e3) e3[d.pe]=v; }
+        else if(d.mv!==undefined){ const c=el.closest("[data-pecmov]"); const m=c&&r.pecuaria.mov[parseInt(c.dataset.pecmov)]; if(m) m[d.mv]=v; }
+        else if(d.nt!==undefined){ const c=el.closest("[data-pecnut]"); const u=c&&r.pecuaria.nut[parseInt(c.dataset.pecnut)]; if(u) u[d.nt]=v; } }
       else if(d.pl!==undefined){ const c=el.closest("[data-peclote]"); const l=r.pecuaria.lotes[parseInt(c.dataset.peclote)];
         if(l){ l[d.pl]=el.value;
           if(d.pl==="cabecas"){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0);
