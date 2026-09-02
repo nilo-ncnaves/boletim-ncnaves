@@ -90,6 +90,14 @@ h3{font-size:.95rem;font-weight:700}
 .secao>summary .seta{margin-left:auto;color:var(--tinta-2);transition:transform .15s;flex:none}
 .secao[open]>summary .seta{transform:rotate(90deg)}
 .secao .corpo{padding:0 14px 16px;border-top:1px solid var(--linha)}
+/* sub-acordeões da pecuária (dentro da seção 🐂): mesmo desenho, um degrau menor */
+.subsec{border:1px solid var(--linha);border-radius:10px;margin-top:10px;background:var(--papel)}
+.subsec>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px;font-weight:700;font-size:.95rem;cursor:pointer;min-height:48px}
+.subsec>summary::-webkit-details-marker{display:none}
+.subsec>summary .resumo{margin-left:auto;margin-right:6px;font-size:.76rem;color:var(--verde);font-weight:700;white-space:nowrap}
+.subsec>summary .seta{color:var(--tinta-2);transition:transform .15s;flex:none}
+.subsec[open]>summary .seta{transform:rotate(90deg)}
+.subsec .corpo{padding:0 12px 14px;border-top:1px solid var(--linha)}
 .secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
 /* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
 .fase-op{border:1px solid var(--linha);border-radius:10px;margin-top:8px;background:var(--cartao)}
@@ -1226,6 +1234,43 @@ const OPS_PECUARIA_FASES=[
   ["Pastagem e estrutura",["Roçada","Adubação de pastagem","Reforma de pasto","Manutenção de cerca / cocho / bebedouro","Controle de formiga"]]
 ];
 const LISTA_PECUARIA=OPS_PECUARIA_FASES.flatMap(([,ops])=>ops);
+/* PECUÁRIA v50 — catálogos do módulo de campo (movimentação, sanidade,
+   reprodução, cocho). Tudo configurável aqui, no mesmo padrão das
+   outras listas. Retiros/pastos/currais NÃO são lista nova: são os
+   talhões tipo PASTO_PECUARIA de cada fazenda (talhoesPasto — cadastro
+   já existente em Cadastros). */
+const CATEGORIAS_ANIMAIS=["Bezerro(a) mamando","Desmamado(a)","Garrote","Novilha","Boi magro","Boi gordo","Vaca","Vaca descarte","Touro"];
+const PEC_MOV_TIPOS=["Nascimento","Morte","Desmama","Mudança de pasto","Entrada","Saída"];
+const PEC_TIPOS_PARTO=["Normal","Assistido"];
+const PEC_SEXO_CRIA=["Macho","Fêmea"];
+const PEC_CAUSAS_MORTE=["Doença","Acidente","Cobra","Raio","Atolamento","Desconhecida","Outra"];
+const PEC_MODOS_ENTRADA=["Compra","Transferência do grupo"];
+const PEC_MODOS_SAIDA=["Venda","Abate","Transferência do grupo"];
+const PEC_PROBLEMAS_SAN=["Bicheira","Pneumonia","Diarreia","Casco","Olho","Carrapato / mosca em excesso","Outro"];
+const PEC_ACOES_SAN=["Medicou","Vacinou","Everminou","Curou","Apartou p/ enfermaria"];
+const PEC_MASSA_TIPOS=["Vacinação","Vermifugação"];
+const PEC_IATF_ETAPAS=["Implante (D0)","Retirada do implante","Inseminação","Ressincronização","Outra etapa"];
+const PEC_OCOR_TOURO=["OK","Brigou","Machucou","Manqueira"];
+const PEC_COCHO_INSUMOS=["Sal mineral","Sal proteinado","Ração","Silagem / volumoso"];
+const PEC_COCHO_UN=["sacos","kg"];
+const PEC_LEITURA_COCHO=["Vazio","Lambido","Com sobra"];
+const PEC_AGUA_SIT=["OK","Baixa","Problema bomba / bebedouro"];
+const PEC_CONDICAO_PASTO=["Sobrando","No ponto","Apertando","Crítico"];
+const PEC_VISITAS=["Veterinário","Comprador","Fiscal","Outra"];
+/* estrutura vazia do bloco pecuária de um boletim (lotes/eventos/cocho/sal/agua
+   são da v41 e continuam valendo; mov/san/massa/rep/nut/pasto/obs entraram na v50) */
+function pecVazia(){ return {lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[],
+  mov:[],san:[],massa:[],rep:{},nut:[],pasto:{},obs:""}; }
+/* boletins e rascunhos gravados antes da v50 ganham os campos novos vazios */
+function pecMigrar(p){ p.mov=p.mov||[]; p.san=p.san||[]; p.massa=p.massa||[];
+  p.rep=p.rep||{}; p.nut=p.nut||[]; p.pasto=p.pasto||{}; if(p.obs===undefined) p.obs="";
+  return p; }
+/* contador do dia por tipo de movimento — conferência antes de enviar ("2 nascimentos · 1 morte") */
+function contadorMovPec(p){
+  const c={}; ((p&&p.mov)||[]).forEach(m=>{ if(m.tipo) c[m.tipo]=(c[m.tipo]||0)+(n0(m.qtd)||1); });
+  const rot={"Nascimento":"nascimento","Morte":"morte","Desmama":"desmama","Mudança de pasto":"mudança","Entrada":"entrada","Saída":"saída"};
+  return PEC_MOV_TIPOS.filter(tp=>c[tp]).map(tp=>c[tp]+" "+rot[tp]+(c[tp]>1?"s":"")).join(" · ");
+}
 /* PRAGAS E DOENÇAS — GRÃOS (o SUGESTAO_FITO do café fica intocado) */
 const SUGESTAO_FITO_GRAOS={
   "Praga":["Percevejo-marrom (soja)","Lagarta Spodoptera / Helicoverpa","Mosca-branca","Cigarrinha-do-milho (enfezamento)","Lagarta-do-cartucho (milho)","Percevejo-barriga-verde (milho)","Vaquinha (feijão)","Nematoides","Formiga","Ataque de pássaros / javali"],
@@ -1266,8 +1311,15 @@ function opcoesAtiv(fz, sel){
 }
 function temPecuaria(r){
   const p=r&&r.pecuaria; if(!p) return false;
+  const algo=o=>!!o&&Object.values(o).some(v=>v!==""&&v!=null);
   return (p.lotes||[]).some(l=>l.talhaoId||l.lote||n0(l.cabecas)) ||
-    (p.eventos||[]).some(e=>e.tipo) || !!p.cocho || !!p.sal || !!p.agua;
+    (p.eventos||[]).some(e=>e.tipo) || !!p.cocho || !!p.sal || !!p.agua ||
+    (p.mov||[]).some(m=>m.tipo) ||
+    (p.san||[]).some(s=>s.problema||s.acao||s.produto||s.categoria) ||
+    (p.massa||[]).some(m=>m.tipo||m.produto||n0(m.qtd)) ||
+    algo(p.rep) ||
+    (p.nut||[]).some(u=>u.talhaoId||u.insumo||u.cocho||u.agua||n0(u.qtd)) ||
+    algo(p.pasto) || !!p.obs;
 }
 /* ---- Estrutura de pós-colheita e remessas entre fazendas ---- */
 const ESTR_ITENS=[["terreiro","☀️ Terreiro"],["secador","🔥 Secador"],["tulha","🏠 Tulha"],["benef","⚙️ Benefício"]];
@@ -1667,7 +1719,7 @@ function novoRascunho(dataBase){
     pos:{terreiro:"", secLote:"", secTemp:"", secHoras:"", sacasBenef:""},
     fito:[], ocorrencias:[], obsGeral:"", pendencias:"",
     ...(temCultura(fz,"GRAOS")?{irg:[]}:{}),
-    ...(temCultura(fz,"PECUARIA")?{pecuaria:{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]}}:{})
+    ...(temCultura(fz,"PECUARIA")?{pecuaria:pecVazia()}:{})
   };
 }
 
@@ -1715,7 +1767,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v49</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v50</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1743,7 +1795,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v49 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v50 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -2354,27 +2406,176 @@ function cardEventoPec(e2,i){
     <label>Observação</label><input data-pe="obs" value="${esc(e2.obs||"")}" placeholder="Ex.: causa da morte, pasto de destino">
     <button class="btn suave mini mt" data-rm-pecev="${i}">remover este evento</button></div>`;
 }
+/* ---- Pecuária v50: cartões do módulo de campo ---- */
+const pastosDe = fz => talhoesPasto(fz).length?talhoesPasto(fz):talhoesDa(fz);
+const selPastoPec=(attr,campo,valor,rot,fz)=>`<label class="mt">${rot}</label>
+  <select data-${attr}="${campo}">${["<option value=''>Selecione…</option>",
+    ...pastosDe(fz).map(t=>`<option value="${t.id}" ${valor===t.id?"selected":""}>${esc(t.nome)}</option>`)].join("")}</select>`;
+const chipsPecIdx=(obj,attr,i,campo,lista)=>`<div class="chips">${lista.map(v=>
+  `<button class="chip ${obj[campo]===v?"on":""}" data-${attr}="${i}|${campo}|${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+/* movimentação do rebanho: cada movimento = tipo + categoria + qtd + origem/destino */
+function cardMovPec(m,i,fz){
+  const ch=(campo,lista)=>chipsPecIdx(m,"mvc",i,campo,lista);
+  const tp=m.tipo||"";
+  return `<div class="mt" data-pecmov="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>O que houve</label>${ch("tipo",PEC_MOV_TIPOS)}
+    ${tp?`
+    ${(tp==="Entrada")?`<label class="mt">Como entrou</label>${ch("modo",PEC_MODOS_ENTRADA)}`:""}
+    ${(tp==="Saída")?`<label class="mt">Como saiu</label>${ch("modo",PEC_MODOS_SAIDA)}`:""}
+    ${tp!=="Nascimento"?`<label class="mt">Categoria</label>${ch("categoria",CATEGORIAS_ANIMAIS)}`:""}
+    <label class="mt">Quantas cabeças</label><input inputmode="numeric" data-mv="qtd" value="${esc(m.qtd||"")}" placeholder="1">
+    ${tp==="Nascimento"?`<label class="mt">Parto <span class="mut">(se quiser)</span></label>${ch("parto",PEC_TIPOS_PARTO)}
+      <label>Sexo da cria <span class="mut">(se quiser)</span></label>${ch("sexo",PEC_SEXO_CRIA)}
+      ${selPastoPec("mv","pastoDe",m.pastoDe,"Pasto / retiro",fz)}`:""}
+    ${tp==="Morte"?`<label class="mt">Causa</label>${ch("causa",PEC_CAUSAS_MORTE)}
+      <label class="mt">Brinco (se tiver)</label><input data-mv="brinco" value="${esc(m.brinco||"")}">
+      ${selPastoPec("mv","pastoDe",m.pastoDe,"Pasto / retiro",fz)}`:""}
+    ${(tp==="Desmama"||tp==="Mudança de pasto")?`${selPastoPec("mv","pastoDe",m.pastoDe,"Saiu do pasto",fz)}
+      ${selPastoPec("mv","pastoPara",m.pastoPara,"Foi para o pasto",fz)}`:""}
+    ${tp==="Entrada"?`<label class="mt">De onde veio (fazenda / vendedor)</label>
+      <input data-mv="contraparte" value="${esc(m.contraparte||"")}" placeholder="Ex.: Faz. Chapada, leilão">
+      ${selPastoPec("mv","pastoPara",m.pastoPara,"Foi para o pasto",fz)}`:""}
+    ${tp==="Saída"?`<label class="mt">Para onde foi (comprador / frigorífico / fazenda)</label>
+      <input data-mv="contraparte" value="${esc(m.contraparte||"")}" placeholder="Ex.: frigorífico, Faz. Confins">
+      ${selPastoPec("mv","pastoDe",m.pastoDe,"Saiu do pasto",fz)}`:""}
+    <label class="mt">Observação</label><input data-mv="obs" value="${esc(m.obs||"")}" placeholder="Se quiser detalhar">`:""}
+    <button class="btn suave mini mt" data-rm-pecmov="${i}">remover este movimento</button></div>`;
+}
+/* sanidade: animal ou lote tratado no dia */
+function cardSanPec(s,i){
+  const ch=(campo,lista)=>chipsPecIdx(s,"snc",i,campo,lista);
+  return `<div class="mt" data-pecsan="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>Categoria</label>${ch("categoria",CATEGORIAS_ANIMAIS)}
+    <div class="grade2 mt">
+      <div><label>Quantas cabeças</label><input inputmode="numeric" data-sn="qtd" value="${esc(s.qtd||"")}" placeholder="1"></div>
+      <div><label>Brinco (se for um só)</label><input data-sn="brinco" value="${esc(s.brinco||"")}"></div>
+    </div>
+    <label class="mt">Problema</label>${ch("problema",PEC_PROBLEMAS_SAN)}
+    ${s.problema==="Outro"?`<input data-sn="problemaObs" value="${esc(s.problemaObs||"")}" placeholder="Qual problema?" style="margin-top:8px">`:""}
+    <label class="mt">O que fez</label>${ch("acao",PEC_ACOES_SAN)}
+    <label class="mt">Produto usado <span class="mut">(se usou)</span></label>
+    <input data-sn="produto" list="dl-prod" value="${esc(s.produto||"")}" placeholder="Ex.: Ivermectina 1%, spray de bicheira">
+    <label>Observação</label><input data-sn="obs" value="${esc(s.obs||"")}" placeholder="Se quiser detalhar">
+    <button class="btn suave mini mt" data-rm-pecsan="${i}">remover este registro</button></div>`;
+}
+/* vacinação / vermifugação em massa */
+function cardMassaPec(v,i){
+  const ch=(campo,lista)=>chipsPecIdx(v,"msc",i,campo,lista);
+  return `<div class="mt" data-pecmassa="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    <label>Manejo em massa</label>${ch("tipo",PEC_MASSA_TIPOS)}
+    <label class="mt">Categoria</label>${ch("categoria",CATEGORIAS_ANIMAIS)}
+    <div class="grade2 mt">
+      <div><label>Quantas cabeças</label><input inputmode="numeric" data-ms="qtd" value="${esc(v.qtd||"")}" placeholder="0"></div>
+      <div><label>Produto / vacina</label><input data-ms="produto" list="dl-prod" value="${esc(v.produto||"")}" placeholder="Ex.: aftosa"></div>
+    </div>
+    <button class="btn suave mini mt" data-rm-pecmassa="${i}">remover este manejo</button></div>`;
+}
+/* reprodução (cria): touros, coberturas, IATF, DG */
+function blocoRepPec(p){
+  const rep=p.rep||{};
+  const ch=(campo,lista)=>`<div class="chips">${lista.map(v=>
+    `<button class="chip ${rep[campo]===v?"on":""}" data-rpc="${campo}|${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+  return `<label class="mt">Touros no pasto?</label>${ch("touros",["Sim","Não"])}
+    ${rep.touros?`<input data-rp="tourosOnde" value="${esc(rep.tourosOnde||"")}" placeholder="Em quais retiros / pastos?" style="margin-top:8px">`:""}
+    <div class="grade2 mt">
+      <div><label>Coberturas vistas (berro)</label><input inputmode="numeric" data-rp="coberturas" value="${esc(rep.coberturas||"")}" placeholder="0"></div>
+      <div><label>IATF — vacas no dia</label><input inputmode="numeric" data-rp="iatfQtd" value="${esc(rep.iatfQtd||"")}" placeholder="0"></div>
+    </div>
+    <label class="mt">Etapa de IATF do dia</label>${ch("iatfEtapa",PEC_IATF_ETAPAS)}
+    <label class="mt">Diagnóstico de gestação</label>
+    <div class="grade2">
+      <div><label>Prenhes</label><input inputmode="numeric" data-rp="dgPrenhes" value="${esc(rep.dgPrenhes||"")}" placeholder="0"></div>
+      <div><label>Vazias</label><input inputmode="numeric" data-rp="dgVazias" value="${esc(rep.dgVazias||"")}" placeholder="0"></div>
+    </div>
+    <label class="mt">Ocorrência com touro</label>${ch("ocorTouro",PEC_OCOR_TOURO)}
+    ${(rep.ocorTouro&&rep.ocorTouro!=="OK")?`<input data-rp="ocorTouroObs" value="${esc(rep.ocorTouroObs||"")}" placeholder="Qual touro / o que houve?" style="margin-top:8px">`:""}`;
+}
+/* nutrição e cocho por pasto/lote */
+function cardNutPec(u,i,fz){
+  const ch=(campo,lista)=>chipsPecIdx(u,"ntc",i,campo,lista);
+  return `<div class="mt" data-pecnut="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
+    ${selPastoPec("nt","talhaoId",u.talhaoId,"Pasto / lote",fz).replace('class="mt"','')}
+    <label class="mt">Repôs no cocho</label>${ch("insumo",PEC_COCHO_INSUMOS)}
+    ${u.insumo?`<input data-nt="produto" list="dl-prod" value="${esc(u.produto||"")}" placeholder="Qual (ex.: proteinado 30%)" style="margin-top:8px">
+    <div class="grade2 mt">
+      <div><label>Quanto</label><input inputmode="decimal" data-nt="qtd" value="${esc(u.qtd||"")}" placeholder="0"></div>
+      <div><label>Sacos ou kg</label><select data-nt="un">${PEC_COCHO_UN.map(x=>`<option ${((u.un||"sacos")===x)?"selected":""}>${x}</option>`).join("")}</select></div>
+    </div>`:""}
+    <label class="mt">Situação do cocho</label>${ch("cocho",PEC_LEITURA_COCHO)}
+    <label class="mt">Água / aguadas</label>${ch("agua",PEC_AGUA_SIT)}
+    <button class="btn suave mini mt" data-rm-pecnut="${i}">remover este pasto</button></div>`;
+}
+/* pasto, cerca e visitas (chuva e equipe já vivem nas seções Clima e Mão de obra) */
+function blocoPastoPec(p){
+  const ps=p.pasto||{};
+  const ch=(campo,lista)=>`<div class="chips">${lista.map(v=>
+    `<button class="chip ${ps[campo]===v?"on":""}" data-psc="${campo}|${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+  return `<label class="mt">Como está o pasto em geral</label>${ch("condicao",PEC_CONDICAO_PASTO)}
+    <label class="mt">Cerca / porteira com problema? <span class="mut">(diga qual pasto)</span></label>
+    <input data-pst="cerca" value="${esc(ps.cerca||"")}" placeholder="Ex.: cerca caída no Pasto da Lagoa">
+    <label class="mt">Visita na fazenda</label>${ch("visita",PEC_VISITAS)}
+    ${ps.visita?`<input data-pst="visitaObs" value="${esc(ps.visitaObs||"")}" placeholder="Quem veio / o que resolveu" style="margin-top:8px">`:""}
+    <p class="mut mt" style="font-size:.78rem">Chuva vai na seção Clima e a equipe na Mão de obra — não precisa repetir aqui.</p>`;
+}
+function pecPintarMov(r){ const s=$("#res-pec-mov"); if(s) s.textContent=contadorMovPec(r.pecuaria)||""; }
 function secaoPecuaria(r){
   if(!temCultura(r.fazendaId,"PECUARIA")) return "";
-  if(!r.pecuaria) r.pecuaria={lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
-  const p=r.pecuaria;
+  if(!r.pecuaria) r.pecuaria=pecVazia();
+  const p=pecMigrar(r.pecuaria);
   const tot=(p.lotes||[]).reduce((s,l)=>s+n0(l.cabecas),0);
   const chips=(k,attr)=>["OK","Problema"].map(v=>`<button class="chip ${p[k]===v?"on":""}" data-${attr}="${v}">${v==="OK"?"✔ OK":"⚠ Problema"}</button>`).join("");
-  return `<details class="secao" ${temPecuaria(r)?"open":""}><summary><span class="ico">🐂</span>Retiro (pecuária)
+  const algo=o=>!!o&&Object.values(o).some(v=>v!==""&&v!=null);
+  const contMov=contadorMovPec(p);
+  const nSan=(p.san||[]).length+(p.massa||[]).length;
+  const nNut=(p.nut||[]).length;
+  const nEv=(p.eventos||[]).filter(e2=>e2.tipo).length;
+  const temNutRapida=!!(p.cocho||p.sal||p.agua);
+  const sub=(titulo,resumoId,resumoTxt,aberto,corpo)=>`<details class="subsec" ${aberto?"open":""}><summary>${titulo}
+    <span class="resumo" id="${resumoId}">${resumoTxt||""}</span><span class="seta">›</span></summary>
+    <div class="corpo">${corpo}</div></details>`;
+  return `<details class="secao" ${temPecuaria(r)?"open":""}><summary><span class="ico">🐂</span>Pecuária
     <span class="resumo" id="res-pec">${tot?tot+" cabeças":""}</span><span class="seta">›</span></summary>
     <div class="corpo">
-      <label>Contagem por lote / pasto</label>
-      <div id="lista-pec-lotes">${(p.lotes||[]).map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("")}</div>
-      <button class="btn suave mini mt" id="bt-add-lote-pec">＋ lote / pasto</button>
-      <label class="mt">Cocho / ração</label><div class="chips">${chips("cocho","pec-cocho")}</div>
-      <label>Sal mineral</label><div class="chips">${chips("sal","pec-sal")}</div>
-      <label>Água / aguadas</label><div class="chips">${chips("agua","pec-agua")}</div>
-      <input data-pec="estrutObs" value="${esc(p.estrutObs||"")}" placeholder="Se houve problema, conte aqui"
-        style="margin-top:8px;${(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"display:none"}">
-      <label class="mt">Eventos do dia</label>
-      <div id="lista-pec-ev">${(p.eventos||[]).map((e2,i)=>cardEventoPec(e2,i)).join("")}</div>
-      <button class="btn suave mini mt" id="bt-add-ev-pec">＋ evento (vacinação, nascimento, embarque…)</button>
-      ${(D.ultimoEvPec||{})[r.fazendaId]?`<button class="btn suave mini mt" id="bt-uev-pec">⚡ usar o último lançamento (${esc((D.ultimoEvPec[r.fazendaId].tipo||""))})</button>`:""}
+      <p class="mut mt" style="font-size:.8rem">Abra só o que teve movimento hoje — dia parado fica tudo fechado e fora do resumo.</p>
+
+      ${sub("📋 Movimentação do rebanho","res-pec-mov",contMov,(p.mov||[]).some(m=>m.tipo),`
+        <div id="lista-pec-mov">${(p.mov||[]).map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-mov-pec">＋ movimento (nascimento, morte, mudança…)</button>`)}
+
+      ${sub("💉 Sanidade","res-pec-san",nSan?nSan+" registro"+(nSan>1?"s":""):"",nSan>0,`
+        <label class="mt">Animal doente / tratado</label>
+        <div id="lista-pec-san">${(p.san||[]).map((s,i)=>cardSanPec(s,i)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-san-pec">＋ animal ou lote tratado</button>
+        <label class="mt">Vacinação / vermifugação em massa</label>
+        <div id="lista-pec-massa">${(p.massa||[]).map((v,i)=>cardMassaPec(v,i)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-massa-pec">＋ manejo em massa</button>`)}
+
+      ${sub("🐄 Reprodução","res-pec-rep",algo(p.rep)?"✓":"",algo(p.rep),`<div id="bloco-pec-rep">${blocoRepPec(p)}</div>`)}
+
+      ${sub("🧂 Cocho e nutrição","res-pec-nut",nNut?nNut+" pasto"+(nNut>1?"s":""):(temNutRapida?"✓":""),nNut>0||temNutRapida,`
+        <div id="lista-pec-nut">${(p.nut||[]).map((u,i)=>cardNutPec(u,i,r.fazendaId)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-nut-pec">＋ pasto (sal, ração, cocho, água)</button>
+        <label class="mt">Resumo rápido da fazenda inteira <span class="mut">(um toque)</span></label>
+        <label>Cocho / ração</label><div class="chips">${chips("cocho","pec-cocho")}</div>
+        <label>Sal mineral</label><div class="chips">${chips("sal","pec-sal")}</div>
+        <label>Água / aguadas</label><div class="chips">${chips("agua","pec-agua")}</div>
+        <input data-pec="estrutObs" value="${esc(p.estrutObs||"")}" placeholder="Se houve problema, conte aqui"
+          style="margin-top:8px;${(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"display:none"}">`)}
+
+      ${sub("🐮 Contagem por lote / pasto","res-pec-cont",tot?tot+" cabeças":"",(p.lotes||[]).length>0,`
+        <div id="lista-pec-lotes">${(p.lotes||[]).map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-lote-pec">＋ lote / pasto</button>`)}
+
+      ${sub("🌱 Pasto e estrutura","res-pec-pasto",(p.pasto&&p.pasto.condicao)||"",algo(p.pasto),`<div id="bloco-pec-pasto">${blocoPastoPec(p)}</div>`)}
+
+      ${sub("🔧 Outros manejos","res-pec-ev",nEv?nEv+" registro"+(nEv>1?"s":""):"",(p.eventos||[]).length>0,`
+        <p class="mut mt" style="font-size:.78rem">Pesagem, marcação, castração, apartação, roçada, embarque…</p>
+        <div id="lista-pec-ev">${(p.eventos||[]).map((e2,i)=>cardEventoPec(e2,i)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-ev-pec">＋ manejo</button>
+        ${(D.ultimoEvPec||{})[r.fazendaId]?`<button class="btn suave mini mt" id="bt-uev-pec">⚡ usar o último lançamento (${esc((D.ultimoEvPec[r.fazendaId].tipo||""))})</button>`:""}`)}
+
+      <label class="mt">Observações de pecuária</label>
+      <input data-pec="obs" value="${esc(p.obs||"")}" placeholder="Qualquer recado do dia — vai no resumo">
     </div></details>`;
 }
 
@@ -2984,6 +3185,55 @@ function filtrarBoletins(){
 }
 
 /* ---------- Tela: detalhe do boletim ---------- */
+/* cartão 🐂 Pecuária do detalhe do boletim (gerente e diretoria) */
+function blocoPainelPec(b){
+  if(!temPecuaria(b)) return "";
+  const p=pecMigrar(b.pecuaria);
+  const nomeTal=id=>(id&&talhao(id).nome!=="?")?talhao(id).nome:"";
+  const contMov=contadorMovPec(p);
+  const rep=p.rep||{}, ps=p.pasto||{};
+  const algo=o=>!!o&&Object.values(o).some(v=>v!==""&&v!=null);
+  return `<div class="cartao"><h3>🐂 Pecuária${contMov?` <span class="mut" style="font-weight:400;font-size:.8rem">— ${esc(contMov)}</span>`:""}</h3>
+    ${(p.mov||[]).filter(m=>m.tipo).map(m=>{const pd=nomeTal(m.pastoDe),pp=nomeTal(m.pastoPara);
+      return `<p class="mt"><b>${esc(m.tipo)}</b>${m.modo?" ("+esc(m.modo)+")":""} — ${[
+        (n0(m.qtd)?n0(m.qtd)+" ":"")+(m.categoria?esc(m.categoria.toLowerCase()):(n0(m.qtd)?"cabeça"+(n0(m.qtd)>1?"s":""):"")),
+        m.parto?"parto "+esc(m.parto.toLowerCase()):"", m.sexo?esc(m.sexo.toLowerCase()):"",
+        m.causa?"causa: "+esc(m.causa.toLowerCase()):"", m.brinco?"brinco "+esc(m.brinco):"",
+        (pd&&pp)?esc(pd)+" → "+esc(pp):esc(pd||pp||""), m.contraparte?esc(m.contraparte):""
+      ].filter(Boolean).join(" · ")||"—"}${m.obs?`<br><span class="mut">${esc(m.obs)}</span>`:""}</p>`;}).join("")}
+    ${(p.san||[]).filter(s=>s.problema||s.acao||s.produto||s.categoria).map(s=>`<p class="mt">💉 ${[
+        (n0(s.qtd)?n0(s.qtd)+" ":"")+(s.categoria?esc(s.categoria.toLowerCase()):(n0(s.qtd)?"cabeça"+(n0(s.qtd)>1?"s":""):"")),
+        s.brinco?"brinco "+esc(s.brinco):"",
+        s.problema?esc(s.problema==="Outro"?(s.problemaObs||"outro problema"):s.problema.toLowerCase()):"",
+        s.acao?"→ "+esc(s.acao.toLowerCase()):"", s.produto?"("+esc(s.produto)+")":""
+      ].filter(Boolean).join(" · ")}${s.obs?`<br><span class="mut">${esc(s.obs)}</span>`:""}</p>`).join("")}
+    ${(p.massa||[]).filter(v=>v.tipo||v.produto||n0(v.qtd)).map(v=>`<p class="mt">💉 <b>${esc(v.tipo||"Manejo em massa")}</b>: ${[
+        (n0(v.qtd)?n0(v.qtd)+" ":"")+(v.categoria?esc(v.categoria.toLowerCase()):(n0(v.qtd)?"cabeças":"")),
+        v.produto?esc(v.produto):""].filter(Boolean).join(" · ")||"—"}</p>`).join("")}
+    ${algo(rep)?`<p class="mt">🐄 <b>Reprodução</b>: ${[
+        rep.touros?("touros no pasto: "+esc(rep.touros.toLowerCase())+(rep.tourosOnde?" ("+esc(rep.tourosOnde)+")":"")):"",
+        n0(rep.coberturas)?n0(rep.coberturas)+" coberturas vistas":"",
+        (rep.iatfEtapa||n0(rep.iatfQtd))?"IATF: "+[rep.iatfEtapa?esc(rep.iatfEtapa.toLowerCase()):"",n0(rep.iatfQtd)?n0(rep.iatfQtd)+" vacas":""].filter(Boolean).join(" — "):"",
+        (n0(rep.dgPrenhes)||n0(rep.dgVazias))?"DG: "+n0(rep.dgPrenhes)+" prenhes / "+n0(rep.dgVazias)+" vazias":"",
+        rep.ocorTouro?"touro: "+esc(rep.ocorTouro.toLowerCase())+(rep.ocorTouroObs?" ("+esc(rep.ocorTouroObs)+")":""):""
+      ].filter(Boolean).join(" · ")}</p>`:""}
+    ${(p.nut||[]).filter(u=>u.talhaoId||u.insumo||u.cocho||u.agua||n0(u.qtd)).map(u=>`<p class="mt">🧂 <b>${esc(nomeTal(u.talhaoId)||"Pasto")}</b> — ${[
+        u.insumo?esc(u.insumo.toLowerCase())+(u.produto?" ("+esc(u.produto)+")":"")+(n0(u.qtd)?" — "+esc(String(u.qtd).replace(".",","))+" "+esc(u.un||"sacos"):""):"",
+        u.cocho?"cocho "+esc(u.cocho.toLowerCase()):"", u.agua?"água "+esc(u.agua.toLowerCase()):""
+      ].filter(Boolean).join(" · ")||"—"}</p>`).join("")}
+    ${(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas)).map(l=>`<p class="mt"><b>${esc(talhao(l.talhaoId).nome==="?"?(l.lote||"Lote"):talhao(l.talhaoId).nome)}</b>${l.lote&&talhao(l.talhaoId).nome!=="?"?" · "+esc(l.lote):""} — <b class="num">${n0(l.cabecas)}</b> cabeças</p>`).join("")}
+    ${(p.cocho||p.sal||p.agua)?`<dl class="dl mt">
+      ${p.cocho?`<dt>Cocho</dt><dd>${p.cocho==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+      ${p.sal?`<dt>Sal mineral</dt><dd>${p.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+      ${p.agua?`<dt>Água</dt><dd>${p.agua==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
+      ${p.estrutObs?`<dt>Obs.</dt><dd>${esc(p.estrutObs)}</dd>`:""}</dl>`:""}
+    ${algo(ps)?`<p class="mt">🌱 <b>Pasto</b>: ${[
+        ps.condicao?esc(ps.condicao.toLowerCase()):"", ps.cerca?"cerca/porteira: "+esc(ps.cerca):"",
+        ps.visita?"visita: "+esc(ps.visita.toLowerCase())+(ps.visitaObs?" ("+esc(ps.visitaObs)+")":""):""
+      ].filter(Boolean).join(" · ")}</p>`:""}
+    ${(p.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}
+    ${p.obs?`<p class="mt">📝 ${esc(p.obs)}</p>`:""}</div>`;
+}
 function vDetalhe(id){
   const b = D.boletins.find(x=>x.id===id);
   if(!b) return topo("Boletim","não encontrado",true);
@@ -3035,14 +3285,7 @@ function vDetalhe(id){
       ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.sacas)?n0(c.sacas)+" sacas · ":""}destino: ${esc(c.destino)||"—"}
         ${c.modo?` <span class="tag verde">${esc(c.modo).toLowerCase()}</span>`:""}${c.passada?` <span class="tag terra">${esc(c.passada)}</span>`:""}
         <div class="matura"><div class="mat-cereja" style="width:${s?100*n0(c.cereja)/s:0}%">${n0(c.cereja)}%</div><div class="mat-verde" style="width:${s?100*n0(c.verde)/s:0}%">${n0(c.verde)}%</div><div class="mat-seco" style="width:${s?100*n0(c.seco)/s:0}%">${n0(c.seco)}%</div></div></div>`;}).join("")}</div>`:""}
-    ${temPecuaria(b)?`<div class="cartao"><h3>🐂 Retiro</h3>
-      ${(b.pecuaria.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas)).map(l=>`<p class="mt"><b>${esc(talhao(l.talhaoId).nome==="?"?(l.lote||"Lote"):talhao(l.talhaoId).nome)}</b>${l.lote&&talhao(l.talhaoId).nome!=="?"?" · "+esc(l.lote):""} — <b class="num">${n0(l.cabecas)}</b> cabeças</p>`).join("")}
-      ${(b.pecuaria.cocho||b.pecuaria.sal||b.pecuaria.agua)?`<dl class="dl mt">
-        ${b.pecuaria.cocho?`<dt>Cocho</dt><dd>${b.pecuaria.cocho==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
-        ${b.pecuaria.sal?`<dt>Sal mineral</dt><dd>${b.pecuaria.sal==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
-        ${b.pecuaria.agua?`<dt>Água</dt><dd>${b.pecuaria.agua==="OK"?"✔ OK":"⚠ Problema"}</dd>`:""}
-        ${b.pecuaria.estrutObs?`<dt>Obs.</dt><dd>${esc(b.pecuaria.estrutObs)}</dd>`:""}</dl>`:""}
-      ${(b.pecuaria.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" · "+esc(talhao(e2.talhaoId).nome):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}</div>`:""}
+    ${blocoPainelPec(b)}
     ${(b.pos&&(b.pos.terreiro||b.pos.secLote||n0(b.pos.sacasBenef)))?`<div class="cartao"><h3>🏭 Pós-colheita</h3><dl class="dl mt">
       ${b.pos.terreiro?`<dt>Terreiro</dt><dd>${esc(b.pos.terreiro)}</dd>`:""}
       ${b.pos.secLote?`<dt>Secador</dt><dd>${esc(b.pos.secLote)} · ${esc(b.pos.secTemp)}°C · ${esc(b.pos.secHoras)} h</dd>`:""}
@@ -3487,14 +3730,65 @@ function resumoWhats(b){
     if(x.destino==="Outra fazenda 🚚"&&x.destinoFazendaId) L.push("🚚 Café enviado p/ "+fazenda(x.destinoFazendaId).nome+(x.motorista?" · "+x.motorista:"")+" — aguardando confirmação lá");
   });
   if(temPecuaria(b)){
-    const p=b.pecuaria;
+    /* bloco 🐂 PECUÁRIA: TODO campo preenchido aparece; seção vazia fica de fora */
+    const p=pecMigrar(b.pecuaria);
+    const nomeTal=id=>(id&&talhao(id).nome!=="?")?talhao(id).nome:"";
+    const contMov=contadorMovPec(p);
+    L.push("🐂 *PECUÁRIA*"+(contMov?" — "+contMov:""));
+    (p.mov||[]).forEach(m=>{ if(!m.tipo) return;
+      const pd=nomeTal(m.pastoDe), pp=nomeTal(m.pastoPara);
+      L.push("📋 "+m.tipo+(m.modo?" ("+m.modo.toLowerCase()+")":"")+": "+[
+        (n0(m.qtd)?n0(m.qtd)+" ":"")+(m.categoria?m.categoria.toLowerCase():(n0(m.qtd)?"cabeça"+(n0(m.qtd)>1?"s":""):"")),
+        m.parto?"parto "+m.parto.toLowerCase():"", m.sexo?m.sexo.toLowerCase():"",
+        m.causa?"causa: "+m.causa.toLowerCase():"", m.brinco?"brinco "+m.brinco:"",
+        (pd&&pp)?pd+" → "+pp:(pd||pp||""), m.contraparte||""
+      ].filter(Boolean).join(" · ")+(m.obs?" — "+m.obs:""));
+    });
+    (p.san||[]).forEach(s2=>{ if(!(s2.problema||s2.acao||s2.produto||s2.categoria)) return;
+      L.push("💉 "+[
+        (n0(s2.qtd)?n0(s2.qtd)+" ":"")+(s2.categoria?s2.categoria.toLowerCase():(n0(s2.qtd)?"cabeça"+(n0(s2.qtd)>1?"s":""):"")),
+        s2.brinco?"brinco "+s2.brinco:"",
+        s2.problema?(s2.problema==="Outro"?(s2.problemaObs||"outro problema"):s2.problema.toLowerCase()):"",
+        s2.acao?"→ "+s2.acao.toLowerCase():"", s2.produto?"("+s2.produto+")":""
+      ].filter(Boolean).join(" · ")+(s2.obs?" — "+s2.obs:""));
+    });
+    (p.massa||[]).forEach(v=>{ if(!(v.tipo||v.produto||n0(v.qtd))) return;
+      L.push("💉 "+(v.tipo||"Manejo em massa")+": "+[
+        (n0(v.qtd)?n0(v.qtd)+" ":"")+(v.categoria?v.categoria.toLowerCase():(n0(v.qtd)?"cabeças":"")),
+        v.produto||""].filter(Boolean).join(" · "));
+    });
+    const rep=p.rep||{};
+    if(Object.values(rep).some(v=>v!==""&&v!=null)){
+      L.push("🐄 Reprodução: "+[
+        rep.touros?("touros no pasto: "+rep.touros.toLowerCase()+(rep.tourosOnde?" ("+rep.tourosOnde+")":"")):"",
+        n0(rep.coberturas)?n0(rep.coberturas)+" cobertura"+(n0(rep.coberturas)>1?"s":"")+" vista"+(n0(rep.coberturas)>1?"s":""):"",
+        (rep.iatfEtapa||n0(rep.iatfQtd))?"IATF: "+[rep.iatfEtapa?rep.iatfEtapa.toLowerCase():"",n0(rep.iatfQtd)?n0(rep.iatfQtd)+" vacas":""].filter(Boolean).join(" — "):"",
+        (n0(rep.dgPrenhes)||n0(rep.dgVazias))?"DG: "+n0(rep.dgPrenhes)+" prenhes / "+n0(rep.dgVazias)+" vazias":"",
+        (rep.ocorTouro&&rep.ocorTouro!=="OK")?"touro: "+rep.ocorTouro.toLowerCase()+(rep.ocorTouroObs?" ("+rep.ocorTouroObs+")":""):(rep.ocorTouro==="OK"?"touros OK":"")
+      ].filter(Boolean).join(" · "));
+    }
+    (p.nut||[]).forEach(u=>{ if(!(u.talhaoId||u.insumo||u.cocho||u.agua||n0(u.qtd))) return;
+      L.push("🧂 "+[
+        nomeTal(u.talhaoId)||"Pasto",
+        u.insumo?u.insumo.toLowerCase()+(u.produto?" ("+u.produto+")":"")+(n0(u.qtd)?" — "+String(u.qtd).replace(".",",")+" "+(u.un||"sacos"):""):"",
+        u.cocho?"cocho "+u.cocho.toLowerCase():"", u.agua?"água "+u.agua.toLowerCase():""
+      ].filter(Boolean).join(" · "));
+    });
     const lotes=(p.lotes||[]).filter(l=>l.talhaoId||l.lote||n0(l.cabecas));
     const tot=lotes.reduce((s,l)=>s+n0(l.cabecas),0);
-    if(lotes.length) L.push("🐂 Contagem: "+tot+" cabeças ("+lotes.map(l=>(talhao(l.talhaoId).nome!=="?"?talhao(l.talhaoId).nome:(l.lote||"lote"))+" "+n0(l.cabecas)).join(" · ")+")");
+    if(lotes.length) L.push("🐮 Contagem: "+tot+" cabeças ("+lotes.map(l=>(talhao(l.talhaoId).nome!=="?"?talhao(l.talhaoId).nome:(l.lote||"lote"))+" "+n0(l.cabecas)).join(" · ")+")");
     const probs=[p.cocho==="Problema"?"cocho":"",p.sal==="Problema"?"sal mineral":"",p.agua==="Problema"?"água":""].filter(Boolean);
     if(probs.length) L.push("⚠️ Problema em: "+probs.join(", ")+(p.estrutObs?" — "+p.estrutObs:""));
-    else if(p.cocho||p.sal||p.agua) L.push("🐂 Cocho, sal e água: OK");
-    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🐂 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(e2.lote?" · "+e2.lote:"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto+(e2.dose?" "+String(e2.dose).replace(".",",")+" "+(e2.doseUn||"mL")+"/cab":""):"")+(n0(e2.pesoMedio)?" · peso médio "+n0(e2.pesoMedio).toLocaleString("pt-BR")+" kg":"")+(n0(e2.valor)?" · R$ "+n0(e2.valor).toLocaleString("pt-BR"):"")+(e2.contraparte?" ("+e2.contraparte+")":"")+(e2.obs?" — "+e2.obs:"")); });
+    else if(p.cocho||p.sal||p.agua) L.push("🧂 Cocho, sal e água: OK"+(p.estrutObs?" — "+p.estrutObs:""));
+    const ps=p.pasto||{};
+    if(Object.values(ps).some(v=>v!==""&&v!=null)){
+      L.push("🌱 Pasto: "+[ps.condicao?ps.condicao.toLowerCase():"",
+        ps.cerca?"cerca/porteira: "+ps.cerca:"",
+        ps.visita?"visita: "+ps.visita.toLowerCase()+(ps.visitaObs?" ("+ps.visitaObs+")":""):""
+      ].filter(Boolean).join(" · "));
+    }
+    (p.eventos||[]).forEach(e2=>{ if(e2.tipo) L.push("🔧 "+e2.tipo+(e2.talhaoId&&talhao(e2.talhaoId).nome!=="?"?" ("+talhao(e2.talhaoId).nome+")":"")+(e2.lote?" · "+e2.lote:"")+(n0(e2.qtd)?": "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):"")+(e2.produto?" · "+e2.produto+(e2.dose?" "+String(e2.dose).replace(".",",")+" "+(e2.doseUn||"mL")+"/cab":""):"")+(n0(e2.pesoMedio)?" · peso médio "+n0(e2.pesoMedio).toLocaleString("pt-BR")+" kg":"")+(n0(e2.valor)?" · R$ "+n0(e2.valor).toLocaleString("pt-BR"):"")+(e2.contraparte?" ("+e2.contraparte+")":"")+(e2.obs?" — "+e2.obs:"")); });
+    if(p.obs) L.push("📝 Pecuária: "+p.obs);
   }
   (b.fito||[]).forEach(f=>{ if(f.nome||f.tipo) L.push("🐛 "+(f.nome||f.tipo)+" — "+talhao(f.talhaoId).nome+" · nível "+(f.nivel||"—")+(f.obs?" — "+f.obs:"")); });
   (b.ocorrencias||[]).forEach(o=>{ L.push((o.grav==="Alta"?"🔴 ":"⚠️ ")+(o.tipo||"Ocorrência")+": "+(o.texto||"")); });
@@ -3578,6 +3872,13 @@ async function syncEnviar(){
       if(!cod) continue;
       corpo={ chave:item.id, codigo:cod, atualizado_em:new Date().toISOString() };
       conflito="chave";
+    }else if(item.t==="pec"){
+      /* espelho da pecuária do boletim em tabela própria (ERP/consultas);
+         o payload completo do boletim continua indo para "boletins" */
+      col="boletim_pecuaria"; reg=D.boletins.find(x=>x.id===item.id);
+      if(!reg || reg.exemplo || !temPecuaria(reg)) continue;
+      corpo={ id:reg.id, fazenda_id:reg.fazendaId, data:reg.data, responsavel:reg.responsavel||"", payload:reg.pecuaria };
+      conflito="id";
     }else{
       col = item.t==="b" ? "boletins" : "pos_colheitas";
       reg = item.t==="b" ? D.boletins.find(x=>x.id===item.id) : (D.posColheitas||[]).find(x=>x.id===item.id);
@@ -3994,6 +4295,7 @@ function concluirEnvio(){
   if(r.responsavel) Persist.set("bdf:nomeResp", r.responsavel);
   envioRecente=r.id;
   syncEnfileirar('b', r.id);
+  if(temPecuaria(r)) syncEnfileirar('pec', r.id); /* cópia da pecuária na tabela boletim_pecuaria */
   gerarRemessasDe(r);
   salvarDados(); rascunho=null; Persist.del("bdf:rascunho");
   ir("casa");
@@ -4276,15 +4578,16 @@ function ligarEventos(tela){
       if(i>=0) r.atividades.splice(i,1);
       else r.atividades.push({id:uid(),talhaoId:tid,tipo:op,pessoas:"",obs:"",status:"",falta:"",receita:"",tanques:"",ltanque:"",insumos:[],maquinas:[]});
       salvarRascunho(); ir("form",null,true); return; }
-    if(t.id==="bt-add-lote-pec"){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+    if(t.id==="bt-add-lote-pec"){ r.pecuaria=r.pecuaria||pecVazia();
       r.pecuaria.lotes.push({talhaoId:"",lote:"",cabecas:""});
       $("#lista-pec-lotes").innerHTML=r.pecuaria.lotes.map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("");
       salvarRascunho(); return; }
     if(d.rmPeclote!==undefined){ r.pecuaria.lotes.splice(parseInt(d.rmPeclote),1);
       $("#lista-pec-lotes").innerHTML=r.pecuaria.lotes.map((l,i)=>cardLotePec(l,i,r.fazendaId)).join("");
-      const sp=$("#res-pec"); if(sp){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0); sp.textContent=tot?tot+" cabeças":""; }
+      const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0);
+      ["res-pec","res-pec-cont"].forEach(id2=>{ const sp=$("#"+id2); if(sp) sp.textContent=tot?tot+" cabeças":""; });
       salvarRascunho(); return; }
-    if(t.id==="bt-add-ev-pec"){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+    if(t.id==="bt-add-ev-pec"){ r.pecuaria=r.pecuaria||pecVazia();
       r.pecuaria.eventos.push({tipo:"",talhaoId:"",qtd:"",produto:"",obs:""});
       $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
       salvarRascunho(); return; }
@@ -4292,7 +4595,7 @@ function ligarEventos(tela){
       $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
       salvarRascunho(); return; }
     if(d.pecCocho!==undefined||d.pecSal!==undefined||d.pecAgua!==undefined){
-      const p=r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+      const p=r.pecuaria=r.pecuaria||pecVazia();
       const k=d.pecCocho!==undefined?"cocho":(d.pecSal!==undefined?"sal":"agua");
       const v=d.pecCocho!==undefined?d.pecCocho:(d.pecSal!==undefined?d.pecSal:d.pecAgua);
       p[k]=(p[k]===v)?"":v;
@@ -4301,6 +4604,61 @@ function ligarEventos(tela){
         ch.classList.toggle("on",cv===p[k]); });
       const inp=app.querySelector('input[data-pec="estrutObs"]');
       if(inp) inp.style.display=(p.cocho==="Problema"||p.sal==="Problema"||p.agua==="Problema")?"":"none";
+      salvarRascunho(); return; }
+    /* ---- pecuária v50: movimentação, sanidade, reprodução, cocho, pasto ---- */
+    if(t.id==="bt-add-mov-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      p.mov.push({tipo:"",categoria:"",qtd:""});
+      $("#lista-pec-mov").innerHTML=p.mov.map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPecmov!==undefined){ r.pecuaria.mov.splice(parseInt(d.rmPecmov),1);
+      $("#lista-pec-mov").innerHTML=r.pecuaria.mov.map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("");
+      pecPintarMov(r); salvarRascunho(); return; }
+    if(d.mvc){ const pt=d.mvc.split("|"); const m=r.pecuaria.mov[parseInt(pt[0])];
+      if(m){ const v=pt.slice(2).join("|"); m[pt[1]]=(m[pt[1]]===v)?"":v;
+        const card=app.querySelector(`[data-pecmov="${pt[0]}"]`); if(card) card.outerHTML=cardMovPec(m,parseInt(pt[0]),r.fazendaId);
+        pecPintarMov(r); salvarRascunho(); } return; }
+    if(t.id==="bt-add-san-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      p.san.push({categoria:"",qtd:"",brinco:"",problema:"",acao:"",produto:"",obs:""});
+      $("#lista-pec-san").innerHTML=p.san.map((s,i)=>cardSanPec(s,i)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPecsan!==undefined){ r.pecuaria.san.splice(parseInt(d.rmPecsan),1);
+      $("#lista-pec-san").innerHTML=r.pecuaria.san.map((s,i)=>cardSanPec(s,i)).join("");
+      salvarRascunho(); return; }
+    if(d.snc){ const pt=d.snc.split("|"); const s=r.pecuaria.san[parseInt(pt[0])];
+      if(s){ const v=pt.slice(2).join("|"); s[pt[1]]=(s[pt[1]]===v)?"":v;
+        const card=app.querySelector(`[data-pecsan="${pt[0]}"]`); if(card) card.outerHTML=cardSanPec(s,parseInt(pt[0]));
+        salvarRascunho(); } return; }
+    if(t.id==="bt-add-massa-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      p.massa.push({tipo:"",categoria:"",qtd:"",produto:""});
+      $("#lista-pec-massa").innerHTML=p.massa.map((v,i)=>cardMassaPec(v,i)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPecmassa!==undefined){ r.pecuaria.massa.splice(parseInt(d.rmPecmassa),1);
+      $("#lista-pec-massa").innerHTML=r.pecuaria.massa.map((v,i)=>cardMassaPec(v,i)).join("");
+      salvarRascunho(); return; }
+    if(d.msc){ const pt=d.msc.split("|"); const v2=r.pecuaria.massa[parseInt(pt[0])];
+      if(v2){ const v=pt.slice(2).join("|"); v2[pt[1]]=(v2[pt[1]]===v)?"":v;
+        const card=app.querySelector(`[data-pecmassa="${pt[0]}"]`); if(card) card.outerHTML=cardMassaPec(v2,parseInt(pt[0]));
+        salvarRascunho(); } return; }
+    if(d.rpc){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      const i2=d.rpc.indexOf("|"); const campo=d.rpc.slice(0,i2), v=d.rpc.slice(i2+1);
+      p.rep[campo]=(p.rep[campo]===v)?"":v;
+      const bx=$("#bloco-pec-rep"); if(bx) bx.innerHTML=blocoRepPec(p);
+      salvarRascunho(); return; }
+    if(t.id==="bt-add-nut-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      p.nut.push({talhaoId:"",insumo:"",produto:"",qtd:"",un:"sacos",cocho:"",agua:""});
+      $("#lista-pec-nut").innerHTML=p.nut.map((u,i)=>cardNutPec(u,i,r.fazendaId)).join("");
+      salvarRascunho(); return; }
+    if(d.rmPecnut!==undefined){ r.pecuaria.nut.splice(parseInt(d.rmPecnut),1);
+      $("#lista-pec-nut").innerHTML=r.pecuaria.nut.map((u,i)=>cardNutPec(u,i,r.fazendaId)).join("");
+      salvarRascunho(); return; }
+    if(d.ntc){ const pt=d.ntc.split("|"); const u=r.pecuaria.nut[parseInt(pt[0])];
+      if(u){ const v=pt.slice(2).join("|"); u[pt[1]]=(u[pt[1]]===v)?"":v;
+        const card=app.querySelector(`[data-pecnut="${pt[0]}"]`); if(card) card.outerHTML=cardNutPec(u,parseInt(pt[0]),r.fazendaId);
+        salvarRascunho(); } return; }
+    if(d.psc){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
+      const i2=d.psc.indexOf("|"); const campo=d.psc.slice(0,i2), v=d.psc.slice(i2+1);
+      p.pasto[campo]=(p.pasto[campo]===v)?"":v;
+      const bx=$("#bloco-pec-pasto"); if(bx) bx.innerHTML=blocoPastoPec(p);
       salvarRascunho(); return; }
 
     if(t.id==="bt-add-ativ"){
@@ -4388,7 +4746,7 @@ function ligarEventos(tela){
       repintarIrg(r); salvarRascunho(); return; }
     /* ---- pecuária: repetir o último lançamento ---- */
     if(t.id==="bt-uev-pec"){ const mem=(D.ultimoEvPec||{})[r.fazendaId];
-      if(mem){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]};
+      if(mem){ r.pecuaria=r.pecuaria||pecVazia();
         r.pecuaria.eventos.push(JSON.parse(JSON.stringify(mem)));
         $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
         salvarRascunho(); } return; }
@@ -4568,11 +4926,19 @@ function ligarEventos(tela){
         if(d.cc==="sacas"){ const s=$("#res-col"); if(s) s.textContent=r.colheita.reduce((x,y)=>x+n0(y.sacas),0)+" sacas"; } }
       else if(d.f!==undefined){ const c=el.closest("[data-fito]"); r.fito.find(x=>x.id===c.dataset.fito)[d.f]=el.value; }
       else if(d.o!==undefined){ const c=el.closest("[data-oc]"); r.ocorrencias.find(x=>x.id===c.dataset.oc)[d.o]=el.value; }
-      else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||{lotes:[],cocho:"",sal:"",agua:"",estrutObs:"",eventos:[]}; r.pecuaria[d.pec]=el.value; }
+      else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||pecVazia(); r.pecuaria[d.pec]=el.value; }
       else if(d.pl!==undefined){ const c=el.closest("[data-peclote]"); const l=r.pecuaria.lotes[parseInt(c.dataset.peclote)];
         if(l){ l[d.pl]=el.value;
-          if(d.pl==="cabecas"){ const sp=$("#res-pec"); if(sp){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0); sp.textContent=tot?tot+" cabeças":""; } } } }
+          if(d.pl==="cabecas"){ const tot=r.pecuaria.lotes.reduce((x,y)=>x+n0(y.cabecas),0);
+            ["res-pec","res-pec-cont"].forEach(id2=>{ const sp=$("#"+id2); if(sp) sp.textContent=tot?tot+" cabeças":""; }); } } }
       else if(d.pe!==undefined){ const c=el.closest("[data-pecev]"); const e3=r.pecuaria.eventos[parseInt(c.dataset.pecev)]; if(e3) e3[d.pe]=el.value; }
+      else if(d.mv!==undefined){ const c=el.closest("[data-pecmov]"); const m=c&&r.pecuaria.mov[parseInt(c.dataset.pecmov)];
+        if(m){ m[d.mv]=el.value; if(d.mv==="qtd") pecPintarMov(r); } }
+      else if(d.sn!==undefined){ const c=el.closest("[data-pecsan]"); const s=c&&r.pecuaria.san[parseInt(c.dataset.pecsan)]; if(s) s[d.sn]=el.value; }
+      else if(d.ms!==undefined){ const c=el.closest("[data-pecmassa]"); const v=c&&r.pecuaria.massa[parseInt(c.dataset.pecmassa)]; if(v) v[d.ms]=el.value; }
+      else if(d.nt!==undefined){ const c=el.closest("[data-pecnut]"); const u=c&&r.pecuaria.nut[parseInt(c.dataset.pecnut)]; if(u) u[d.nt]=el.value; }
+      else if(d.rp!==undefined){ const p2=pecMigrar(r.pecuaria=r.pecuaria||pecVazia()); p2.rep[d.rp]=el.value; }
+      else if(d.pst!==undefined){ const p2=pecMigrar(r.pecuaria=r.pecuaria||pecVazia()); p2.pasto[d.pst]=el.value; }
       salvarRascunho(); return;
     }
     if(telaAtual==="casa" && sessao && sessao.papel!=="gerente"){
