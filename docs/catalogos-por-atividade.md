@@ -136,8 +136,92 @@ As listas são filtradas pela cultura do ciclo do talhão.
 Catálogo original do app (LISTA_ATIV, LISTA_FUNCOES, SUGESTAO_FITO)
 — INTOCADO por este redesenho.
 
-## PECUÁRIA
-Eventos por grupo (OPS_PECUARIA_FASES): manejo diário, sanitário,
-reprodutivo, manejo de lote, pastagem e estrutura. Cada evento tem
-lote/pasto, quantidade de cabeças e, onde couber (eventos
-sanitários), produto + dose por cabeça.
+## PECUÁRIA (módulo de campo — v50)
+
+### Princípios de tela
+- Uma seção 🐂 Pecuária no boletim, com SUB-ACORDEÕES fechados por
+  padrão: o capataz abre só o que teve movimento. Dia parado = tudo
+  fechado, nada no resumo. Meta: preencher em até 3 minutos.
+- Chips grandes, teclado numérico, mínimo de digitação. Linguagem do
+  campo: cabeça, cocho, sal, berro, bicheira.
+- Retiros/pastos/currais = os talhões tipo PASTO_PECUARIA da fazenda
+  (cadastro já existente); não há lista paralela.
+- Categorias animais padronizadas em TODO o módulo
+  (CATEGORIAS_ANIMAIS): bezerro(a) mamando, desmamado(a), garrote,
+  novilha, boi magro, boi gordo, vaca, vaca descarte, touro.
+- Confinamento: fora do módulo por decisão de escopo (as fazendas do
+  grupo engordam a pasto). Se um dia entrar, vira sub-acordeão novo.
+
+### 📋 Movimentação do rebanho
+Cada movimento = um lançamento (tipo + categoria + qtd +
+origem/destino + observação). Tipos (PEC_MOV_TIPOS) e campos:
+| Tipo | Campos |
+|---|---|
+| Nascimento | qtd, parto (normal/assistido), sexo da cria (macho/fêmea), pasto — tudo opcional além da qtd |
+| Morte | categoria, qtd, causa (doença, acidente, cobra, raio, atolamento, desconhecida, outra), brinco, pasto |
+| Desmama | qtd, pasto de origem → pasto de destino |
+| Mudança de pasto | categoria, qtd, origem → destino |
+| Entrada | como entrou (compra / transferência do grupo), categoria, qtd, de onde veio, pasto de destino |
+| Saída | como saiu (venda / abate / transferência do grupo), categoria, qtd, para onde foi, pasto de origem |
+
+Contador do dia por tipo no cabeçalho do sub-acordeão
+("2 nascimentos · 1 morte") para conferência antes de enviar.
+
+### 💉 Sanidade
+- Animal/lote tratado: categoria · qtd OU brinco · problema
+  (PEC_PROBLEMAS_SAN: bicheira, pneumonia, diarreia, casco, olho,
+  carrapato/mosca em excesso, outro + campo livre) · o que fez
+  (PEC_ACOES_SAN: medicou, vacinou, everminou, curou, apartou p/
+  enfermaria) · produto (texto curto, com sugestões do datalist)
+  · observação.
+- Vacinação/vermifugação em massa (PEC_MASSA_TIPOS): tipo, categoria,
+  qtd, produto.
+
+### 🐄 Reprodução (cria)
+Touros no pasto? (sim/não + em quais retiros) · coberturas vistas
+(berro, qtd) · etapa de IATF do dia (PEC_IATF_ETAPAS: implante D0,
+retirada, inseminação, ressincronização, outra) + vacas no dia ·
+diagnóstico de gestação (prenhes / vazias) · ocorrência com touro
+(PEC_OCOR_TOURO: OK, brigou, machucou, manqueira + campo livre).
+
+### 🧂 Cocho e nutrição
+- Por pasto/lote: repôs no cocho (PEC_COCHO_INSUMOS: sal mineral,
+  sal proteinado, ração, silagem/volumoso) + qual produto + quanto
+  (sacos ou kg) · situação do cocho (PEC_LEITURA_COCHO: vazio,
+  lambido, com sobra) · água/aguadas (PEC_AGUA_SIT: OK, baixa,
+  problema bomba/bebedouro).
+- Resumo rápido da fazenda inteira (um toque, herdado da v41):
+  cocho / sal / água = OK ou Problema + observação.
+
+### 🐮 Contagem por lote/pasto (herdada da v41)
+Pasto + lote/categoria + cabeças contadas; total no cabeçalho.
+
+### 🌱 Pasto e estrutura
+Condição do pasto (PEC_CONDICAO_PASTO: sobrando, no ponto,
+apertando, crítico) · cerca/porteira com problema (texto: qual
+pasto) · visita na fazenda (PEC_VISITAS: veterinário, comprador,
+fiscal, outra + quem/o quê). Chuva fica na seção Clima e equipe na
+Mão de obra — sem duplicação.
+
+### 🔧 Outros manejos (catálogo herdado — OPS_PECUARIA_FASES)
+Pesagem, marcação/brincagem, castração, apartação, embarque/venda,
+roçada, adubação de pastagem etc., com campos em cascata (sanitário:
+produto + dose/cabeça; pesagem: peso médio; venda/compra: valor e
+contraparte). Botão "usar o último lançamento".
+
+### 📝 Observações de pecuária
+Campo livre; sempre entra no resumo quando preenchido.
+
+### Resumo WhatsApp — bloco 🐂 PECUÁRIA
+Só aparece se algo foi preenchido; toda linha preenchida entra:
+cabeçalho com o contador do dia; 📋 um movimento por linha;
+💉 sanidade e manejos em massa; 🐄 reprodução; 🧂 cocho por pasto e
+resumo rápido; 🐮 contagem; 🌱 pasto/cerca/visitas; 🔧 outros
+manejos; 📝 observações.
+
+### Sincronização
+A pecuária vai dentro do payload do boletim (tabela boletins, como
+sempre) E espelhada na tabela boletim_pecuaria
+(sql/004-boletim-pecuaria.sql), item t:"pec" da mesma fila offline.
+A visão pecuaria_movimentos abre um movimento por linha para o ERP
+AgroGestão.

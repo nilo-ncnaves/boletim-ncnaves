@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v49** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v50** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -89,13 +89,42 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   plantio lançado e encerra quando a colheita atinge a área do
   talhão. Talhões ARRENDADO (milho semente → sementeira) aparecem só
   como etiqueta, sem operações/irrigação/colheita.
-- 🐂 Pecuária: lotes por pasto, cocho/sal/água, eventos com campos em
-  cascata (sanitário: produto + dose/cabeça; pesagem: peso médio;
-  venda/compra: valor e contraparte).
+- 🐂 Pecuária (módulo de campo redesenhado na v50 — fonte:
+  docs/catalogos-por-atividade.md, seção PECUÁRIA): uma seção 🐂 com
+  sub-acordeões fechados por padrão, tudo opcional:
+  **📋 Movimentação do rebanho** (nascimento com parto/sexo, morte com
+  causa em chips e brinco, desmama, mudança de pasto, entrada por
+  compra/transferência, saída por venda/abate/transferência — cada
+  movimento com categoria animal padronizada, qtd e origem → destino;
+  contador do dia por tipo para conferência); **💉 Sanidade** (animal/
+  lote com problema em chips — bicheira, pneumonia, diarreia, casco,
+  olho, carrapato/mosca —, ação, produto; vacinação/vermifugação em
+  massa); **🐄 Reprodução** (touros no pasto, coberturas vistas, etapa
+  de IATF + qtd, DG prenhes/vazias, ocorrência com touro);
+  **🧂 Cocho e nutrição** (por pasto: sal/proteinado/ração em sacos ou
+  kg, leitura de cocho vazio/lambido/com sobra, água; + resumo rápido
+  OK/Problema da v41); **🐮 Contagem por lote/pasto** (v41);
+  **🌱 Pasto e estrutura** (condição do pasto, cerca/porteira,
+  visitas — chuva e equipe seguem nas seções Clima e Mão de obra);
+  **🔧 Outros manejos** (catálogo OPS_PECUARIA_FASES da v41: pesagem,
+  castração, embarque etc., com campos em cascata) e **📝 Observações
+  de pecuária**. Pastos/retiros = talhões tipo PASTO_PECUARIA (sem
+  lista paralela); categorias animais na constante CATEGORIAS_ANIMAIS;
+  demais catálogos nas constantes PEC_* do index.html. Confinamento
+  ficou fora de propósito (engorda do grupo é a pasto). Tudo que for
+  preenchido sai no bloco 🐂 PECUÁRIA do resumo WhatsApp e no cartão
+  do painel; boletins antigos continuam abrindo (migração leve
+  pecMigrar).
 
 ## Robôs e integrações
 - Supabase (sync): boletins, pos_colheitas, remessas, telemetria —
-  gravação/leitura pelo app com a chave publishable.
+  gravação/leitura pelo app com a chave publishable. Desde a v50,
+  boletim com pecuária preenchida também sobe um espelho para a
+  tabela **boletim_pecuaria** (item t:"pec" da mesma fila offline;
+  id = id do boletim), pensado para o estoque de rebanho e o custeio
+  no ERP AgroGestão — a visão pecuaria_movimentos entrega um
+  movimento por linha. O app não lê essa tabela (o boletim completo
+  continua em boletins).
 - Robô iCrop (pg_cron + pg_net no Supabase): grava icrop_manejo toda
   madrugada; o app LÊ (icropDo) e mostra medição do dia, compara
   lâmina informada × medida e alerta parcela vencida (icrop_fazendas
@@ -154,6 +183,10 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   publishable).
 
 ## PENDÊNCIAS
+- **Rodar sql/004-boletim-pecuaria.sql no SQL Editor do Supabase**
+  (cria a tabela boletim_pecuaria + visão pecuaria_movimentos).
+  Enquanto não rodar, o espelho da pecuária fica na fila offline e o
+  boletim continua subindo normal para a tabela boletins.
 - **Rodar sql/001-codigos-acesso.sql e depois
   sql/002-codigos-escopo.sql no SQL Editor do Supabase** (001 cria a
   tabela codigos_acesso; 002 insere as chaves de escopo por atividade
