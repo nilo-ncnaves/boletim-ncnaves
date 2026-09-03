@@ -40,6 +40,11 @@ SAFRA = '2026/27'
 VERSAO = 1
 INSUMOS = ['ureia', 'nitrato', 'sulfato_amonio', 'kcl', 'phusion', 'sulfato_mn', 'acido_borico', 'sulfato_zn']
 PIVOS = {'VEC-P02', 'VEC-P06'}
+# Observações do CADASTRO (unidade_manejo.obs), não do plano: exceções declaradas pelo Escritório.
+# "sem área: ok" é o texto que a auditoria reconhece para não travar a publicação.
+OBS_CADASTRO = {
+    'MTP-3PT': 'sem área: ok — liberado pelo Escritório em 03/09/2026 para publicar a v1; área e identidade a informar pelo agrônomo',
+}
 
 # Gantt: tipo e evidência (item A1 do pedido). Rótulos entre aspas são os
 # itens exatos de LISTA_ATIV do index.html.
@@ -124,8 +129,8 @@ def main():
             erros.append(f"de-para {d['plano']}: app_id {d['app_id']} não existe no index.html")
         elif real != d['app_nome']:
             erros.append(f"de-para {d['plano']}: app_nome '{d['app_nome']}' ≠ cadastro '{real}'")
-        if d['confirmado'] and d['plano'] != d['app_nome']:
-            erros.append(f"de-para {d['plano']}: confirmado=true mas o nome não é exatamente igual ao do app ('{d['app_nome']}') — regra 5: pare e confirme")
+        if d['confirmado'] and d['plano'] != d['app_nome'] and 'confirmado pelo nilo' not in d.get('observacao', '').lower():
+            erros.append(f"de-para {d['plano']}: confirmado=true mas o nome não é igual ao do app ('{d['app_nome']}') e a observação não registra a confirmação do Nilo — regra 5: pare e confirme")
         if not d['confirmado']:
             avisos.append(f"fazenda '{d['plano']}' NÃO confirmada (app candidato: {d['app_id']} '{d['app_nome']}') — seed grava o nome do plano; sem alias app; o app não carrega este plano")
     nome_db = {fz: (dp[fz]['app_nome'] if dp.get(fz, {}).get('confirmado') else fz) for fz in fazendas_plano}
@@ -201,6 +206,17 @@ def main():
     w('begin;')
     w('')
 
+    # renomeações de cargas anteriores ---------------------------------------
+    # Fazenda confirmada cujo nome no plano difere do app: se uma carga anterior
+    # gravou o nome do plano, corrige aqui (num banco vazio não faz nada).
+    renomear = [d for d in depara if d['confirmado'] and d['plano'] != d['app_nome']]
+    if renomear:
+        w('-- 0. Nome do plano → nome exato do app em cargas anteriores (não faz nada num banco vazio)')
+        for d in renomear:
+            for tb in ['unidade_manejo', 'unidade_alias', 'plano_safra', 'plano_fito_excecao']:
+                w('update public.%s set fazenda_app = %s where fazenda_app = %s;' % (tb, q(d['app_nome']), q(d['plano'])))
+        w('')
+
     # unidade_manejo -------------------------------------------------------
     w('-- 1. unidade_manejo (%d unidades; pais antes dos filhos) ----------------' % len(unidades))
     ordenadas = [u for u in unidades if not u['pai']] + [u for u in unidades if u['pai']]
@@ -210,6 +226,8 @@ def main():
         if u['safra_zerada_tipo'] == 'em_branco':
             nota = 'coluna de safra zerada em branco no deck — status "producao" assumido na carga'
             obs = (obs + '; ' + nota) if obs else nota
+        if u['codigo'] in OBS_CADASTRO:
+            obs = (obs + '; ' + OBS_CADASTRO[u['codigo']]) if obs else OBS_CADASTRO[u['codigo']]
         cols = OrderedDict([
             ('id', q(uid('unidade:' + u['codigo']))),
             ('codigo', q(u['codigo'])),

@@ -1625,10 +1625,12 @@ function cartaoSolinftecPainel(){
    Escritório, faróis dizem "sem registro" (nunca "não fez") e ficam só na Diretoria.
    Na v52 NADA muda na tela do gerente: aqui só se baixa e guarda o plano vigente
    (bdf:plano, para a fase B) e existe a tela de Escritório "Unidades e Plano". */
-/* id da unidade do app → nome gravado em fazenda_app no Supabase. Só entram fazendas cujo
-   nome no plano bate EXATAMENTE com o cadastro do app; as outras três ficam fora até o
-   Nilo confirmar (docs/plano/2026-27/depara_fazendas.json). Nunca casar "por parecido". */
-const PLANO_FAZENDA_APP={ f01:"Água Limpa", f03c:"Rio Preto-Lagamar — Café", f14c:"Monte Carmelo — Café", f23:"Vereda Romaria", f24:"Vereda Café 5º e 6º" };
+/* id da unidade do app → nome gravado em fazenda_app no Supabase (= nome exato do cadastro).
+   Cinco batiam de saída; Vereda — Café, Lagamar Café (Rodrigo) e Mata Preta — Café foram
+   confirmadas pelo Nilo em 03/09/2026 (docs/plano/2026-27/depara_fazendas.json). Fazenda
+   nova no plano só entra aqui depois de conferida — nunca casar "por parecido". */
+const PLANO_FAZENDA_APP={ f01:"Água Limpa", f03c:"Rio Preto-Lagamar — Café", f13c:"Mata Preta — Café", f14c:"Monte Carmelo — Café",
+  f20:"Lagamar Café (Rodrigo)", f22c:"Vereda — Café", f23:"Vereda Romaria", f24:"Vereda Café 5º e 6º" };
 const planoFzDe = nome => Object.keys(PLANO_FAZENDA_APP).find(k=>PLANO_FAZENDA_APP[k]===nome)||null;
 const PLANO_MODELO={ "NC Naves":"NC", "NR Agropecuária":"NR" };
 const PLANO_STATUS_UNIDADE=[["producao","produção"],["poda","poda"],["renovacao","renovação"],["recepa","recepa"],["plantio","plantio"],["a_confirmar","a confirmar"]];

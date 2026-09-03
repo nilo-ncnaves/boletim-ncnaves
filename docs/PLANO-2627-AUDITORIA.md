@@ -32,29 +32,39 @@ entra sempre como **nova versão** do plano (nunca editando a vigente).
 - Os dois itens que travam a publicação (✱) são: unidade do plano
   inativa ou de outra fazenda, e unidade com calendário sem área. Na
   carga v1 o MTP-3PT (3º plantio, torres) tem calendário e não tem
-  área: o plano de **Mata Preta** só pode ser publicado depois que o
-  agrônomo informar a área (ou registrar a exceção em `obs`).
+  área. Para não travar a publicação da v1 de **Mata Preta**, o seed
+  grava em `obs` dessa unidade a exceção "sem área: ok" (liberada pelo
+  Escritório em 03/09/2026, autorização do Nilo); os faróis da fase B
+  não dependem de área. A área e a identidade continuam devidas pelo
+  agrônomo.
+- Resultado da auditoria das 8 fazendas sobre os dados do seed:
+  `docs/plano/2026-27/auditoria_v1_resultado.json` (as 8 passam nos
+  itens ✱; os itens informativos reproduzem as diferenças desta lista).
+  É o que `sql/007-publicar-planos-2627.sql` grava ao publicar.
 
 ## Achados da própria carga (03/09/2026, v52)
 
 Coisas que apareceram ao materializar o apêndice e que não estavam na
 lista original. Não alteram dados; ficam registradas para decisão.
 
-- **3 nomes de fazenda do plano não batem exatamente com o cadastro do
-  app** (regra 5 do pedido: não mapear "por parecido"):
+- **3 nomes de fazenda do plano diferiam do cadastro do app só na
+  pontuação** (regra 5 do pedido: não mapear "por parecido"):
   `Vereda Café` × app `Vereda — Café` (f22c); `Lagamar Café – Rodrigo` ×
   app `Lagamar Café (Rodrigo)` (f20); `Mata Preta - Café` × app
-  `Mata Preta — Café` (f13c). Enquanto o Nilo não confirmar, o seed grava
-  o nome do plano em `fazenda_app`, o app não carrega o plano dessas
-  três fazendas e nenhum alias `app` é criado para elas
-  (`docs/plano/2026-27/depara_fazendas.json`, campo `confirmado`).
+  `Mata Preta — Café` (f13c). O Nilo confirmou em 03/09/2026 que são as
+  mesmas fazendas; o seed grava o nome exato do app
+  (`docs/plano/2026-27/depara_fazendas.json`).
 - Nomes do plano se repetem entre fazendas ("Setor 01" existe em Vereda,
   Rio Preto, Lagamar e Mata Preta). Por isso a unicidade de
   `unidade_alias` é por (sistema, fazenda_app, alias), não por
   (sistema, alias) como no rascunho do pedido.
 - Rio Preto: o app tem "Setor 1 (café grupo)" … "Setor 7 (café grupo)";
-  o plano tem Setor 01–06 do 1º plantio E st01–06 do 2º plantio. Mesmo
-  número em duas unidades da mesma fazenda → nenhum alias `app` criado.
+  o plano tem Setor 01–06 do 1º plantio E st01–06 do 2º plantio. Com
+  autorização do Nilo (03/09/2026), os setores numerados do app foram
+  ligados ao **1º plantio** (Setor 6 + Setor 7 = 19 ha = S06), porque o
+  2º plantio é um bloco de 180 ha que corresponde ao talhão "Sede
+  Abdala — Café Grupo" (194 ha) — e esse bloco fica sem apelido (6
+  unidades para 1 talhão). Conferir com o agrônomo.
 - Vereda Café 5º e 6º: o app tem só "Café 5º" (80 ha) e "Café 6º"
   (50 ha); o plano tem 3 unidades no 5º e 2 no 6º → sem alias `app`
   (várias unidades para um talhão só).

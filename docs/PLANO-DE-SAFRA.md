@@ -76,6 +76,7 @@ Arquivos, na ordem em que nascem:
 | 6 | `scripts/gerar_seed_plano.py` | Lê 3, 4, 5 e o cadastro real do `index.html`, confere tudo e gera `sql/006-plano-safra-seed-2627.sql` (ids fixos por uuid5; `on conflict do nothing`; conferência final que desfaz a carga se as somas não baterem). |
 | 7 | `sql/005-plano-safra.sql` → `sql/006-plano-safra-seed-2627.sql` | Rodar nesta ordem no SQL Editor. Os 8 planos entram como **versão 1 em rascunho**. |
 | 8 | Tela Escritório › Cadastros › **Unidades e Plano** | Rodar auditoria → preencher "Aprovado por" (agrônomo) → **Publicar como vigente**. |
+| 8b | `sql/007-publicar-planos-2627.sql` (opcional) | Atalho gerado por `scripts/gerar_publicacao_plano.py` a partir de `auditoria_v1_resultado.json`: grava a auditoria e publica as 8 versões 1 de uma vez. Só quando o agrônomo aprovar. |
 
 Como carregar uma **nova versão** do plano (PPTX novos):
 PPTX → `importar_plano.py` (JSON bruto) → resolver cada nome contra
@@ -94,15 +95,40 @@ código novo; unidade que sumiu se inativa. Nunca se reaproveita código.
 | Vereda Romaria | f23 Vereda Romaria | igual |
 | Vereda Café 5º e 6º | f24 Vereda Café 5º e 6º | igual |
 | Monte Carmelo — Café | f14c Monte Carmelo — Café | igual |
-| Vereda Café | f22c **Vereda — Café** | **não bate** (travessão; e "Vereda Café" é prefixo de "Vereda Café 5º e 6º") |
-| Lagamar Café – Rodrigo | f20 **Lagamar Café (Rodrigo)** | **não bate** (meia-risca × parênteses) |
-| Mata Preta - Café | f13c **Mata Preta — Café** | **não bate** (hífen × travessão) |
+| Vereda Café | f22c Vereda — Café | só a pontuação diferia; **confirmado pelo Nilo em 03/09/2026** |
+| Lagamar Café – Rodrigo | f20 Lagamar Café (Rodrigo) | só a pontuação diferia; **confirmado pelo Nilo em 03/09/2026** |
+| Mata Preta - Café | f13c Mata Preta — Café | só a pontuação diferia; **confirmado pelo Nilo em 03/09/2026** |
 
-Para liberar uma fazenda divergente: confirmar com o Nilo → trocar
-`confirmado` para `true` no de-para → rodar `gerar_seed_plano.py` e o
-seed (cria os apelidos `app`) → rodar o bloco "AJUSTE PENDENTE" do fim
-do seed (renomeia `fazenda_app` nas tabelas já carregadas) → incluir a
-fazenda em `PLANO_FAZENDA_APP` no `index.html` (nova versão do app).
+O seed grava sempre o **nome exato do app** em `fazenda_app` e começa
+com um bloco de `update` que renomeia cargas antigas feitas com o nome
+do plano (não faz nada num banco vazio). Fazenda nova no plano: só entra
+depois de conferida — o gerador recusa `confirmado: true` com nome
+diferente do app a menos que a observação registre a confirmação do
+Nilo; depois, incluir a fazenda em `PLANO_FAZENDA_APP` no `index.html`
+(nova versão do app).
+
+## Apelidos `app` (unidade do plano ↔ talhão do app)
+
+47 apelidos em 43 unidades (`docs/plano/2026-27/alias_app.json`, com a
+evidência de cada um). Critérios, do mais forte ao mais fraco: número
+do setor citado pelo próprio deck + área (Água Limpa); mesmo número na
+mesma fazenda (Vereda, Romaria, Lagamar, Mata Preta); mesmo nome
+(Caxico Topázio, Caxico Mundo Novo, João Xavier); **inferidos** com
+autorização do Nilo em 03/09/2026 — Rio Preto 1º plantio (setores 1–5;
+S06 = Setor 6 + Setor 7 = 19 ha; o 2º plantio é o bloco de 180 ha que
+corresponde à Sede Abdala) e Caxico represa (por eliminação). Os
+inferidos estão marcados "INFERIDO" e podem ser encerrados na tela de
+Escritório se o agrônomo discordar.
+
+26 unidades ficam sem apelido `app` porque o cadastro de talhões do app
+não comporta: várias unidades para um talhão só (2º plantio de Rio
+Preto → Sede Abdala; Café 5º e 6º; M. Carmelo st01–08 → Café Talhão
+1/2; Sr. Ernani alto/baixo → Ernane), pivôs 2 e 6 do café cadastrados
+em Vereda — Grãos, Romaria 01 b (filha), Mata Preta Plantio 2026 e 3º
+plantio. Um talhão só pode apontar para uma unidade (índice único), de
+propósito: senão o farol por unidade fica ambíguo. Ligar essas exige
+desmembrar talhões no app — muda os chips do gerente, então é decisão
+para uma versão própria, não da fase B.
 
 ## Mapa Gantt ↔ registros do app (`plano_gantt.evidencia_app`)
 

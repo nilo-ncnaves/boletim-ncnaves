@@ -219,20 +219,33 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   inativar; por fazenda, versões do plano com **Rodar auditoria**
   (resultado em plano_safra.auditoria_json; ✱ trava publicação) e
   **Publicar como vigente** (exige auditoria ✔ + nome do agrônomo).
-- Fazendas do plano ligadas ao app: Água Limpa (f01), Rio Preto-Lagamar
-  — Café (f03c), Monte Carmelo — Café (f14c), Vereda Romaria (f23),
-  Vereda Café 5º e 6º (f24). **Três nomes do plano NÃO batem com o
-  cadastro** e ficaram fora até o Nilo confirmar: "Vereda Café" ×
-  "Vereda — Café" (f22c), "Lagamar Café – Rodrigo" × "Lagamar Café
-  (Rodrigo)" (f20), "Mata Preta - Café" × "Mata Preta — Café" (f13c).
-  De-para em `docs/plano/2026-27/depara_fazendas.json`.
-- Apelidos `app` criados só onde a correspondência é inequívoca (Água
-  Limpa por setor de irrigação + área, Romaria por número, Caxico
-  Topázio/Mundo Novo por nome). Unidades sem apelido `app` e o motivo:
-  `docs/plano/2026-27/alias_app.json` (Rio Preto 1º × 2º plantio com o
-  mesmo número; Café 5º/6º um talhão para várias unidades; M. Carmelo
-  st01–08, Caxico represa e Sr. Ernani sem talhão no app; pivôs 2 e 6
-  do café cadastrados em Vereda — Grãos).
+- As 8 fazendas do plano estão ligadas ao app (`PLANO_FAZENDA_APP`):
+  Água Limpa (f01), Rio Preto-Lagamar — Café (f03c), Mata Preta — Café
+  (f13c), Monte Carmelo — Café (f14c), Lagamar Café (Rodrigo) (f20),
+  Vereda — Café (f22c), Vereda Romaria (f23), Vereda Café 5º e 6º (f24).
+  Três nomes do plano diferiam do cadastro só na pontuação ("Vereda
+  Café", "Lagamar Café – Rodrigo", "Mata Preta - Café") e foram
+  confirmados pelo Nilo em 03/09/2026; o seed grava sempre o nome exato
+  do app e renomeia cargas antigas. De-para em
+  `docs/plano/2026-27/depara_fazendas.json`.
+- Apelidos `app` (ligação unidade do plano → talhão do app): 47 em 43
+  unidades — Água Limpa por setor de irrigação + área, Romaria, Vereda,
+  Lagamar e Mata Preta por número, Caxico por nome, Rio Preto 1º
+  plantio inferido (setores 1–5 e 6+7 = 19 ha; o 2º plantio é o bloco de
+  180 ha) e Caxico represa por eliminação — os inferidos estão marcados
+  em `docs/plano/2026-27/alias_app.json`. **26 unidades continuam sem
+  apelido `app` porque o cadastro de talhões do app não permite**
+  (várias unidades para um talhão só: 2º plantio de Rio Preto → Sede
+  Abdala, Café 5º/6º, M. Carmelo st01–08 → Café Talhão 1/2, Sr. Ernani
+  alto/baixo → Ernane; pivôs 2 e 6 do café cadastrados em Vereda —
+  Grãos; Romaria 01 b filha do 01; Mata Preta Plantio 2026 e 3º
+  plantio). Ligar essas exige desmembrar talhões no app, o que muda os
+  chips do gerente — decisão para uma versão futura.
+- `sql/007-publicar-planos-2627.sql` (opcional): publica as 8 versões 1
+  como vigentes de uma vez, gravando a auditoria de
+  `docs/plano/2026-27/auditoria_v1_resultado.json` (as 8 passaram; Mata
+  Preta só porque MTP-3PT recebeu a exceção "sem área: ok" em obs).
+  Rodar só quando o agrônomo aprovar; senão, usar a tela.
 
 ## Chaves ligadas/desligadas
 - SOLINFTEC_AUTO = true (desde a v48). Enquanto sql/003-solinftec.sql não
@@ -246,21 +259,18 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   1. Rodar `sql/005-plano-safra.sql` e depois
      `sql/006-plano-safra-seed-2627.sql` no SQL Editor (o seed confere
      as somas e desfaz tudo se algo não bater).
-  2. Confirmar os 3 nomes de fazenda divergentes (Vereda Café, Lagamar
-     Café – Rodrigo, Mata Preta - Café) → `confirmado: true` no
-     de-para, regenerar o seed, rodar o bloco "AJUSTE PENDENTE" e
-     incluir as fazendas em `PLANO_FAZENDA_APP` (nova versão do app).
-  3. Na tela Unidades e Plano: rodar a auditoria de cada fazenda,
-     resolver o ✱ de Mata Preta (MTP-3PT sem área), preencher
-     "Aprovado por" e publicar as versões vigentes. Sem plano vigente
-     a fase B não tem o que mostrar.
-  4. Decidir as unidades sem apelido `app` (lista em
-     `docs/plano/2026-27/alias_app.json`) — em especial Rio Preto (1º ×
-     2º plantio), Café 5º/6º (desmembrar talhões?) e os pivôs 2 e 6 do
-     café da Vereda.
-  5. Perguntas ao agrônomo herdadas dos decks: V56-6MN (renovação?),
+  2. Publicar as versões vigentes: ou `sql/007-publicar-planos-2627.sql`
+     de uma vez (quando o agrônomo aprovar), ou fazenda por fazenda na
+     tela Unidades e Plano (Rodar auditoria → Aprovado por → Publicar).
+     Sem plano vigente a fase B não tem o que mostrar.
+  3. Decidir se os talhões do app serão desmembrados para ligar as 26
+     unidades ainda sem apelido `app` (lista e motivos em
+     `docs/plano/2026-27/alias_app.json`); isso muda os chips do
+     gerente e fica para uma versão própria.
+  4. Perguntas ao agrônomo herdadas dos decks: V56-6MN (renovação?),
      MCC-CXR (recepa?), AGL-T1 (Catuaí × Catucaí), MTP-3PT (área e
-     identidade), Auto 400 × Alto 400, via da uréia mai–jul.
+     identidade), Auto 400 × Alto 400, via da uréia mai–jul, e conferir
+     os apelidos inferidos (Rio Preto 1º plantio, Caxico represa).
 - **Fase B (v53)**: cartão "Plano do mês", chips ordenados pelo plano,
   modo safra zerada, chip "chumbinho visível", faróis do plano na
   Diretoria e texto "Plano × Semana" — só depois do merge da v52 e de

@@ -1,61 +1,295 @@
 {
  "_regra": "Alias sistema='app' = id do talhão no cadastro do app (D.talhoes do index.html). Só entra aqui correspondência INEQUÍVOCA: mesmo nome ou mesmo número dentro da mesma fazenda, conferido também pela área. Em caso de dúvida o código fica em 'sem_alias' com o motivo, para o Nilo resolver na tela de Escritório. O gerador só emite os aliases de fazendas com confirmado=true em depara_fazendas.json.",
  "aliases": {
-  "AGL-T1":  {"talhoes": ["t004"], "evidencia": "alias do plano 'T1 Catuaí / IBC (setor 04)' → app 'Setor 4 — Catuaí' (11,6 ha × 11 ha do plano; cultivar Catuaí confere)"},
-  "AGL-T2B": {"talhoes": ["t007", "t008"], "evidencia": "'(setores 7 e 8)' → app 'Setor 7 — IPR 100' + 'Setor 8 — IPR 100' (12,1 + 12,27 = 24,4 ha × 24 ha)"},
-  "AGL-T2C": {"talhoes": ["t005", "t006"], "evidencia": "'(setores 5 e 6)' → app 'Setor 5 — IPR 100' + 'Setor 6 — IPR 100' (12,0 + 12,12 = 24,1 ha × 24 ha)"},
-  "AGL-T3":  {"talhoes": ["t002"], "evidencia": "'(setor 02)' → app 'Setor 2 — IPR 100' (11,41 ha × 11 ha)"},
-  "AGL-T4":  {"talhoes": ["t001", "t003"], "evidencia": "'(setores 1 e 3)' → app 'Setor 1 — IBC 12' + 'Setor 3 — IBC 12' (11,94 + 11,44 = 23,4 ha × 22 ha)"},
-  "MCC-CXT": {"talhoes": ["t021"], "evidencia": "mesmo nome: 'Caxico Topázio' → app 'Caxico — Topázio' (27,5 ha × 27 ha)"},
-  "MCC-CXR": {"talhoes": ["t020"], "evidencia": "mesmo nome: 'Caxico Mundo novo recepa' → app 'Caxico — Mundo Novo' (27,5 ha × 29 ha); a dúvida é só o status (recepa), não a identidade"},
-  "ROM-S01": {"talhoes": ["t101"], "evidencia": "mesmo número: 'Romaria setor 01' → app 'Setor 1' (21 ha = 14 ha do S01 + 7 ha do S01B)"},
-  "ROM-S02": {"talhoes": ["t102"], "evidencia": "mesmo número → app 'Setor 2'"},
-  "ROM-S03": {"talhoes": ["t103"], "evidencia": "mesmo número → app 'Setor 3'"},
-  "ROM-S04": {"talhoes": ["t104"], "evidencia": "mesmo número → app 'Setor 4'"},
-  "ROM-S05": {"talhoes": ["t105"], "evidencia": "mesmo número → app 'Setor 5'"},
-  "ROM-S06": {"talhoes": ["t106"], "evidencia": "mesmo número → app 'Setor 6'"},
-  "ROM-S07": {"talhoes": ["t107"], "evidencia": "mesmo número → app 'Setor 7'"},
-  "ROM-S08": {"talhoes": ["t108"], "evidencia": "mesmo número → app 'Setor 8' (11 ha × 12 ha)"},
-  "VEC-S01": {"talhoes": ["t086"], "evidencia": "mesmo número → app 'Setor 01' (16 ha)"},
-  "VEC-S02": {"talhoes": ["t087"], "evidencia": "mesmo número → app 'Setor 02' (23 ha)"},
-  "VEC-S03": {"talhoes": ["t088"], "evidencia": "mesmo número → app 'Setor 03' (20 ha)"},
-  "VEC-S04": {"talhoes": ["t089"], "evidencia": "mesmo número → app 'Setor 04' (18 ha)"},
-  "VEC-S05": {"talhoes": ["t090"], "evidencia": "mesmo número → app 'Setor 05' (18 ha)"},
-  "VEC-S06": {"talhoes": ["t091"], "evidencia": "mesmo número → app 'Setor 06' (21 ha)"},
-  "VEC-S07": {"talhoes": ["t092"], "evidencia": "mesmo número → app 'Setor 07' (19 ha)"},
-  "VEC-S08": {"talhoes": ["t093"], "evidencia": "mesmo número → app 'Setor 08' (60 ha × 59 ha)"},
-  "VEC-S09": {"talhoes": ["t094"], "evidencia": "mesmo número → app 'Setor 09' (17 ha × 14 ha)"},
-  "LAG-S01": {"talhoes": ["t077"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 1' (24 ha)"},
-  "LAG-S02": {"talhoes": ["t078"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 2' (24 ha)"},
-  "LAG-S03": {"talhoes": ["t079"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 3' (24 ha)"},
-  "LAG-S04": {"talhoes": ["t080"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 4' (24 ha × 21 ha)"},
-  "LAG-S05": {"talhoes": ["t081"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 5' (24 ha × 21 ha)"},
-  "LAG-S06": {"talhoes": ["t082"], "evidencia": "mesmo número → app 'Café Rodrigo — Setor 6' (20 ha × 21 ha)"},
-  "LAG-JX":  {"talhoes": ["t083"], "evidencia": "mesmo nome: 'João Xavier' → app 'Arrendo João Xavier' (25 ha × 26 ha)"},
-  "MTP-S01": {"talhoes": ["t045"], "evidencia": "mesmo número → app 'Setor 1' (19,5 ha × 19 ha)"},
-  "MTP-S02": {"talhoes": ["t046"], "evidencia": "mesmo número → app 'Setor 2' (19 ha)"},
-  "MTP-S03": {"talhoes": ["t047"], "evidencia": "mesmo número → app 'Setor 3' (20 ha)"},
-  "MTP-S04": {"talhoes": ["t048"], "evidencia": "mesmo número → app 'Setor 4' (20 ha)"},
-  "MTP-S05": {"talhoes": ["t049"], "evidencia": "mesmo número → app 'Setor 5' (20 ha)"}
+  "AGL-T1": {
+   "talhoes": [
+    "t004"
+   ],
+   "evidencia": "alias do plano 'T1 Catuaí / IBC (setor 04)' → app 'Setor 4 — Catuaí' (11,6 ha × 11 ha do plano; cultivar Catuaí confere)"
+  },
+  "AGL-T2B": {
+   "talhoes": [
+    "t007",
+    "t008"
+   ],
+   "evidencia": "'(setores 7 e 8)' → app 'Setor 7 — IPR 100' + 'Setor 8 — IPR 100' (12,1 + 12,27 = 24,4 ha × 24 ha)"
+  },
+  "AGL-T2C": {
+   "talhoes": [
+    "t005",
+    "t006"
+   ],
+   "evidencia": "'(setores 5 e 6)' → app 'Setor 5 — IPR 100' + 'Setor 6 — IPR 100' (12,0 + 12,12 = 24,1 ha × 24 ha)"
+  },
+  "AGL-T3": {
+   "talhoes": [
+    "t002"
+   ],
+   "evidencia": "'(setor 02)' → app 'Setor 2 — IPR 100' (11,41 ha × 11 ha)"
+  },
+  "AGL-T4": {
+   "talhoes": [
+    "t001",
+    "t003"
+   ],
+   "evidencia": "'(setores 1 e 3)' → app 'Setor 1 — IBC 12' + 'Setor 3 — IBC 12' (11,94 + 11,44 = 23,4 ha × 22 ha)"
+  },
+  "MCC-CXT": {
+   "talhoes": [
+    "t021"
+   ],
+   "evidencia": "mesmo nome: 'Caxico Topázio' → app 'Caxico — Topázio' (27,5 ha × 27 ha)"
+  },
+  "MCC-CXR": {
+   "talhoes": [
+    "t020"
+   ],
+   "evidencia": "mesmo nome: 'Caxico Mundo novo recepa' → app 'Caxico — Mundo Novo' (27,5 ha × 29 ha); a dúvida é só o status (recepa), não a identidade"
+  },
+  "ROM-S01": {
+   "talhoes": [
+    "t101"
+   ],
+   "evidencia": "mesmo número: 'Romaria setor 01' → app 'Setor 1' (21 ha = 14 ha do S01 + 7 ha do S01B)"
+  },
+  "ROM-S02": {
+   "talhoes": [
+    "t102"
+   ],
+   "evidencia": "mesmo número → app 'Setor 2'"
+  },
+  "ROM-S03": {
+   "talhoes": [
+    "t103"
+   ],
+   "evidencia": "mesmo número → app 'Setor 3'"
+  },
+  "ROM-S04": {
+   "talhoes": [
+    "t104"
+   ],
+   "evidencia": "mesmo número → app 'Setor 4'"
+  },
+  "ROM-S05": {
+   "talhoes": [
+    "t105"
+   ],
+   "evidencia": "mesmo número → app 'Setor 5'"
+  },
+  "ROM-S06": {
+   "talhoes": [
+    "t106"
+   ],
+   "evidencia": "mesmo número → app 'Setor 6'"
+  },
+  "ROM-S07": {
+   "talhoes": [
+    "t107"
+   ],
+   "evidencia": "mesmo número → app 'Setor 7'"
+  },
+  "ROM-S08": {
+   "talhoes": [
+    "t108"
+   ],
+   "evidencia": "mesmo número → app 'Setor 8' (11 ha × 12 ha)"
+  },
+  "VEC-S01": {
+   "talhoes": [
+    "t086"
+   ],
+   "evidencia": "mesmo número → app 'Setor 01' (16 ha)"
+  },
+  "VEC-S02": {
+   "talhoes": [
+    "t087"
+   ],
+   "evidencia": "mesmo número → app 'Setor 02' (23 ha)"
+  },
+  "VEC-S03": {
+   "talhoes": [
+    "t088"
+   ],
+   "evidencia": "mesmo número → app 'Setor 03' (20 ha)"
+  },
+  "VEC-S04": {
+   "talhoes": [
+    "t089"
+   ],
+   "evidencia": "mesmo número → app 'Setor 04' (18 ha)"
+  },
+  "VEC-S05": {
+   "talhoes": [
+    "t090"
+   ],
+   "evidencia": "mesmo número → app 'Setor 05' (18 ha)"
+  },
+  "VEC-S06": {
+   "talhoes": [
+    "t091"
+   ],
+   "evidencia": "mesmo número → app 'Setor 06' (21 ha)"
+  },
+  "VEC-S07": {
+   "talhoes": [
+    "t092"
+   ],
+   "evidencia": "mesmo número → app 'Setor 07' (19 ha)"
+  },
+  "VEC-S08": {
+   "talhoes": [
+    "t093"
+   ],
+   "evidencia": "mesmo número → app 'Setor 08' (60 ha × 59 ha)"
+  },
+  "VEC-S09": {
+   "talhoes": [
+    "t094"
+   ],
+   "evidencia": "mesmo número → app 'Setor 09' (17 ha × 14 ha)"
+  },
+  "LAG-S01": {
+   "talhoes": [
+    "t077"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 1' (24 ha)"
+  },
+  "LAG-S02": {
+   "talhoes": [
+    "t078"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 2' (24 ha)"
+  },
+  "LAG-S03": {
+   "talhoes": [
+    "t079"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 3' (24 ha)"
+  },
+  "LAG-S04": {
+   "talhoes": [
+    "t080"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 4' (24 ha × 21 ha)"
+  },
+  "LAG-S05": {
+   "talhoes": [
+    "t081"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 5' (24 ha × 21 ha)"
+  },
+  "LAG-S06": {
+   "talhoes": [
+    "t082"
+   ],
+   "evidencia": "mesmo número → app 'Café Rodrigo — Setor 6' (20 ha × 21 ha)"
+  },
+  "LAG-JX": {
+   "talhoes": [
+    "t083"
+   ],
+   "evidencia": "mesmo nome: 'João Xavier' → app 'Arrendo João Xavier' (25 ha × 26 ha)"
+  },
+  "MTP-S01": {
+   "talhoes": [
+    "t045"
+   ],
+   "evidencia": "mesmo número → app 'Setor 1' (19,5 ha × 19 ha)"
+  },
+  "MTP-S02": {
+   "talhoes": [
+    "t046"
+   ],
+   "evidencia": "mesmo número → app 'Setor 2' (19 ha)"
+  },
+  "MTP-S03": {
+   "talhoes": [
+    "t047"
+   ],
+   "evidencia": "mesmo número → app 'Setor 3' (20 ha)"
+  },
+  "MTP-S04": {
+   "talhoes": [
+    "t048"
+   ],
+   "evidencia": "mesmo número → app 'Setor 4' (20 ha)"
+  },
+  "MTP-S05": {
+   "talhoes": [
+    "t049"
+   ],
+   "evidencia": "mesmo número → app 'Setor 5' (20 ha)"
+  },
+  "RPL-1P-S01": {
+   "talhoes": [
+    "t064"
+   ],
+   "evidencia": "INFERIDO (autorizado pelo Nilo em 03/09/2026): mesmo número → app 'Setor 1 (café grupo)' (14,5 ha × 16 ha). O 2º plantio do plano é um bloco de 180 ha, que corresponde ao talhão 'Sede Abdala — Café Grupo' (194 ha); logo os setores numerados do app são o 1º plantio"
+  },
+  "RPL-1P-S02": {
+   "talhoes": [
+    "t065"
+   ],
+   "evidencia": "INFERIDO: mesmo número → app 'Setor 2 (café grupo)' (15,3 ha × 16 ha)"
+  },
+  "RPL-1P-S03": {
+   "talhoes": [
+    "t066"
+   ],
+   "evidencia": "INFERIDO: mesmo número → app 'Setor 3 (café grupo)' (14,7 ha × 16 ha)"
+  },
+  "RPL-1P-S04": {
+   "talhoes": [
+    "t067"
+   ],
+   "evidencia": "INFERIDO: mesmo número → app 'Setor 4 (café grupo)' (16,8 ha × 16 ha)"
+  },
+  "RPL-1P-S05": {
+   "talhoes": [
+    "t068"
+   ],
+   "evidencia": "INFERIDO: mesmo número → app 'Setor 5 (café grupo)' (16,9 ha × 16 ha)"
+  },
+  "RPL-1P-S06": {
+   "talhoes": [
+    "t069",
+    "t070"
+   ],
+   "evidencia": "INFERIDO: app 'Setor 6 (café grupo)' (10 ha) + 'Setor 7 (café grupo)' (9 ha) = 19 ha, exatamente a área do S06 do plano; o plano não tem setor 07 no 1º plantio"
+  },
+  "MCC-CXP": {
+   "talhoes": [
+    "t019"
+   ],
+   "evidencia": "INFERIDO por eliminação: o app tem 3 áreas Caxico (Topázio, Mundo Novo, Área Nova) e o plano tem 3 (Topázio, M Novo recepa, represa); sobra 'Caxico represa' (27 ha) ↔ 'Caxico — Área Nova' (22 ha) — conferir com o agrônomo"
+  }
  },
  "sem_alias": {
-  "VEC-P02": "o app cadastra 'Pivô 2' na unidade Vereda — Grãos (f22g, t096), não na de café — decidir onde o pivô de café mora",
-  "VEC-P06": "idem: 'Pivô 6' está em Vereda — Grãos (f22g, t100)",
-  "RPL-1P-S01": "app tem 'Setor 1 (café grupo)' (t064, 14,5 ha); o plano tem Setor 01 no 1º plantio (16 ha) E st01 no 2º plantio (30 ha) — mesmo número em duas unidades",
-  "RPL-1P-S02": "idem (t065)", "RPL-1P-S03": "idem (t066)", "RPL-1P-S04": "idem (t067)", "RPL-1P-S05": "idem (t068)", "RPL-1P-S06": "idem (t069)",
-  "RPL-2P-S01": "2º plantio st01 — ver RPL-1P-S01; o app não separa 1º e 2º plantio (talhão 'Sede Abdala — Café Grupo', 194 ha, pode ser o 2º plantio de 180 ha — confirmar)",
-  "RPL-2P-S02": "idem", "RPL-2P-S03": "idem", "RPL-2P-S04": "idem", "RPL-2P-S05": "idem", "RPL-2P-S06": "idem",
+  "VEC-P02": "o app cadastra 'Pivô 2' na unidade Vereda — Grãos (f22g, t096), não na de café; o apelido app só aceita talhão da própria unidade — mover/duplicar o pivô para Vereda — Café muda os chips do gerente (versão futura, decisão do Nilo)",
+  "VEC-P06": "idem VEC-P02 ('Pivô 6', f22g, t100)",
+  "RPL-2P-S01": "2º plantio (bloco de 180 ha) ↔ app 'Sede Abdala — Café Grupo' (t076, 194 ha): 6 unidades para 1 talhão — o cadastro de apelidos não aceita (um talhão só pode apontar para uma unidade). Para ligar, é preciso desmembrar o talhão no app em 6 setores (muda os chips do gerente → versão futura, decisão do Nilo)",
+  "RPL-2P-S02": "idem RPL-2P-S01",
+  "RPL-2P-S03": "idem RPL-2P-S01",
+  "RPL-2P-S04": "idem RPL-2P-S01",
+  "RPL-2P-S05": "idem RPL-2P-S01",
+  "RPL-2P-S06": "idem RPL-2P-S01",
   "ROM-S01B": "filha de ROM-S01; o app não tem talhão separado (Setor 1 = 21 ha cobre 01 + 01b)",
-  "V56-5PA": "app tem um único talhão 'Café 5º' (t109, 80 ha) para 3 unidades do plano (34 + 23 + 22 ha) — precisa desmembrar o talhão no app ou aceitar 3 unidades → 1 talhão",
-  "V56-5CA": "idem 'Café 5º'", "V56-5BX": "idem 'Café 5º'",
+  "V56-5PA": "app tem um único talhão 'Café 5º' (t109, 80 ha) para 3 unidades do plano (34 + 23 + 22 ha): 3 → 1 não cabe no cadastro de apelidos; precisa desmembrar o talhão no app (muda os chips do gerente → versão futura)",
+  "V56-5CA": "idem 'Café 5º'",
+  "V56-5BX": "idem 'Café 5º'",
   "V56-6MN": "app tem um único talhão 'Café 6º' (t110, 50 ha) para 2 unidades do plano (24 + 30 ha)",
   "V56-6IPR": "idem 'Café 6º'",
-  "MCC-CXP": "'Caxico represa' não existe no app (há 'Caxico — Área Nova', t019, 22 ha — nome diferente)",
-  "MCC-S01": "'M. Carmelo st01' não existe no app (o app tem 'Café Talhão 1' 65,6 ha e 'Café Talhão 2' 44,8 ha, sem setores)",
-  "MCC-S02": "idem", "MCC-S03": "idem", "MCC-S04": "idem", "MCC-S05": "idem", "MCC-S06": "idem", "MCC-S07": "idem", "MCC-S08": "idem",
-  "MCC-ERA": "app tem um único 'Ernane — Área geral' (t056, 100 ha, tipo estrutura) para 'Sr. Ernani alto' (50) e 'baixo' (25)",
+  "MCC-S01": "'M. Carmelo st01' não existe no app: o app tem 'Café Talhão 1' (65,6 ha) e 'Café Talhão 2' (44,8 ha), sem setores; 8 setores de 15 ha → 2 talhões não cabe no cadastro de apelidos (desmembrar no app em versão futura)",
+  "MCC-S02": "idem",
+  "MCC-S03": "idem",
+  "MCC-S04": "idem",
+  "MCC-S05": "idem",
+  "MCC-S06": "idem",
+  "MCC-S07": "idem",
+  "MCC-S08": "idem",
+  "MCC-ERA": "app tem um único 'Ernane — Área geral' (t056, 100 ha, tipo estrutura) para 'Sr. Ernani alto' (50) e 'baixo' (25): 2 → 1 não cabe; desmembrar no app em versão futura",
   "MCC-ERB": "idem",
   "MTP-P26": "'Plantio 2026' (45 ha) ≠ app 'Plantio 2025 (60 ha)' (t050) — ano e área diferentes",
-  "MTP-3PT": "'3º plantio (torres)' sem área e sem talhão no app — identidade a confirmar com o agrônomo"
+  "MTP-3PT": "'3º plantio (torres)' sem área e sem talhão no app — identidade a confirmar com o agrônomo. Para não travar a publicação da v1, a unidade recebe em obs a exceção \"sem área: ok\" (liberada pelo Escritório em 03/09/2026); os faróis da fase B não dependem de área"
  }
 }
