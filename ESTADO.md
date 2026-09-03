@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v51** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v52** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -185,6 +185,68 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   mostra "Operação NNN") ajustáveis no SQL Editor. A importação
   manual por arquivo continua como plano B.
 
+## Plano de safra 2026/27 (v52 — fase A, "Fundação")
+Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
+- **O plano do agrônomo (Salvino) entra no app só como referência e
+  comparação, nunca como receituário.** Nada de produto, dose, época
+  ou lâmina recomendada; kg do plano nunca aparecem por padrão ao
+  gerente. Na v52 **nada mudou na tela do gerente** (café, grãos e
+  pecuária idênticos à v51 — prova em scripts/regressao_render.cjs).
+- Dados: `docs/plano/2026-27/apendice_dados.md` (fonte única, 7 PPTX
+  extraídos em 03/09/2026) → `scripts/expandir_apendice_plano.py` →
+  `plano_2627_seed.json` (69 unidades, 71 calagens = 4.648 t, 1.533
+  linhas de adubo mês a mês, fito de 10 meses, Gantt NC e NR) →
+  `scripts/gerar_seed_plano.py` → `sql/006-plano-safra-seed-2627.sql`.
+  Extrator dos PPTX: `docs/plano/importar_plano.py`. Inconsistências
+  conhecidas dos decks: `docs/PLANO-2627-AUDITORIA.md`.
+- Supabase (`sql/005-plano-safra.sql`): unidade_manejo (cadastro
+  mestre; identidade = id/codigo, nomes são apelidos), unidade_alias
+  (por sistema: plano, app = id do talhão do index.html, solinftec,
+  icrop, agrogestao), unidade_manejo_log, plano_safra (versões:
+  rascunho → vigente → superado; uma vigente por fazenda-safra),
+  plano_unidade, plano_adubo_mes, plano_calagem, plano_fito_mes,
+  plano_fito_excecao, plano_gantt, plano_parametros. O app LÊ; só a
+  tela de ADMIN escreve. Nada se apaga (sem policy de delete).
+- App: `baixarPlano()` (dentro de syncTudo) guarda em `bdf:plano` o
+  plano **vigente** das fazendas de café do escopo que estão em
+  `PLANO_FAZENDA_APP` (id do app → nome exato em fazenda_app):
+  unidades, apelidos app, adubo do mês e do próximo, calagem, fito,
+  Gantt do modelo da empresa, parâmetros. Sem rede fica o cache; sem
+  cache o app é a v51. Tabelas ainda não criadas → silêncio.
+- Tela **Escritório › Cadastros › Unidades e Plano** (só ADMIN, precisa
+  de rede): editar unidades (nome curto, status, área, obs — cada
+  campo alterado vira linha de log), adicionar/encerrar apelidos,
+  inativar; por fazenda, versões do plano com **Rodar auditoria**
+  (resultado em plano_safra.auditoria_json; ✱ trava publicação) e
+  **Publicar como vigente** (exige auditoria ✔ + nome do agrônomo).
+- As 8 fazendas do plano estão ligadas ao app (`PLANO_FAZENDA_APP`):
+  Água Limpa (f01), Rio Preto-Lagamar — Café (f03c), Mata Preta — Café
+  (f13c), Monte Carmelo — Café (f14c), Lagamar Café (Rodrigo) (f20),
+  Vereda — Café (f22c), Vereda Romaria (f23), Vereda Café 5º e 6º (f24).
+  Três nomes do plano diferiam do cadastro só na pontuação ("Vereda
+  Café", "Lagamar Café – Rodrigo", "Mata Preta - Café") e foram
+  confirmados pelo Nilo em 03/09/2026; o seed grava sempre o nome exato
+  do app e renomeia cargas antigas. De-para em
+  `docs/plano/2026-27/depara_fazendas.json`.
+- Apelidos `app` (ligação unidade do plano → talhão do app): 47 em 43
+  unidades — Água Limpa por setor de irrigação + área, Romaria, Vereda,
+  Lagamar e Mata Preta por número, Caxico por nome, Rio Preto 1º
+  plantio inferido (setores 1–5 e 6+7 = 19 ha; o 2º plantio é o bloco de
+  180 ha) e Caxico represa por eliminação — os inferidos estão marcados
+  em `docs/plano/2026-27/alias_app.json`. **26 unidades continuam sem
+  apelido `app` porque o cadastro de talhões do app não permite**
+  (várias unidades para um talhão só: 2º plantio de Rio Preto → Sede
+  Abdala, Café 5º/6º, M. Carmelo st01–08 → Café Talhão 1/2, Sr. Ernani
+  alto/baixo → Ernane; pivôs 2 e 6 do café cadastrados em Vereda —
+  Grãos; Romaria 01 b filha do 01; Mata Preta Plantio 2026 e 3º
+  plantio). Ligar essas exige desmembrar talhões no app, o que muda os
+  chips do gerente — decisão para uma versão futura.
+- `sql/007-publicar-planos-2627.sql` (opcional): publica as 8 versões 1
+  como vigentes de uma vez, gravando a auditoria de
+  `docs/plano/2026-27/auditoria_v1_resultado.json` (as 8 passaram; Mata
+  Preta só porque MTP-3PT recebeu a exceção "sem área: ok" em obs).
+  Rodar só quando o agrônomo aprovar; senão, usar a tela.
+
 ## Chaves ligadas/desligadas
 - SOLINFTEC_AUTO = true (desde a v48). Enquanto sql/003-solinftec.sql não
   rodar no Supabase, o fetch falha em silêncio e nenhum cartão
@@ -193,6 +255,26 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   publishable).
 
 ## PENDÊNCIAS
+- **Plano de safra (v52) — para o Nilo:**
+  1. Rodar `sql/005-plano-safra.sql` e depois
+     `sql/006-plano-safra-seed-2627.sql` no SQL Editor (o seed confere
+     as somas e desfaz tudo se algo não bater).
+  2. Publicar as versões vigentes: ou `sql/007-publicar-planos-2627.sql`
+     de uma vez (quando o agrônomo aprovar), ou fazenda por fazenda na
+     tela Unidades e Plano (Rodar auditoria → Aprovado por → Publicar).
+     Sem plano vigente a fase B não tem o que mostrar.
+  3. Decidir se os talhões do app serão desmembrados para ligar as 26
+     unidades ainda sem apelido `app` (lista e motivos em
+     `docs/plano/2026-27/alias_app.json`); isso muda os chips do
+     gerente e fica para uma versão própria.
+  4. Perguntas ao agrônomo herdadas dos decks: V56-6MN (renovação?),
+     MCC-CXR (recepa?), AGL-T1 (Catuaí × Catucaí), MTP-3PT (área e
+     identidade), Auto 400 × Alto 400, via da uréia mai–jul, e conferir
+     os apelidos inferidos (Rio Preto 1º plantio, Caxico represa).
+- **Fase B (v53)**: cartão "Plano do mês", chips ordenados pelo plano,
+  modo safra zerada, chip "chumbinho visível", faróis do plano na
+  Diretoria e texto "Plano × Semana" — só depois do merge da v52 e de
+  pelo menos uma fazenda com plano vigente.
 - **Rodar sql/004-boletim-pecuaria.sql no SQL Editor do Supabase**
   (cria a tabela boletim_pecuaria + visão pecuaria_movimentos).
   Enquanto não rodar, o espelho da pecuária fica na fila offline e o

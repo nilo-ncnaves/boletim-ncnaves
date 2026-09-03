@@ -919,6 +919,8 @@ async function carregarTudo(){
       delete rascunhoPos.secador; delete rascunhoPos.beneficio; }
     if(rascunhoPos && !rascunhoPos.tulhas) rascunhoPos.tulhas=[{lote:'',mov:'',obs:''}]; } }catch(e){}
   D.posColheitas = D.posColheitas||[];
+  /* plano de safra vigente guardado no aparelho (v52) — sem cache o app é igual à v51 */
+  try{ const pc=await Persist.get("bdf:plano"); planoCache=pc?(JSON.parse(pc)||{}):{}; }catch(e){ planoCache={}; }
   D.remessas = D.remessas||[];
   D.estruturas = D.estruturas||{};
   D.telemetria = D.telemetria||[];
@@ -1614,6 +1616,303 @@ function cartaoSolinftecPainel(){
     ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
     <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
 }
+/* ---------- Plano de safra (v52): proposta técnica do agrônomo, SÓ LEITURA ----------
+   O plano (PPTX do Salvino) vive no Supabase (sql/005 cria as tabelas, sql/006 carrega a
+   safra 2026/27) como REFERÊNCIA e comparação — nunca receituário: o app não recomenda
+   produto, dose, época nem lâmina. Regras permanentes do projeto (CLAUDE.md):
+   identidade só pelo cadastro mestre (unidade_manejo.id; nomes são aliases), kg do plano
+   nunca aparecem por padrão ao gerente, mudança de plano só por NOVA versão publicada pelo
+   Escritório, faróis dizem "sem registro" (nunca "não fez") e ficam só na Diretoria.
+   Na v52 NADA muda na tela do gerente: aqui só se baixa e guarda o plano vigente
+   (bdf:plano, para a fase B) e existe a tela de Escritório "Unidades e Plano". */
+/* id da unidade do app → nome gravado em fazenda_app no Supabase (= nome exato do cadastro).
+   Cinco batiam de saída; Vereda — Café, Lagamar Café (Rodrigo) e Mata Preta — Café foram
+   confirmadas pelo Nilo em 03/09/2026 (docs/plano/2026-27/depara_fazendas.json). Fazenda
+   nova no plano só entra aqui depois de conferida — nunca casar "por parecido". */
+const PLANO_FAZENDA_APP={ f01:"Água Limpa", f03c:"Rio Preto-Lagamar — Café", f13c:"Mata Preta — Café", f14c:"Monte Carmelo — Café",
+  f20:"Lagamar Café (Rodrigo)", f22c:"Vereda — Café", f23:"Vereda Romaria", f24:"Vereda Café 5º e 6º" };
+const planoFzDe = nome => Object.keys(PLANO_FAZENDA_APP).find(k=>PLANO_FAZENDA_APP[k]===nome)||null;
+const PLANO_MODELO={ "NC Naves":"NC", "NR Agropecuária":"NR" };
+const PLANO_STATUS_UNIDADE=[["producao","produção"],["poda","poda"],["renovacao","renovação"],["recepa","recepa"],["plantio","plantio"],["a_confirmar","a confirmar"]];
+const rotuloStatusUnidade = s => { const h=PLANO_STATUS_UNIDADE.find(([k])=>k===s); return h?h[1]:(s||"—"); };
+const PLANO_FONTES_AREA=["estimativa","calcario","calcario_rateado","icrop","solinftec","agrogestao"];
+const PLANO_SISTEMAS=["plano","app","solinftec","icrop","agrogestao"];
+const PLANO_INSUMOS=["ureia","nitrato","sulfato_amonio","kcl","phusion","sulfato_mn","acido_borico","sulfato_zn"];
+const PLANO_ROTULO_INSUMO={ureia:"ureia", nitrato:"nitrato", sulfato_amonio:"sulfato de amônio", kcl:"KCl", phusion:"Phusion", sulfato_mn:"sulfato de Mn", acido_borico:"ácido bórico", sulfato_zn:"sulfato de Zn"};
+let planoCache={};   /* {fzId:{plano_versao_id, versao, vigente_de, fazenda_app, modelo, baixado_em, mes, unidades, aliasApp, adubo, calagem, fito, fitoExc, gantt, parametros}} */
+const planoDe = fz => planoCache[fz]||null;   /* usado pela fase B (cartão do mês, chips, faróis) */
+const planoIn = lista => "in.("+lista.map(s=>'"'+String(s).replace(/"/g,"")+'"').join(",")+")";
+/* pedido ao Supabase com a mesma chave publishable do resto do app */
+async function planoReq(metodo, caminho, corpo, prefer){
+  const h={ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave, "Content-Type":"application/json" };
+  if(prefer) h.Prefer=prefer;
+  const r=await fetch(syncCfg.url+"/rest/v1/"+caminho, { method:metodo||"GET", headers:h, body:corpo?JSON.stringify(corpo):undefined });
+  if(!r.ok){ let m=""; try{ m=(await r.json()).message||""; }catch(e){} throw new Error("Supabase "+r.status+(m?" — "+m:"")); }
+  const txt=await r.text(); return txt?JSON.parse(txt):null;
+}
+/* Baixa o plano VIGENTE das fazendas de café do escopo (unidades, adubo do mês corrente e
+   do próximo, calagem, fito do mês, Gantt do modelo da empresa, parâmetros) e guarda em
+   bdf:plano com plano_versao_id e data. Sem rede fica o cache; sem cache o app é a v51.
+   Tabelas ainda não criadas (404) ou qualquer erro: silêncio, nada muda para o gerente. */
+async function baixarPlano(){
+  if(!syncAtivo()) return;
+  try{
+    const fzs=unidadesPermitidas().filter(f=>temCultura(f.id,"CAFE") && PLANO_FAZENDA_APP[f.id]);
+    if(!fzs.length) return;
+    const nomes=[...new Set(fzs.map(f=>PLANO_FAZENDA_APP[f.id]))];
+    const fzArg="fazenda_app="+encodeURIComponent(planoIn(nomes));
+    const planos=await planoReq("GET","plano_safra?select=id,fazenda_app,safra,versao,vigente_de,aprovado_por&status=eq.vigente&"+fzArg);
+    if(!Array.isArray(planos)) return;
+    const mes=new Date().getMonth()+1, prox=mes===12?1:mes+1;
+    const meses="mes="+encodeURIComponent("in.("+mes+","+prox+")");
+    let unidades=[], aliasApp=[], adubo=[], calagem=[], fito=[], fitoExc=[], gantt=[], params=[];
+    if(planos.length){
+      const ids="plano_id="+encodeURIComponent(planoIn(planos.map(p=>p.id)));
+      [unidades,aliasApp,adubo,calagem,fito,fitoExc,gantt,params]=await Promise.all([
+        planoReq("GET","unidade_manejo?select=id,codigo,fazenda_app,empresa,nome_plano,nome_curto,pai_id,area_ha,irrigacao,status,status_desde,area_zerada_ha&ativo=is.true&"+fzArg),
+        planoReq("GET","unidade_alias?select=unidade_id,alias&sistema=eq.app&vigente_ate=is.null&"+fzArg),
+        planoReq("GET","plano_adubo_mes?select=plano_id,unidade_id,mes,insumo,kg,via&"+ids+"&"+meses),
+        planoReq("GET","plano_calagem?select=plano_id,unidade_id,subarea,t_ha,t_total,rateado,janela_ini,janela_fim&"+ids),
+        planoReq("GET","plano_fito_mes?select=mes,fase,alvos,produtos,via_solo&plano_id=is.null&"+meses),
+        planoReq("GET","plano_fito_excecao?select=mes,produto,fazenda_app&"+meses+"&"+fzArg),
+        planoReq("GET","plano_gantt?select=modelo,atividade,meses,tipo,evidencia_app"),
+        planoReq("GET","plano_parametros?select=chave,valor")
+      ]);
+    }
+    const agora=new Date().toISOString();
+    const parametros={}; (params||[]).forEach(x=>{ parametros[x.chave]=x.valor; });
+    fzs.forEach(f=>{
+      const nome=PLANO_FAZENDA_APP[f.id];
+      const p=planos.find(x=>x.fazenda_app===nome);
+      if(!p){ delete planoCache[f.id]; return; }   /* sem plano vigente: nada em cache para esta fazenda */
+      const uns=(unidades||[]).filter(u=>u.fazenda_app===nome);
+      const modelo=PLANO_MODELO[(uns[0]||{}).empresa]||"NC";
+      const idsU=new Set(uns.map(u=>u.id));
+      planoCache[f.id]={ plano_versao_id:p.id, versao:p.versao, vigente_de:p.vigente_de, fazenda_app:nome, modelo, baixado_em:agora, mes,
+        unidades:uns, aliasApp:(aliasApp||[]).filter(a=>idsU.has(a.unidade_id)),
+        adubo:(adubo||[]).filter(a=>a.plano_id===p.id), calagem:(calagem||[]).filter(c=>c.plano_id===p.id),
+        fito:fito||[], fitoExc:(fitoExc||[]).filter(x=>x.fazenda_app===nome), gantt:(gantt||[]).filter(g=>g.modelo===modelo), parametros };
+    });
+    await Persist.set("bdf:plano", JSON.stringify(planoCache));
+  }catch(e){ /* tabelas ainda não criadas ou sem rede: fica o cache que já existia */ }
+}
+
+/* ---------- Tela de Escritório (só ADMIN): Unidades e Plano ----------
+   Lê e grava direto no Supabase (precisa de rede). Unidades: editar nome curto, status,
+   área e obs; adicionar/encerrar apelidos; inativar (nunca apagar) — cada campo alterado
+   vira uma linha em unidade_manejo_log. Plano: rodar auditoria (resultado em
+   plano_safra.auditoria_json) e publicar como vigente (só com auditoria ✔ e nome do
+   agrônomo); publicar passa a vigente anterior para "superado". */
+let upEstado={ fz:"", dados:null, erro:"", editando:null, aliasEm:null };
+async function upCarregar(){
+  upEstado.erro="";
+  if(!syncAtivo()){ upEstado.erro="Sincronização desligada — esta tela precisa do Supabase (Cadastros › Sincronização)."; return; }
+  try{
+    const [unidades,aliases,planos]=await Promise.all([
+      planoReq("GET","unidade_manejo?select=*&order=codigo"),
+      planoReq("GET","unidade_alias?select=id,unidade_id,fazenda_app,sistema,alias,vigente_de&vigente_ate=is.null&order=sistema,alias"),
+      planoReq("GET","plano_safra?select=id,fazenda_app,safra,versao,status,vigente_de,motivo,arquivo_origem,criado_por,aprovado_por,aprovado_em,auditoria_ok,auditoria_json,resumo_deck,criado_em&order=fazenda_app,versao.desc")
+    ]);
+    upEstado.dados={unidades:unidades||[], aliases:aliases||[], planos:planos||[]};
+    const fzs=[...new Set(upEstado.dados.unidades.map(u=>u.fazenda_app).concat(upEstado.dados.planos.map(p=>p.fazenda_app)))].sort((a,b)=>a.localeCompare(b));
+    if(!upEstado.fz||!fzs.includes(upEstado.fz)) upEstado.fz=fzs[0]||"";
+  }catch(e){ upEstado.dados=null; upEstado.erro="Não consegui ler o plano no Supabase ("+e.message+"). Se as tabelas ainda não existem, rode sql/005-plano-safra.sql e depois sql/006-plano-safra-seed-2627.sql no SQL Editor."; }
+}
+async function upRecarregar(){ await upCarregar(); if(telaAtual==="unidplano") ir("unidplano",null,true); }
+function vUnidPlano(){
+  const e=upEstado, d=e.dados;
+  const cab=topo("Unidades e Plano de safra","Escritório · referência do agrônomo",true);
+  if(e.erro) return cab+`<div class="aviso">${esc(e.erro)}</div><button class="btn sec mt" data-up="recarregar">Tentar de novo</button>`;
+  if(!d) return cab+`<p class="mut centro mt">Lendo o plano no Supabase…</p>`;
+  const fzs=[...new Set(d.unidades.map(u=>u.fazenda_app).concat(d.planos.map(p=>p.fazenda_app)))].sort((a,b)=>a.localeCompare(b));
+  const fz=e.fz, fzId=planoFzDe(fz);
+  const uns=d.unidades.filter(u=>u.fazenda_app===fz).sort((a,b)=>a.codigo.localeCompare(b.codigo));
+  const planos=d.planos.filter(p=>p.fazenda_app===fz);
+  const aliasesDe=id=>d.aliases.filter(a=>a.unidade_id===id);
+  const nomeAlias=a=>{ if(a.sistema!=="app") return a.alias; const t2=D.talhoes.find(x=>x.id===a.alias); return t2?t2.nome+" · "+a.alias:a.alias; };
+  const corSis={plano:"terra", app:"verde", solinftec:"amarelo", icrop:"amarelo", agrogestao:"amarelo"};
+  const num=v=>(v==null||v==="")?"—":Number(v).toLocaleString("pt-BR");
+  const tagStatus=s=>`<span class="tag ${s==="producao"?"verde":s==="a_confirmar"?"cereja":"amarelo"}">${esc(rotuloStatusUnidade(s))}</span>`;
+  const formEdicao=u=>`<div class="subcartao">
+      <label>Nome curto (rótulo do chip)</label><input data-upc="nome_curto" value="${esc(u.nome_curto||u.nome_plano||"")}">
+      <div class="grade2">
+        <div><label>Status</label><select data-upc="status">${PLANO_STATUS_UNIDADE.map(([k,r])=>`<option value="${k}" ${u.status===k?"selected":""}>${r}</option>`).join("")}</select></div>
+        <div><label>Status desde</label><input type="date" data-upc="status_desde" value="${esc(u.status_desde||"")}"></div>
+      </div>
+      <div class="grade2">
+        <div><label>Área (ha)</label><input inputmode="decimal" data-upc="area_ha" value="${u.area_ha==null?"":esc(String(u.area_ha))}" placeholder="vazio = sem área"></div>
+        <div><label>Fonte da área</label><select data-upc="fonte_area"><option value="">—</option>${PLANO_FONTES_AREA.map(f=>`<option value="${f}" ${u.fonte_area===f?"selected":""}>${f}</option>`).join("")}</select></div>
+      </div>
+      <label>Observação</label><textarea data-upc="obs" rows="2">${esc(u.obs||"")}</textarea>
+      <p class="mut" style="font-size:.75rem">Cada campo alterado vira uma linha em unidade_manejo_log (antes → depois, quem, quando). O código ${esc(u.codigo)} não muda nunca.</p>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="salvar" data-upv="${esc(u.id)}">Salvar</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
+    </div>`;
+  const formAlias=u=>`<div class="subcartao">
+      <label>Sistema</label><select data-upc="alias_sistema">${PLANO_SISTEMAS.map(s=>`<option value="${s}">${s}</option>`).join("")}</select>
+      ${fzId?`<label>Talhão do app (para o sistema "app")</label><select data-upc="alias_app"><option value="">— escolha o talhão —</option>${talhoesDa(fzId).map(t2=>`<option value="${t2.id}">${esc(t2.nome)} — ${t2.area} ha (${t2.id})</option>`).join("")}</select>`
+        :`<p class="mut" style="font-size:.78rem">Esta fazenda ainda não está ligada a uma unidade do app (o nome no plano não é idêntico ao do cadastro) — apelidos "app" ficam para depois da confirmação.</p>`}
+      <label>Apelido em texto (plano, Solinftec, iCrop, AgroGestão)</label><input data-upc="alias_texto" placeholder="Ex.: VE-SETOR 1">
+      <p class="mut" style="font-size:.75rem">Um apelido aponta para uma unidade só, por sistema, dentro da fazenda; se já existir, o Supabase recusa e nada muda.</p>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="alias-salvar" data-upv="${esc(u.id)}">Salvar apelido</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
+    </div>`;
+  const auditoriaHtml=p=>{ const a=p.auditoria_json;
+    if(!a||!Array.isArray(a.itens)) return `<p class="mut" style="font-size:.8rem">Auditoria ainda não rodada.</p>`;
+    return `<ul class="lista-limpa" style="font-size:.84rem">${a.itens.map(i=>`<li>${i.bloqueante?"✱ ":""}${i.ok?"✅":"⚠️"} ${esc(i.titulo)}${(i.detalhes||[]).length?`<br><span class="mut">${i.detalhes.slice(0,15).map(esc).join("<br>")}${i.detalhes.length>15?"<br>… e mais "+(i.detalhes.length-15):""}</span>`:""}</li>`).join("")}</ul>
+      <p class="mut" style="font-size:.74rem">Rodada em ${a.quando?new Date(a.quando).toLocaleString("pt-BR"):"—"} · ✱ = trava a publicação · nada é corrigido automaticamente.</p>`; };
+  const tagPlano=s=>`<span class="tag ${s==="vigente"?"verde":s==="rascunho"?"amarelo":"terra"}">${esc(s)}</span>`;
+  return cab+`
+    <div class="aviso verde" style="font-size:.8rem">O plano é a proposta técnica do agrônomo (Salvino) para 2026/27 — referência e comparação, nunca receituário. Aqui você cuida do cadastro mestre das unidades, dos apelidos por sistema e das versões do plano. O gerente não vê nada disto na v52.</div>
+    <div class="chips mb">${fzs.map(f=>`<button class="chip ${f===fz?"on":""}" data-up="fz" data-upv="${esc(f)}">${esc(f)}${planoFzDe(f)?"":" ⚠"}</button>`).join("")||"<span class='mut'>Nenhuma fazenda com plano ainda.</span>"}</div>
+    ${fz&&!fzId?`<div class="aviso">⚠ "${esc(fz)}" não está ligada a nenhuma unidade do app: o nome no plano não é idêntico ao do cadastro. Enquanto o Nilo não confirmar (docs/plano/2026-27/depara_fazendas.json), o app não carrega este plano e não dá para criar apelidos "app".</div>`:""}
+    <div class="cartao"><h3>📋 Plano de safra — ${esc(fz||"—")}</h3>
+      ${planos.length?planos.map(p=>`<div class="subcartao">
+        <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><b>Versão ${p.versao}</b> ${tagPlano(p.status)} <span class="mut" style="font-size:.8rem">safra ${esc(p.safra)}</span></div>
+        <p class="mut" style="font-size:.8rem;margin-top:4px">${esc(p.motivo||"")}${p.arquivo_origem?" · "+esc(p.arquivo_origem):""}${p.criado_em?" · criado em "+fmtData(String(p.criado_em).slice(0,10)):""}</p>
+        <p style="font-size:.85rem;margin-top:4px">Auditoria: ${p.auditoria_ok?"<b style='color:var(--verde)'>✔ ok</b>":"<b style='color:var(--amarelo)'>pendente ou com item ✱</b>"}${p.aprovado_por?" · aprovado por "+esc(p.aprovado_por):""}${p.vigente_de?" · vigente desde "+fmtData(p.vigente_de):""}</p>
+        ${auditoriaHtml(p)}
+        ${p.status==="rascunho"?`<button class="btn sec mini mt" data-up="auditar" data-upv="${esc(p.id)}">Rodar auditoria</button>
+          <label>Aprovado por (nome do agrônomo)</label><input data-upc="aprovado_por:${esc(p.id)}" value="${esc(p.aprovado_por||"")}" placeholder="Ex.: Salvino">
+          <button class="btn mt" data-up="publicar" data-upv="${esc(p.id)}" ${(p.auditoria_ok&&p.aprovado_por)?"":"disabled"}>Publicar como vigente</button>
+          <p class="mut" style="font-size:.75rem">Só habilita com auditoria ✔ e o nome do agrônomo. Publicar passa a versão vigente atual para "superado"; os celulares baixam a nova na próxima sincronização.</p>`:""}
+      </div>`).join(""):`<p class="mut">Nenhuma versão do plano para esta fazenda.</p>`}
+    </div>
+    <div class="cartao"><h3>🌱 Unidades <span class="mut">· ${uns.length} nesta fazenda</span></h3>
+      <p class="mut" style="font-size:.78rem">O código é a identidade e não muda. Apelidos: <b>plano</b> = nomes do deck; <b>app</b> = talhão do cadastro do app (é o que liga o plano aos chips); solinftec / icrop / agrogestao = nomes nesses sistemas. Encerrar um apelido (✕) guarda a data de fim; inativar uma unidade não apaga nada.</p>
+      <ul class="lista-limpa">${uns.map(u=>{ const pai=u.pai_id?d.unidades.find(x=>x.id===u.pai_id):null; const als=aliasesDe(u.id);
+        return `<li style="padding:9px 0;border-bottom:1px solid var(--linha)">
+        <div class="linha-flex" style="flex-wrap:wrap;gap:6px">
+          <span class="cresce"><b class="num">${esc(u.codigo)}</b> ${esc(u.nome_curto||u.nome_plano)} ${u.ativo?"":'<span class="tag cereja">inativa</span>'} ${tagStatus(u.status)}
+            <br><span class="mut" style="font-size:.8rem">${u.area_ha==null?"sem área":num(u.area_ha)+" ha"+(u.fonte_area?" ("+esc(u.fonte_area)+")":"")}${u.status_desde?" · desde "+fmtData(u.status_desde):""}${n0(u.area_zerada_ha)?" · zerada "+num(u.area_zerada_ha)+" ha":""}${pai?" · parte de "+esc(pai.codigo):""}${u.irrigacao?" · "+esc(u.irrigacao):""}</span>
+            ${u.obs?`<br><span class="mut" style="font-size:.76rem">${esc(u.obs)}</span>`:""}</span>
+          ${u.ativo?`<button class="btn suave mini" data-up="editar" data-upv="${esc(u.id)}">editar</button><button class="btn suave mini" data-up="alias-novo" data-upv="${esc(u.id)}">＋ apelido</button><button class="btn suave mini" data-up="inativar" data-upv="${esc(u.id)}">inativar</button>`:""}
+        </div>
+        <div class="chips mt" style="gap:6px">${als.map(a=>`<span class="tag ${corSis[a.sistema]||"amarelo"}" style="display:inline-flex;align-items:center;gap:6px">${esc(a.sistema)}: ${esc(nomeAlias(a))}${u.ativo?`<button data-up="alias-fim" data-upv="${esc(a.id)}" title="encerrar apelido" style="font-weight:800;padding:0 2px;min-height:0;line-height:1">✕</button>`:""}</span>`).join("")||'<span class="mut" style="font-size:.78rem">sem apelidos</span>'}</div>
+        ${e.editando===u.id?formEdicao(u):""}${e.aliasEm===u.id?formAlias(u):""}
+      </li>`; }).join("")||"<li class='mut'>Nenhuma unidade cadastrada para esta fazenda.</li>"}</ul>
+    </div>
+    <button class="btn sec mt" data-up="recarregar">🔄 Recarregar do Supabase</button>`;
+}
+/* Auditoria de uma versão do plano. ✱ = bloqueia a publicação. Só informa, não corrige. */
+function auditarPlano(p, unidades, pus, adubo, cal){
+  const itens=[], add=(titulo,bloqueante,detalhes)=>itens.push({titulo, bloqueante, ok:!detalhes.length, detalhes});
+  const uni=id=>unidades.find(u=>u.id===id);
+  const rot=id=>{ const u=uni(id); return u?u.codigo+" "+(u.nome_curto||u.nome_plano):"unidade "+String(id).slice(0,8)+"…"; };
+  /* ✱ toda unidade do plano existe, está ativa e é desta fazenda */
+  const d1=[];
+  pus.forEach(x=>{ const u=uni(x.unidade_id);
+    if(!u) d1.push("unidade "+String(x.unidade_id).slice(0,8)+"… não existe no cadastro");
+    else if(!u.ativo) d1.push(rot(u.id)+" está inativa");
+    else if(u.fazenda_app!==p.fazenda_app) d1.push(rot(u.id)+" pertence a "+u.fazenda_app); });
+  add("Toda unidade do plano existe, está ativa e é desta fazenda", true, d1);
+  /* ✱ calendário de adubação sem área (exceção declarada em obs: "sem área: ok") */
+  const comCal=[...new Set(adubo.map(a=>a.unidade_id))];
+  const d2=comCal.filter(id=>{ const u=uni(id); return u && (u.area_ha==null||u.area_ha==="") && !/sem\s+[áa]rea\s*:\s*ok/i.test(u.obs||""); }).map(rot);
+  add("Nenhuma unidade com calendário de adubação sem área (exceção: escrever \"sem área: ok\" em obs)", true, d2);
+  /* soma dos calendários × resumo do deck */
+  const soma={}; PLANO_INSUMOS.forEach(i=>{ soma[i]=0; }); adubo.forEach(a=>{ soma[a.insumo]=(soma[a.insumo]||0)+n0(a.kg); });
+  const d3=[], rd=p.resumo_deck||null;
+  if(!rd) d3.push("plano sem resumo do deck gravado — não há com o que comparar");
+  else PLANO_INSUMOS.forEach(i=>{ const r=n0(rd[i]); if(r!==soma[i]) d3.push(PLANO_ROTULO_INSUMO[i]+": calendários "+soma[i].toLocaleString("pt-BR")+" kg × resumo do deck "+r.toLocaleString("pt-BR")+" kg ("+((r-soma[i])>0?"+":"")+(r-soma[i]).toLocaleString("pt-BR")+")"); });
+  add("Soma de kg por insumo bate com o resumo do deck (informa)", false, d3);
+  /* kg/ha por insumo fora de ±50% da mediana da fazenda */
+  const d4=[];
+  const comArea=comCal.filter(id=>{ const u=uni(id); return u && n0(u.area_ha)>0; });
+  const mediana=v=>{ const s=[...v].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; };
+  PLANO_INSUMOS.forEach(i=>{
+    const kgha={}; comArea.forEach(id=>{ kgha[id]=adubo.filter(a=>a.unidade_id===id&&a.insumo===i).reduce((s,a)=>s+n0(a.kg),0)/n0(uni(id).area_ha); });
+    const vals=Object.values(kgha); if(vals.length<3) return;
+    const med=mediana(vals); if(!(med>0)) return;
+    comArea.forEach(id=>{ const x=kgha[id]; if(Math.abs(x-med)>0.5*med) d4.push(rot(id)+" — "+PLANO_ROTULO_INSUMO[i]+" "+Math.round(x)+" kg/ha (mediana "+Math.round(med)+")"); });
+  });
+  add("kg/ha por insumo dentro de ±50% da mediana da fazenda (informa)", false, d4);
+  /* calendário × calagem */
+  const comCalag=new Set(cal.map(c=>c.unidade_id));
+  const d5=[...comCal.filter(id=>!comCalag.has(id)).map(id=>rot(id)+": calendário sem calagem"),
+            ...[...comCalag].filter(id=>!comCal.includes(id)).map(id=>rot(id)+": calagem sem calendário")];
+  add("Toda unidade com calendário tem calagem e vice-versa (informa)", false, d5);
+  /* status a confirmar */
+  const d6=pus.map(x=>uni(x.unidade_id)).filter(u=>u&&u.status==="a_confirmar").map(u=>rot(u.id));
+  add("Nenhuma unidade com status \"a confirmar\" (informa)", false, d6);
+  /* via do insumo-mês */
+  const semVia=adubo.filter(a=>!a.via).length;
+  add("Todo insumo-mês tem via (fertirrigação / lanço) definida (informa — na v1 nenhuma tem, é esperado)", false, semVia?[semVia+" de "+adubo.length+" linhas sem via"]:[]);
+  return { ok:itens.filter(i=>i.bloqueante).every(i=>i.ok), quando:new Date().toISOString(), versao_app:"v52", itens };
+}
+function upInput(el){
+  const k=el.dataset.upc||"";
+  if(k.indexOf("aprovado_por:")===0){ const pid=k.slice("aprovado_por:".length);
+    const p=((upEstado.dados&&upEstado.dados.planos)||[]).find(x=>x.id===pid);
+    const bt=$("#app").querySelector('[data-up="publicar"][data-upv="'+pid+'"]');
+    if(bt) bt.disabled=!(p&&p.auditoria_ok&&el.value.trim()); }
+}
+async function upClique(d,t){
+  const e=upEstado, acao=d.up, v=d.upv, app=$("#app");
+  const val=k=>{ const el=app.querySelector('[data-upc="'+k+'"]'); return el?el.value:""; };
+  const quem=(sessao&&sessao.nome)||"ADMIN";
+  const agora=()=>new Date().toISOString();
+  const log=linhas=>linhas.length?planoReq("POST","unidade_manejo_log",linhas.map(l=>({quem,...l})),"return=minimal"):Promise.resolve();
+  try{
+    if(acao==="recarregar"){ e.dados=null; e.erro=""; ir("unidplano",null,true); await upRecarregar(); return; }
+    if(acao==="fz"){ e.fz=v; e.editando=null; e.aliasEm=null; ir("unidplano",null,true); return; }
+    if(acao==="editar"){ e.editando=(e.editando===v)?null:v; e.aliasEm=null; ir("unidplano",null,true); return; }
+    if(acao==="alias-novo"){ e.aliasEm=(e.aliasEm===v)?null:v; e.editando=null; ir("unidplano",null,true); return; }
+    if(acao==="cancelar"){ e.editando=null; e.aliasEm=null; ir("unidplano",null,true); return; }
+    if(!e.dados) return;
+    const u=e.dados.unidades.find(x=>x.id===v);
+    if(acao==="salvar" && u){
+      const areaTxt=val("area_ha").trim().replace(",",".");
+      const novo={ nome_curto:val("nome_curto").trim()||null, status:val("status")||u.status, status_desde:val("status_desde")||null,
+        area_ha:areaTxt===""?null:Number(areaTxt), fonte_area:val("fonte_area")||null, obs:val("obs").trim()||null };
+      if(novo.area_ha!==null && !(novo.area_ha>0)){ alert("Área inválida."); return; }
+      if(novo.area_ha!==null && !novo.fonte_area){ alert("Diga a fonte da área (estimativa, calcário, iCrop…)."); return; }
+      const mud={}, linhas=[];
+      Object.keys(novo).forEach(k=>{ const antes=(u[k]==null?null:String(u[k])), depois=(novo[k]==null?null:String(novo[k]));
+        if(antes!==depois){ mud[k]=novo[k]; linhas.push({unidade_id:u.id, campo:k, antes, depois}); } });
+      if(!linhas.length){ e.editando=null; ir("unidplano",null,true); return; }
+      t.disabled=true;
+      await planoReq("PATCH","unidade_manejo?id=eq."+u.id,{...mud, atualizado_em:agora()},"return=minimal");
+      await log(linhas);
+      e.editando=null; await upRecarregar(); await baixarPlano(); return; }
+    if(acao==="inativar" && u){
+      if(!confirm("Inativar "+u.codigo+" — "+(u.nome_curto||u.nome_plano)+"? Ela sai das listas, mas nada é apagado.")) return;
+      await planoReq("PATCH","unidade_manejo?id=eq."+u.id,{ativo:false, inativado_em:agora(), atualizado_em:agora()},"return=minimal");
+      await log([{unidade_id:u.id, campo:"ativo", antes:"true", depois:"false"}]);
+      await upRecarregar(); await baixarPlano(); return; }
+    if(acao==="alias-salvar" && u){
+      const sistema=val("alias_sistema"); let alias=val("alias_texto").trim();
+      if(sistema==="app"){ const sel=val("alias_app"); if(sel) alias=sel; }
+      if(!alias){ alert("Escreva o apelido (ou, no sistema app, escolha o talhão)."); return; }
+      t.disabled=true;
+      await planoReq("POST","unidade_alias",[{unidade_id:u.id, fazenda_app:u.fazenda_app, sistema, alias}],"return=minimal");
+      await log([{unidade_id:u.id, campo:"alias:"+sistema, antes:null, depois:alias}]);
+      e.aliasEm=null; await upRecarregar(); await baixarPlano(); return; }
+    if(acao==="alias-fim"){
+      const a=e.dados.aliases.find(x=>x.id===v); if(!a) return;
+      if(!confirm("Encerrar o apelido \""+a.alias+"\" ("+a.sistema+")? Ele fica no histórico com a data de fim.")) return;
+      await planoReq("PATCH","unidade_alias?id=eq."+a.id,{vigente_ate:hojeISO()},"return=minimal");
+      await log([{unidade_id:a.unidade_id, campo:"alias:"+a.sistema, antes:a.alias, depois:null}]);
+      await upRecarregar(); await baixarPlano(); return; }
+    const p=e.dados.planos.find(x=>x.id===v);
+    if(acao==="auditar" && p){
+      t.disabled=true; t.textContent="Auditando…";
+      const [pus,adubo,cal]=await Promise.all([
+        planoReq("GET","plano_unidade?select=unidade_id,area_ha_plano&plano_id=eq."+p.id),
+        planoReq("GET","plano_adubo_mes?select=unidade_id,mes,insumo,kg,via&plano_id=eq."+p.id+"&limit=5000"),
+        planoReq("GET","plano_calagem?select=unidade_id,subarea,t_total&plano_id=eq."+p.id)]);
+      const aud=auditarPlano(p, e.dados.unidades, pus||[], adubo||[], cal||[]);
+      await planoReq("PATCH","plano_safra?id=eq."+p.id,{auditoria_ok:aud.ok, auditoria_json:aud},"return=minimal");
+      await upRecarregar(); return; }
+    if(acao==="publicar" && p){
+      const nome=val("aprovado_por:"+p.id).trim();
+      if(!p.auditoria_ok){ alert("Rode a auditoria e resolva os itens ✱ antes de publicar."); return; }
+      if(!nome){ alert("Preencha o nome do agrônomo em \"Aprovado por\"."); return; }
+      if(!confirm("Publicar a versão "+p.versao+" de "+p.fazenda_app+" como VIGENTE? A versão vigente atual (se houver) passa a \"superado\".")) return;
+      t.disabled=true;
+      await planoReq("PATCH","plano_safra?fazenda_app=eq."+encodeURIComponent(p.fazenda_app)+"&safra=eq."+encodeURIComponent(p.safra)+"&status=eq.vigente",{status:"superado"},"return=minimal");
+      await planoReq("PATCH","plano_safra?id=eq."+p.id,{status:"vigente", vigente_de:hojeISO(), aprovado_por:nome, aprovado_em:agora()},"return=minimal");
+      await upRecarregar(); await baixarPlano(); return; }
+  }catch(err){ alert("Não deu: "+err.message); await upRecarregar(); }
+}
 function telemetriaDo(data,fz){
   const out={maquinas:[],lamina:[]};
   (D.telemetria||[]).filter(b=>b.data===data).forEach(b=>(b.linhas||[]).forEach(l=>{
@@ -1784,7 +2083,7 @@ function novoRascunho(dataBase){
 function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
-  else if((tela==="cadastros"||tela==="importar") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
+  else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
   else if(["painel","relatorio","historico"].includes(tela) && !podePainel()) tela="entrada";
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
@@ -1802,6 +2101,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="historico") app.innerHTML = vHistorico();
   else if(tela==="cadastros") app.innerHTML = vCadastros();
   else if(tela==="importar") app.innerHTML = vImportar();
+  else if(tela==="unidplano") app.innerHTML = vUnidPlano();
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
@@ -1824,7 +2124,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v51</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v52</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -1852,7 +2152,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v51 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v52 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3521,6 +3821,9 @@ function vCadastros(){
         <button class="btn mt" id="bt-combo-gerar">Gerar código combinado</button>
         <button class="btn sec mt" id="bt-combo-cancelar">Cancelar</button>
       </div>`:`<button class="btn suave mini mt" id="bt-novo-combo">＋ novo código combinado</button>`}</div>
+    <div class="cartao"><h3>🌱 Unidades e Plano de safra</h3>
+      <p class="mut" style="font-size:.78rem">Cadastro mestre das unidades do agrônomo (setores, pivôs e talhões do plano), apelidos por sistema e versões do plano de safra 2026/27: rodar a auditoria e publicar a versão vigente. O plano é referência para comparação — nunca receituário; o gerente não vê nada disto na v52.</p>
+      <button class="btn mt" id="bt-unidplano">Abrir Unidades e Plano</button></div>
     <div class="cartao"><h3>📡 Telemetria — Solinftec / iCrop</h3>
       <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar.</p>
       <button class="btn mt" id="bt-importar">📥 Importar arquivo do dia</button></div>
@@ -4024,7 +4327,7 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa"].includes(telaAtual))
     ir(telaAtual, null, true);
 }
@@ -4422,6 +4725,9 @@ function ligarEventos(tela){
       const novo=gerarNovoCodigo(chave);
       alert("Código combinado ("+rotuloDaChave(chave)+"): "+novo+(jaTinha?"\nJá existia um código com este mesmo escopo — o antigo não abre mais.":"")+"\nAnote e repasse.");
       novoCombo=null; ir("cadastros",null,true); return; }
+    /* Escritório: Unidades e Plano de safra (v52) — só ADMIN */
+    if(t.id==="bt-unidplano"){ if(!podeCadastros()) return; upEstado.dados=null; upEstado.erro=""; ir("unidplano"); upRecarregar(); return; }
+    if(d.up!==undefined){ if(!podeCadastros()) return; upClique(d,t); return; }
     /* entrada e fazenda */
     if(d.atividade){ const u=D.usuarios.find(x=>x.papel==="gerente"); if(!u) return;
       if(soLeitura()) return; /* diretoria só lê */
@@ -4950,6 +5256,7 @@ function ligarEventos(tela){
       filtroTimer=setTimeout(()=>{ const pos=el.selectionStart; ir("cadastros",null,true);
         const n=app.querySelector("#cad-busca-maq"); if(n){ n.focus(); n.setSelectionRange(pos,pos); } },250);
       return; }
+    if(d.upc!==undefined){ upInput(el); return; } /* tela Unidades e Plano (v52) */
     if(rascunho && telaAtual==="form"){
       const r=rascunho;
       if(d.c!==undefined){ r.clima[d.c]=el.value; }

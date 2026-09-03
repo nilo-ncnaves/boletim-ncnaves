@@ -1,0 +1,61 @@
+{
+ "_leia": "De-para entre o nome da fazenda no plano do agrônomo (fazenda_app do apêndice) e a unidade do app (id + nome exato do cadastro em index.html). Regra 5 do pedido: só vale correspondência EXATA de nome; nada é mapeado 'por parecido'. Enquanto confirmado=false (nenhuma hoje: as três divergentes foram confirmadas pelo Nilo em 03/09/2026), o gerador do seed grava o nome do plano em fazenda_app, não cria alias 'app' para as unidades dessa fazenda e o app não carrega o plano dela. Para liberar: o Nilo confirma, troca confirmado para true, roda scripts/gerar_seed_plano.py de novo e aplica o bloco 'AJUSTE PENDENTE' do seed se a carga já tiver sido feita.",
+ "fazendas": [
+  {
+   "plano": "Vereda Café",
+   "app_id": "f22c",
+   "app_nome": "Vereda — Café",
+   "confirmado": true,
+   "observacao": "Nome do plano sem o travessão do app. 'Vereda Café' também é prefixo de 'Vereda Café 5º e 6º' (f24) — por isso não se mapeia sem confirmação. Confirmado pelo Nilo em 03/09/2026: é a mesma fazenda."
+  },
+  {
+   "plano": "Rio Preto-Lagamar — Café",
+   "app_id": "f03c",
+   "app_nome": "Rio Preto-Lagamar — Café",
+   "confirmado": true,
+   "observacao": "Nome idêntico ao cadastro do app."
+  },
+  {
+   "plano": "Vereda Romaria",
+   "app_id": "f23",
+   "app_nome": "Vereda Romaria",
+   "confirmado": true,
+   "observacao": "Nome idêntico ao cadastro do app."
+  },
+  {
+   "plano": "Vereda Café 5º e 6º",
+   "app_id": "f24",
+   "app_nome": "Vereda Café 5º e 6º",
+   "confirmado": true,
+   "observacao": "Nome idêntico ao cadastro do app."
+  },
+  {
+   "plano": "Água Limpa",
+   "app_id": "f01",
+   "app_nome": "Água Limpa",
+   "confirmado": true,
+   "observacao": "Nome idêntico ao cadastro do app."
+  },
+  {
+   "plano": "Monte Carmelo — Café",
+   "app_id": "f14c",
+   "app_nome": "Monte Carmelo — Café",
+   "confirmado": true,
+   "observacao": "Nome idêntico ao cadastro do app."
+  },
+  {
+   "plano": "Lagamar Café – Rodrigo",
+   "app_id": "f20",
+   "app_nome": "Lagamar Café (Rodrigo)",
+   "confirmado": true,
+   "observacao": "Plano usa meia-risca ('– Rodrigo'); app usa parênteses '(Rodrigo)'. Única fazenda de café com 'Rodrigo', mas o nome não é exato. Confirmado pelo Nilo em 03/09/2026: é a mesma fazenda."
+  },
+  {
+   "plano": "Mata Preta - Café",
+   "app_id": "f13c",
+   "app_nome": "Mata Preta — Café",
+   "confirmado": true,
+   "observacao": "Plano usa hífen simples ('- Café'); app usa travessão ('— Café'). Confirmado pelo Nilo em 03/09/2026: é a mesma fazenda."
+  }
+ ]
+}
