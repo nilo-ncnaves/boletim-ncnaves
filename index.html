@@ -1743,7 +1743,7 @@ function vUnidPlano(){
       </div>
       <label>Observação</label><textarea data-upc="obs" rows="2">${esc(u.obs||"")}</textarea>
       <p class="mut" style="font-size:.75rem">Cada campo alterado vira uma linha em unidade_manejo_log (antes → depois, quem, quando). O código ${esc(u.codigo)} não muda nunca.</p>
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="salvar" data-upv="${u.id}">Salvar</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="salvar" data-upv="${esc(u.id)}">Salvar</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
     </div>`;
   const formAlias=u=>`<div class="subcartao">
       <label>Sistema</label><select data-upc="alias_sistema">${PLANO_SISTEMAS.map(s=>`<option value="${s}">${s}</option>`).join("")}</select>
@@ -1751,7 +1751,7 @@ function vUnidPlano(){
         :`<p class="mut" style="font-size:.78rem">Esta fazenda ainda não está ligada a uma unidade do app (o nome no plano não é idêntico ao do cadastro) — apelidos "app" ficam para depois da confirmação.</p>`}
       <label>Apelido em texto (plano, Solinftec, iCrop, AgroGestão)</label><input data-upc="alias_texto" placeholder="Ex.: VE-SETOR 1">
       <p class="mut" style="font-size:.75rem">Um apelido aponta para uma unidade só, por sistema, dentro da fazenda; se já existir, o Supabase recusa e nada muda.</p>
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="alias-salvar" data-upv="${u.id}">Salvar apelido</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="alias-salvar" data-upv="${esc(u.id)}">Salvar apelido</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
     </div>`;
   const auditoriaHtml=p=>{ const a=p.auditoria_json;
     if(!a||!Array.isArray(a.itens)) return `<p class="mut" style="font-size:.8rem">Auditoria ainda não rodada.</p>`;
@@ -1768,9 +1768,9 @@ function vUnidPlano(){
         <p class="mut" style="font-size:.8rem;margin-top:4px">${esc(p.motivo||"")}${p.arquivo_origem?" · "+esc(p.arquivo_origem):""}${p.criado_em?" · criado em "+fmtData(String(p.criado_em).slice(0,10)):""}</p>
         <p style="font-size:.85rem;margin-top:4px">Auditoria: ${p.auditoria_ok?"<b style='color:var(--verde)'>✔ ok</b>":"<b style='color:var(--amarelo)'>pendente ou com item ✱</b>"}${p.aprovado_por?" · aprovado por "+esc(p.aprovado_por):""}${p.vigente_de?" · vigente desde "+fmtData(p.vigente_de):""}</p>
         ${auditoriaHtml(p)}
-        ${p.status==="rascunho"?`<button class="btn sec mini mt" data-up="auditar" data-upv="${p.id}">Rodar auditoria</button>
-          <label>Aprovado por (nome do agrônomo)</label><input data-upc="aprovado_por:${p.id}" value="${esc(p.aprovado_por||"")}" placeholder="Ex.: Salvino">
-          <button class="btn mt" data-up="publicar" data-upv="${p.id}" ${(p.auditoria_ok&&p.aprovado_por)?"":"disabled"}>Publicar como vigente</button>
+        ${p.status==="rascunho"?`<button class="btn sec mini mt" data-up="auditar" data-upv="${esc(p.id)}">Rodar auditoria</button>
+          <label>Aprovado por (nome do agrônomo)</label><input data-upc="aprovado_por:${esc(p.id)}" value="${esc(p.aprovado_por||"")}" placeholder="Ex.: Salvino">
+          <button class="btn mt" data-up="publicar" data-upv="${esc(p.id)}" ${(p.auditoria_ok&&p.aprovado_por)?"":"disabled"}>Publicar como vigente</button>
           <p class="mut" style="font-size:.75rem">Só habilita com auditoria ✔ e o nome do agrônomo. Publicar passa a versão vigente atual para "superado"; os celulares baixam a nova na próxima sincronização.</p>`:""}
       </div>`).join(""):`<p class="mut">Nenhuma versão do plano para esta fazenda.</p>`}
     </div>
@@ -1782,9 +1782,9 @@ function vUnidPlano(){
           <span class="cresce"><b class="num">${esc(u.codigo)}</b> ${esc(u.nome_curto||u.nome_plano)} ${u.ativo?"":'<span class="tag cereja">inativa</span>'} ${tagStatus(u.status)}
             <br><span class="mut" style="font-size:.8rem">${u.area_ha==null?"sem área":num(u.area_ha)+" ha"+(u.fonte_area?" ("+esc(u.fonte_area)+")":"")}${u.status_desde?" · desde "+fmtData(u.status_desde):""}${n0(u.area_zerada_ha)?" · zerada "+num(u.area_zerada_ha)+" ha":""}${pai?" · parte de "+esc(pai.codigo):""}${u.irrigacao?" · "+esc(u.irrigacao):""}</span>
             ${u.obs?`<br><span class="mut" style="font-size:.76rem">${esc(u.obs)}</span>`:""}</span>
-          ${u.ativo?`<button class="btn suave mini" data-up="editar" data-upv="${u.id}">editar</button><button class="btn suave mini" data-up="alias-novo" data-upv="${u.id}">＋ apelido</button><button class="btn suave mini" data-up="inativar" data-upv="${u.id}">inativar</button>`:""}
+          ${u.ativo?`<button class="btn suave mini" data-up="editar" data-upv="${esc(u.id)}">editar</button><button class="btn suave mini" data-up="alias-novo" data-upv="${esc(u.id)}">＋ apelido</button><button class="btn suave mini" data-up="inativar" data-upv="${esc(u.id)}">inativar</button>`:""}
         </div>
-        <div class="chips mt" style="gap:6px">${als.map(a=>`<span class="tag ${corSis[a.sistema]||"amarelo"}" style="display:inline-flex;align-items:center;gap:6px">${esc(a.sistema)}: ${esc(nomeAlias(a))}${u.ativo?`<button data-up="alias-fim" data-upv="${a.id}" title="encerrar apelido" style="font-weight:800;padding:0 2px;min-height:0;line-height:1">✕</button>`:""}</span>`).join("")||'<span class="mut" style="font-size:.78rem">sem apelidos</span>'}</div>
+        <div class="chips mt" style="gap:6px">${als.map(a=>`<span class="tag ${corSis[a.sistema]||"amarelo"}" style="display:inline-flex;align-items:center;gap:6px">${esc(a.sistema)}: ${esc(nomeAlias(a))}${u.ativo?`<button data-up="alias-fim" data-upv="${esc(a.id)}" title="encerrar apelido" style="font-weight:800;padding:0 2px;min-height:0;line-height:1">✕</button>`:""}</span>`).join("")||'<span class="mut" style="font-size:.78rem">sem apelidos</span>'}</div>
         ${e.editando===u.id?formEdicao(u):""}${e.aliasEm===u.id?formAlias(u):""}
       </li>`; }).join("")||"<li class='mut'>Nenhuma unidade cadastrada para esta fazenda.</li>"}</ul>
     </div>

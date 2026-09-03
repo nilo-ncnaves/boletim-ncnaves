@@ -235,6 +235,15 @@ create table if not exists public.plano_parametros (
   atualizado_em timestamptz not null default now()
 );
 comment on table public.plano_parametros is 'Limites e datas usados pelos faróis do plano (fase B). Editáveis pelo perfil ADMIN.';
+-- Valores iniciais (o seed 006 repete os mesmos; "do nothing" preserva o que o ADMIN já tiver mudado)
+insert into public.plano_parametros (chave, valor, descricao) values
+  ('fito_dias_sem_monitoramento', '10', 'Dias sem monitoramento de um alvo previsto no mês para o farol Fito ficar amarelo'),
+  ('gantt_pct_janela_amarelo', '60', '% da janela decorrida sem registro para o farol Gantt ficar amarelo'),
+  ('adubo_dia_limite_cadencia', '20', 'Dia do mês até o qual se espera o 1º registro de fertirrigação/adubação (e a 1ª pulverização nos meses de fungicida + inseticida)'),
+  ('poda_data_limite', '2026-09-30', 'Data-limite para o chip de poda ✔ nas unidades com status poda'),
+  ('desbrota_data_limite', '2026-12-31', 'Data-limite para o chip de desbrota ✔ nas unidades com status poda'),
+  ('chumbinho_meses', '10,11,12', 'Meses em que o chip "chumbinho visível" aparece no bloco Clima (fase B)')
+on conflict (chave) do nothing;
 
 -- RLS (mesmo padrão das demais tabelas do app) -------------------------
 alter table public.unidade_manejo     enable row level security;
