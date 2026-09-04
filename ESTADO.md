@@ -266,6 +266,18 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
 - Sincronização Supabase: ligada por padrão (SYNC_PADRAO com a chave
   publishable).
 
+## Carteira de relatórios: ver docs/relatorios.md
+A lista oficial dos 24 relatórios do Grupo LGS (nível, o que responde,
+fonte, cadência, dono e status EXISTE / PRONTO / AGUARDA) está em
+`docs/relatorios.md`. Os prompts salvos para o Cowork, um por relatório
+PRONTO, ficam em `docs/relatorios/nn-nome.md` (cabeçalho de papel da
+Controladoria + URLs REST do Supabase que o Nilo abre no Safari e
+cola). A vistoria de segunda (`docs/vistoria-semanal.md`) confere
+quais relatórios da semana rodaram. Nada disso muda o app; os
+relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
+(matriz de acesso) dependem de tabelas ainda não criadas (sql/005-007
+e sql/001-002, listadas nas PENDÊNCIAS).
+
 ## PENDÊNCIAS
 - **Plano de safra (v52) — para o Nilo:**
   1. Rodar `sql/005-plano-safra.sql` e depois
