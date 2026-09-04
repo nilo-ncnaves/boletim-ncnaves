@@ -127,6 +127,35 @@ h3{font-size:.95rem;font-weight:700}
 .lista-limpa{list-style:none}
 .lista-limpa li{padding:9px 0;border-bottom:1px solid var(--linha)}
 .lista-limpa li:last-child{border:none}
+/* Cadastros (v55): menu → lista → detalhe; sem sombra, sem canto arredondado */
+.cad-busca{margin:0 0 10px;min-height:46px;border-radius:0}
+.cad-menu{display:flex;align-items:center;gap:12px;width:100%;background:var(--cartao);border:1px solid var(--linha);padding:14px;margin-bottom:8px;text-align:left;min-height:64px}
+.cad-menu .ico{font-size:1.3rem;width:34px;text-align:center;flex:none}
+.cad-menu .txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.cad-menu .txt .mut{font-size:.78rem}
+.cad-menu .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:var(--verde);flex:none}
+.cad-item{display:flex;align-items:center;gap:10px;width:100%;background:var(--cartao);border:1px solid var(--linha);margin-top:-1px;padding:7px 12px;text-align:left;min-height:46px;line-height:1.3}
+.cad-saltos{display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;margin:0 -14px 2px;padding-left:14px;-webkit-overflow-scrolling:touch}
+.cad-saltos .chip{flex:none;min-height:40px;padding:8px 12px;font-size:.84rem;border-radius:0}
+.cad-item .cresce{display:flex;flex-direction:column;min-width:0}
+.cad-item .cresce .mut{font-size:.78rem;white-space:normal}
+.cad-item .seta{color:var(--tinta-2);flex:none}
+.cad-item .cad-extra{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;flex:none}
+.cad-foco{outline:2px solid var(--verde);outline-offset:-2px}
+.cad-grupo{position:sticky;top:62px;z-index:5;background:var(--papel);font-size:.76rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-2);padding:12px 0 6px;margin-top:6px}
+.cad-rodape{position:sticky;bottom:0;z-index:6;background:var(--papel);padding:10px 0 calc(10px + env(safe-area-inset-bottom));margin-top:12px;border-top:1px solid var(--linha)}
+.cad-rodape .btn{border-radius:0;box-shadow:none}
+.cad-bloco{background:var(--cartao);border:1px solid var(--linha);margin:12px 0}
+.cad-bloco>summary{list-style:none;padding:14px;font-weight:700;min-height:48px;cursor:pointer}
+.cad-bloco>summary::-webkit-details-marker{display:none}
+.cad-bloco>summary::after{content:"›";float:right;color:var(--tinta-2)}
+.cad-bloco[open]>summary::after{content:"⌄"}
+.cad-bloco .corpo{padding:0 14px 14px;border-top:1px solid var(--linha);font-size:.9rem}
+.cad-bloco.zona>summary{color:var(--cereja)}
+.cad-bloco[data-cadlista]>summary{padding:9px 14px;min-height:44px;font-weight:600}
+.cad-tab{width:100%;border-collapse:collapse;font-size:.9rem}
+.cad-tab th,.cad-tab td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--linha)}
+.cad-tab th.num,.cad-tab td.num{text-align:right}
 .dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.92rem}
 .dl dt{color:var(--tinta-2);font-weight:600}
 .dl dd{font-weight:600}
@@ -876,7 +905,13 @@ async function carregarTudo(){
     const dMaq=D.deparaMaq||{}, dTal=D.deparaTal||{}, mImp=D.mapaImport||{};
     const uDoses=D.ultimasDoses||{}, uRec=D.ultimasReceitas||{}, uFert=D.ultimasFert||{}, insApr=D.insumosAprendidos||[];
     const pivLoc=D.pivosLocais||{}, uOpsTal=D.ultimasOpsTal||{}, uRecTal=D.ultimasReceitasTal||{}, uEvPec=D.ultimoEvPec||{};
+    const catEx=D.catalogoExtra||{}, invPec=D.inventarioPec||{};   /* Cadastros v55 */
+    const fzExtras=(D.fazendas||[]).filter(f=>!semente.fazendas.some(x=>x.id===f.id));
+    const fzCampos={}; (D.fazendas||[]).forEach(f=>{ fzCampos[f.id]={entidade:f.entidade||"", inativa:!!f.inativa}; });
     D = semente;
+    D.fazendas=[...semente.fazendas, ...fzExtras];
+    D.fazendas.forEach(f=>{ const c=fzCampos[f.id]; if(c){ if(c.entidade) f.entidade=c.entidade; if(c.inativa) f.inativa=true; } });
+    D.catalogoExtra=catEx; D.inventarioPec=invPec;
     D.talhoes = [...semente.talhoes, ...talExtras.filter(t=>D.fazendas.some(f=>f.id===t.fazendaId))];
     D.boletins = antigos.length ? antigos.filter(b=>D.fazendas.some(f=>f.id===b.fazendaId)) : semente.boletins;
     D.posColheitas = posAntigos.filter(p=>D.fazendas.some(f=>f.id===p.fazendaId));
@@ -1148,7 +1183,8 @@ const OPS_GRAOS_FASES=[
   ["Pós-colheita",["Destruição de restos culturais","Semeadura de cobertura","Vazio sanitário (soja)"]]
 ];
 function fasesDa(cultura){
-  if(cultura==="FEIJAO"||cultura==="SOJA"||cultura==="MILHO_COMERCIAL") return OPS_GRAOS_FASES;
+  if(cultura==="FEIJAO"||cultura==="SOJA"||cultura==="MILHO_COMERCIAL"){ const ex=catExtra("operacoes:GRAOS");
+    return ex.length?[...OPS_GRAOS_FASES,["Outras (cadastro do escritório)",ex]]:OPS_GRAOS_FASES; }
   return [];
 }
 function operacoesDa(cultura){ return fasesDa(cultura).flatMap(([,ops])=>ops); }
@@ -1336,7 +1372,9 @@ const SUGESTAO_FITO_GRAOS={
   "Doença":["Ferrugem-asiática (soja)","Mofo-branco","Oídio","Antracnose","Mancha-branca (milho)","Helmintosporiose (milho)","Ferrugem-polissora (milho)","Grãos ardidos (milho)","Mancha-angular (feijão)","Crestamento bacteriano (feijão)","Mosaico-dourado / mosca-branca (feijão)"],
   "Planta daninha":["Buva (resistente)","Capim-amargoso (resistente)","Caruru","Trapoeraba","Picão-preto"]
 };
-const sugestaoFitoDa = fz => atividadeDe(fz)==="GRAOS" ? SUGESTAO_FITO_GRAOS : SUGESTAO_FITO;
+const sugestaoFitoDa = fz => { const atv=atividadeDe(fz)==="GRAOS"?"GRAOS":"CAFE", base=atv==="GRAOS"?SUGESTAO_FITO_GRAOS:SUGESTAO_FITO;
+  const tipos=Object.keys(base); if(!tipos.some(k=>catExtra("fito:"+atv+":"+k).length)) return base;
+  const out={}; tipos.forEach(k=>{ out[k]=[...base[k],...catExtra("fito:"+atv+":"+k)]; }); return out; };
 /* MÃO DE OBRA por atividade (funções/postos de trabalho, não operações) */
 const LISTA_FUNCOES_GRAOS=["Operador de colheitadeira","Operador de plantadeira","Operador de pulverizador",
   "Tratorista","Auxiliar de plantio","Aplicador (costal)","Abastecimento / apoio a máquinas",
@@ -1350,6 +1388,7 @@ function funcoesDa(fz){
   if(p.includes("CAFE")) out.push(...LISTA_FUNCOES);
   if(p.includes("GRAOS")) out.push(...LISTA_FUNCOES_GRAOS);
   if(p.includes("PECUARIA")) out.push(...LISTA_FUNCOES_PECUARIA);
+  p.forEach(c=>out.push(...catExtra("funcoes:"+c)));   /* termos acrescentados em Cadastros › Catálogos */
   return out.length?[...new Set(out)]:[...LISTA_FUNCOES];
 }
 /* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária e grãos ganham as próprias) */
@@ -1359,9 +1398,9 @@ const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUAR
   : atividadeDe(fz)==="GRAOS" ? [...LISTA_OCORR_GRAOS, ...LISTA_OCORR] : LISTA_OCORR;
 /* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
 function opcoesAtiv(fz, sel){
-  if(atividadeDe(fz)!=="GRAOS")
-    return ["<option value=''>Selecione…</option>",...LISTA_ATIV.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`),(sel&&!LISTA_ATIV.includes(sel)?`<option selected>${esc(sel)}</option>`:"")].join("");
-  const fases = OPS_GRAOS_FASES;
+  if(atividadeDe(fz)!=="GRAOS"){ const lst=[...LISTA_ATIV,...catExtra("operacoes:CAFE")];
+    return ["<option value=''>Selecione…</option>",...lst.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`),(sel&&!lst.includes(sel)?`<option selected>${esc(sel)}</option>`:"")].join(""); }
+  const fases = fasesDa("SOJA");
   const todas = fases.flatMap(([,ops])=>ops);
   return "<option value=''>Selecione…</option>"
     + fases.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`).join("")}</optgroup>`).join("")
@@ -1721,7 +1760,7 @@ async function upCarregar(){
 async function upRecarregar(){ await upCarregar(); if(telaAtual==="unidplano") ir("unidplano",null,true); }
 function vUnidPlano(){
   const e=upEstado, d=e.dados;
-  const cab=topo("Unidades e Plano de safra","Escritório · referência do agrônomo",true);
+  const cab=cadTopo("Unidades e Plano de safra","Escritório · referência do agrônomo");
   if(e.erro) return cab+`<div class="aviso">${esc(e.erro)}</div><button class="btn sec mt" data-up="recarregar">Tentar de novo</button>`;
   if(!d) return cab+`<p class="mut centro mt">Lendo o plano no Supabase…</p>`;
   const fzs=[...new Set(d.unidades.map(u=>u.fazenda_app).concat(d.planos.map(p=>p.fazenda_app)))].sort((a,b)=>a.localeCompare(b));
@@ -2124,7 +2163,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v54</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO}</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -2152,7 +2191,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v54 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3691,7 +3730,7 @@ function vImportar(){
   const fonte=e?e.fonte:"solinftec";
   const campos=CAMPOS_IMPORT[fonte];
   const mapaSalvo=(D.mapaImport||{})[fonte]||{};
-  return topo("Importar telemetria","Solinftec · iCrop — plano B se o robô falhar",true)+`
+  return cadTopo("Importar telemetria","Solinftec · iCrop — plano B se o robô falhar")+`
   <div class="cartao">
     <label>De qual sistema é o arquivo?</label>
     <div class="chips">
@@ -3795,102 +3834,616 @@ function impRodar(){
   e.resultado="✅ "+lidas+" linha(s) importadas em "+Object.keys(porDia).length+" dia(s)."+(semHora?" ("+semHora+" linha(s) zeradas ignoradas)":"")+(semData?" ("+semData+" sem data, ignoradas)":"");
   salvarDados(); ir("importar");
 }
-function vCadastros(){
-  const selFaz=(atual,attr,id)=>`<select data-${attr}="${id}" class="mini" style="max-width:170px">
-    <option value="">Grupo (todas)</option>
-    ${D.fazendas.map(f=>`<option value="${f.id}" ${atual===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}</select>`;
-  const rotuloVinc=m=>{ const v=m.fazendas||[];
-    if(!v.length) return "Grupo (todas)";
-    if(v.length===1) return fazenda(v[0]).nome;
-    return v.length+" fazendas"; };
-  const fm=(filtroCadMaq||"").toLowerCase();
-  const maqs=D.maquinas.filter(m=>!fm || m.nome.toLowerCase().includes(fm) || (m.cat||"").toLowerCase().includes(fm));
-  const linhaCod=(chave,rot,sub)=>`<li class="linha-flex" style="flex-wrap:wrap;gap:6px;padding:7px 0;border-bottom:1px solid var(--linha)">
-    <span class="cresce"><b>${esc(rot)}</b>${sub?` <span class="mut">· ${esc(sub)}</span>`:""}</span>
-    <span class="num" style="font-weight:700">${esc(codigoDe(chave)||"—")}</span>
-    <button class="btn suave mini" data-novo-cod="${chave}">gerar novo</button></li>`;
-  const chavesMix=Object.keys(D.codigosAcesso||{}).filter(k=>k.indexOf("MIX:")===0 && escopoDaChave(k)).sort();
-  const tituloGrupo=r=>`<li class="mut" style="padding:10px 0 2px;font-weight:700;font-size:.78rem;letter-spacing:.04em">${r}</li>`;
-  return topo("Cadastros","Administrador",true)+`
-    <div class="cartao"><h3>🔑 Códigos de acesso <span class="mut">· código → escopo</span></h3>
-      <p class="mut" style="font-size:.78rem">Cada aparelho entra com um código e passa a ver só o escopo dele: uma unidade, uma atividade inteira (unidades novas entram sozinhas) ou uma combinação. "Gerar novo" invalida o código atual (código vazou ou funcionário saiu): os aparelhos com o antigo voltam para a tela de código na próxima sincronização. Anote e repasse o código novo.</p>
-      <ul class="lista-limpa">
-        ${tituloGrupo("POR UNIDADE")}
-        ${D.fazendas.map(f=>linhaCod(f.id, f.nome, emojiAtividade(atividadeDe(f.id))+" "+rotuloAtividade(atividadeDe(f.id)))).join("")}
-        ${tituloGrupo("POR ATIVIDADE E COMBINADOS")}
-        ${CHAVES_ATV.map(k=>linhaCod(k, rotuloDaChave(k), escopoRotulo(k))).join("")}
-        ${chavesMix.map(k=>linhaCod(k, rotuloDaChave(k), escopoRotulo(k))).join("")}
-        ${tituloGrupo("DIRETORIA E ADMINISTRADOR")}
-        ${linhaCod("DIRETORIA","Diretoria",escopoRotulo("DIRETORIA"))}
-        ${linhaCod("ADMIN","Administrador",escopoRotulo("ADMIN"))}
-      </ul>
-      ${novoCombo?`<div class="mt" style="border-top:1px solid var(--linha);padding-top:10px">
-        <b>Novo código combinado</b>
-        <p class="mut" style="font-size:.78rem">Marque atividades inteiras (pegam as unidades futuras sozinhas) e/ou unidades avulsas. O código criado abre exatamente essa combinação.</p>
-        <div class="chips mt">${ATIVIDADES.map(([k,em,r])=>`<button class="chip ${novoCombo.ativs.includes(k)?"on":""}" data-combo-atv="${k}">${em} ${r}</button>`).join("")}</div>
-        <div class="chips mt">${D.fazendas.map(f=>`<button class="chip ${novoCombo.unis.includes(f.id)?"on":""}" data-combo-uni="${f.id}">${esc(f.nome)}</button>`).join("")}</div>
-        <button class="btn mt" id="bt-combo-gerar">Gerar código combinado</button>
-        <button class="btn sec mt" id="bt-combo-cancelar">Cancelar</button>
-      </div>`:`<button class="btn suave mini mt" id="bt-novo-combo">＋ novo código combinado</button>`}</div>
-    <div class="cartao"><h3>🌱 Unidades e Plano de safra</h3>
-      <p class="mut" style="font-size:.78rem">Cadastro mestre das unidades do agrônomo (setores, pivôs e talhões do plano), apelidos por sistema e versões do plano de safra 2026/27: rodar a auditoria e publicar a versão vigente. O plano é referência para comparação — nunca receituário; o gerente não vê nada disto na v52.</p>
-      <button class="btn mt" id="bt-unidplano">Abrir Unidades e Plano</button></div>
-    <div class="cartao"><h3>Relatórios da Controladoria</h3>
-      <p class="mut" style="font-size:.78rem">Carteira dos relatórios do grupo (o que sai do painel, o que roda no Cowork, o que ainda aguarda) e os prompts prontos para copiar e colar no Cowork. Abre uma página do site; precisa de internet. A carteira vive em docs/relatorios.md — esta tela só aponta para lá.</p>
-      <button class="btn mt" id="bt-relatorios">Abrir carteira de relatórios</button></div>
-    <div class="cartao"><h3>📡 Telemetria — Solinftec / iCrop</h3>
-      <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar.</p>
-      <button class="btn mt" id="bt-importar">📥 Importar arquivo do dia</button></div>
-    <div class="cartao"><h3>Estrutura de pós-colheita <span class="mut">· marque o que cada fazenda tem</span></h3>
-      <p class="mut" style="font-size:.78rem">Isso define para quais fazendas o café colhido pode ser enviado para secar, armazenar e beneficiar.</p>
-      <ul class="lista-limpa">${D.fazendas.map(f=>`<li style="padding:8px 0;border-bottom:1px solid var(--linha)">
-        <b>${esc(f.nome)}</b>
-        <div class="chips mt">${ESTR_ITENS.map(([k,r])=>`<button class="chip ${estruturaDe(f.id)[k]?"on":""}" data-estr="${f.id}:${k}">${r}</button>`).join("")}</div></li>`).join("")}</ul></div>
-    <div class="cartao"><h3>Perfil das fazendas <span class="mut">· o que cada uma produz</span></h3>
-      <p class="mut" style="font-size:.78rem">O perfil decide quais seções o boletim mostra ao gerente. Já vem preenchido conforme o cadastro oficial — só mexa se uma fazenda mudar de atividade.</p>
-      <ul class="lista-limpa">${D.fazendas.map(f=>{
-        const atual=perfilDe(f.id).join(",");
-        const ops=[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"],["CAFE,GRAOS","Café + Grãos"],["CAFE,PECUARIA","Café + Pecuária"],["GRAOS,PECUARIA","Grãos + Pecuária"],["CAFE,GRAOS,PECUARIA","Café + Grãos + Pecuária"]];
-        if(!ops.some(([k])=>k===atual)) ops.push([atual, perfilDe(f.id).map(c=>ROTULO_CULT[c]||c).join(" + ")]);
-        return `<li class="linha-flex" style="flex-wrap:wrap;gap:6px">
-          <span class="cresce"><b>${esc(f.nome)}</b></span>
-          <select data-perfil-faz="${f.id}" class="mini" style="max-width:190px">${ops.map(([k,rot])=>`<option value="${k}" ${atual===k?"selected":""}>${rot}</option>`).join("")}</select></li>`;}).join("")}</ul></div>
-    <div class="cartao"><h3>Talhões <span class="mut">· fazenda, tipo de uso e ciclo de cultura</span></h3>
-      <p class="mut" style="font-size:.78rem">Nos talhões de grão (anual), a cultura vive no <b>ciclo</b>: use "Novo plantio" ao plantar e "Encerrar colheita" ao terminar. O histórico de ciclos nunca é apagado.</p>
-      <ul class="lista-limpa">${D.talhoes.map(t=>{
-        const c=cicloAtivo(t.id), anual=(t.tipo==="GRAO_ANUAL");
-        return `<li class="linha-flex" style="flex-wrap:wrap;gap:6px">
-        <span class="cresce"><b>${esc(t.nome)}</b> <span class="mut">· ${t.area} ha${c?" · "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):(anual?" · em preparo / pousio":"")}</span>${t.tipo==="ARRENDADO"?` <span class="tag amarelo">Arrendado — sementeira</span>`:""}</span>
-        ${selFaz(t.fazendaId,"vinc-tal",t.id)}
-        <select data-tipo-tal="${t.id}" class="mini" style="max-width:150px">${TIPOS_TALHAO.map(([k,rot])=>`<option value="${k}" ${t.tipo===k?"selected":""}>${rot}</option>`).join("")}</select>
-        ${anual?(c?`<button class="btn suave mini" data-enc-ciclo="${c.id}">Encerrar colheita</button>`
-                  :`<button class="btn suave mini" data-novo-ciclo="${t.id}">Novo plantio</button>`):""}
-        <button class="btn suave mini" data-rm-cad="talhao:${t.id}">remover</button></li>`;}).join("")}</ul>
-      <button class="btn suave mini mt" data-add-cad="talhao">＋ adicionar talhão</button></div>
-    <div class="cartao"><h3>Máquinas e equipamentos <span class="mut">· ${maqs.length} de ${D.maquinas.length}</span></h3>
-      <input id="cad-busca-maq" placeholder="Filtrar por nome, COD ou categoria…" value="${esc(filtroCadMaq||"")}" class="mb">
-      <p class="mut" style="font-size:.78rem">Uma máquina pode atender mais de uma fazenda: toque no vínculo e marque todas as que ela serve. Sem nenhuma marcada = Grupo (todas).</p>
-      <ul class="lista-limpa">${maqs.map(m=>`<li style="padding:8px 0;border-bottom:1px solid var(--linha)">
-        <div class="linha-flex" style="flex-wrap:wrap;gap:6px">
-          <span class="cresce">${esc(m.nome)} <span class="mut">· ${esc(m.cat||"")}</span></span>
-          <button class="btn suave mini" data-vinc-abrir="${m.id}">${(m.fazendas||[]).length?"🔗 ":""}${esc(rotuloVinc(m))} ▾</button>
-          <button class="btn suave mini" data-rm-cad="maquina:${m.id}">remover</button></div>
-        ${vincAberto===m.id?`<div class="chips mt">
-          <button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
-          ${D.fazendas.map(f=>`<button class="chip ${(m.fazendas||[]).includes(f.id)?"on":""}" data-vinc-faz="${m.id}:${f.id}">${esc(f.nome)}</button>`).join("")}
-        </div>`:""}</li>`).join("")}</ul>
-      <button class="btn suave mini mt" data-add-cad="maquina">＋ adicionar máquina</button></div>
-    <div class="cartao"><h3>🔗 Sincronização entre celulares</h3>
-      <p class="mut" style="font-size:.78rem">Cole aqui os dois valores do Supabase (Configurações → API). Com isso, os boletins de todas as fazendas aparecem no painel da diretoria em qualquer aparelho.</p>
-      <label>Project URL</label><input id="sync-url" value="${esc(syncCfg.url)}" placeholder="https://xxxx.supabase.co">
-      <label>Chave (publishable / anon)</label><input id="sync-key" value="${esc(syncCfg.chave)}" placeholder="sb_publishable_… ou eyJhbGciOi…">
-      <button class="btn mini mt" id="bt-sync-salvar">Testar e salvar</button>
-      ${syncAtivo()?`<p class="mut mt" style="font-size:.78rem">${syncStatus()||"Configurado."}</p>`:""}
+/* ====================================================================
+   CADASTROS (v55) — navegação em níveis: menu → assunto → item.
+   Uma tela, um propósito. Tudo o que existia na tela única de Cadastros
+   continua aqui, só reorganizado (mapa "onde cada função mora" no
+   ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
+   sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
+   ==================================================================== */
+const APP_VERSAO="v55";
+let cadNav=[];
+let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
+const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
+function cadLimpar(){ cadUI.confirma=""; cadUI.form=null; cadUI.novo=""; cadUI.mais=false; cadUI.zona=false; cadUI.filtro=""; cadUI.msg=""; }
+function cadIr(tela){ cadLimpar(); cadNav.push(tela); ir("cadastros"); }
+function cadVoltar(){ cadLimpar(); if(cadNav.length>1){ cadNav.pop(); ir("cadastros"); } else { cadNav=[]; ir("painel"); } }
+function cadRender(){ ir("cadastros",null,true); }
+function cadSalvo(foco,msg){ cadUI.flash=msg||"Salvo"; cadUI.foco=foco||""; }
+function cadPosRender(){
+  const app=$("#app");
+  if(cadUI.foco){ const el=app.querySelector('[data-cadfoco="'+cadUI.foco+'"]'); if(el){ el.scrollIntoView({block:"center"}); el.classList.add("cad-foco"); } cadUI.foco=""; }
+  if(cadUI.flash){ const f=app.querySelector("#cad-flash"); cadUI.flash=""; if(f) setTimeout(()=>f.remove(),2200); }
+  app.querySelectorAll("details.cad-bloco").forEach(dt=>dt.addEventListener("toggle",()=>{
+    if(dt.dataset.cadlista){ cadUI.form=cadUI.form||{}; const ab=cadUI.form.abertos=cadUI.form.abertos||[]; const i=ab.indexOf(dt.dataset.cadlista); if(dt.open&&i<0) ab.push(dt.dataset.cadlista); if(!dt.open&&i>=0) ab.splice(i,1); return; }
+    if(dt.classList.contains("zona")) cadUI.zona=dt.open; else cadUI.mais=dt.open; }));
+}
+/* ---- peças de tela ---- */
+function cadTopo(titulo,sub){
+  return `<div class="topo"><button class="btn-topo" data-cadvoltar="1">‹ Voltar</button>
+    <h1>${esc(titulo)}<br><span class="sub">${esc(sub||"Cadastros")}</span></h1>
+    <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button></div>
+    ${cadUI.flash?`<div class="aviso verde" id="cad-flash">✔ ${esc(cadUI.flash)}</div>`:""}
+    ${cadUI.msg?`<div class="aviso">${cadUI.msg}</div>`:""}`;
+}
+const cadItem=(v,id,titulo,estado,extra)=>`<button class="cad-item" data-cadv="${v}" data-cadid="${esc(id)}" data-cadfoco="${esc(v+":"+id)}">
+  <span class="cresce"><b>${titulo}</b>${estado?`<span class="mut">${estado}</span>`:""}</span>${extra?`<span class="num cad-extra">${extra}</span>`:""}<span class="seta">›</span></button>`;
+const cadGrupo=t=>`<div class="cad-grupo">${esc(t)}</div>`;
+/* lista agrupada: com mais de 12 linhas e sem busca, cada grupo vem fechado (um toque abre);
+   com busca ou chip de salto, a lista vem aberta com cabeçalhos fixos ao rolar */
+function cadListaAgrupada(grupos){
+  const total=grupos.reduce((s,g)=>s+g.n,0);
+  if(cadUI.filtro || total<=12 || grupos.length===1) return grupos.map(g=>cadGrupo(g.nome+" · "+g.n)+g.html).join("");
+  return grupos.map(g=>`<details class="cad-bloco" data-cadlista="${esc(g.nome)}" ${(cadUI.form&&cadUI.form.abertos||[]).includes(g.nome)?"open":""}><summary>${esc(g.nome)} <span class="mut num">· ${g.n}</span></summary><div class="corpo" style="padding:0">${g.html}</div></details>`).join("");
+}
+const cadBusca=(id,ph)=>`<input class="cad-busca" id="${id}" placeholder="${ph}" value="${esc(cadUI.filtro||"")}" autocomplete="off" autocapitalize="off">`;
+const cadRodape=h=>`<div class="cad-rodape">${h}</div>`;
+/* chips de salto: filtram a lista pelo grupo (mesmo campo da busca) — evita rolar listas longas */
+const cadSaltos=nomes=>nomes.length>1?`<div class="cad-saltos"><button class="chip ${cadUI.filtro?"":"on"}" data-cadsalto="">todos</button>${nomes.map(n=>`<button class="chip ${cadUI.filtro===n?"on":""}" data-cadsalto="${esc(n)}">${esc(n)}</button>`).join("")}</div>`:"";
+const cadMais=(h,rot)=>`<details class="cad-bloco"${cadUI.mais?" open":""}><summary>${rot||"Mais opções"}</summary><div class="corpo">${h}</div></details>`;
+const cadZona=h=>`<details class="cad-bloco zona"${cadUI.zona?" open":""}><summary>Zona de cuidado</summary><div class="corpo">${h}</div></details>`;
+const cadCampo=(rot,k,val,attrs)=>`<label>${rot}</label><input data-cadc="${k}" value="${esc(val==null?"":val)}" ${attrs||""}>`;
+const cadSelect=(rot,k,ops,val)=>`<label>${rot}</label><select data-cadc="${k}">${ops.map(([v,r])=>`<option value="${esc(v)}" ${String(val)===String(v)?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
+const cadConfirmar=(chave,rotulo,pergunta,classe)=> cadUI.confirma===chave
+  ? `<div class="aviso" style="border-color:var(--cereja)"><b>${pergunta}</b>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadok="${esc(chave)}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`
+  : `<button class="btn ${classe||"suave"} mini" data-cadpede="${esc(chave)}">${rotulo}</button>`;
+const cadVal=k=>{ const el=$("#app").querySelector('[data-cadc="'+k+'"]'); return el?el.value.trim():""; };
+const cadNorm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const cadBate=(q,...txts)=>{ const n=cadNorm(q); return !n || txts.some(t=>cadNorm(t).includes(n)); };
+const cadNum=v=>Number(v||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
+const cadFimGrupo=()=>`<p class="mut centro" style="font-size:.78rem;padding:8px 0">— fim —</p>`;
+
+/* ---- catálogos: termos extras cadastrados pelo escritório ---- */
+const catExtra=k=>((D.catalogoExtra||{})[k])||[];
+function catExtraAdd(k,termo){ D.catalogoExtra=D.catalogoExtra||{}; const l=D.catalogoExtra[k]=D.catalogoExtra[k]||[]; if(termo&&!l.includes(termo)) l.push(termo); salvarDados(); }
+function catExtraRm(k,termo){ if(!D.catalogoExtra||!D.catalogoExtra[k]) return; D.catalogoExtra[k]=D.catalogoExtra[k].filter(x=>x!==termo); salvarDados(); }
+/* catálogos por atividade: [chave do extra, rótulo, lista do código, editável] */
+function cadCatalogosDe(atv){
+  if(atv==="CAFE") return [
+    ["funcoes:CAFE","Funções (mão de obra)",LISTA_FUNCOES,true],
+    ["operacoes:CAFE","Operações por talhão",LISTA_ATIV,true],
+    ["fito:CAFE:Praga","Pragas",SUGESTAO_FITO["Praga"],true],
+    ["fito:CAFE:Doença","Doenças",SUGESTAO_FITO["Doença"],true],
+    ["fito:CAFE:Planta daninha","Plantas daninhas",SUGESTAO_FITO["Planta daninha"],true],
+    ["ocorr:GERAL","Ocorrências",LISTA_OCORR,false],
+    ["clima","Condições de clima",LISTA_CLIMA,false],
+    ["destino","Destinos da colheita",LISTA_DESTINO,false]];
+  if(atv==="GRAOS") return [
+    ["funcoes:GRAOS","Funções (mão de obra)",LISTA_FUNCOES_GRAOS,true],
+    ...OPS_GRAOS_FASES.map(([fase,ops])=>["opsg:"+fase,"Operações — "+fase,ops,false]),
+    ["operacoes:GRAOS","Operações — outras (cadastro do escritório)",[],true],
+    ["fito:GRAOS:Praga","Pragas",SUGESTAO_FITO_GRAOS["Praga"],true],
+    ["fito:GRAOS:Doença","Doenças",SUGESTAO_FITO_GRAOS["Doença"],true],
+    ["fito:GRAOS:Planta daninha","Plantas daninhas",SUGESTAO_FITO_GRAOS["Planta daninha"],true],
+    ["cult","Culturas anuais",CULTURAS_ANUAIS.map(c=>c[1]),false],
+    ["ocorr:GRAOS","Ocorrências",[...LISTA_OCORR_GRAOS,...LISTA_OCORR],false]];
+  return [
+    ["funcoes:PECUARIA","Funções (mão de obra)",LISTA_FUNCOES_PECUARIA,true],
+    ...OPS_PECUARIA_FASES.map(([fase,ops])=>["opsp:"+fase,"Outros manejos — "+fase,ops,false]),
+    ["catanimal","Categorias animais",CATEGORIAS_ANIMAIS,false],
+    ["pecmov","Movimentos do rebanho",PEC_MOV_TIPOS,false],
+    ["pecmorte","Causas de morte",PEC_CAUSAS_MORTE,false],
+    ["pecsan","Problemas de sanidade",PEC_PROBLEMAS_SAN,false],
+    ["pecacao","Ações de sanidade",PEC_ACOES_SAN,false],
+    ["pecpasto","Condição do pasto",PEC_CONDICAO_PASTO,false],
+    ["pastos","Pastos por fazenda (PASTOS_POR_FAZENDA)",Object.keys(PASTOS_POR_FAZENDA).flatMap(k=>PASTOS_POR_FAZENDA[k].map(p=>k+" · "+p)),false],
+    ["ocorr:PECUARIA","Ocorrências",[...LISTA_OCORR_PECUARIA,...LISTA_OCORR],false]];
+}
+const cadCatTotal=()=>["CAFE","GRAOS","PECUARIA"].reduce((s,a)=>s+cadCatalogosDe(a).reduce((x,[k,,lista])=>x+lista.length+catExtra(k).length,0),0)+D.insumos.length+D.maquinas.length;
+
+/* ---- inventário de rebanho (Lotes e inventário) ---- */
+const cadInv=fz=>((D.inventarioPec||{})[fz])||{cats:{},hist:[]};
+const cadInvTotal=fz=>Object.values(cadInv(fz).cats).reduce((s,n)=>s+n0(n),0);
+function cadInvGravar(fz,cats,tipo,motivo){
+  D.inventarioPec=D.inventarioPec||{}; const inv=D.inventarioPec[fz]=D.inventarioPec[fz]||{cats:{},hist:[]};
+  const quem=(sessao&&sessao.nome)||"ADMIN";
+  Object.keys(cats).forEach(c=>{ const antes=n0(inv.cats[c]), depois=n0(cats[c]);
+    if(tipo==="inicial"||antes!==depois) inv.hist.push({data:hojeISO(),tipo,cat:c,antes,depois,motivo:motivo||"",quem});
+    inv.cats[c]=depois; });
+  salvarDados();
+}
+const cadUltimaContagem=fz=>{ const b=[...(D.boletins||[])].filter(x=>x.fazendaId===fz && x.pecuaria && (x.pecuaria.lotes||[]).some(l=>n0(l.cabecas))).sort((a,b)=>a.data<b.data?1:-1)[0]; return b||null; };
+
+/* ================= NÍVEL 1 — MENU ================= */
+function cadVMenu(){
+  const unis=D.fazendas, maes=[...new Set(unis.map(f=>maeDe(f).id))];
+  const pivLoc=Object.values(D.pivosLocais||{}).reduce((s,l)=>s+(l||[]).length,0);
+  const graos=D.talhoes.filter(t=>t.tipo==="GRAO_ANUAL"), ativos=graos.filter(t=>cicloAtivo(t.id)).length;
+  const pec=unis.filter(f=>temCultura(f.id,"PECUARIA")), cab=pec.reduce((s,f)=>s+cadInvTotal(f.id),0);
+  const planos=Object.keys(planoCache||{}).length, cods=chavesConhecidas().length, termos=cadCatTotal();
+  const robos=[(D.icropDados||[]).length>0,(D.solinftecDados||[]).length>0,syncAtivo()].filter(Boolean).length;
+  const itens=[
+    ["fazendas","🏡","Fazendas e unidades",unis.length+" unidades em "+maes.length+" fazendas físicas",unis.length],
+    ["talhoes","🗺️","Talhões, pivôs e pastos",D.talhoes.length+" talhões"+(pivLoc?" · "+pivLoc+" pivôs cadastrados no app":""),D.talhoes.length+pivLoc],
+    ["ciclos","🌾","Ciclos e plantios",ativos+" ciclos ativos em "+graos.length+" talhões de grãos",ativos],
+    ["lotes","🐂","Lotes e inventário",pec.length+" unidades de pecuária"+(cab?" · "+cadNum(cab)+" cabeças":" · sem inventário"),pec.length],
+    ["plano","📅","Plano do mês",planos?planos+" fazendas com plano vigente baixado":"nenhum plano vigente baixado",planos],
+    ["codigos","🔐","Códigos de acesso",cods+" códigos · gerar novo · combinados",cods],
+    ["catalogos","📚","Catálogos","funções, operações, pragas, insumos, máquinas",termos],
+    ["integracoes","🔌","Integrações e robôs","Supabase · iCrop · Solinftec · plano de safra",robos+"/3"],
+    ["importacoes","📡","Importações manuais","planilha Solinftec / iCrop (plano B do robô)",(D.telemetria||[]).length],
+    ["sync","🔄","Sincronização e dados",syncAtivo()?(syncFila.length?syncFila.length+" registro(s) na fila":"em dia"):"desligada",syncFila.length],
+    ["sobre","ℹ️","Sobre","versão "+APP_VERSAO+" · LEIA-ME · contato",APP_VERSAO]
+  ];
+  const q=cadUI.busca;
+  return cadTopo("Cadastros","Escritório · administrador")+`
+    <input class="cad-busca" id="cad-busca-global" placeholder="Buscar em cadastros (fazenda, talhão, lote, código, termo)…" value="${esc(q)}" autocomplete="off" autocapitalize="off">
+    ${q?cadResultadosBusca(q):itens.map(([v,ico,nome,sub,n])=>`<button class="cad-menu" data-cadv="${v}">
+      <span class="ico">${ico}</span><span class="txt"><b>${nome}</b><span class="mut">${esc(sub)}</span></span><span class="num">${n}</span></button>`).join("")}`;
+}
+function cadResultadosBusca(q){
+  const r=[];
+  D.fazendas.forEach(f=>{ if(cadBate(q,f.nome,f.id)) r.push(cadItem("fazenda",f.id,esc(f.nome),"unidade · "+rotuloAtividade(atividadeDe(f.id)))); });
+  D.talhoes.forEach(t=>{ if(cadBate(q,t.nome)) r.push(cadItem("talhao",t.id,esc(t.nome),"talhão · "+esc(fazenda(t.fazendaId).nome)+" · "+cadNum(t.area)+" ha")); });
+  Object.entries(D.pivosLocais||{}).forEach(([fz,l])=>(l||[]).forEach(p=>{ if(cadBate(q,p.nome)) r.push(cadItem("pivo",fz+":"+p.id,esc(p.nome),"pivô cadastrado no app · "+esc(fazenda(fz).nome))); }));
+  D.fazendas.filter(f=>temCultura(f.id,"PECUARIA")).forEach(f=>{ if(cadBate(q,f.nome,"lote","rebanho")) r.push(cadItem("lote",f.id,esc(f.nome),"lotes e inventário")); });
+  chavesConhecidas().forEach(k=>{ if(cadBate(q,rotuloDaChave(k),codigoDe(k),k)) r.push(cadItem("codigo",k,esc(rotuloDaChave(k)),"código de acesso · "+esc(codigoDe(k)))); });
+  ["CAFE","GRAOS","PECUARIA"].forEach(a=>cadCatalogosDe(a).forEach(([k,rot,lista])=>[...lista,...catExtra(k)].forEach(t=>{ if(cadBate(q,t)) r.push(cadItem("catalogo",a,esc(t),"catálogo · "+ROTULO_CULT[a]+" · "+esc(rot))); })));
+  D.maquinas.forEach(m=>{ if(cadBate(q,m.nome,m.cat)) r.push(cadItem("maquinas","",esc(m.nome),"máquina · "+esc(m.cat||""))); });
+  D.insumos.forEach(i=>{ if(cadBate(q,i.nome)) r.push(cadItem("insumos","",esc(i.nome),"insumo · "+esc(i.un||""))); });
+  return r.length?`<p class="mut" style="font-size:.78rem">${r.length} resultado(s)</p>`+r.slice(0,40).join("")+(r.length>40?`<p class="mut centro">mostrando 40 — refine a busca</p>`:""):`<p class="mut centro mt">Nada encontrado para "${esc(q)}".</p>`;
+}
+
+/* ================= 1. FAZENDAS E UNIDADES ================= */
+function cadVFazendas(){
+  const q=cadUI.filtro, grupos={}, ordem=[];
+  D.fazendas.forEach(f=>{ if(!cadBate(q,f.nome,maeDe(f).nome)) return; const k=maeDe(f).id; if(!grupos[k]){ grupos[k]={mae:maeDe(f),uns:[]}; ordem.push(k); } grupos[k].uns.push(f); });
+  const maes=[...new Set(D.fazendas.map(f=>maeDe(f).nome))];
+  const gs=ordem.map(k=>({nome:grupos[k].mae.nome, n:grupos[k].uns.length, html:grupos[k].uns.map(f=>{ const a=atividadeDe(f.id), nt=D.talhoes.filter(t=>t.fazendaId===f.id).length;
+      return cadItem("fazenda",f.id,esc(f.nome)+(f.inativa?' <span class="tag cereja">inativa</span>':""),
+        emojiAtividade(a)+" "+rotuloAtividade(a)+" · "+nt+" talhões · código "+esc(codigoDe(f.id)||"—")); }).join("")}));
+  return cadTopo("Fazendas e unidades",D.fazendas.length+" unidades")+cadBusca("cad-f-busca","Buscar fazenda ou unidade…")+cadSaltos(maes)+
+    (gs.length?cadListaAgrupada(gs):`<p class="mut centro mt">Nenhuma unidade com esse nome.</p>`);
+}
+function cadVFazenda(id){
+  const f=D.fazendas.find(x=>x.id===id); if(!f) return cadTopo("Unidade")+`<p class="mut">Unidade não encontrada.</p>`;
+  const atual=perfilDe(f.id).join(",");
+  const ops=[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"],["CAFE,GRAOS","Café + Grãos"],["CAFE,PECUARIA","Café + Pecuária"],["GRAOS,PECUARIA","Grãos + Pecuária"],["CAFE,GRAOS,PECUARIA","Café + Grãos + Pecuária"]];
+  if(!ops.some(([k])=>k===atual)) ops.push([atual, perfilDe(f.id).map(c=>ROTULO_CULT[c]||c).join(" + ")]);
+  const irmas=D.fazendas.filter(x=>x.id!==f.id && maeDe(x).id===maeDe(f).id);
+  const nt=D.talhoes.filter(t=>t.fazendaId===f.id).length;
+  return cadTopo(f.nome,"Unidade · "+rotuloAtividade(atividadeDe(f.id)))+`
+    <div class="cartao">
+      ${cadCampo("Nome da unidade","nome",f.nome)}
+      ${cadSelect("Atividade / perfil (decide as seções do boletim)","perfil",ops,atual)}
+      ${cadCampo("Entidade / CNPJ (opcional)","entidade",f.entidade||"","placeholder=\"Ex.: NC Naves Agrícola Ltda · 00.000.000/0001-00\"")}
+      ${cadCampo("Município","municipio",f.municipio||"")}
+      ${cadSelect("Situação","ativa",[["1","Ativa"],["0","Inativa (não recebe boletim novo)"]],f.inativa?"0":"1")}
+      <p class="mut mt" style="font-size:.78rem">Fazenda física: <b>${esc(maeDe(f).nome)}</b>${irmas.length?" · unidades irmãs: "+irmas.map(x=>esc(x.nome)).join(", "):" · sem unidades irmãs"}.</p>
     </div>
-    <div class="cartao"><h3>Insumos</h3>
-      <ul class="lista-limpa">${D.insumos.map(i=>`<li class="linha-flex"><span class="cresce">${esc(i.nome)} (${esc(i.un)})</span>
-        <button class="btn suave mini" data-rm-cad="insumo:${i.id}">remover</button></li>`).join("")}</ul>
-      <button class="btn suave mini mt" data-add-cad="insumo">＋ adicionar insumo</button></div>`;
+    ${temCultura(f.id,"CAFE")?`<div class="cartao"><h3>Estrutura de pós-colheita</h3>
+      <p class="mut" style="font-size:.78rem">Marque o que esta fazenda tem: decide para onde o café colhido pode ser enviado.</p>
+      <div class="chips mt">${ESTR_ITENS.map(([k,r])=>`<button class="chip ${estruturaDe(f.id)[k]?"on":""}" data-estr="${f.id}:${k}">${r}</button>`).join("")}</div></div>`:""}
+    ${cadItem("codigo",f.id,"Código de acesso","código "+esc(codigoDe(f.id)||"—")+" · só esta unidade")}
+    ${cadItem("talhoes",f.nome,"Talhões desta unidade",nt+" talhões · toque para ver a lista")}
+    ${cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(f.id)}</b>${f.fazendaMae?" · fazenda-mãe "+esc(f.fazendaMae.id):""}. Ids antigos (FZ_LEGADO) continuam aceitos na leitura dos boletins.</p>`)}
+    ${cadZona(`
+      <p><b>Desmembrar</b> — cria uma unidade irmã desta fazenda física, para outra atividade (cada turma preenche o seu boletim).</p>
+      ${cadSelect("Atividade da nova unidade","novaAtv",[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"]],"")}
+      <div class="mt">${cadConfirmar("desmembrar:"+f.id,"Criar unidade irmã","Criar a unidade irmã com a atividade escolhida acima?")}</div>
+      ${irmas.length?`<p class="mt"><b>Unificar</b> — passa os talhões desta unidade para uma irmã e deixa esta inativa. Os boletins antigos continuam abrindo.</p>
+      ${cadSelect("Unificar com","alvoUnif",irmas.map(x=>[x.id,x.nome]),irmas[0].id)}
+      <div class="mt">${cadConfirmar("unificar:"+f.id,"Unificar nesta irmã","Passar os "+nt+" talhões para a unidade escolhida e inativar esta?","sec")}</div>`:""}`)}
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-fazenda" data-cadid="${f.id}">Salvar</button>`)}`;
+}
+
+/* ================= 2. TALHÕES, PIVÔS E PASTOS ================= */
+function cadVTalhoes(){
+  const q=cadUI.filtro;
+  const gs=D.fazendas.map(f=>{
+    const ts=D.talhoes.filter(t=>t.fazendaId===f.id && cadBate(q,t.nome,f.nome));
+    const ps=pivosLocaisDa(f.id).filter(p=>cadBate(q,p.nome,f.nome));
+    if(!ts.length&&!ps.length) return null;
+    return {nome:f.nome, n:ts.length+ps.length, html:ts.map(t=>{ const c=cicloAtivo(t.id);
+      return cadItem("talhao",t.id,esc(t.nome),rotuloTipo(t.tipo)+(c?" · "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):(t.tipo==="GRAO_ANUAL"?" · em preparo / pousio":"")),cadNum(t.area)+" ha"); }).join("")
+      +ps.map(p=>cadItem("pivo",f.id+":"+p.id,esc(p.nome),"pivô cadastrado no app pela unidade")).join("")};
+  }).filter(Boolean);
+  const blocos=gs.length?cadListaAgrupada(gs):"";
+  const semDono=D.talhoes.filter(t=>!D.fazendas.some(f=>f.id===t.fazendaId) && cadBate(q,t.nome));
+  return cadTopo("Talhões, pivôs e pastos",D.talhoes.length+" talhões")+cadBusca("cad-t-busca","Buscar talhão, pivô ou unidade…")+cadSaltos(D.fazendas.filter(f=>D.talhoes.some(t=>t.fazendaId===f.id)||pivosLocaisDa(f.id).length).map(f=>f.nome))+
+    (blocos||`<p class="mut centro mt">Nada encontrado.</p>`)+
+    (semDono.length?cadGrupo("Sem unidade")+semDono.map(t=>cadItem("talhao",t.id,esc(t.nome),rotuloTipo(t.tipo),cadNum(t.area)+" ha")).join(""):"")+
+    cadRodape(`<button class="btn" data-cadv="talhao" data-cadid="novo">＋ Novo talhão</button>`);
+}
+function cadVTalhao(id){
+  const novo=id==="novo", t=novo?{nome:"",area:"",fazendaId:(cadUI.form&&cadUI.form.fz)||"",tipo:""}:D.talhoes.find(x=>x.id===id);
+  if(!t) return cadTopo("Talhão")+`<p class="mut">Talhão não encontrado.</p>`;
+  const partes=String(t.nome||"").split(" — "), prefixo=partes.length>1?partes[0]:"", nome=partes.length>1?partes.slice(1).join(" — "):t.nome;
+  const c=novo?null:cicloAtivo(t.id), hist=novo?[]:(D.ciclos||[]).filter(x=>x.talhaoId===t.id && x.encerradoEm);
+  return cadTopo(novo?"Novo talhão":t.nome,novo?"Cadastro":esc(fazenda(t.fazendaId).nome))+`
+    <div class="cartao">
+      ${cadSelect("Unidade","fazendaId",[["","— sem unidade —"],...D.fazendas.map(f=>[f.id,f.nome])],t.fazendaId||"")}
+      ${cadCampo("Prefixo de área (opcional — ex.: Caxico, Setor 3)","prefixo",prefixo)}
+      ${cadCampo("Nome do talhão / pivô / pasto","nome",nome,"placeholder=\"Ex.: Pivô 01, Talhão 12, Pasto da Sede\"")}
+      ${cadCampo("Área (ha)","area",t.area,"inputmode=\"decimal\" class=\"num\"")}
+      ${cadSelect("Tipo de uso",`tipo`,[["","(pelo perfil da unidade)"],...TIPOS_TALHAO],t.tipo||"")}
+    </div>
+    ${novo?"":cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(t.id)}</b>.</p>
+      ${t.tipo==="GRAO_ANUAL"?`<p class="mt">${c?"Ciclo ativo: <b>"+rotuloCultura(c.cultura)+"</b> desde "+fmtData(c.plantio):"Sem ciclo ativo (preparo / pousio)"} · ${hist.length} ciclo(s) no histórico.</p>
+      <div class="mt">${cadItem("ciclo",t.id,"Ciclos e plantios deste talhão","novo plantio, encerrar colheita, histórico")}</div>`:""}`)}
+    ${novo?"":cadZona(cadConfirmar("rm-talhao:"+t.id,"Remover talhão","Remover "+esc(t.nome)+"? Boletins antigos continuam mostrando o nome pelo id.","sec"))}
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-talhao" data-cadid="${esc(id)}">${novo?"Criar talhão":"Salvar"}</button>`)}`;
+}
+function cadVPivo(id){
+  const [fz,pid]=id.split(":"), p=pivosLocaisDa(fz).find(x=>x.id===pid);
+  if(!p) return cadTopo("Pivô")+`<p class="mut">Pivô não encontrado.</p>`;
+  return cadTopo(p.nome,"Pivô cadastrado no app · "+esc(fazenda(fz).nome))+`
+    <div class="cartao">${cadCampo("Nome do pivô","nome",p.nome)}
+      <p class="mut mt" style="font-size:.78rem">Cadastrado pelo gerente na seção Irrigação (fazenda sem pivô no cadastro oficial). Para virar talhão oficial, crie o talhão em "Talhões" e remova este.</p></div>
+    ${cadZona(cadConfirmar("rm-pivo:"+id,"Remover pivô","Remover o pivô "+esc(p.nome)+" do cadastro local desta unidade?","sec"))}
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-pivo" data-cadid="${esc(id)}">Salvar</button>`)}`;
+}
+
+/* ================= 3. CICLOS E PLANTIOS (grãos) ================= */
+function cadVCiclos(){
+  const q=cadUI.filtro;
+  const gs=D.fazendas.filter(f=>temCultura(f.id,"GRAOS")).map(f=>{
+    const ts=D.talhoes.filter(t=>t.fazendaId===f.id && (t.tipo==="GRAO_ANUAL"||t.tipo==="ARRENDADO") && cadBate(q,t.nome,f.nome));
+    if(!ts.length) return null;
+    return {nome:f.nome, n:ts.length, html:ts.map(t=>{ const c=cicloAtivo(t.id);
+      const est=t.tipo==="ARRENDADO"?'<span class="tag amarelo">Arrendado — sementeira</span>':(c?"🌱 "+rotuloCultura(c.cultura)+" desde "+fmtData(c.plantio):"em preparo / pousio");
+      return cadItem("ciclo",t.id,esc(t.nome),est,cadNum(t.area)+" ha"); }).join("")};
+  }).filter(Boolean);
+  const blocos=gs.length?cadListaAgrupada(gs):"";
+  return cadTopo("Ciclos e plantios","Talhões de grãos")+cadBusca("cad-c-busca","Buscar talhão ou unidade…")+cadSaltos(D.fazendas.filter(f=>temCultura(f.id,"GRAOS")).map(f=>f.nome))+(blocos||`<p class="mut centro mt">Nenhum talhão de grãos${q?" com esse nome":""}.</p>`);
+}
+function cadVCiclo(talId){
+  const t=D.talhoes.find(x=>x.id===talId); if(!t) return cadTopo("Ciclo")+`<p class="mut">Talhão não encontrado.</p>`;
+  const c=cicloAtivo(t.id), hist=(D.ciclos||[]).filter(x=>x.talhaoId===t.id && x.encerradoEm).sort((a,b)=>a.plantio<b.plantio?1:-1);
+  const fm=cadUI.form||{cultura:"",data:hojeISO()};
+  return cadTopo(t.nome,esc(fazenda(t.fazendaId).nome)+" · "+cadNum(t.area)+" ha")+`
+    <div class="cartao">
+      ${t.tipo==="ARRENDADO"?`<p><span class="tag amarelo">Arrendado — sementeira</span></p><p class="mut mt">Área arrendada a sementeira: não tem ciclo no app (só etiqueta no boletim).</p>`
+      :c?`<p>Ciclo ativo: <b>${rotuloCultura(c.cultura)}</b> · plantio em <b>${fmtData(c.plantio)}</b></p>
+        <div class="mt">${cadConfirmar("enc-ciclo:"+c.id,"Encerrar colheita","Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+esc(t.nome)+"? O ciclo fica guardado no histórico.")}</div>`
+      :`<p>Sem ciclo ativo — <b>em preparo / pousio</b>.</p>
+        <label class="mt">Novo plantio — cultura</label>
+        <div class="chips">${CULTURAS_ANUAIS.map(([k,r])=>`<button class="chip ${fm.cultura===k?"on":""}" data-cadchip="cultura:${k}">${r}</button>`).join("")}</div>
+        <label>Data do plantio</label><input type="date" data-cadc="plantio" value="${esc(fm.data)}">`}
+    </div>
+    ${cadMais(hist.length?`<ul class="lista-limpa">${hist.map(h=>`<li><b>${rotuloCultura(h.cultura)}</b> <span class="mut">· ${fmtData(h.plantio)} → ${fmtData(h.encerradoEm)}</span></li>`).join("")}</ul>`:`<p class="mut">Nenhum ciclo encerrado ainda. O histórico nunca é apagado.</p>`,"Histórico do talhão ("+hist.length+")")}
+    ${(!c && t.tipo!=="ARRENDADO")?cadRodape(`<button class="btn" data-cadacao="novo-ciclo" data-cadid="${t.id}">Registrar plantio</button>`):""}`;
+}
+
+/* ================= 4. LOTES E INVENTÁRIO (pecuária) ================= */
+function cadVLotes(){
+  const unis=D.fazendas.filter(f=>temCultura(f.id,"PECUARIA"));
+  return cadTopo("Lotes e inventário","Pecuária · "+unis.length+" unidades")+
+    unis.map(f=>{ const tot=cadInvTotal(f.id), ult=cadUltimaContagem(f.id), inv=cadInv(f.id);
+      const est=(tot?cadNum(tot)+" cabeças no inventário":"sem inventário")+(inv.hist.length?" · último ajuste "+fmtData(inv.hist[inv.hist.length-1].data):"")+(ult?" · contagem do gerente em "+fmtData(ult.data):"");
+      return cadItem("lote",f.id,esc(f.nome),est,tot?cadNum(tot):""); }).join("");
+}
+function cadVLote(fz){
+  const f=fazenda(fz), inv=cadInv(fz), tot=cadInvTotal(fz), ult=cadUltimaContagem(fz);
+  const modo=cadUI.novo; /* "inicial" | "ajuste" */
+  return cadTopo(f.nome,"Rebanho · "+cadNum(tot)+" cabeças")+`
+    <div class="cartao"><h3>Inventário por categoria</h3>
+      ${tot?`<table class="cad-tab"><tr><th>Categoria</th><th class="num">Cabeças</th></tr>${CATEGORIAS_ANIMAIS.filter(c=>n0(inv.cats[c])).map(c=>`<tr><td>${esc(c)}</td><td class="num">${cadNum(inv.cats[c])}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="num"><b>${cadNum(tot)}</b></td></tr></table>`
+        :`<p class="mut">Sem inventário. Registre o inventário inicial na Zona de cuidado.</p>`}
+    </div>
+    ${ult?`<div class="cartao"><h3>Última contagem do gerente <span class="mut">· ${fmtData(ult.data)}</span></h3>
+      <ul class="lista-limpa">${(ult.pecuaria.lotes||[]).filter(l=>n0(l.cabecas)).map(l=>`<li class="linha-flex"><span class="cresce">${esc(l.talhaoId?nomePastoPec(l.talhaoId):(l.lote||"Lote"))}${l.lote&&l.talhaoId?" · "+esc(l.lote):""}</span><b class="num">${cadNum(l.cabecas)}</b></li>`).join("")}</ul>
+      <p class="mut" style="font-size:.78rem">Vem do boletim (contagem por lote/pasto). Não altera o inventário.</p></div>`:""}
+    ${cadMais(inv.hist.length?`<ul class="lista-limpa">${inv.hist.slice().reverse().slice(0,30).map(h=>`<li><b>${fmtData(h.data)}</b> · ${h.tipo==="inicial"?"inventário inicial":"ajuste"} · ${esc(h.cat)}: <span class="num">${cadNum(h.antes)} → ${cadNum(h.depois)}</span>${h.motivo?` <span class="mut">· ${esc(h.motivo)}</span>`:""}</li>`).join("")}</ul>`:`<p class="mut">Sem histórico.</p>`,"Histórico de inventário ("+inv.hist.length+")")}
+    ${cadZona(`
+      ${modo==="inicial"?`<p><b>Inventário inicial</b> — substitui os números atuais.</p>
+        ${CATEGORIAS_ANIMAIS.map(c=>`<div class="linha-flex" style="gap:8px;margin-top:6px"><span class="cresce">${esc(c)}</span><input data-cadc="inv:${esc(c)}" value="${n0(inv.cats[c])||""}" inputmode="numeric" class="num" style="max-width:110px;min-height:44px;padding:8px"></div>`).join("")}
+        <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="inv-inicial" data-cadid="${fz}">Gravar inventário</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div>`
+      :modo==="ajuste"?`<p><b>Ajuste com motivo</b> — corrige uma categoria e guarda o porquê.</p>
+        ${cadSelect("Categoria","ajCat",CATEGORIAS_ANIMAIS.map(c=>[c,c+" ("+cadNum(inv.cats[c])+")"]),"")}
+        ${cadCampo("Novo total de cabeças","ajQtd","","inputmode=\"numeric\" class=\"num\"")}
+        ${cadCampo("Motivo","ajMotivo","","placeholder=\"Ex.: recontagem no curral, erro de digitação\"")}
+        <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="inv-ajuste" data-cadid="${fz}">Gravar ajuste</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div>`
+      :`<div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn suave mini" data-cadnovo="inicial">Inventário inicial</button><button class="btn suave mini" data-cadnovo="ajuste">Ajuste com motivo</button></div>`}`)}`;
+}
+
+/* ================= 5. PLANO DO MÊS (v52) ================= */
+const MESES_PT=["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function cadVPlano(){
+  const fzs=Object.keys(PLANO_FAZENDA_APP);
+  return cadTopo("Plano do mês","Plano de safra · referência do agrônomo")+`
+    <p class="mut" style="font-size:.78rem">O plano entra só como referência e comparação — nunca receituário. kg aparecem aqui (tela do Escritório) rotulados pela versão; o gerente não vê nada disto.</p>
+    ${fzs.map(fz=>{ const p=planoDe(fz), f=fazenda(fz);
+      return cadItem("planofz",fz,esc(f.nome),p?"plano v"+p.versao+" · vigente desde "+fmtData(p.vigente_de)+" · "+p.unidades.length+" unidades · baixado "+new Date(p.baixado_em).toLocaleDateString("pt-BR"):"sem plano vigente baixado",p?"v"+p.versao:""); }).join("")}
+    ${cadGrupo("Cadastro mestre")}
+    ${cadItem("unidplano","","Unidades e versões do plano","cadastro mestre, apelidos por sistema, auditoria e publicação (precisa de rede)")}`;
+}
+function cadVPlanoFz(fz){
+  const p=planoDe(fz), f=fazenda(fz);
+  if(!p) return cadTopo(f.nome,"Plano do mês")+`<p class="mut">Sem plano vigente baixado para esta fazenda. Publique a versão em "Unidades e versões do plano" e sincronize.</p>`;
+  const mes=cadUI.form&&cadUI.form.mes?cadUI.form.mes:p.mes, prox=p.mes===12?1:p.mes+1;
+  const q=cadUI.filtro;
+  const uns=p.unidades.filter(u=>cadBate(q,u.nome_curto,u.nome_plano,u.codigo)).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo)));
+  const aliasDe=uid=>{ const a=(p.aliasApp||[]).find(x=>x.unidade_id===uid); if(!a) return ""; const t=D.talhoes.find(x=>x.id===a.alias); return t?t.nome:a.alias; };
+  const fito=(p.fito||[]).find(x=>x.mes===mes);
+  return cadTopo(f.nome,"Plano v"+p.versao+" · previsto pelo agrônomo")+`
+    <div class="chips mb"><button class="chip ${mes===p.mes?"on":""}" data-cadchip="mes:${p.mes}">${MESES_PT[p.mes]}</button><button class="chip ${mes===prox?"on":""}" data-cadchip="mes:${prox}">${MESES_PT[prox]}</button></div>
+    ${fito?`<div class="cartao"><h3>Fito do mês <span class="mut">· ${esc(fito.fase||"")}</span></h3><p class="mut" style="font-size:.8rem">Alvos: ${(fito.alvos||[]).map(esc).join(", ")||"—"}. Produtos citados pelo agrônomo (referência, nunca receituário): ${(fito.produtos||[]).map(esc).join(", ")||"—"}.</p></div>`:""}
+    ${cadBusca("cad-p-busca","Buscar unidade do plano…")}
+    ${uns.map(u=>{ const ad=(p.adubo||[]).filter(a=>a.unidade_id===u.id && a.mes===mes), cal=(p.calagem||[]).filter(c=>c.unidade_id===u.id), al=aliasDe(u.id);
+      const est=[rotuloStatusUnidade(u.status), u.area_ha?cadNum(u.area_ha)+" ha":"", al?"talhão do app: "+al:"sem ligação com talhão do app"].filter(Boolean).join(" · ");
+      const linhas=ad.map(a=>`<span class="num">${cadNum(a.kg)} kg</span> ${esc(a.insumo)}${a.via?" ("+esc(a.via)+")":""}`).concat(cal.map(c=>`calagem ${esc(c.subarea)}: <span class="num">${cadNum(c.t_total)} t</span> (${fmtData(c.janela_ini)}–${fmtData(c.janela_fim)})`));
+      return `<div class="cad-item" data-cadfoco="planou:${esc(u.id)}" style="cursor:default"><span class="cresce"><b>${esc(u.nome_curto||u.nome_plano)}</b><span class="mut">${esc(est)}</span>${linhas.length?`<span class="mut" style="color:var(--tinta)">${linhas.join(" · ")}</span>`:`<span class="mut">nada previsto em ${MESES_PT[mes]} (plano v${p.versao})</span>`}</span></div>`; }).join("")}`;
+}
+
+/* ================= 6. CÓDIGOS DE ACESSO ================= */
+function cadVCodigos(){
+  const q=cadUI.filtro;
+  const chavesMix=Object.keys(D.codigosAcesso||{}).filter(k=>k.indexOf("MIX:")===0 && escopoDaChave(k)).sort();
+  const linha=(k,g)=>cadBate(q,rotuloDaChave(k),codigoDe(k),escopoRotulo(k),g)?cadItem("codigo",k,esc(rotuloDaChave(k)),esc(escopoRotulo(k)),esc(codigoDe(k)||"—")):"";
+  const g1=D.fazendas.map(f=>linha(f.id,"Por unidade")).join(""), g2=CHAVES_ATV.concat(chavesMix).map(k=>linha(k,"Por atividade e combinados")).join(""), g3=["DIRETORIA","ADMIN"].map(k=>linha(k,"Diretoria e administrador")).join("");
+  return cadTopo("Códigos de acesso",chavesConhecidas().length+" códigos")+cadBusca("cad-k-busca","Buscar unidade, atividade ou código…")+cadSaltos(["Por unidade","Por atividade e combinados","Diretoria e administrador"])+
+    cadListaAgrupada([["Por unidade",g1,D.fazendas.length],["Por atividade e combinados",g2,CHAVES_ATV.length+chavesMix.length],["Diretoria e administrador",g3,2]].filter(x=>x[1]).map(([nome,html,n])=>({nome,html,n:q?(html.match(/class="cad-item"/g)||[]).length:n})))+
+    (!g1&&!g2&&!g3?`<p class="mut centro mt">Nada encontrado.</p>`:"")+
+    cadRodape(`<button class="btn" data-cadv="codigonovo" data-cadid="">＋ Novo código combinado</button>`);
+}
+function cadVCodigo(chave){
+  if(!escopoDaChave(chave)) return cadTopo("Código")+`<p class="mut">Chave desconhecida.</p>`;
+  const novo=cadUI.form&&cadUI.form.novoCodigo;
+  return cadTopo(rotuloDaChave(chave),"Código de acesso")+`
+    <div class="cartao">
+      <p class="mut" style="font-size:.78rem">Escopo</p><p><b>${esc(escopoRotulo(chave))}</b></p>
+      <p class="mut mt" style="font-size:.78rem">Código atual</p><p class="num" style="font-size:1.6rem;font-weight:800;letter-spacing:.08em">${esc(codigoDe(chave)||"—")}</p>
+      <p class="mut" style="font-size:.78rem">Chave: <span class="num">${esc(chave)}</span>${acesso&&acesso.chave===chave?" · é o código deste aparelho":""}</p>
+      ${novo?`<div class="aviso verde mt"><b>Novo código gerado: <span class="num">${esc(novo)}</span></b><br><span class="mut">Anote e repasse. O antigo deixa de valer nos aparelhos na próxima sincronização.</span></div>`:""}
+    </div>
+    ${cadZona(`<p class="mut" style="font-size:.78rem">"Gerar novo" invalida o código atual (código vazou ou funcionário saiu). Os aparelhos com o antigo voltam para a tela de código na próxima sincronização.</p>
+      <div class="mt">${cadConfirmar("novo-cod:"+chave,"Gerar novo código","Gerar novo código para "+esc(rotuloDaChave(chave))+"? O atual ("+esc(codigoDe(chave))+") deixa de valer.")}</div>`)}`;
+}
+function cadVCodigoNovo(){
+  const fm=novoCombo||{ativs:[],unis:[]}; novoCombo=fm;
+  const gerado=cadUI.form&&cadUI.form.novoCodigo;
+  return cadTopo("Novo código combinado","Códigos de acesso")+`
+    <div class="cartao">
+      <p class="mut" style="font-size:.78rem">Marque atividades inteiras (pegam as unidades futuras sozinhas) e/ou unidades avulsas. O código criado abre exatamente essa combinação.</p>
+      <label>Atividades inteiras</label>
+      <div class="chips">${ATIVIDADES.map(([k,em,r])=>`<button class="chip ${fm.ativs.includes(k)?"on":""}" data-combo-atv="${k}">${em} ${r}</button>`).join("")}</div>
+      <label>Unidades avulsas</label>
+      <div class="chips">${D.fazendas.map(f=>`<button class="chip ${fm.unis.includes(f.id)?"on":""}" data-combo-uni="${f.id}">${esc(f.nome)}</button>`).join("")}</div>
+      ${gerado?`<div class="aviso verde mt"><b>Código criado: <span class="num">${esc(gerado)}</span></b><br><span class="mut">Anote e repasse. Ele já aparece na lista de códigos.</span></div>`:""}
+    </div>
+    ${cadRodape(`<button class="btn" data-cadacao="combo-gerar">Gerar código combinado</button>`)}`;
+}
+
+/* ================= 7. CATÁLOGOS ================= */
+function cadVCatalogos(){
+  const n=a=>cadCatalogosDe(a).reduce((s,[k,,l])=>s+l.length+catExtra(k).length,0);
+  return cadTopo("Catálogos","Vocabulário do boletim")+`
+    <p class="mut" style="font-size:.78rem">Termos padrão vêm do código (fonte oficial: docs/catalogos-por-atividade.md). O escritório pode acrescentar termos, que entram nas listas do gerente da atividade.</p>
+    ${cadItem("catalogo","CAFE","☕ Café","funções, operações, pragas, doenças, daninhas, ocorrências",n("CAFE"))}
+    ${cadItem("catalogo","GRAOS","🌾 Grãos","funções, operações por fase, pragas, doenças, daninhas, culturas",n("GRAOS"))}
+    ${cadItem("catalogo","PECUARIA","🐂 Pecuária","funções, manejos, categorias animais, sanidade, pastos",n("PECUARIA"))}
+    ${cadItem("maquinas","","Máquinas e equipamentos","nome, categoria e fazendas que atende",D.maquinas.length)}
+    ${cadItem("insumos","","Insumos","nome e unidade",D.insumos.length)}`;
+}
+function cadVCatalogo(atv){
+  const cats=cadCatalogosDe(atv), q=cadUI.filtro, editaveis=cats.filter(c=>c[3]);
+  const fm=cadUI.form||{cat:editaveis[0]?editaveis[0][0]:""};
+  return cadTopo(ROTULO_CULT[atv],"Catálogo · "+cats.length+" listas")+cadBusca("cad-cat-busca","Buscar termo…")+
+    (cadUI.novo==="termo"?`<div class="cartao"><h3>Acrescentar termo</h3>
+      ${cadSelect("Em qual lista",`catk`,editaveis.map(([k,rot])=>[k,rot]),fm.cat)}
+      ${cadCampo("Termo","termo","","placeholder=\"Como o gerente vai ler no boletim\"")}
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="termo-add" data-cadid="${atv}">Acrescentar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+    cats.map(([k,rot,lista,edit])=>{ const pad=lista.filter(t=>cadBate(q,t)), ex=catExtra(k).filter(t=>cadBate(q,t)); if(!pad.length&&!ex.length) return "";
+      const aberto=!!q || cadUI.confirma.indexOf("rm-termo:"+k+"|")===0 || (cadUI.form&&cadUI.form.abertos||[]).includes(k);
+      return `<details class="cad-bloco" ${aberto?"open":""} data-cadlista="${esc(k)}"><summary>${esc(rot)} <span class="mut num">· ${lista.length+catExtra(k).length}${edit?"":" · só leitura"}</span></summary><div class="corpo" style="padding:0">`
+        +pad.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)}</span><span class="mut" style="font-size:.72rem">padrão</span></div>`).join("")
+        +ex.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)} <span class="tag verde">acrescentado</span></span>${cadUI.confirma==="rm-termo:"+k+"|"+t?`<button class="btn mini" data-cadok="rm-termo:${esc(k)}|${esc(t)}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-termo:${esc(k)}|${esc(t)}">remover</button>`}</div>`).join("")+`</div></details>`;
+    }).join("")+
+    cadRodape(`<button class="btn" data-cadnovo="termo">＋ Acrescentar termo</button>`);
+}
+function cadVMaquinas(){
+  const q=cadUI.filtro, maqs=D.maquinas.filter(m=>cadBate(q,m.nome,m.cat));
+  const rotuloVinc=m=>{ const v=m.fazendas||[]; return !v.length?"Grupo (todas)":v.length===1?fazenda(v[0]).nome:v.length+" fazendas"; };
+  return cadTopo("Máquinas e equipamentos",maqs.length+" de "+D.maquinas.length)+cadBusca("cad-m-busca","Buscar por nome, COD ou categoria…")+
+    `<p class="mut" style="font-size:.78rem">Uma máquina pode atender mais de uma fazenda: toque no vínculo e marque as que ela serve. Sem nenhuma marcada = Grupo (todas).</p>`+
+    (cadUI.novo==="maquina"?`<div class="cartao"><h3>Nova máquina</h3>${cadCampo("Nome (com COD, se tiver)","mnome","")}${cadCampo("Categoria","mcat","Outros")}
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="maquina-add">Criar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+    maqs.map(m=>`<div class="cad-item" data-cadfoco="maq:${m.id}" style="cursor:default;flex-wrap:wrap">
+      <span class="cresce"><b>${esc(m.nome)}</b><span class="mut">${esc(m.cat||"")}</span></span>
+      <button class="btn suave mini" data-vinc-abrir="${m.id}">${(m.fazendas||[]).length?"🔗 ":""}${esc(rotuloVinc(m))} ▾</button>
+      ${cadUI.confirma==="rm-maq:"+m.id?`<button class="btn mini" data-cadok="rm-maq:${m.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-maq:${m.id}">remover</button>`}
+      ${vincAberto===m.id?`<div class="chips mt" style="width:100%"><button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
+        ${D.fazendas.map(f=>`<button class="chip ${(m.fazendas||[]).includes(f.id)?"on":""}" data-vinc-faz="${m.id}:${f.id}">${esc(f.nome)}</button>`).join("")}</div>`:""}</div>`).join("")+
+    (maqs.length?"":`<p class="mut centro mt">Nenhuma máquina${q?" com esse nome":""}.</p>`)+
+    cadRodape(`<button class="btn" data-cadnovo="maquina">＋ Nova máquina</button>`);
+}
+function cadVInsumos(){
+  const q=cadUI.filtro, ins=D.insumos.filter(i=>cadBate(q,i.nome,i.un));
+  return cadTopo("Insumos",D.insumos.length+" cadastrados")+(D.insumos.length>12?cadBusca("cad-i-busca","Buscar insumo…"):"")+
+    (cadUI.novo==="insumo"?`<div class="cartao"><h3>Novo insumo</h3>${cadCampo("Nome","inome","")}${cadCampo("Unidade (L, kg, t…)","iun","")}
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="insumo-add">Criar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+    ins.map(i=>`<div class="cad-item" data-cadfoco="ins:${i.id}" style="cursor:default"><span class="cresce"><b>${esc(i.nome)}</b><span class="mut">${esc(i.un||"")}</span></span>
+      ${cadUI.confirma==="rm-ins:"+i.id?`<button class="btn mini" data-cadok="rm-ins:${i.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-ins:${i.id}">remover</button>`}</div>`).join("")+
+    (ins.length?"":`<p class="mut centro mt">Nenhum insumo cadastrado.</p>`)+
+    cadRodape(`<button class="btn" data-cadnovo="insumo">＋ Novo insumo</button>`);
+}
+
+/* ================= 8. INTEGRAÇÕES E ROBÔS ================= */
+function cadVIntegracoes(){
+  const fmtDH=s=>s?new Date(s).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
+  const ic=D.icropDados||[], icUlt=ic.length?ic.map(l=>l.data).sort().slice(-1)[0]:"", icGrav=ic.length?ic.map(l=>l.atualizado_em||"").sort().slice(-1)[0]:"";
+  const so=D.solinftecDados||[], soUlt=so.length?so.map(l=>l.data).sort().slice(-1)[0]:"", soSem=so.filter(l=>!l.fazenda_id).length, soOp=[...new Set(so.filter(l=>/^Operação \d+$/.test(l.operacao||"")).map(l=>l.operacao))];
+  const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+  const farol=ok=>`<span class="farol ${ok===null?"vazio":ok?"ok":"espera"}"></span>`;
+  const venc=icropVencimentos();
+  const planos=Object.keys(planoCache||{});
+  return cadTopo("Integrações e robôs","Última execução e pendências")+`
+    <div class="cartao"><div class="linha-flex">${farol(syncAtivo()?(syncUltima?true:null):false)}<h3 class="cresce">Supabase (banco central)</h3></div>
+      <p class="mut" style="font-size:.8rem">${syncAtivo()?"Ligado · "+(syncUltima?"última sincronização "+syncUltima.toTimeString().slice(0,5):"ainda não sincronizou nesta sessão")+" · fila: "+syncFila.length:"Desligado — configure em Sincronização e dados."}</p></div>
+    <div class="cartao"><div class="linha-flex">${farol(ic.length?icGrav.slice(0,10)>=ontem:null)}<h3 class="cresce">Robô iCrop (irrigação)</h3></div>
+      <p class="mut" style="font-size:.8rem">Roda no Supabase (pg_cron) de madrugada e às 9h45. Última medição: <b>${icUlt?fmtData(icUlt):"—"}</b> · última gravação do robô: <b>${fmtDH(icGrav)}</b>${ic.length&&icGrav.slice(0,10)<ontem?" · <b>robô parado há mais de um dia</b> (token na Vision / Restart project)":""}${ic.length&&icGrav.slice(0,10)>=ontem&&icUlt<ontem?" · robô OK, iCrop sem medição nova (ciclo vencido ou atraso)":""}</p>
+      <p class="mut" style="font-size:.8rem">De-para iCrop → app: ${DEPARA_ICROP.map(([n,id])=>esc(n)+" → "+id).join(" · ")}.</p>
+      ${venc?`<p class="mut" style="font-size:.8rem">${venc.vencendo.length?"Parcelas vencendo: "+venc.vencendo.map(v=>esc(v.fazenda)+" "+esc(v.nome)+" ("+v.dias+" d)").join(", ")+". ":""}${venc.zeradas.length?"Fazendas sem parcela ativa: "+venc.zeradas.map(esc).join(", ")+".":""}</p>`:""}</div>
+    <div class="cartao"><div class="linha-flex">${farol(SOLINFTEC_AUTO?(so.length?soUlt>=ontem:null):false)}<h3 class="cresce">Robô Solinftec (máquinas)</h3></div>
+      <p class="mut" style="font-size:.8rem">Chave SOLINFTEC_AUTO: <b>${SOLINFTEC_AUTO?"ligada":"desligada"}</b> (definida no código). Última medição: <b>${soUlt?fmtData(soUlt):"—"}</b> · ${so.length} linhas nos últimos 3 dias.</p>
+      ${soSem?`<p class="mut" style="font-size:.8rem">⚠ ${soSem} linha(s) sem de-para de fazenda — ajustar solinftec_depara no SQL Editor.</p>`:""}
+      ${soOp.length?`<p class="mut" style="font-size:.8rem">Operações sem nome (${soOp.length}): ${soOp.slice(0,8).map(esc).join(", ")} — preencher solinftec_operacoes.</p>`:""}</div>
+    <div class="cartao"><div class="linha-flex">${farol(planos.length?true:null)}<h3 class="cresce">Plano de safra (v52)</h3></div>
+      <p class="mut" style="font-size:.8rem">${planos.length?planos.length+" fazendas com plano vigente no aparelho: "+planos.map(fz=>esc(fazenda(fz).nome)+" v"+planoCache[fz].versao).join(", "):"Nenhum plano vigente baixado (tabelas ainda não criadas ou versão não publicada)."}</p></div>
+    ${cadRodape(`<button class="btn" data-cadacao="baixar-agora">${syncOcupado?"Sincronizando…":"Baixar agora (robôs e boletins)"}</button>`)}`;
+}
+
+/* ================= 9. IMPORTAÇÕES MANUAIS ================= */
+function cadVImportacoes(){
+  const tel=(D.telemetria||[]).slice().sort((a,b)=>a.data<b.data?1:-1);
+  return cadTopo("Importações manuais","Plano B do robô")+`
+    <div class="cartao"><h3>Planilha Solinftec / iCrop</h3>
+      <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar. Use só se o robô falhar.</p></div>
+    ${tel.length?cadGrupo("Importações feitas ("+tel.length+")")+tel.slice(0,12).map(r=>`<div class="cad-item" style="cursor:default"><span class="cresce"><b>${fmtData(r.data)}</b><span class="mut">${esc(r.fonte)} · ${(r.linhas||[]).length} linhas · ${r.atualizado?new Date(r.atualizado).toLocaleDateString("pt-BR"):""}</span></span></div>`).join(""):""}
+    ${cadRodape(`<button class="btn" data-cadacao="abrir-importar">Importar arquivo do dia</button>`)}`;
+}
+
+/* ================= 10. SINCRONIZAÇÃO E DADOS ================= */
+function cadVSync(){
+  const porTipo={}; syncFila.forEach(x=>{ porTipo[x.t]=(porTipo[x.t]||0)+1; });
+  const rot={b:"boletins",p:"pós-colheita",r:"remessas",t:"telemetria",c:"códigos",pec:"pecuária"};
+  const teste=(D.boletins||[]).filter(b=>b.exemplo).length+(D.posColheitas||[]).filter(p=>p.exemplo).length;
+  return cadTopo("Sincronização e dados","Supabase · fila · exportações")+`
+    <div class="cartao"><h3>Situação</h3>
+      <p>${syncAtivo()?(syncStatus()||"Configurado."):"Sincronização desligada."}</p>
+      ${syncFila.length?`<p class="mut" style="font-size:.8rem">Na fila: ${Object.entries(porTipo).map(([t,n])=>n+" "+(rot[t]||t)).join(" · ")}. Enviam sozinhos quando houver sinal.</p>`:""}
+      <p class="mut" style="font-size:.78rem">${(D.boletins||[]).length} boletins · ${(D.posColheitas||[]).length} pós-colheita · ${(D.remessas||[]).length} remessas · ${(D.telemetria||[]).length} telemetrias neste aparelho.</p>
+      ${cadUI.form&&cadUI.form.syncMsg?`<div class="aviso mt">${esc(cadUI.form.syncMsg)}</div>`:""}
+    </div>
+    <div class="cartao"><h3>Exportar</h3>
+      <div class="linha-flex" style="gap:8px;flex-wrap:wrap"><button class="btn sec mini" data-cadacao="csv">⬇ Boletins em CSV</button><button class="btn sec mini" data-cadacao="backup">⬇ Backup completo (JSON)</button></div>
+      <p class="mut" style="font-size:.78rem">O CSV respeita os filtros do painel. O backup é o conteúdo inteiro deste aparelho.</p></div>
+    ${cadMais(`<p class="mut" style="font-size:.78rem">Cole aqui os dois valores do Supabase (Configurações → API). Com isso, os boletins de todas as fazendas aparecem no painel em qualquer aparelho.</p>
+      <label>Project URL</label><input id="sync-url" value="${esc(syncCfg.url)}" placeholder="https://xxxx.supabase.co">
+      <label>Chave (publishable / anon)</label><input id="sync-key" value="${esc(syncCfg.chave)}" placeholder="sb_publishable_…">
+      <button class="btn mini mt" data-cadacao="sync-salvar">Testar e salvar</button>`,"Mais opções · conexão")}
+    ${cadZona(`<p class="mut" style="font-size:.78rem">Registros de exemplo (marcados "exemplo") vieram com a instalação e nunca sobem para o banco.</p>
+      <div class="mt">${teste?cadConfirmar("limpar-teste","Limpar dados de teste ("+teste+")","Apagar os "+teste+" registros de exemplo deste aparelho? Boletins reais não são tocados.","sec"):`<span class="mut">Sem dados de teste neste aparelho.</span>`}</div>`)}
+    ${cadRodape(`<button class="btn" data-cadacao="sync-agora">${syncOcupado?"Sincronizando…":"Sincronizar agora"}</button>`)}`;
+}
+
+/* ================= 11. SOBRE ================= */
+function cadVSobre(){
+  return cadTopo("Sobre","Boletim NCNaves")+`
+    <div class="cartao"><h3>Boletim NCNaves · ${APP_VERSAO}</h3>
+      <p class="mut" style="font-size:.8rem">Grupo LGS · informativo diário de campo. Publicado pelo Netlify a partir do branch main; os celulares atualizam sozinhos ao abrir (cache ${"boletim-lgs-"+APP_VERSAO}).</p>
+      <p class="mut" style="font-size:.8rem">Armazenamento: ${Persist.usaMem?"só memória (este aparelho não liberou armazenamento permanente)":"permanente neste aparelho"}.</p></div>
+    ${cadItem("abrir","LEIA-ME.txt","LEIA-ME","novidades por versão e como publicar")}
+    ${cadItem("abrir","relatorios.html","Carteira de relatórios","relatórios da Controladoria e prompts prontos para o Cowork")}
+    ${cadItem("abrir","ESTADO.md","ESTADO.md","o que o app tem hoje e as pendências")}
+    <div class="cartao mt"><h3>Contato</h3><p class="mut" style="font-size:.8rem">Dúvidas e pedidos: Nilo (controller do grupo). Robôs e banco: Supabase (SQL Editor). Código: github.com/nilo-ncnaves/boletim-ncnaves.</p></div>`;
+}
+
+/* ================= despacho ================= */
+function vCadastros(){
+  if(!cadNav.length) cadNav=[{v:"menu"}];
+  const a=cadAtual();
+  switch(a.v){
+    case "fazendas": return cadVFazendas();
+    case "fazenda": return cadVFazenda(a.id);
+    case "talhoes": return cadVTalhoes();
+    case "talhao": return cadVTalhao(a.id);
+    case "pivo": return cadVPivo(a.id);
+    case "ciclos": return cadVCiclos();
+    case "ciclo": return cadVCiclo(a.id);
+    case "lotes": return cadVLotes();
+    case "lote": return cadVLote(a.id);
+    case "plano": return cadVPlano();
+    case "planofz": return cadVPlanoFz(a.id);
+    case "codigos": return cadVCodigos();
+    case "codigo": return cadVCodigo(a.id);
+    case "codigonovo": return cadVCodigoNovo();
+    case "catalogos": return cadVCatalogos();
+    case "catalogo": return cadVCatalogo(a.id);
+    case "maquinas": return cadVMaquinas();
+    case "insumos": return cadVInsumos();
+    case "integracoes": return cadVIntegracoes();
+    case "importacoes": return cadVImportacoes();
+    case "sync": return cadVSync();
+    case "sobre": return cadVSobre();
+    default: return cadVMenu();
+  }
+}
+/* cliques da área de Cadastros — devolve true quando tratou */
+function cadClique(t,d){
+  if(d.cadvoltar!==undefined){ if(telaAtual==="cadastros") cadVoltar(); else ir("cadastros"); return true; }
+  if(d.cadv!==undefined){
+    const v=d.cadv, id=d.cadid||"";
+    if(v==="unidplano"){ upEstado.dados=null; upEstado.erro=""; ir("unidplano"); upRecarregar(); return true; }
+    if(v==="abrir"){ window.open(id,"_blank"); return true; }
+    if(v==="talhoes" && id){ cadIr({v:"talhoes"}); cadUI.filtro=id; cadRender(); return true; }
+    if(v==="maquinas"||v==="insumos"){ cadIr({v}); if(t.closest("#app") && cadUI.busca){ cadUI.filtro=cadUI.busca; cadRender(); } return true; }
+    if(v==="codigonovo"){ novoCombo={ativs:[],unis:[]}; cadIr({v}); return true; }
+    cadIr(id?{v,id}:{v}); return true;
+  }
+  if(d.cadsalto!==undefined){ cadUI.filtro=d.cadsalto; cadRender(); return true; }
+  if(d.cadnovo!==undefined){ cadUI.novo=d.cadnovo; cadUI.confirma=""; if(cadAtual().v==="lote") cadUI.zona=true; cadRender(); return true; }
+  if(d.cadcancel!==undefined){ cadUI.novo=""; cadUI.confirma=""; cadRender(); return true; }
+  if(d.cadpede!==undefined){ cadUI.confirma=d.cadpede; cadUI.zona=true; cadRender(); return true; }
+  if(d.cadchip!==undefined){ const [k,v]=d.cadchip.split(":"); cadUI.form=cadUI.form||{}; cadUI.form[k]=(k==="mes")?parseInt(v):(cadUI.form[k]===v?"":v); if(k==="mes") cadUI.filtro=""; cadRender(); return true; }
+  if(d.cadok!==undefined){ cadOk(d.cadok); return true; }
+  if(d.cadacao!==undefined){ cadAcao(d.cadacao,d.cadid||""); return true; }
+  return false;
+}
+function cadOk(chave){
+  const [tipo,resto]=[chave.slice(0,chave.indexOf(":")>=0?chave.indexOf(":"):chave.length), chave.slice(chave.indexOf(":")+1)];
+  cadUI.confirma="";
+  if(tipo==="rm-talhao"){ D.talhoes=D.talhoes.filter(x=>x.id!==resto); salvarDados(); cadSalvo("","Talhão removido"); cadVoltar(); return; }
+  if(tipo==="rm-pivo"){ const [fz,pid]=resto.split(":"); D.pivosLocais=D.pivosLocais||{}; D.pivosLocais[fz]=(D.pivosLocais[fz]||[]).filter(p=>p.id!==pid); salvarDados(); cadSalvo("","Pivô removido"); cadVoltar(); return; }
+  if(tipo==="rm-maq"){ D.maquinas=D.maquinas.filter(x=>x.id!==resto); salvarDados(); cadSalvo("","Máquina removida"); cadRender(); return; }
+  if(tipo==="rm-ins"){ D.insumos=D.insumos.filter(x=>x.id!==resto); salvarDados(); cadSalvo("","Insumo removido"); cadRender(); return; }
+  if(tipo==="rm-termo"){ const i=resto.indexOf("|"); catExtraRm(resto.slice(0,i),resto.slice(i+1)); cadSalvo("","Termo removido"); cadRender(); return; }
+  if(tipo==="enc-ciclo"){ const c=(D.ciclos||[]).find(x=>x.id===resto); if(c){ c.encerradoEm=hojeISO(); salvarDados(); } cadSalvo("ciclo:"+(c?c.talhaoId:""),"Colheita encerrada"); cadVoltar(); return; }
+  if(tipo==="novo-cod"){ const novo=gerarNovoCodigo(resto); cadUI.form={novoCodigo:novo}; cadUI.zona=false; cadSalvo("","Novo código gerado"); cadRender(); return; }
+  if(tipo==="desmembrar"){ const f=D.fazendas.find(x=>x.id===resto), atv=cadVal("novaAtv"); if(!f||!atv){ cadUI.msg="Escolha a atividade da nova unidade."; cadUI.zona=true; cadRender(); return; }
+    const mae=maeDe(f); const base=(mae.id||f.id).replace(/[cgp]$/,""); let novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p"}[atv]); let n=2; while(D.fazendas.some(x=>x.id===novoId)) novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p"}[atv])+(n++);
+    const nova={id:novoId, nome:mae.nome+" — "+ROTULO_CULT[atv], municipio:f.municipio||"", perfil:[atv], fazendaMae:{id:mae.id, nome:mae.nome}, entidade:f.entidade||""};
+    if(!f.fazendaMae) f.fazendaMae={id:mae.id, nome:mae.nome};
+    D.fazendas.push(nova); salvarDados(); cadSalvo("fazenda:"+novoId,"Unidade irmã criada"); cadNav.pop(); cadNav.push({v:"fazenda",id:novoId}); ir("cadastros"); return; }
+  if(tipo==="unificar"){ const f=D.fazendas.find(x=>x.id===resto), alvo=D.fazendas.find(x=>x.id===cadVal("alvoUnif")); if(!f||!alvo) return;
+    D.talhoes.forEach(t=>{ if(t.fazendaId===f.id){ t.fazendaId=alvo.id; t.tipo=tipoPeloPerfil(t.nome, perfilDe(alvo.id)); } });
+    f.inativa=true; salvarDados(); cadSalvo("fazenda:"+alvo.id,"Unificada em "+alvo.nome); cadVoltar(); return; }
+  if(tipo==="limpar-teste"){ D.boletins=(D.boletins||[]).filter(b=>!b.exemplo); D.posColheitas=(D.posColheitas||[]).filter(p=>!p.exemplo); salvarDados(); cadSalvo("","Dados de teste apagados"); cadRender(); return; }
+}
+function cadAcao(acao,id){
+  if(acao==="salvar-fazenda"){ const f=D.fazendas.find(x=>x.id===id); if(!f) return;
+    const nome=cadVal("nome"); if(!nome){ cadUI.msg="O nome não pode ficar vazio."; cadRender(); return; }
+    const perfilNovo=cadVal("perfil").split(",").filter(Boolean), mudouPerfil=perfilNovo.join(",")!==perfilDe(f.id).join(",");
+    f.nome=nome; f.entidade=cadVal("entidade"); f.municipio=cadVal("municipio"); f.inativa=cadVal("ativa")==="0";
+    if(perfilNovo.length){ f.perfil=perfilNovo; if(mudouPerfil) talhoesDa(f.id).forEach(t=>{ t.tipo=tipoPeloPerfil(t.nome, f.perfil); }); }
+    salvarDados(); cadSalvo("fazenda:"+f.id); cadVoltar(); return; }
+  if(acao==="salvar-talhao"){ const nome=cadVal("nome"), pref=cadVal("prefixo"); if(!nome){ cadUI.msg="Dê um nome ao talhão."; cadRender(); return; }
+    const nomeFinal=pref?pref+" — "+nome:nome, fz=cadVal("fazendaId")||null, tipo=cadVal("tipo");
+    let t; if(id==="novo"){ t={id:uid(), nome:nomeFinal, area:n0(cadVal("area")), fazendaId:fz}; D.talhoes.push(t); } else { t=D.talhoes.find(x=>x.id===id); if(!t) return; t.nome=nomeFinal; t.area=n0(cadVal("area")); t.fazendaId=fz; }
+    t.tipo=tipo||tipoPeloPerfil(t.nome, fz?perfilDe(fz):["CAFE"]);
+    salvarDados(); cadSalvo("talhao:"+t.id, id==="novo"?"Talhão criado":"Salvo"); if(id==="novo"){ cadNav.pop(); ir("cadastros"); } else cadVoltar(); return; }
+  if(acao==="salvar-pivo"){ const [fz,pid]=id.split(":"), p=pivosLocaisDa(fz).find(x=>x.id===pid); if(!p) return; const nome=cadVal("nome"); if(!nome) return; p.nome=nome; salvarDados(); cadSalvo("pivo:"+id); cadVoltar(); return; }
+  if(acao==="novo-ciclo"){ const fm=cadUI.form||{}; const cult=fm.cultura, dt=cadVal("plantio"); if(!cult){ cadUI.msg="Escolha a cultura do plantio."; cadRender(); return; }
+    D.ciclos=D.ciclos||[]; D.ciclos.push({id:uid(), talhaoId:id, cultura:cult, plantio:dataNorm(dt)||hojeISO()}); salvarDados(); cadSalvo("ciclo:"+id,"Plantio registrado"); cadVoltar(); return; }
+  if(acao==="inv-inicial"){ const cats={}; CATEGORIAS_ANIMAIS.forEach(c=>{ cats[c]=n0(cadVal("inv:"+c)); }); cadInvGravar(id,cats,"inicial",""); cadUI.novo=""; cadUI.zona=false; cadSalvo("","Inventário gravado"); cadRender(); return; }
+  if(acao==="inv-ajuste"){ const cat=cadVal("ajCat"), qtd=cadVal("ajQtd"), mot=cadVal("ajMotivo"); if(!cat||qtd===""||!mot){ cadUI.msg="Preencha categoria, novo total e motivo."; cadUI.zona=true; cadRender(); return; }
+    const cats={}; cats[cat]=n0(qtd); cadInvGravar(id,cats,"ajuste",mot); cadUI.novo=""; cadUI.zona=false; cadSalvo("","Ajuste gravado"); cadRender(); return; }
+  if(acao==="combo-gerar"){ if(!novoCombo) return; if(!novoCombo.ativs.length && !novoCombo.unis.length){ cadUI.msg="Marque pelo menos uma atividade ou unidade."; cadRender(); return; }
+    const ordem=ATIVIDADES.map(([k])=>k); const chave="MIX:"+ordem.filter(a=>novoCombo.ativs.includes(a)).join("+")+":"+novoCombo.unis.slice().sort().join("+");
+    if(!escopoDaChave(chave)) return; const novo=codigoDe(chave)||gerarNovoCodigo(chave); cadUI.form={novoCodigo:novo}; cadUI.msg=""; cadSalvo("","Código combinado criado"); cadRender(); return; }
+  if(acao==="termo-add"){ const k=cadVal("catk"), termo=cadVal("termo"); if(!k||!termo){ cadUI.msg="Escolha a lista e escreva o termo."; cadRender(); return; }
+    catExtraAdd(k,termo); cadUI.novo=""; cadUI.msg=""; cadSalvo("","Termo acrescentado"); cadRender(); return; }
+  if(acao==="maquina-add"){ const nome=cadVal("mnome"); if(!nome){ cadUI.msg="Dê um nome à máquina."; cadRender(); return; } const m={id:uid(),nome,cat:cadVal("mcat")||"Outros",fazendas:[]}; D.maquinas.push(m); salvarDados(); cadUI.novo=""; cadUI.msg=""; cadSalvo("maq:"+m.id,"Máquina criada"); cadRender(); return; }
+  if(acao==="insumo-add"){ const nome=cadVal("inome"); if(!nome){ cadUI.msg="Dê um nome ao insumo."; cadRender(); return; } const i={id:uid(),nome,un:cadVal("iun")}; D.insumos.push(i); salvarDados(); cadUI.novo=""; cadUI.msg=""; cadSalvo("ins:"+i.id,"Insumo criado"); cadRender(); return; }
+  if(acao==="baixar-agora"||acao==="sync-agora"){ if(!syncAtivo()){ cadUI.msg="Sincronização desligada — configure a conexão em Sincronização e dados."; cadRender(); return; }
+    cadRender(); syncTudo().then(()=>{ if(telaAtual==="cadastros"){ cadSalvo("","Sincronizado"); cadRender(); } }); return; }
+  if(acao==="abrir-importar"){ impEstado=null; ir("importar"); return; }
+  if(acao==="csv"){ baixarCSV(); return; }
+  if(acao==="backup"){ const blob=new Blob([JSON.stringify(D)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="boletim-ncnaves-backup-"+hojeISO()+".json"; document.body.appendChild(a); a.click(); a.remove(); return; }
+  if(acao==="sync-salvar"){ const app=$("#app"); const u=(app.querySelector("#sync-url")||{}).value||"", k=(app.querySelector("#sync-key")||{}).value||"";
+    syncCfg={ url:u.trim().replace(/\/+$/,""), chave:k.trim() }; Persist.set("bdf:sync", JSON.stringify(syncCfg));
+    if(!syncAtivo()){ cadUI.form={syncMsg:"Preencha os dois campos."}; cadUI.mais=true; cadRender(); return; }
+    syncBaixar().then(ok=>{ cadUI.form={syncMsg:ok?"✅ Conectado! Sincronização ligada.":"❌ Não conectou. Confira a URL e a chave."}; cadUI.mais=true; cadRender(); }); return; }
+}
+/* digitação nas buscas de Cadastros — devolve true quando tratou */
+function cadInput(el){
+  if(!el.classList||!el.classList.contains("cad-busca")) return false;
+  if(el.id==="cad-busca-global") cadUI.busca=el.value; else cadUI.filtro=el.value;
+  clearTimeout(filtroTimer);
+  filtroTimer=setTimeout(()=>{ const pos=el.selectionStart, id=el.id; cadRender(); const n=$("#app").querySelector("#"+id); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } },220);
+  return true;
 }
 
 
@@ -4688,6 +5241,7 @@ function concluirEnvio(){
 /* ---------- Eventos ---------- */
 function ligarEventos(tela){
   const app=$("#app");
+  if(tela==="cadastros") cadPosRender();
   if(tela==="codigo"){ const cod=$("#cod-acesso");
     if(cod) cod.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=$("#bt-cod-entrar"); if(b) b.click(); } }; }
   const marcarChips=(raiz,attr,valor)=>raiz.querySelectorAll("[data-"+attr+"]").forEach(ch=>ch.classList.toggle("on",ch.dataset[attr.replace(/-(.)/g,(m,c)=>c.toUpperCase())]===valor));
@@ -4701,6 +5255,7 @@ function ligarEventos(tela){
   app.onclick = async ev=>{
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
+    if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
     /* código de acesso */
     if(t.id==="bt-cod-entrar"){
       const el=$("#cod-acesso"), cod=el?el.value:"";
@@ -4888,7 +5443,7 @@ function ligarEventos(tela){
     if(t.id==="bt-sair"||t.id==="bt-topo-sair"){ sessao=null; Persist.del("bdf:sessao"); ir("entrada"); return; }
     if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
-    if(t.id==="bt-cad"){ ir("cadastros"); return; }
+    if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }
     if(d.ver){ ir("detalhe", d.ver); return; }
     if(t.id==="bt-preencher"){
       const b=boletimDoDia(hojeISO(), sessao.fazendaId);
@@ -5256,6 +5811,7 @@ function ligarEventos(tela){
   /* entrada de dados: salva campo a campo, no lugar */
   app.oninput = ev=>{
     const el=ev.target, d=el.dataset;
+    if(telaAtual==="cadastros" && cadInput(el)) return;
     if(d.r!==undefined && rascunho){ rascunho[d.r]=el.value; salvarRascunho(); return; }
     if(d.pr!==undefined && rascunhoPos){ rascunhoPos[d.pr]=el.value; salvarRascPos(); return; }
     if(d.pt!==undefined && rascunhoPos){ rascunhoPos.terreiro[d.pt]=el.value; salvarRascPos(); return; }

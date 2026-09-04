@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v54** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v55** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -266,9 +266,73 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
 - Sincronização Supabase: ligada por padrão (SYNC_PADRAO com a chave
   publishable).
 
+## Cadastros (v55 — menu → assunto → item)
+A tela única e longa de Cadastros virou navegação em níveis, no padrão
+de aplicativos de gestão: **menu** (11 assuntos, cartões grandes com
+número-resumo e busca global no topo) → **lista** do assunto (busca
+quando há mais de 12 itens, agrupada por fazenda/unidade; listas longas
+abrem com os grupos fechados e chips de salto por grupo) → **detalhe**
+do item (cabeçalho fixo com "‹ Voltar" para o nível anterior, botão
+principal fixo no rodapé, "Mais opções" e "Zona de cuidado" fechados,
+confirmações inline, "Salvo" discreto e retorno à lista na posição do
+item). Só o código ADMIN vê. Telas de gerente, pós-colheita e Diretoria
+idênticas à v54 (scripts/regressao_render.cjs). Onde cada função antiga
+passou a morar:
+1. **🏡 Fazendas e unidades** — perfil/atividade da fazenda (era
+   "Perfil das fazendas"), estrutura de pós-colheita (era "Estrutura de
+   pós-colheita"), nome, entidade/CNPJ, município, ativa/inativa,
+   fazenda física e irmãs; Zona de cuidado: desmembrar (cria unidade
+   irmã) e unificar (talhões vão para a irmã, esta fica inativa).
+2. **🗺️ Talhões, pivôs e pastos** — cadastro de talhões (era "Talhões":
+   unidade, tipo de uso, remover, adicionar — agora formulário em vez
+   de prompts em cadeia; prefixo de área + nome, área) e os pivôs
+   cadastrados no app pela unidade (D.pivosLocais, antes só na seção
+   Irrigação do gerente).
+3. **🌾 Ciclos e plantios** — "Novo plantio" / "Encerrar colheita" (eram
+   botões da lista de talhões) com cultura em chips e data, histórico
+   do talhão em "Mais opções". O gerente continua com o botão dele no
+   boletim, inalterado.
+4. **🐂 Lotes e inventário** — NOVO: inventário por categoria animal
+   por unidade (D.inventarioPec), última contagem por lote vinda do
+   boletim, histórico; Zona de cuidado: inventário inicial e ajuste
+   com motivo. Não muda nada no boletim do gerente.
+5. **📅 Plano do mês** — leitura do plano vigente baixado (bdf:plano):
+   por fazenda, mês atual/próximo, adubo (kg rotulados "plano vN"),
+   calagem, fito e ligação com o talhão do app; entrada "Unidades e
+   versões do plano" abre a tela Unidades e Plano (era o botão "Abrir
+   Unidades e Plano"), que agora volta para cá.
+6. **🔐 Códigos de acesso** — lista com escopo e código (era "Códigos
+   de acesso"), detalhe com "gerar novo" em Zona de cuidado (confirmação
+   e código novo inline, sem alert) e "＋ Novo código combinado" (era
+   "novo código combinado").
+7. **📚 Catálogos** — por atividade (Café, Grãos, Pecuária), cada lista
+   fechada com contagem; termos padrão vêm do código (só leitura) e o
+   escritório pode **acrescentar termos** (D.catalogoExtra) em funções,
+   operações e pragas/doenças/daninhas — entram nas listas do gerente
+   daquela atividade (funcoesDa, opcoesAtiv/fasesDa, sugestaoFitoDa);
+   sem termos extras nada muda. Máquinas e equipamentos (era o cartão
+   com busca e vínculo por fazenda) e Insumos (era "Insumos") moram
+   aqui, com formulário inline em vez de prompts.
+8. **🔌 Integrações e robôs** — Supabase, robô iCrop (última medição ×
+   última gravação, de-para, parcelas vencendo), robô Solinftec
+   (SOLINFTEC_AUTO, última data, linhas sem de-para, operações sem
+   nome), plano de safra; "Baixar agora" = syncTudo.
+9. **📡 Importações manuais** — importador de planilha Solinftec/iCrop
+   (era "Telemetria — Importar arquivo do dia") e a lista das
+   importações feitas; a tela de importar volta para cá.
+10. **🔄 Sincronização e dados** — status e fila (era "Sincronização
+    entre celulares"), URL/chave em "Mais opções", "Sincronizar agora",
+    exportar CSV (era o botão do painel, que continua lá) e backup JSON
+    (novo); Zona de cuidado: limpar dados de teste (registros exemplo).
+11. **ℹ️ Sobre** — versão, LEIA-ME, carteira de relatórios (era o cartão
+    "Relatórios da Controladoria" da v54), ESTADO.md, contato.
+Constante APP_VERSAO alimenta os rodapés e o Sobre. Migração de seed
+preserva catalogoExtra, inventarioPec, unidades criadas por desmembrar
+e os campos entidade/inativa.
+
 ## Carteira de relatórios: ver docs/relatorios.md
-Desde a v54 o app aponta para ela: em Escritório › Cadastros (só ADMIN)
-o botão "Abrir carteira de relatórios" abre `relatorios.html`, página
+Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
+(só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
 nova do site (fora do index.html e do cache do sw.js) que lê
 `docs/relatorios.md` e os prompts da pasta `docs/relatorios/` e mostra
 um botão "copiar prompt" por relatório. Precisa de internet; nada é

@@ -1,5 +1,15 @@
 # Catálogos por atividade — fonte oficial do vocabulário
 
+> **Termos acrescentados pelo escritório (v55).** Em Cadastros › Catálogos
+> o ADMIN pode acrescentar termos em funções (mão de obra), operações
+> (café: LISTA_ATIV; grãos: fase "Outras (cadastro do escritório)") e
+> pragas/doenças/daninhas de café e grãos. Eles ficam em
+> `D.catalogoExtra` no aparelho (sincronizam junto com os dados) e
+> entram no fim das listas do gerente daquela atividade. Este arquivo
+> descreve só o vocabulário padrão do código; termos extras são locais
+> e não constam aqui.
+
+
 Este arquivo é a especificação oficial das operações e dos campos do
 boletim, por atividade. O código (index.html) implementa EXATAMENTE
 o que está aqui — nem mais, nem menos. Mudou aqui? Muda no código no
