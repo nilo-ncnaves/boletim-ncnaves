@@ -2124,7 +2124,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v53</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v54</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -2152,7 +2152,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v53 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v54 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3835,6 +3835,9 @@ function vCadastros(){
     <div class="cartao"><h3>🌱 Unidades e Plano de safra</h3>
       <p class="mut" style="font-size:.78rem">Cadastro mestre das unidades do agrônomo (setores, pivôs e talhões do plano), apelidos por sistema e versões do plano de safra 2026/27: rodar a auditoria e publicar a versão vigente. O plano é referência para comparação — nunca receituário; o gerente não vê nada disto na v52.</p>
       <button class="btn mt" id="bt-unidplano">Abrir Unidades e Plano</button></div>
+    <div class="cartao"><h3>Relatórios da Controladoria</h3>
+      <p class="mut" style="font-size:.78rem">Carteira dos relatórios do grupo (o que sai do painel, o que roda no Cowork, o que ainda aguarda) e os prompts prontos para copiar e colar no Cowork. Abre uma página do site; precisa de internet. A carteira vive em docs/relatorios.md — esta tela só aponta para lá.</p>
+      <button class="btn mt" id="bt-relatorios">Abrir carteira de relatórios</button></div>
     <div class="cartao"><h3>📡 Telemetria — Solinftec / iCrop</h3>
       <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar.</p>
       <button class="btn mt" id="bt-importar">📥 Importar arquivo do dia</button></div>
@@ -4738,6 +4741,7 @@ function ligarEventos(tela){
       novoCombo=null; ir("cadastros",null,true); return; }
     /* Escritório: Unidades e Plano de safra (v52) — só ADMIN */
     if(t.id==="bt-unidplano"){ if(!podeCadastros()) return; upEstado.dados=null; upEstado.erro=""; ir("unidplano"); upRecarregar(); return; }
+    if(t.id==="bt-relatorios"){ if(!podeCadastros()) return; window.open("relatorios.html","_blank"); return; }
     if(d.up!==undefined){ if(!podeCadastros()) return; upClique(d,t); return; }
     /* entrada e fazenda */
     if(d.atividade){ const u=D.usuarios.find(x=>x.papel==="gerente"); if(!u) return;
