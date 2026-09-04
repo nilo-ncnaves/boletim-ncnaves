@@ -79,6 +79,12 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 ## Como rodar um relatório PRONTO no Cowork
 
+Caminho curto (v54): no app, com código ADMIN, Escritório › Cadastros ›
+"Abrir carteira de relatórios" abre a página
+https://boletim-ncnaves.netlify.app/relatorios.html, que lê esta carteira
+e os prompts direto da pasta docs e tem o botão "copiar prompt" em cada
+um. O passo a passo manual é o mesmo:
+
 1. Abrir `docs/relatorios/nn-nome.md` e copiar o prompt inteiro.
 2. Abrir no Safari cada URL REST listada no prompt (a chave publishable
    já vai na URL; é a mesma que está no app), selecionar tudo e copiar.

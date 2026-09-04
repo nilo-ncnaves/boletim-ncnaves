@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v53** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v54** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -267,6 +267,13 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   publishable).
 
 ## Carteira de relatórios: ver docs/relatorios.md
+Desde a v54 o app aponta para ela: em Escritório › Cadastros (só ADMIN)
+o botão "Abrir carteira de relatórios" abre `relatorios.html`, página
+nova do site (fora do index.html e do cache do sw.js) que lê
+`docs/relatorios.md` e os prompts da pasta `docs/relatorios/` e mostra
+um botão "copiar prompt" por relatório. Precisa de internet; nada é
+copiado para dentro do app. Telas de gerente, pós-colheita e Diretoria
+idênticas à v53 (prova em scripts/regressao_render.cjs).
 A lista oficial dos 24 relatórios do Grupo LGS (nível, o que responde,
 fonte, cadência, dono e status EXISTE / PRONTO / AGUARDA) está em
 `docs/relatorios.md`. Os prompts salvos para o Cowork, um por relatório

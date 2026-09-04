@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Relatórios da Controladoria · Boletim NCNaves</title>
+<style>
+:root{ --papel:#FBF9F4; --cartao:#FFFFFF; --tinta:#23201A; --tinta-2:#5C554A;
+  --verde:#2F5233; --verde-claro:#E9F0E5; --cereja:#B5432E; --cereja-claro:#F7E5E1;
+  --amarelo:#C98A1B; --amarelo-claro:#F8EFDC; --linha:#E3DDD2; }
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{overflow-wrap:anywhere;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--papel);color:var(--tinta);font-size:16px;line-height:1.45;padding:14px 12px calc(24px + env(safe-area-inset-bottom))}
+main{max-width:860px;margin:0 auto}
+h1{font-size:1.25rem;line-height:1.2}
+h2{font-size:1.02rem;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--linha)}
+h3{font-size:.95rem;margin:16px 0 6px}
+p{margin:6px 0}
+.mut{color:var(--tinta-2);font-size:.86rem}
+.num{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.cartao{background:var(--cartao);border:1px solid var(--linha);padding:12px 14px;margin:12px 0}
+.aviso{background:var(--amarelo-claro);border-left:4px solid var(--amarelo);padding:8px 12px;margin:10px 0;font-size:.9rem}
+.aviso.erro{background:var(--cereja-claro);border-left-color:var(--cereja)}
+.aviso.ok{background:var(--verde-claro);border-left-color:var(--verde)}
+.tabela{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--linha);vertical-align:top}
+th{border-bottom:2px solid var(--linha);font-size:.78rem;letter-spacing:.03em;text-transform:uppercase;color:var(--tinta-2)}
+td.nivel{background:var(--papel);font-weight:700}
+ul{padding-left:20px;margin:6px 0}
+li{margin:3px 0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em;background:var(--papel);padding:0 3px}
+a{color:var(--verde)}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border:1.5px solid var(--verde);background:var(--verde);color:#fff;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit}
+.btn.sec{background:var(--cartao);color:var(--verde)}
+.btn:active{opacity:.85}
+.prompt{border-top:1px solid var(--linha);padding:10px 0}
+.prompt .cab{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.prompt .cab b{flex:1 1 220px}
+.prompt pre{white-space:pre-wrap;word-break:break-word;font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--papel);border:1px solid var(--linha);padding:10px;margin-top:8px;max-height:60vh;overflow:auto}
+.status-EXISTE{color:var(--verde);font-weight:700}
+.status-PRONTO{color:var(--amarelo);font-weight:700}
+.status-AGUARDA{color:var(--tinta-2);font-weight:700}
+.rodape{margin-top:28px;text-align:center}
+@media print{.btn,.aviso.ok{display:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Relatórios da Controladoria</h1>
+  <p class="mut">Grupo LGS · carteira de relatórios e prompts prontos para o Cowork. Esta página lê os arquivos da pasta <code>docs/</code> do repositório: a fonte é uma só.</p>
+  <p class="mut" id="hoje"></p>
+
+  <div class="cartao" id="prompts">
+    <h2 style="margin-top:0">Prompts prontos (relatórios PRONTO)</h2>
+    <p class="mut">Toque em <b>copiar prompt</b>, abra o Cowork e cole. Depois abra no Safari as URLs que o prompt lista (troque DE e ATE pelas datas) e cole cada resposta abaixo do nome da tabela. "ver" mostra o arquivo inteiro, com o passo a passo.</p>
+    <div id="lista-prompts"><p class="mut">Carregando…</p></div>
+  </div>
+
+  <div class="cartao">
+    <h2 style="margin-top:0">Carteira de relatórios</h2>
+    <div id="carteira"><p class="mut">Carregando docs/relatorios.md…</p></div>
+  </div>
+
+  <p class="rodape mut">Boletim NCNaves · v54 · página do Escritório · <a href="./">voltar ao app</a></p>
+</main>
+<script>
+(function(){
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const DIAS=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  const hoje=new Date();
+  document.getElementById("hoje").textContent="Hoje: "+DIAS[hoje.getDay()]+", "+hoje.toLocaleDateString("pt-BR")+". Confira no calendário resumido o que está previsto para esta semana.";
+
+  /* markdown mínimo: títulos, tabelas, listas, parágrafos, negrito, código, links */
+  function inline(t){
+    t=esc(t);
+    t=t.replace(/`([^`]+)`/g,(m,c)=>"<code>"+c+"</code>");
+    t=t.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+    t=t.replace(/\b(EXISTE|PRONTO|AGUARDA)\b/g,(m)=>'<span class="status-'+m+'">'+m+"</span>");
+    t=t.replace(/(https?:\/\/[^\s<)]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return t;
+  }
+  function md(txt){
+    const L=txt.replace(/\r/g,"").split("\n"); let h="", i=0;
+    const junta=(ini,fim)=>L.slice(ini,fim).join(" ");
+    while(i<L.length){
+      const l=L[i];
+      if(/^#{1,3} /.test(l)){ const n=l.match(/^#+/)[0].length; const nivel=n===1?"h1":(n===2?"h2":"h3");
+        if(n===1){ i++; continue; } /* o título do arquivo já é o da página */
+        h+="<"+nivel+">"+inline(l.replace(/^#+ /,""))+"</"+nivel+">"; i++; continue; }
+      if(/^\|/.test(l)){ const rows=[]; while(i<L.length && /^\|/.test(L[i])){ rows.push(L[i]); i++; }
+        const cel=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+        const cab=cel(rows[0]); const corpo=rows.slice(2);
+        h+='<div class="tabela"><table><tr>'+cab.map(c=>"<th>"+inline(c)+"</th>").join("")+"</tr>";
+        corpo.forEach(r=>{ const cs=cel(r);
+          if(cs.length>1 && cs.slice(1).every(c=>c==="")){ h+='<tr><td class="nivel" colspan="'+cab.length+'">'+inline(cs[0])+"</td></tr>"; return; }
+          h+="<tr>"+cs.map((c,k)=>"<td"+(k===0&&/^\d+$/.test(c)?' class="num"':"")+">"+inline(c)+"</td>").join("")+"</tr>"; });
+        h+="</table></div>"; continue; }
+      if(/^\s*[-*] /.test(l)){ h+="<ul>"; while(i<L.length && (/^\s*[-*] /.test(L[i]) || /^\s{2,}\S/.test(L[i]))){
+          if(/^\s*[-*] /.test(L[i])){ let item=L[i].replace(/^\s*[-*] /,""); let j=i+1;
+            while(j<L.length && /^\s{2,}\S/.test(L[j]) && !/^\s*[-*] /.test(L[j])){ item+=" "+L[j].trim(); j++; }
+            h+="<li>"+inline(item)+"</li>"; i=j; } else i++; }
+        h+="</ul>"; continue; }
+      if(/^\s*\d+\. /.test(l)){ h+="<ol>"; while(i<L.length && (/^\s*\d+\. /.test(L[i]) || /^\s{2,}\S/.test(L[i]))){
+          if(/^\s*\d+\. /.test(L[i])){ let item=L[i].replace(/^\s*\d+\. /,""); let j=i+1;
+            while(j<L.length && /^\s{2,}\S/.test(L[j]) && !/^\s*\d+\. /.test(L[j])){ item+=" "+L[j].trim(); j++; }
+            h+="<li>"+inline(item)+"</li>"; i=j; } else i++; }
+        h+="</ol>"; continue; }
+      if(l.trim()===""){ i++; continue; }
+      let j=i; while(j<L.length && L[j].trim()!=="" && !/^(#|\||\s*[-*] |\s*\d+\. )/.test(L[j])) j++;
+      h+="<p>"+inline(junta(i,j))+"</p>"; i=j;
+    }
+    return h;
+  }
+
+  async function texto(url){ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) throw new Error(r.status+" "+url); return await r.text(); }
+
+  function copiar(t, botao){
+    const feito=()=>{ const ant=botao.textContent; botao.textContent="copiado ✔"; setTimeout(()=>{ botao.textContent=ant; },1800); };
+    const manual=()=>{ const ta=document.createElement("textarea"); ta.value=t; ta.style.position="fixed"; ta.style.top="0"; document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); let ok=false; try{ ok=document.execCommand("copy"); }catch(e){} document.body.removeChild(ta);
+      if(ok) feito(); else alert("Não consegui copiar sozinho. Toque em 'ver', selecione o texto e copie."); };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(feito, manual); else manual();
+  }
+
+  async function carregar(){
+    let carteira="";
+    try{ carteira=await texto("docs/relatorios.md"); }
+    catch(e){ document.getElementById("carteira").innerHTML='<div class="aviso erro">Não consegui ler docs/relatorios.md ('+esc(e.message)+'). Sem internet esta página não funciona.</div>';
+      document.getElementById("lista-prompts").innerHTML=""; return; }
+    document.getElementById("carteira").innerHTML=md(carteira);
+
+    const arquivos=[...new Set((carteira.match(/docs\/relatorios\/\d\d-[a-z0-9-]+\.md/g)||[]))].sort();
+    const alvo=document.getElementById("lista-prompts");
+    if(!arquivos.length){ alvo.innerHTML='<p class="mut">Nenhum prompt listado na carteira.</p>'; return; }
+    alvo.innerHTML="";
+    for(const arq of arquivos){
+      const bloco=document.createElement("div"); bloco.className="prompt";
+      let conteudo="";
+      try{ conteudo=await texto(arq); }
+      catch(e){ bloco.innerHTML='<div class="cab"><b>'+esc(arq)+'</b></div><div class="aviso erro">Arquivo não encontrado ('+esc(e.message)+').</div>'; alvo.appendChild(bloco); continue; }
+      const titulo=(conteudo.match(/^# (.+)$/m)||[,arq])[1];
+      const cad=(conteudo.match(/Cadência: \*\*([^*]+)\*\*/)||[,""])[1];
+      /* marcadores só valem em linha própria (o passo a passo cita "=== PROMPT ===" entre crases) */
+      const mIni=conteudo.match(/^=== PROMPT ===$/m), mFim=conteudo.match(/^=== FIM DO PROMPT ===$/m);
+      const prompt=(mIni&&mFim&&mFim.index>mIni.index)?conteudo.slice(mIni.index+mIni[0].length, mFim.index).trim():conteudo;
+      bloco.innerHTML='<div class="cab"><b>'+esc(titulo)+'</b>'+(cad?'<span class="mut">'+esc(cad)+'</span>':"")+
+        '<button class="btn" data-copiar>copiar prompt</button><button class="btn sec" data-ver>ver</button></div>';
+      const pre=document.createElement("pre"); pre.hidden=true; pre.textContent=conteudo; bloco.appendChild(pre);
+      bloco.querySelector("[data-copiar]").addEventListener("click",ev=>copiar(prompt, ev.currentTarget));
+      bloco.querySelector("[data-ver]").addEventListener("click",ev=>{ pre.hidden=!pre.hidden; ev.currentTarget.textContent=pre.hidden?"ver":"fechar"; });
+      alvo.appendChild(bloco);
+    }
+  }
+  carregar();
+})();
+</script>
+</body>
+</html>
