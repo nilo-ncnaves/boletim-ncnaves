@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v55** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v56** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -266,7 +266,7 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
 - Sincronização Supabase: ligada por padrão (SYNC_PADRAO com a chave
   publishable).
 
-## Cadastros (v55 — menu → assunto → item)
+## Cadastros (v56 — menu → assunto → item)
 A tela única e longa de Cadastros virou navegação em níveis, no padrão
 de aplicativos de gestão: **menu** (11 assuntos, cartões grandes com
 número-resumo e busca global no topo) → **lista** do assunto (busca
@@ -276,7 +276,7 @@ do item (cabeçalho fixo com "‹ Voltar" para o nível anterior, botão
 principal fixo no rodapé, "Mais opções" e "Zona de cuidado" fechados,
 confirmações inline, "Salvo" discreto e retorno à lista na posição do
 item). Só o código ADMIN vê. Telas de gerente, pós-colheita e Diretoria
-idênticas à v54 (scripts/regressao_render.cjs). Onde cada função antiga
+idênticas à v55 (scripts/regressao_render.cjs). Onde cada função antiga
 passou a morar:
 1. **🏡 Fazendas e unidades** — perfil/atividade da fazenda (era
    "Perfil das fazendas"), estrutura de pós-colheita (era "Estrutura de
@@ -329,6 +329,44 @@ passou a morar:
 Constante APP_VERSAO alimenta os rodapés e o Sobre. Migração de seed
 preserva catalogoExtra, inventarioPec, unidades criadas por desmembrar
 e os campos entidade/inativa.
+## Relatórios automáticos — fase 1 (v55): motor no Supabase + vitrine
+Princípio: o Supabase calcula em horário agendado (pg_cron) e grava o
+resultado pronto; o app só lê e exibe. Nada é calculado no celular além
+de formatação. Detalhe por relatório (tabelas e campos reais lidos,
+agenda, formato) em `docs/relatorios.md`, seção "Motor de relatórios
+automáticos".
+- **Motor** (`sql/020-relatorios-motor.sql`): tabela `relatorios_gerados`
+  (relatorio, periodo_ini, periodo_fim, unidade_id nulo = grupo, gerado_em,
+  dados jsonb, texto reservado) com leitura anon e escrita só pelas funções
+  (security definer; sem policy de insert/update); `relatorios_execucoes`
+  (diário de bordo); `rel_unidades` (espelho das 24 unidades do app —
+  unidade nova no app precisa de insert aqui) e `rel_icrop_depara`.
+  Funções: `rel_farol(7|30)`, `rel_dito_medido_icrop`,
+  `rel_dito_medido_solinftec`, `rel_irrigacao_recomendado_executado`,
+  `rel_balanco_hidrico`, `rel_custo_fisico_talhao`, `rel_rebanho`,
+  `rel_plano_executado`, cada uma lendo as tabelas reais (boletins.payload,
+  icrop_manejo e bruto, solinftec_diario, plano_*), mais as rodadas
+  `rel_rodar_diario/semanal/mensal/plano` (cada relatório protegido por
+  exception). Ids antigos de fazenda passam por `rel_fz_atual` (= FZ_LEGADO).
+  Agenda pg_cron (UTC): diário 08:00 (05:00 BRT), sexta 08:10, dia 1 08:20,
+  segunda 08:30 — fora dos horários dos robôs iCrop e Solinftec.
+  `sql/021-relatorios-teste.sql`: chamadas manuais + consultas de conferência.
+- **App**: `baixarRelatorios()` em `syncTudo` baixa só as unidades do
+  escopo do código (filtro na REST + trava local), guarda em
+  `bdf:relatorios`, funciona offline com o último baixado; tabela
+  inexistente = silêncio. Diretoria: seção "📊 Relatórios" (fechada) com
+  filtro dia/semana/mês, último período gerado, "N para conferir" em
+  âmbar; toque abre a tela do relatório (tabelas compactas `.rel-tab`,
+  fonte tabular, âmbar = para conferir, vermelho só janela fechada) com
+  navegação anterior/próximo, "📲 Compartilhar" (texto limpo para
+  WhatsApp) e "🖨 PDF" (impressão). Gerente: cartão "📊 Meus relatórios"
+  com farol 7 dias e dito × medido (iCrop e Solinftec) SOMENTE da unidade
+  dele; a tela filtra de novo por `sessao.fazendaId` e nunca abre
+  relatórios da Diretoria. Sem relatório baixado o cartão não aparece
+  (telas do gerente idênticas à v54 — prova em scripts/regressao_render.cjs).
+- Vocabulário obrigatório: "sem registro" (nunca "não fez"); diferença
+  entre dito e medido é "para conferir" (nunca "erro"); produto do plano só
+  como "previsto pelo agrônomo".
 
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
@@ -350,6 +388,16 @@ relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
 e sql/001-002, listadas nas PENDÊNCIAS).
 
 ## PENDÊNCIAS
+- **Relatórios automáticos (v55) — para o Nilo:** colar no SQL Editor,
+  nesta ordem, o que ainda faltar: `sql/003-solinftec.sql` (se não rodou),
+  `sql/005` → `006` → `007` (plano; sem eles o relatório plano × executado
+  grava só um aviso), depois `sql/020-relatorios-motor.sql` e, para não
+  esperar a madrugada, `sql/021-relatorios-teste.sql` (gera tudo na hora e
+  traz as consultas de conferência). Depois sincronizar o app e abrir
+  Diretoria › 📊 Relatórios. Unidade nova no app: inserir também em
+  `rel_unidades`. Fase 2 (futuro): texto pronto na coluna `texto`, custo
+  em R$ de insumo (ERP AgroGestão), lotação (área de pasto no Supabase),
+  percentímetro executado (se a iCrop mandar no bruto).
 - **Plano de safra (v52) — para o Nilo:**
   1. Rodar `sql/005-plano-safra.sql` e depois
      `sql/006-plano-safra-seed-2627.sql` no SQL Editor (o seed confere

@@ -1,6 +1,6 @@
 # Catálogos por atividade — fonte oficial do vocabulário
 
-> **Termos acrescentados pelo escritório (v55).** Em Cadastros › Catálogos
+> **Termos acrescentados pelo escritório (v56).** Em Cadastros › Catálogos
 > o ADMIN pode acrescentar termos em funções (mão de obra), operações
 > (café: LISTA_ATIV; grãos: fase "Outras (cadastro do escritório)") e
 > pragas/doenças/daninhas de café e grãos. Eles ficam em

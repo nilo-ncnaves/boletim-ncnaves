@@ -122,12 +122,21 @@ h3{font-size:.95rem;font-weight:700}
 /* Aviso de rascunho / offline */
 .aviso{background:var(--amarelo-claro);border:1px solid #ecd9ad;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:12px}
 .aviso.verde{background:var(--verde-claro);border-color:#cfe0c8}
+/* Relatórios automáticos (v55): tabelas compactas, números tabulares, âmbar = para conferir */
+.rel-tab{overflow-x:auto;margin:6px 0}
+.rel-tab table{width:100%;border-collapse:collapse;font-size:.8rem}
+.rel-tab th,.rel-tab td{text-align:left;padding:4px 5px;border-bottom:1px solid var(--linha);vertical-align:top;white-space:nowrap}
+.rel-tab th{font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;color:var(--tinta-2);border-bottom:2px solid var(--linha)}
+.rel-tab td.num,.rel-tab th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.rel-tab tr.conferir td{background:var(--amarelo-claro)}
+.rel-tab tr.critico td{background:var(--cereja-claro)}
+.rel-conf{color:#8a5f10;font-weight:600}
 .foto-mini{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--linha)}
 .foto-grande{width:100%;border-radius:10px;border:1px solid var(--linha);margin-top:8px}
 .lista-limpa{list-style:none}
 .lista-limpa li{padding:9px 0;border-bottom:1px solid var(--linha)}
 .lista-limpa li:last-child{border:none}
-/* Cadastros (v55): menu → lista → detalhe; sem sombra, sem canto arredondado */
+/* Cadastros (v56): menu → lista → detalhe; sem sombra, sem canto arredondado */
 .cad-busca{margin:0 0 10px;min-height:46px;border-radius:0}
 .cad-menu{display:flex;align-items:center;gap:12px;width:100%;background:var(--cartao);border:1px solid var(--linha);padding:14px;margin-bottom:8px;text-align:left;min-height:64px}
 .cad-menu .ico{font-size:1.3rem;width:34px;text-align:center;flex:none}
@@ -905,7 +914,7 @@ async function carregarTudo(){
     const dMaq=D.deparaMaq||{}, dTal=D.deparaTal||{}, mImp=D.mapaImport||{};
     const uDoses=D.ultimasDoses||{}, uRec=D.ultimasReceitas||{}, uFert=D.ultimasFert||{}, insApr=D.insumosAprendidos||[];
     const pivLoc=D.pivosLocais||{}, uOpsTal=D.ultimasOpsTal||{}, uRecTal=D.ultimasReceitasTal||{}, uEvPec=D.ultimoEvPec||{};
-    const catEx=D.catalogoExtra||{}, invPec=D.inventarioPec||{};   /* Cadastros v55 */
+    const catEx=D.catalogoExtra||{}, invPec=D.inventarioPec||{};   /* Cadastros v56 */
     const fzExtras=(D.fazendas||[]).filter(f=>!semente.fazendas.some(x=>x.id===f.id));
     const fzCampos={}; (D.fazendas||[]).forEach(f=>{ fzCampos[f.id]={entidade:f.entidade||"", inativa:!!f.inativa}; });
     D = semente;
@@ -956,6 +965,8 @@ async function carregarTudo(){
   D.posColheitas = D.posColheitas||[];
   /* plano de safra vigente guardado no aparelho (v52) — sem cache o app é igual à v51 */
   try{ const pc=await Persist.get("bdf:plano"); planoCache=pc?(JSON.parse(pc)||{}):{}; }catch(e){ planoCache={}; }
+  /* relatórios automáticos já baixados (v55) — sem rede vale o último; sem cache, nada aparece */
+  try{ const rc=await Persist.get("bdf:relatorios"); relCache=rc?(JSON.parse(rc)||[]):[]; }catch(e){ relCache=[]; }
   D.remessas = D.remessas||[];
   D.estruturas = D.estruturas||{};
   D.telemetria = D.telemetria||[];
@@ -1655,6 +1666,305 @@ function cartaoSolinftecPainel(){
     ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
     <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
 }
+/* ---------- Relatórios automáticos (v55): o Supabase calcula em horário agendado
+   (sql/020-relatorios-motor.sql, pg_cron) e grava o resultado pronto em
+   relatorios_gerados; o app só LÊ e mostra. Nada é calculado no celular além de
+   formatação (nome do talhão pelo cadastro, datas, números). Regras de tom:
+   diferença entre dito e medido é "para conferir", nunca "erro"; falta de
+   boletim é "sem registro", nunca "não fez". O gerente só vê a própria unidade. */
+const REL_CATALOGO={
+  farol_7:{nome:"Farol de completude — 7 dias", per:"dia", gerente:true},
+  farol_30:{nome:"Farol de completude — 30 dias", per:"dia", gerente:true},
+  dito_medido_icrop_dia:{nome:"Gerente × iCrop — dia", per:"dia", gerente:true},
+  dito_medido_icrop_semana:{nome:"Gerente × iCrop — semana", per:"semana", gerente:true},
+  dito_medido_solinftec_dia:{nome:"Máquinas × Solinftec — dia", per:"dia", gerente:true},
+  dito_medido_solinftec_semana:{nome:"Máquinas × Solinftec — semana", per:"semana", gerente:true},
+  balanco_hidrico_dia:{nome:"Balanço hídrico por pivô — dia", per:"dia"},
+  irrigacao_rec_exec_semana:{nome:"Irrigação: recomendado × executado — semana", per:"semana"},
+  custo_fisico_talhao_mes:{nome:"Custo físico por talhão — mês", per:"mes"},
+  rebanho_mes:{nome:"Rebanho — mês", per:"mes"},
+  plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"}
+};
+let relCache=[];                 /* linhas de relatorios_gerados guardadas no aparelho (bdf:relatorios) */
+let relFiltro={per:""};          /* filtro da seção do painel: "" | dia | semana | mes */
+let relVista={rel:"",ini:"",fim:""};  /* relatório aberto na tela "relat" */
+/* Baixa os resultados prontos (últimos 60 dias) SÓ das unidades do escopo do
+   código de acesso. A linha do grupo (unidade_id nulo) só entra em aparelho com
+   painel. Tabela ainda não criada ou sem rede: fica o último baixado. */
+async function baixarRelatorios(){
+  if(!syncAtivo()) return;
+  try{
+    const esc0=escopoAtual(); if(!esc0) return;
+    const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
+    if(!tudo && !ids.length) return;
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    const dAtras=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+    const pedidos=[
+      ["farol_7,farol_30", dAtras(8)],
+      ["dito_medido_icrop_dia,dito_medido_solinftec_dia,balanco_hidrico_dia", dAtras(14)],
+      ["dito_medido_icrop_semana,dito_medido_solinftec_semana,irrigacao_rec_exec_semana,custo_fisico_talhao_mes,rebanho_mes,plano_executado_mes", dAtras(60)]
+    ];
+    let novas=[];
+    for(const [rels,de] of pedidos){
+      let url=syncCfg.url+"/rest/v1/relatorios_gerados?select=id,relatorio,periodo_ini,periodo_fim,unidade_id,gerado_em,dados"
+        +"&relatorio=in.("+rels+")&periodo_fim=gte."+de+"&order=periodo_fim.desc,gerado_em.desc&limit=1000";
+      if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
+      const r=await fetch(url,cab); if(!r.ok) return;
+      const linhas=await r.json(); if(!Array.isArray(linhas)) return;
+      novas=novas.concat(linhas);
+    }
+    /* trava: unidade fora do escopo nunca fica no aparelho, venha o que vier do banco */
+    novas=novas.filter(l=>l && REL_CATALOGO[l.relatorio] && l.dados && (tudo || (l.unidade_id && ids.includes(l.unidade_id))));
+    const vistos=new Set(); relCache=novas.filter(l=>{ if(vistos.has(l.id)) return false; vistos.add(l.id); return true; });
+    await Persist.set("bdf:relatorios", JSON.stringify(relCache));
+  }catch(e){}
+}
+const relLinhas=(rel,ini,fim)=>relCache.filter(l=>l.relatorio===rel && (!ini || (l.periodo_ini===ini && l.periodo_fim===fim)));
+const relPeriodos=rel=>[...new Set(relCache.filter(l=>l.relatorio===rel).map(l=>l.periodo_ini+"|"+l.periodo_fim))].sort().reverse();
+const relNum=(v,d)=>(v==null||v==="")?"—":n0(v).toLocaleString("pt-BR",{maximumFractionDigits:d==null?1:d});
+const relTal=id=>{ if(!id) return ""; const t=D.talhoes.find(x=>x.id===id); return t?t.nome:String(id); };
+const relUni=id=>{ if(!id) return "Grupo"; const f=D.fazendas.find(x=>x.id===id); return f?f.nome:id; };
+const MESES_REL=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function relRotuloPer(rel,ini,fim){
+  const per=(REL_CATALOGO[rel]||{}).per;
+  if(ini===fim) return fmtData(ini);
+  if(per==="mes"){ const [a,m]=ini.split("-"); const rot=MESES_REL[parseInt(m,10)-1]+"/"+a;
+    const ultimo=new Date(parseInt(a,10),parseInt(m,10),0).getDate();
+    return fim.slice(8)==String(ultimo).padStart(2,"0")?rot:rot+" (até "+fmtDataCurta(fim)+")"; }
+  return fmtDataCurta(ini)+" a "+fmtData(fim);
+}
+/* tem algo "para conferir"? (âmbar na lista) */
+function relAlerta(l){
+  const d=l.dados||{}, r=d.resumo||{};
+  if(l.relatorio.startsWith("farol")) return l.unidade_id ? d.em_dia===false : (n0(d.em_dia)<n0(d.total));
+  if(l.relatorio.startsWith("dito_medido")) return n0(r.n_div)>0;
+  if(l.relatorio==="irrigacao_rec_exec_semana"||l.relatorio==="balanco_hidrico_dia") return n0(r.n_alertas)>0;
+  if(l.relatorio==="rebanho_mes") return n0(r.alertas)>0;
+  if(l.relatorio==="plano_executado_mes") return n0(r.amarelos)+n0(r.vermelhos)+n0(r.gantt_amarelo)>0;
+  return false;
+}
+const relFarolCor=f=>({verde:"ok",amarelo:"espera",vermelho:"critico"}[f]||"vazio");
+const relTabela=(cab,linhas,classes)=>`<div class="rel-tab"><table><tr>${cab.map(c=>`<th${/^#/.test(c)?' class="num"':""}>${esc(c.replace(/^#/,""))}</th>`).join("")}</tr>
+  ${linhas.map((l,i)=>`<tr${classes&&classes[i]?` class="${classes[i]}"`:""}>${l.map((c,k)=>`<td${/^#/.test(cab[k])?' class="num"':""}>${c==null?"—":c}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cab.length}" class="mut">nada registrado no período</td></tr>`}</table></div>`;
+
+/* ---- Seção do painel da Diretoria ---- */
+function secaoRelatoriosPainel(){
+  const per=relFiltro.per;
+  const itens=Object.keys(REL_CATALOGO).filter(k=>!per||REL_CATALOGO[k].per===per).map(k=>{
+    const ps=relPeriodos(k); if(!ps.length) return "";
+    const [ini,fim]=ps[0].split("|"), ls=relLinhas(k,ini,fim), uni=ls.filter(l=>l.unidade_id);
+    const conf=uni.filter(relAlerta).length;
+    return `<li><button class="linha-flex" style="width:100%;text-align:left" data-relab="${k}|${ini}|${fim}">
+      <span class="farol ${conf?"espera":"ok"}"></span>
+      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${uni.length} unidade${uni.length===1?"":"s"}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
+      <span class="mut">›</span></button></li>`;
+  }).join("");
+  const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
+  return `<details class="secao"><summary><span class="ico">📊</span>Relatórios<span class="resumo">${relCache.length?"automáticos":"—"}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      ${relCache.length?`<div class="chips mt no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
+      <ul class="lista-limpa mt">${itens||"<li class='mut'>Nenhum relatório neste filtro ainda.</li>"}</ul>
+      <p class="mut" style="font-size:.72rem">Calculado no Supabase toda madrugada (motor sql/020); o app só mostra. Último cálculo: ${ultimo?new Date(ultimo).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}. Diferença entre dito e medido é "para conferir", nunca erro.</p>`
+      :`<p class="mut mt" style="font-size:.85rem">Ainda não há relatório calculado. O motor do Supabase (sql/020) roda toda madrugada e o app baixa ao sincronizar.</p>`}
+    </div></details>`;
+}
+/* ---- Cartão do gerente: farol e dito × medido SÓ da unidade dele ---- */
+function cartaoRelatoriosGerente(fz){
+  const meu=k=>relCache.filter(l=>l.relatorio===k && l.unidade_id===fz).sort((a,b)=>b.periodo_fim.localeCompare(a.periodo_fim))[0]||null;
+  const f7=meu("farol_7"), icd=meu("dito_medido_icrop_dia"), ics=meu("dito_medido_icrop_semana"), sod=meu("dito_medido_solinftec_dia"), sos=meu("dito_medido_solinftec_semana");
+  const linhas=[];
+  const item=(l,txt,alerta)=>`<li><button class="linha-flex" style="width:100%;text-align:left" data-relab="${l.relatorio}|${l.periodo_ini}|${l.periodo_fim}">
+      <span class="farol ${alerta?"espera":"ok"}"></span><span class="cresce">${txt}</span><span class="mut">›</span></button></li>`;
+  if(f7){ const d=f7.dados||{};
+    linhas.push(item(f7,`<b>Boletins — 7 dias</b><br><span class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2px;white-space:nowrap">${esc(d.marcas||"")}</span> <span class="mut">${n0(d.enviados)}/${n0(d.uteis)} · ${d.em_dia?"em dia":"sem registro ontem e hoje"}</span>`, d.em_dia===false)); }
+  const dm=(l,rot)=>{ if(!l) return; const r=(l.dados||{}).resumo||{}; const n=n0(r.n_div);
+    linhas.push(item(l,`<b>${rot}</b> <span class="mut">· ${relRotuloPer(l.relatorio,l.periodo_ini,l.periodo_fim)}</span><br><span class="mut">${n?n+" ponto"+(n>1?"s":"")+" para conferir":"boletim e medição batem"}</span>`, n>0)); };
+  dm(icd,"Boletim × iCrop (dia)"); dm(ics,"Boletim × iCrop (semana)"); dm(sod,"Máquinas × Solinftec (dia)"); dm(sos,"Máquinas × Solinftec (semana)");
+  if(!linhas.length) return "";
+  return `<div class="cartao"><h3>📊 Meus relatórios</h3>
+    <ul class="lista-limpa">${linhas.join("")}</ul>
+    <p class="mut" style="font-size:.75rem">Só desta unidade. Calculado no Supabase; diferença é "para conferir", não erro.</p></div>`;
+}
+/* ---- Tela do relatório (Diretoria: todas as unidades do escopo; gerente: só a dele) ---- */
+function relLinhasVista(){
+  const {rel,ini,fim}=relVista;
+  let ls=relLinhas(rel,ini,fim);
+  if(sessao && sessao.papel==="gerente"){
+    if(!(REL_CATALOGO[rel]||{}).gerente) return [];
+    ls=ls.filter(l=>l.unidade_id && l.unidade_id===sessao.fazendaId);   /* nunca outra unidade */
+  }else{
+    ls=ls.filter(l=>!l.unidade_id || podeVer(l.unidade_id));
+  }
+  const ordem=l=>!l.unidade_id?"":relUni(l.unidade_id);
+  return ls.sort((a,b)=>ordem(a).localeCompare(ordem(b),"pt-BR"));
+}
+function vRelat(){
+  const {rel,ini,fim}=relVista, cat=REL_CATALOGO[rel];
+  if(!cat) return topo("Relatório","",true)+`<p class="mut mt">Relatório não encontrado.</p>`;
+  const ps=relPeriodos(rel), i=ps.indexOf(ini+"|"+fim);
+  const ls=relLinhasVista();
+  const nav=`<div class="linha-flex mb no-print" style="gap:8px">
+    <button class="btn sec mini" data-relnav="ant" ${i<0||i>=ps.length-1?"disabled":""}>‹ anterior</button>
+    <span class="cresce centro" style="font-size:.85rem"><b>${relRotuloPer(rel,ini,fim)}</b></span>
+    <button class="btn sec mini" data-relnav="prox" ${i<=0?"disabled":""}>próximo ›</button></div>`;
+  const corpo=ls.length?relRender(rel,ls):`<div class="cartao"><p class="mut">Nada calculado para este período${sessao&&sessao.papel==="gerente"?" na sua unidade":""}.</p></div>`;
+  return topo(cat.nome, relRotuloPer(rel,ini,fim)+(sessao&&sessao.papel==="gerente"?" · "+fazenda(sessao.fazendaId).nome:""), true)+nav+corpo+`
+    <div class="linha-flex mt no-print" style="gap:8px">
+      <button class="btn sec mini" id="bt-rel-zap">📲 Compartilhar</button>
+      ${window.print?`<button class="btn sec mini" id="bt-rel-pdf">🖨 PDF</button>`:""}
+    </div>
+    <p class="mut centro" style="font-size:.72rem;margin-top:8px">Fonte: motor de relatórios do Supabase (sql/020). Gerado ${ls[0]&&ls[0].gerado_em?new Date(ls[0].gerado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}.</p>`;
+}
+function relNavegar(sentido){
+  const ps=relPeriodos(relVista.rel), i=ps.indexOf(relVista.ini+"|"+relVista.fim);
+  const j=sentido==="ant"?i+1:i-1; if(j<0||j>=ps.length) return;
+  const [ini,fim]=ps[j].split("|"); relVista={...relVista,ini,fim}; ir("relat");
+}
+/* renderização por relatório: tabelas compactas, âmbar onde há divergência/atraso */
+function relRender(rel,ls){
+  const conf=t=>`<span class="rel-conf">⚠ ${t}</span>`;
+  const bloco=(titulo,html,sub)=>`<div class="cartao"><h3>${titulo}</h3>${sub?`<p class="mut" style="font-size:.78rem">${sub}</p>`:""}${html}</div>`;
+  if(rel.startsWith("farol")){
+    const g=ls.find(l=>!l.unidade_id);
+    if(g){ const d=g.dados||{}, us=(d.unidades||[]).slice().sort((a,b)=>(a.em_dia===b.em_dia?0:a.em_dia?1:-1)||n0(a.enviados)-n0(b.enviados)||String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+      return bloco(esc(d.placar||""), relTabela(["Unidade","Dias","#Env.","Último envio"],
+        us.map(u=>[esc(u.nome), `<span class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1px">${esc(u.marcas||"")}</span>`, n0(u.enviados)+"/"+n0(u.uteis), u.ultimo_envio?fmtDataCurta(u.ultimo_envio):conf("sem registro")]),
+        us.map(u=>u.em_dia?"":"conferir")), "● enviado · ○ sem registro · – domingo. Em dia = enviou no último dia do período ou no anterior."); }
+    return ls.map(l=>{ const d=l.dados||{};
+      return bloco(esc(relUni(l.unidade_id)), `<p class="num" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2px;font-size:.95rem">${esc(d.marcas||"")}</p>
+        <p style="font-size:.9rem"><b>${n0(d.enviados)}</b> de <b>${n0(d.uteis)}</b> dias úteis com boletim${n0(d.faltantes)?` · ${n0(d.faltantes)} sem registro`:""} · ${d.em_dia?"em dia":conf("sem registro ontem e hoje")}${d.ultimo_envio?` · último envio ${fmtDataCurta(d.ultimo_envio)}`:""}</p>`
+        +relTabela(["Data","Situação"],(d.dias||[]).map(x=>[fmtDataCurta(x.data), x.enviado?"● enviado":x.domingo?"– domingo":conf("sem registro")]),(d.dias||[]).map(x=>(!x.enviado&&!x.domingo)?"conferir":"")),
+        "● enviado · ○ sem registro · – domingo"); }).join("");
+  }
+  if(rel.startsWith("dito_medido_icrop")){
+    return ls.map(l=>{ const d=l.dados||{}, r=d.resumo||{}, ch=d.chuva||{}, dia=l.periodo_ini===l.periodo_fim;
+      const pivos=(d.pivos||[]).map(p=>{ const nome=esc(p.nome_boletim||p.equipamento||("Pivô "+p.pivo));
+        if(dia){ const x=(p.dias||[])[0]||{}; return {c:[nome, x.status||conf("sem registro"), relNum(x.lamina_inf), relNum(x.lamina_med), (x.div||[]).length?conf((x.div||[]).length+" para conferir"):"ok"], k:(x.div||[]).length?"conferir":""}; }
+        return {c:[nome, n0(p.dias_rodou_inf), n0(p.dias_regou_med), relNum(p.lamina_inf_total), relNum(p.lamina_med_total), n0(p.n_div)?conf(n0(p.n_div)):"ok"], k:n0(p.n_div)?"conferir":""}; });
+      const chuva=`<p style="font-size:.85rem;margin-top:6px">🌧️ Chuva: boletim <b class="num">${relNum(ch.digitada)} mm</b> × estação <b class="num">${relNum(ch.estacao)} mm</b>${ch.pluviometro?` (pluviômetro ${relNum(ch.pluviometro)} mm)`:""}${n0(ch.dias_div)?" · "+conf(n0(ch.dias_div)+" dia"+(n0(ch.dias_div)>1?"s":"")+" com diferença > 5 mm"):""}</p>`;
+      const divs=(d.divergencias||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Para conferir</b></p><ul style="padding-left:18px;font-size:.82rem">${(d.divergencias||[]).map(x=>`<li>${fmtDataCurta(x.data)} · ${esc(x.nome||"")}: ${esc(x.texto||x.tipo)}</li>`).join("")}</ul>`:"";
+      const sem=[(d.sem_boletim||[]).length?"sem boletim: "+(d.sem_boletim||[]).map(fmtDataCurta).join(", "):"", (d.sem_medicao||[]).length?"sem medição iCrop: "+(d.sem_medicao||[]).map(fmtDataCurta).join(", "):""].filter(Boolean).join(" · ");
+      return bloco(esc(relUni(l.unidade_id))+(n0(r.n_div)?` <span class="tag amarelo">${n0(r.n_div)} para conferir</span>`:` <span class="tag verde">batem</span>`),
+        (dia?relTabela(["Pivô","Boletim disse","#mm inf.","#mm iCrop","Situação"],pivos.map(p=>p.c),pivos.map(p=>p.k))
+            :relTabela(["Pivô","#Dias rodou (boletim)","#Dias regou (iCrop)","#mm inf.","#mm iCrop","Conferir"],pivos.map(p=>p.c),pivos.map(p=>p.k)))
+        +chuva+(sem?`<p class="mut" style="font-size:.78rem">${esc(sem)}</p>`:"")+divs,
+        "Boletim (status/lâmina informados) × medição automática iCrop. Diferença é para conferir, nunca erro do gerente."); }).join("");
+  }
+  if(rel.startsWith("dito_medido_solinftec")){
+    const vistos=new Set();
+    return ls.filter(l=>{ const k=(l.dados||{}).mae||l.unidade_id; if(vistos.has(k)) return false; vistos.add(k); return true; }).map(l=>{ const d=l.dados||{}, r=d.resumo||{};
+      const dias=(d.dias||[]).filter(x=>x.boletim||x.medicao);
+      const eq=(d.equipamentos||[]);
+      return bloco(esc(d.mae_nome||relUni(l.unidade_id))+(n0(r.n_div)?` <span class="tag amarelo">${n0(r.n_div)} para conferir</span>`:` <span class="tag verde">batem</span>`),
+        `<p style="font-size:.85rem">Horas apontadas no boletim <b class="num">${relNum(r.h_boletim)} h</b> × medidas pela Solinftec <b class="num">${relNum(r.h_medido)} h</b>${n0(r.area_medida)?` · ${relNum(r.area_medida)} ha`:""}${n0(r.litros_medidos)?` · ${relNum(r.litros_medidos)} L`:""}</p>`
+        +relTabela(["Data","#h boletim","#h Solinftec","#ha","#L","Situação"],dias.map(x=>[fmtDataCurta(x.data),relNum(x.h_boletim),relNum(x.h_medido),relNum(x.area_medida),relNum(x.litros_medidos,0),x.div?conf({sem_registro:"sem boletim no dia",medido_sem_apontamento:"medido sem máquina apontada",apontado_sem_medicao:"apontado sem medição",horas_diferentes:"horas diferentes"}[x.div]||x.div):"ok"]),dias.map(x=>x.div?"conferir":""))
+        +(eq.length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Por equipamento</b></p>`+relTabela(["Equipamento","#h","#Ocioso %","#ha","#L","#L/h","#h boletim","Talhões"],eq.map(e=>[esc(e.equipamento),relNum(e.horas),relNum(e.ocioso_pct,0),relNum(e.area_ha),relNum(e.litros,0),relNum(e.l_h),relNum(e.h_boletim),esc(e.talhoes||"")])):"")
+        +((d.talhoes||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Por talhão (Solinftec)</b></p>`+relTabela(["Talhão","Operação","#h","#ha","#L"],(d.talhoes||[]).map(t=>[esc(t.talhao),esc(t.operacao),relNum(t.horas),relNum(t.area_ha),relNum(t.litros,0)])):""),
+        "Máquinas são da fazenda física: unidades irmãs veem o mesmo quadro. Diferença é para conferir."); }).join("");
+  }
+  if(rel==="irrigacao_rec_exec_semana"){
+    return ls.map(l=>{ const d=l.dados||{}, r=d.resumo||{};
+      const ps=(d.pivos||[]);
+      return bloco(esc(relUni(l.unidade_id))+(n0(r.n_alertas)?` <span class="tag amarelo">${n0(r.n_alertas)} pivô${n0(r.n_alertas)>1?"s":""} em alerta</span>`:""),
+        `<p style="font-size:.85rem">R$ necessário <b class="num">${relNum(r.reais_nec,0)}</b> × realizado <b class="num">${relNum(r.reais_real,0)}</b> · lâmina mínima recomendada <b class="num">${relNum(r.mm_min_rec)} mm</b> × executada <b class="num">${relNum(r.mm_real)} mm</b></p>`
+        +relTabela(["Pivô","#Dias rec.","#Dias irrig.","#Rec. s/ irrig.","#mm mín. rec.","#mm exec.","#% rec.","#h rec.","#R$ nec.","#R$ real.","#Atraso (d)","#Déficit","#Efic. %"],
+          ps.map(p=>{ const u=(p.dias||[]).slice(-1)[0]||{}; return [esc(p.equipamento||("Pivô "+p.pivo)),n0(p.dias_rec),n0(p.dias_irr),n0(p.dias_rec_sem_irr)?conf(n0(p.dias_rec_sem_irr)):"0",relNum(p.mm_min_rec),relNum(p.mm_real),relNum(u.pct_rec,0),relNum(u.tempo_rec),relNum(p.reais_nec,0),relNum(p.reais_real,0),n0(p.atraso)>=3?conf(n0(p.atraso)):relNum(p.atraso,0),relNum(p.deficit),relNum(p.eficiencia,0)]; }),
+          ps.map(p=>p.alerta?"conferir":"")),
+        "Recomendação e execução vêm da própria iCrop (bruto). Decidir irrigar é do agrônomo e do gerente; aqui só a distância entre os dois."); }).join("");
+  }
+  if(rel==="balanco_hidrico_dia"){
+    return ls.map(l=>{ const d=l.dados||{}, ps=(d.pivos||[]);
+      return bloco(esc(relUni(l.unidade_id))+(n0((d.resumo||{}).n_alertas)?` <span class="tag amarelo">${n0(d.resumo.n_alertas)} em alerta</span>`:""),
+        relTabela(["Pivô","#ETo","#ETc","#mm","#Déficit","#Umid. %","#Segur. %","#Atraso (d)","Fase","#GD","Problemas"],
+          ps.map(p=>[esc(p.equipamento||("Pivô "+p.pivo)),relNum(p.eto),relNum(p.etc),relNum(p.mm),relNum(p.deficit),p.umid_baixa?conf(relNum(p.umidade)):relNum(p.umidade),relNum(p.umid_seg),n0(p.atraso)>=3?conf(n0(p.atraso)):relNum(p.atraso,0),esc(p.fase||"—"),relNum(p.gd,0),esc(p.probs||"")]),
+          ps.map(p=>p.alerta?"conferir":""))+(d.chuva?`<p class="mut" style="font-size:.8rem">🌧️ chuva na estação: ${relNum(d.chuva)} mm</p>`:""),
+        "Balanço hídrico da iCrop por pivô/parcela (medição de ontem)."); }).join("");
+  }
+  if(rel==="custo_fisico_talhao_mes"){
+    return ls.map(l=>{ const d=l.dados||{}, t=d.totais||{}, iu=d.irrigacao_unidade||{}, mo=d.mao_de_obra||{};
+      const tal=(d.talhoes||[]).map(x=>{ const ir=x.irrigacao||{};
+        return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:8px"><b>${esc(x.nome||relTal(x.talhao_id))}</b>
+          <p class="mut" style="font-size:.8rem">${[ir.mm!=null?`💧 ${relNum(ir.mm)} mm`+(ir.reais_mm?` · R$ ${relNum(ir.reais_mm,2)}/mm·ha`:"")+(ir.reais_real?` · R$ ${relNum(ir.reais_real,0)} realizados`:ir.reais_estimado?` · ~R$ ${relNum(ir.reais_estimado,0)}`:""):"",
+            n0(x.horas)?`🚜 ${relNum(x.horas)} h`+(n0(x.diesel_l)?` · ${relNum(x.diesel_l,0)} L diesel`:""):"", n0(x.pessoas_dia)?`👥 ${relNum(x.pessoas_dia,0)} pessoas-dia`:""].filter(Boolean).join(" · ")||"sem números no período"}</p>
+          ${(x.maquinas||[]).length?relTabela(["Operação","#h","#Diesel (L)","Máquinas"],(x.maquinas||[]).map(m=>[esc(m.operacao),relNum(m.horas),relNum(m.diesel_l,0),esc(m.maquinas||"")])):""}
+          ${(x.produtos||[]).length?relTabela(["Data","Operação","Produto","#Dose","Un.","#Qtd","#Área (ha)","#R$"],(x.produtos||[]).map(p=>[fmtDataCurta(p.data),esc(p.operacao),esc(p.produto),esc(p.dose||"—"),esc(p.un||""),esc(p.qtd||"—"),relNum(p.area_ha),""])):""}
+        </div>`; }).join("");
+      const st=d.sem_talhao||{};
+      return bloco(esc(relUni(l.unidade_id)),
+        `<p style="font-size:.85rem">${n0(d.boletins)} boletins · 💧 <b class="num">${relNum(t.mm)} mm</b>${n0(t.reais_irrigacao)?` (R$ ${relNum(t.reais_irrigacao,0)})`:""}${iu.reais_mm?` · R$ ${relNum(iu.reais_mm,2)}/mm·ha`:""} · 🚜 <b class="num">${relNum(t.horas)} h</b> · ⛽ <b class="num">${relNum(t.diesel_l,0)} L</b> · 👥 <b class="num">${relNum(t.pessoas_dia,0)}</b> pessoas-dia em talhão · 🧪 ${n0(t.produtos)} aplicações</p>
+        <p class="mut" style="font-size:.78rem">Mão de obra da unidade: ${relNum(mo.proprios_dia,0)} próprios-dia + ${relNum(mo.diaristas_dia,0)} diaristas-dia${n0(mo.faltas)?` · ${relNum(mo.faltas,0)} faltas`:""}${n0(mo.horas_extra)?` · ${relNum(mo.horas_extra,0)} h extras`:""}</p>`
+        +((d.funcoes||[]).length?relTabela(["Função","#Próprios","#Diaristas","#Pessoas-dia","#h extra","#Dias"],(d.funcoes||[]).map(f=>[esc(f.funcao),relNum(f.proprios,0),relNum(f.diaristas,0),relNum(f.pessoas_dia,0),relNum(f.horas_extra,0),n0(f.dias)])):"")
+        +tal
+        +((st.maquinas||[]).length||(st.produtos||[]).length?`<div class="mt" style="border-top:1px dashed var(--linha);padding-top:8px"><b>Sem talhão informado</b>${(st.maquinas||[]).length?relTabela(["Operação","#h","#Diesel (L)","Máquinas"],(st.maquinas||[]).map(m=>[esc(m.operacao),relNum(m.horas),relNum(m.diesel_l,0),esc(m.maquinas||"")])):""}${(st.produtos||[]).length?relTabela(["Data","Operação","Produto","#Dose","Un.","#R$"],(st.produtos||[]).map(p=>[fmtDataCurta(p.data),esc(p.operacao),esc(p.produto),esc(p.dose||"—"),esc(p.un||""),""])):""}</div>`:"")
+        +((d.solinftec||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Solinftec por talhão (fazenda física)</b></p>`+relTabela(["Talhão","Operação","#h","#ha","#L"],(d.solinftec||[]).map(s=>[esc(s.talhao),esc(s.operacao),relNum(s.horas),relNum(s.area_ha),relNum(s.litros,0)])):""),
+        esc(d.aviso||"")); }).join("");
+  }
+  if(rel==="rebanho_mes"){
+    return ls.map(l=>{ const d=l.dados||{}, m=d.movimentacao||{}, rp=d.reproducao||{}, es=d.estrutura||{};
+      return bloco(esc(relUni(l.unidade_id))+(n0((d.resumo||{}).alertas)?` <span class="tag amarelo">${n0(d.resumo.alertas)} pontos de atenção</span>`:""),
+        relTabela(["#Nasc.","#M","#F","#Mortes","#Desmama","#Entradas","#Saídas","#Saldo","#Prenhez %"],[[n0(m.nascimentos),n0(m.nascimentos_m),n0(m.nascimentos_f),n0(m.mortes)?conf(n0(m.mortes)):"0",n0(m.desmamas),n0(m.entradas),n0(m.saidas),n0(m.saldo),relNum(rp.taxa_prenhez,0)]])
+        +((m.mortes_causas||[]).length?`<p class="mut" style="font-size:.8rem">Mortes: ${(m.mortes_causas||[]).map(c=>esc(c.causa)+" "+n0(c.qtd)).join(" · ")}</p>`:"")
+        +((m.por_categoria||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Por categoria</b></p>`+relTabela(["Categoria","#Nasc.","#Mortes","#Entr.","#Saídas","#Saldo"],(m.por_categoria||[]).map(c=>[esc(c.categoria),n0(c.nascimentos),n0(c.mortes),n0(c.entradas),n0(c.saidas),n0(c.saldo)])):"")
+        +`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Inventário (última contagem)</b> · ${relNum(d.cabecas_contadas,0)} cabeças contadas</p>`
+        +relTabela(["Pasto","Lote / categoria","#Cabeças","Data","#Lotação"],(d.inventario||[]).map(i=>[esc(i.pasto||"—"),esc(i.lote||"—"),relNum(i.cabecas,0),fmtDataCurta(i.data),i.lotacao==null?"pendente":relNum(i.lotacao,2)]))
+        +`<p style="font-size:.85rem;margin-top:8px">🐄 DG: <b class="num">${relNum(rp.prenhes,0)}</b> prenhes / <b class="num">${relNum(rp.vazias,0)}</b> vazias${rp.taxa_prenhez!=null?` (${relNum(rp.taxa_prenhez,0)}%)`:""}${n0(rp.coberturas)?` · ${n0(rp.coberturas)} coberturas vistas`:""}${rp.iatf_etapas?` · IATF: ${esc(rp.iatf_etapas)}${n0(rp.iatf_vacas)?" ("+n0(rp.iatf_vacas)+" vacas)":""}`:""}</p>`
+        +((d.gmd||[]).length?relTabela(["Lote","De","Até","#Peso ini.","#Peso fim","#GMD kg/dia"],(d.gmd||[]).map(g=>[esc(g.lote||"—"),fmtDataCurta(g.de),fmtDataCurta(g.ate),relNum(g.peso_ini,0),relNum(g.peso_fim,0),relNum(g.gmd_kg_dia,3)])):`<p class="mut" style="font-size:.78rem">GMD: pendente (precisa de duas pesagens do mesmo lote no mês). Lotação: pendente (área do pasto não está no Supabase).</p>`)
+        +((d.sanidade||[]).length||(d.massa||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Sanidade</b></p>`+relTabela(["Problema / manejo","#Casos","#Cabeças","Ação / produto"],(d.sanidade||[]).map(s=>[esc(s.problema),n0(s.casos),relNum(s.cabecas,0),esc(s.acoes||"")]).concat((d.massa||[]).map(s=>[esc(s.tipo),n0(s.vezes),relNum(s.cabecas,0),esc(s.produtos||"")]))):"")
+        +((d.cocho||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Cocho</b></p>`+relTabela(["Pasto","#Vazio","#Lambido","#Com sobra","#Água c/ problema","#Sacos","#kg","Insumos"],(d.cocho||[]).map(c=>[esc(c.pasto),n0(c.cocho_vazio)?conf(n0(c.cocho_vazio)):"0",n0(c.cocho_lambido),n0(c.cocho_sobra),n0(c.agua_problema)?conf(n0(c.agua_problema)):"0",relNum(c.sacos,0),relNum(c.kg,0),esc(c.insumos||"")]),(d.cocho||[]).map(c=>(n0(c.cocho_vazio)||n0(c.agua_problema))?"conferir":"")):"")
+        +((n0(es.cocho_problema)||n0(es.sal_problema)||n0(es.agua_problema)||n0(es.pasto_apertando))?`<p style="font-size:.82rem;margin-top:6px">${conf([n0(es.cocho_problema)?es.cocho_problema+" dia(s) cocho com problema":"",n0(es.sal_problema)?es.sal_problema+" dia(s) sal com problema":"",n0(es.agua_problema)?es.agua_problema+" dia(s) água com problema":"",n0(es.pasto_apertando)?es.pasto_apertando+" dia(s) pasto apertando/crítico":""].filter(Boolean).join(" · "))}</p>`:"")
+        +((d.embarques||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Embarques / compras</b></p>`+relTabela(["Data","Tipo","Lote","#Cabeças","#Peso médio","#R$","Contraparte"],(d.embarques||[]).map(e=>[fmtDataCurta(e.data),esc(e.tipo),esc(e.lote||"—"),relNum(e.cabecas,0),relNum(e.peso_medio,0),relNum(e.valor,0),esc(e.contraparte||"")])):""),
+        `${n0(d.boletins)} boletins com pecuária no mês.`); }).join("");
+  }
+  if(rel==="plano_executado_mes"){
+    return ls.map(l=>{ const d=l.dados||{}, r=d.resumo||{}, p=d.plano;
+      if(d.aviso&&!p) return bloco(esc(relUni(l.unidade_id)),`<p class="mut">${esc(d.aviso)}</p>`);
+      const far=x=>x?`<span class="linha-flex" style="gap:6px"><span class="farol ${relFarolCor(x.farol)}"></span><span>${esc(x.situacao||"")}${x.primeiro?" · "+fmtDataCurta(x.primeiro):x.ultimo?" · "+fmtDataCurta(x.ultimo):""}</span></span>`:`<span class="mut">— sem item previsto</span>`;
+      const uns=(d.unidades||[]);
+      const fito=(d.fito_mes||[])[0];
+      return bloco(esc(relUni(l.unidade_id))+` <span class="mut" style="font-weight:400;font-size:.8rem">plano v${esc(p.versao)} · ${esc(p.safra||"")}${p.aprovado_por?" · "+esc(p.aprovado_por):""}</span>`+(n0(r.vermelhos)?` <span class="tag cereja">${n0(r.vermelhos)} janela fechada</span>`:"")+(n0(r.amarelos)?` <span class="tag amarelo">${n0(r.amarelos)} sem registro</span>`:""),
+        `<p class="mut" style="font-size:.78rem">${n0(d.boletins)} boletins no período · ${d.mes_fechado?"mês fechado":"mês em andamento"} · ${n0(r.sem_alias)} unidade${n0(r.sem_alias)===1?"":"s"} do plano sem ligação com talhão do app (cinza)</p>`
+        +relTabela(["Unidade do plano","Talhão no app","Adubação","Calagem","Fito"],uns.map(u=>[`<b>${esc(u.codigo)}</b> <span class="mut">${esc(u.nome_curto||u.nome_plano||"")}</span>`,esc(relTal(u.talhao_id))||"<span class='mut'>sem ligação</span>",far(u.adubo),far(u.calagem),far(u.fito)]),
+          uns.map(u=>[u.adubo,u.calagem,u.fito].some(x=>x&&x.farol==="vermelho")?"critico":[u.adubo,u.calagem,u.fito].some(x=>x&&x.farol==="amarelo")?"conferir":""))
+        +(fito?`<p class="mut" style="font-size:.78rem;margin-top:8px">Fito do mês (${esc(fito.fase||"")}): alvos ${esc((d.fito_alvos||[]).join(", ")||"—")} · previsto pelo agrônomo — registre o que foi feito: ${esc((fito.produtos_previstos||[]).join(", ")||"—")}</p>`:"")
+        +((d.gantt||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Janelas do mês (Gantt)</b></p>`+relTabela(["Atividade","#Registros","1º registro","Situação"],(d.gantt||[]).map(g=>[esc(String(g.atividade).replace(/_/g," ")),n0(g.registros),g.primeiro?fmtDataCurta(g.primeiro):"—",`<span class="linha-flex" style="gap:6px"><span class="farol ${relFarolCor(g.farol)}"></span>${esc(g.situacao||"")}</span>`]),(d.gantt||[]).map(g=>g.farol==="vermelho"?"critico":g.farol==="amarelo"?"conferir":"")):""),
+        "Plano é referência, nunca receituário: aqui só previsto × registrado. Vermelho só depois de a janela fechar; cinza = unidade sem talhão ligado no app."); }).join("");
+  }
+  return `<div class="cartao"><pre style="white-space:pre-wrap;font-size:.75rem">${esc(JSON.stringify(ls.map(l=>l.dados),null,1))}</pre></div>`;
+}
+/* texto limpo para WhatsApp (o mesmo conteúdo, sem tabela) */
+function relTexto(){
+  const {rel,ini,fim}=relVista, cat=REL_CATALOGO[rel]||{nome:rel};
+  const ls=relLinhasVista(), L=["📊 *"+cat.nome.toUpperCase()+"* — "+relRotuloPer(rel,ini,fim)];
+  ls.forEach(l=>{ const d=l.dados||{}, r=d.resumo||{};
+    if(rel.startsWith("farol")){
+      if(!l.unidade_id){ L.push(d.placar||""); (d.unidades||[]).filter(u=>!u.em_dia).forEach(u=>L.push("○ "+u.nome+": "+n0(u.enviados)+"/"+n0(u.uteis)+(u.ultimo_envio?" · último "+fmtDataCurta(u.ultimo_envio):" · sem registro"))); }
+      else L.push("• "+relUni(l.unidade_id)+": "+(d.marcas||"")+" · "+n0(d.enviados)+"/"+n0(d.uteis)+" · "+(d.em_dia?"em dia":"sem registro ontem e hoje"));
+      return; }
+    if(rel.startsWith("dito_medido")){
+      L.push("• "+(d.mae_nome&&rel.includes("solinftec")?d.mae_nome:relUni(l.unidade_id))+": "+(n0(r.n_div)?n0(r.n_div)+" ponto(s) para conferir":"boletim e medição batem"));
+      (d.divergencias||[]).forEach(x=>L.push("   – "+fmtDataCurta(x.data)+(x.nome?" "+x.nome:"")+": "+(x.texto||x.tipo)));
+      return; }
+    if(rel==="irrigacao_rec_exec_semana"){ L.push("• "+relUni(l.unidade_id)+": R$ nec. "+relNum(r.reais_nec,0)+" × real. "+relNum(r.reais_real,0)+" · mm mín. rec. "+relNum(r.mm_min_rec)+" × exec. "+relNum(r.mm_real));
+      (d.pivos||[]).filter(p=>p.alerta).forEach(p=>L.push("   – "+(p.equipamento||("Pivô "+p.pivo))+": "+[n0(p.dias_rec_sem_irr)?p.dias_rec_sem_irr+" dia(s) recomendado(s) sem irrigação":"",n0(p.atraso)>=3?p.atraso+" dias de atraso":""].filter(Boolean).join(" · "))); return; }
+    if(rel==="balanco_hidrico_dia"){ (d.pivos||[]).forEach(p=>L.push("• "+relUni(l.unidade_id)+" "+(p.equipamento||("Pivô "+p.pivo))+": déficit "+relNum(p.deficit)+" mm · umidade "+relNum(p.umidade)+"%"+(p.umid_baixa?" (abaixo da segurança)":"")+(n0(p.atraso)?" · atraso "+p.atraso+" d":""))); return; }
+    if(rel==="custo_fisico_talhao_mes"){ const t=d.totais||{}; L.push("• "+relUni(l.unidade_id)+": "+relNum(t.mm)+" mm · "+relNum(t.horas)+" h máquina · "+relNum(t.diesel_l,0)+" L · "+relNum(t.pessoas_dia,0)+" pessoas-dia · "+n0(t.produtos)+" aplicações (R$ de insumo: ERP)");
+      (d.talhoes||[]).forEach(x=>{ const ir=x.irrigacao||{}; L.push("   – "+(x.nome||relTal(x.talhao_id))+": "+[ir.mm!=null?relNum(ir.mm)+" mm":"",n0(x.horas)?relNum(x.horas)+" h":"",n0(x.pessoas_dia)?relNum(x.pessoas_dia,0)+" pessoas-dia":"",(x.produtos||[]).length?(x.produtos||[]).length+" aplicações":""].filter(Boolean).join(" · ")); }); return; }
+    if(rel==="rebanho_mes"){ const m=d.movimentacao||{}, rp=d.reproducao||{}; L.push("• "+relUni(l.unidade_id)+": "+n0(m.nascimentos)+" nasc. ("+n0(m.nascimentos_m)+"M/"+n0(m.nascimentos_f)+"F) · "+n0(m.mortes)+" mortes · "+n0(m.desmamas)+" desmamas · "+n0(m.entradas)+" entradas · "+n0(m.saidas)+" saídas · saldo "+n0(m.saldo)+(rp.taxa_prenhez!=null?" · prenhez "+relNum(rp.taxa_prenhez,0)+"%":"")+" · "+relNum(d.cabecas_contadas,0)+" cabeças contadas");
+      (d.embarques||[]).forEach(e=>L.push("   – "+fmtDataCurta(e.data)+" "+e.tipo+": "+relNum(e.cabecas,0)+" cab."+(e.valor?" · R$ "+relNum(e.valor,0):"")+(e.contraparte?" · "+e.contraparte:""))); return; }
+    if(rel==="plano_executado_mes"){ if(d.aviso&&!d.plano){ L.push("• "+relUni(l.unidade_id)+": "+d.aviso); return; }
+      L.push("• "+relUni(l.unidade_id)+" (plano v"+d.plano.versao+"): "+n0((d.unidades||[]).length)+" unidades · "+n0(r.amarelos)+" sem registro · "+n0(r.vermelhos)+" janela fechada · "+n0(r.sem_alias)+" sem ligação com o app");
+      (d.unidades||[]).forEach(u=>{ const it=[["adubação",u.adubo],["calagem",u.calagem],["fito",u.fito]].filter(([,x])=>x&&(x.farol==="amarelo"||x.farol==="vermelho")); if(it.length) L.push("   – "+u.codigo+": "+it.map(([n,x])=>n+" "+x.situacao).join(" · ")); }); return; }
+  });
+  L.push("Fonte: Boletim NCNaves · motor de relatórios (Supabase). Diferença é para conferir, nunca erro.");
+  return L.join("\n");
+}
+function abrirTextoZap(txt){
+  if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); return; }
+  const a=document.createElement("a");
+  a.href="https://wa.me/?text="+encodeURIComponent(txt);
+  a.target="_blank"; a.rel="noopener"; a.click();
+}
+
 /* ---------- Plano de safra (v52): proposta técnica do agrônomo, SÓ LEITURA ----------
    O plano (PPTX do Salvino) vive no Supabase (sql/005 cria as tabelas, sql/006 carrega a
    safra 2026/27) como REFERÊNCIA e comparação — nunca receituário: o app não recomenda
@@ -2142,6 +2452,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="importar") app.innerHTML = vImportar();
   else if(tela==="unidplano") app.innerHTML = vUnidPlano();
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
+  else if(tela==="relat") app.innerHTML = vRelat();
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
 }
@@ -2230,6 +2541,7 @@ function vCasaGerente(){
     </div>
     ${cartaoCargas(fz)}
     ${cartaoSolinftecGerente(fz)}
+    ${cartaoRelatoriosGerente(fz)}
     ${syncFila.length?`<div class="aviso">${syncStatus()}</div>`:""}
     ${temRasc?`<div class="aviso">📝 Você tem um rascunho de ${fmtData(rascunho.data)} guardado neste aparelho. Ele não se perde sem internet.</div>`:""}
     <button class="btn" id="bt-preencher">${b?"Ver / corrigir boletim de hoje":temRasc?"Continuar rascunho":"Preencher boletim de hoje"}</button>
@@ -3516,6 +3828,7 @@ function vPainel(){
     ${cartaoGraosPainel()}
     ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
+    ${secaoRelatoriosPainel()}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
@@ -3835,13 +4148,13 @@ function impRodar(){
   salvarDados(); ir("importar");
 }
 /* ====================================================================
-   CADASTROS (v55) — navegação em níveis: menu → assunto → item.
+   CADASTROS (v56) — navegação em níveis: menu → assunto → item.
    Uma tela, um propósito. Tudo o que existia na tela única de Cadastros
    continua aqui, só reorganizado (mapa "onde cada função mora" no
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v55";
+const APP_VERSAO="v56";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -4894,7 +5207,7 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa"].includes(telaAtual))
     ir(telaAtual, null, true);
 }
@@ -5445,6 +5758,12 @@ function ligarEventos(tela){
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
     if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }
     if(d.ver){ ir("detalhe", d.ver); return; }
+    /* relatórios automáticos (v55) */
+    if(d.relab){ const [rel,ini,fim]=d.relab.split("|"); relVista={rel,ini,fim}; ir("relat"); return; }
+    if(d.relper!==undefined){ relFiltro.per=d.relper; ir(telaAtual,null,true); return; }
+    if(d.relnav){ relNavegar(d.relnav); return; }
+    if(t.id==="bt-rel-zap"){ abrirTextoZap(relTexto()); return; }
+    if(t.id==="bt-rel-pdf"){ window.print(); return; }
     if(t.id==="bt-preencher"){
       const b=boletimDoDia(hojeISO(), sessao.fazendaId);
       if(b){ ir("detalhe",b.id); return; }
