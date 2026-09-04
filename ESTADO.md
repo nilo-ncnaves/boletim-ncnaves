@@ -256,13 +256,19 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
 
 ## PENDÊNCIAS
 - **Plano de safra (v52) — para o Nilo:**
-  1. Rodar `sql/005-plano-safra.sql` e depois
-     `sql/006-plano-safra-seed-2627.sql` no SQL Editor (o seed confere
-     as somas e desfaz tudo se algo não bater).
-  2. Publicar as versões vigentes: ou `sql/007-publicar-planos-2627.sql`
-     de uma vez (quando o agrônomo aprovar), ou fazenda por fazenda na
-     tela Unidades e Plano (Rodar auditoria → Aprovado por → Publicar).
-     Sem plano vigente a fase B não tem o que mostrar.
+  1. Rodar `sql/005-plano-safra.sql` no SQL Editor (é a única etapa
+     que precisa do SQL Editor: cria as tabelas). Conferido em
+     04/09/2026: as tabelas do plano ainda não existem no Supabase.
+  2. Carregar os dados: `sql/006-plano-safra-seed-2627.sql` no SQL
+     Editor OU `scripts/carregar_plano_api.py` (faz a mesma carga pela
+     API pública do app, não duplica, confere somas; testado num
+     simulador local — a primeira carga real é feita pelo Claude
+     assim que o 005 estiver rodado).
+  3. Publicar as versões vigentes: `sql/007-publicar-planos-2627.sql`,
+     `carregar_plano_api.py --publicar` ou fazenda por fazenda na tela
+     Unidades e Plano (Rodar auditoria → Aprovado por → Publicar). Só
+     quando o agrônomo aprovar. Sem plano vigente a fase B não tem o
+     que mostrar.
   3. Decidir se os talhões do app serão desmembrados para ligar as 26
      unidades ainda sem apelido `app` (lista e motivos em
      `docs/plano/2026-27/alias_app.json`); isso muda os chips do
@@ -285,7 +291,9 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   e troca DIRETORIA/ADMIN para o formato novo). Sem eles o app
   continua funcionando com os códigos de fábrica, mas "gerar novo
   código" e os combinados criados em Cadastros não alcançam os
-  outros aparelhos.
+  outros aparelhos. Conferido pela API em 04/09/2026: a tabela
+  codigos_acesso ainda NÃO existe (boletim_pecuaria e as tabelas da
+  Solinftec existem — 003 e 004 já foram rodados).
 - **Limitação conhecida**: o controle de acesso é fechadura de porta,
   não cofre — os códigos de fábrica vivem no código do app (público)
   e um aparelho que nunca sincroniza não fica sabendo de código

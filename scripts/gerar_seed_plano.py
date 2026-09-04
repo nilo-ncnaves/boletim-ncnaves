@@ -34,6 +34,7 @@ DEPARA = RAIZ / 'docs/plano/2026-27/depara_fazendas.json'
 ALIAS_APP = RAIZ / 'docs/plano/2026-27/alias_app.json'
 INDEX = RAIZ / 'index.html'
 SAIDA = RAIZ / 'sql/006-plano-safra-seed-2627.sql'
+CARGA = RAIZ / 'docs/plano/2026-27/carga_2627.json'   # mesmas linhas, para scripts/carregar_plano_api.py
 
 NS = uuid.UUID('b0e7a1c4-5f3d-4c2a-9e8b-7d6c5b4a3f21')  # namespace fixo: ids estáveis entre execuções
 SAFRA = '2026/27'
@@ -189,6 +190,7 @@ def main():
     # ====================================================================
     L = []
     w = L.append
+    rows = defaultdict(list)   # as mesmas linhas do SQL, em JSON (carga pela API)
     w('-- Carga inicial do plano de safra 2026/27 (v52) — GERADO por scripts/gerar_seed_plano.py')
     w('-- Rodar no SQL Editor do Supabase DEPOIS do sql/005-plano-safra.sql.')
     w('-- Fonte única: docs/plano/2026-27/plano_2627_seed.json (7 PPTX do agrônomo, 03/09/2026).')
@@ -213,6 +215,7 @@ def main():
     if renomear:
         w('-- 0. Nome do plano → nome exato do app em cargas anteriores (não faz nada num banco vazio)')
         for d in renomear:
+            rows['renomear'].append({'de': d['plano'], 'para': d['app_nome']})
             for tb in ['unidade_manejo', 'unidade_alias', 'plano_safra', 'plano_fito_excecao']:
                 w('update public.%s set fazenda_app = %s where fazenda_app = %s;' % (tb, q(d['app_nome']), q(d['plano'])))
         w('')
@@ -228,21 +231,23 @@ def main():
             obs = (obs + '; ' + nota) if obs else nota
         if u['codigo'] in OBS_CADASTRO:
             obs = (obs + '; ' + OBS_CADASTRO[u['codigo']]) if obs else OBS_CADASTRO[u['codigo']]
-        cols = OrderedDict([
-            ('id', q(uid('unidade:' + u['codigo']))),
-            ('codigo', q(u['codigo'])),
-            ('fazenda_app', q(nome_db[u['fazenda_app']])),
-            ('empresa', q(empresa_de[u['fazenda_app']])),
-            ('nome_plano', q(u['nome_plano'])),
-            ('nome_curto', q(u['nome_plano'])),
-            ('pai_id', q(uid('unidade:' + u['pai'])) if u['pai'] else 'null'),
-            ('area_ha', q(u['area_ha'])),
-            ('fonte_area', q(u['fonte_area'])),
-            ('irrigacao', q('pivo' if u['codigo'] in PIVOS else 'gotejo')),
-            ('status', q(status_de(u))),
-            ('area_zerada_ha', q(u['area_zerada_ha'])),
-            ('obs', q(obs)),
+        raw = OrderedDict([
+            ('id', uid('unidade:' + u['codigo'])),
+            ('codigo', u['codigo']),
+            ('fazenda_app', nome_db[u['fazenda_app']]),
+            ('empresa', empresa_de[u['fazenda_app']]),
+            ('nome_plano', u['nome_plano']),
+            ('nome_curto', u['nome_plano']),
+            ('pai_id', uid('unidade:' + u['pai']) if u['pai'] else None),
+            ('area_ha', u['area_ha']),
+            ('fonte_area', u['fonte_area']),
+            ('irrigacao', 'pivo' if u['codigo'] in PIVOS else 'gotejo'),
+            ('status', status_de(u)),
+            ('area_zerada_ha', u['area_zerada_ha']),
+            ('obs', obs),
         ])
+        rows['unidade_manejo'].append(raw)
+        cols = OrderedDict((k, q(v)) for k, v in raw.items())
         w('insert into public.unidade_manejo (%s) values (%s) on conflict (codigo) do nothing;'
           % (', '.join(cols), ', '.join(cols.values())))
     w('')
@@ -264,6 +269,7 @@ def main():
             if nm not in nomes and (u['fazenda_app'], nm) not in ambiguos:
                 nomes.append(nm)
         for nm in nomes:
+            rows['unidade_alias'].append({'unidade_id': uid('unidade:' + u['codigo']), 'fazenda_app': nome_db[u['fazenda_app']], 'sistema': 'plano', 'alias': nm})
             w("insert into public.unidade_alias (unidade_id, fazenda_app, sistema, alias) values (%s, %s, 'plano', %s) "
               "on conflict (sistema, fazenda_app, alias) where vigente_ate is null do nothing;"
               % (q(uid('unidade:' + u['codigo'])), q(nome_db[u['fazenda_app']]), q(nm)))
@@ -281,6 +287,7 @@ def main():
             pendentes_app[u['fazenda_app']].append((cod, info['talhoes']))
             continue
         for tid in info['talhoes']:
+            rows['unidade_alias'].append({'unidade_id': uid('unidade:' + cod), 'fazenda_app': nome_db[u['fazenda_app']], 'sistema': 'app', 'alias': tid})
             w("insert into public.unidade_alias (unidade_id, fazenda_app, sistema, alias) values (%s, %s, 'app', %s) "
               "on conflict (sistema, fazenda_app, alias) where vigente_ate is null do nothing;  -- %s"
               % (q(uid('unidade:' + cod)), q(nome_db[u['fazenda_app']]), q(tid), tal_app[tid]['nome']))
@@ -297,7 +304,11 @@ def main():
     for f in seed['fazendas']:
         pid = uid('plano:%s:%s:v%d' % (f['fazenda_app'], SAFRA, VERSAO))
         plano_id[f['fazenda_app']] = pid
-        rj = json.dumps(OrderedDict((i, resumo[f['fazenda_app']].get(i)) for i in INSUMOS), ensure_ascii=False)
+        rd = OrderedDict((i, resumo[f['fazenda_app']].get(i)) for i in INSUMOS)
+        rj = json.dumps(rd, ensure_ascii=False)
+        rows['plano_safra'].append({'id': pid, 'fazenda_app': nome_db[f['fazenda_app']], 'safra': SAFRA, 'versao': VERSAO, 'status': 'rascunho',
+                                    'motivo': 'carga inicial dos PPTX de 2026/27', 'arquivo_origem': f['deck'],
+                                    'criado_por': 'seed v52 (gerar_seed_plano.py)', 'auditoria_ok': False, 'resumo_deck': rd})
         w("insert into public.plano_safra (id, fazenda_app, safra, versao, status, motivo, arquivo_origem, criado_por, auditoria_ok, resumo_deck) "
           "values (%s, %s, %s, %d, 'rascunho', 'carga inicial dos PPTX de 2026/27', %s, 'seed v52 (gerar_seed_plano.py)', false, %s::jsonb) "
           "on conflict (fazenda_app, safra, versao) do nothing;"
@@ -307,6 +318,8 @@ def main():
     # plano_unidade ---------------------------------------------------------
     w('-- 5. plano_unidade ----------------------------------------------------------')
     for u in unidades:
+        rows['plano_unidade'].append({'plano_id': plano_id[u['fazenda_app']], 'unidade_id': uid('unidade:' + u['codigo']), 'area_ha_plano': u['area_ha'],
+                                      'safra_zerada_tipo': u['safra_zerada_tipo'], 'area_zerada_ha': u['area_zerada_ha'], 'estimativa_sc_ha': None})
         w("insert into public.plano_unidade (plano_id, unidade_id, area_ha_plano, safra_zerada_tipo, area_zerada_ha, estimativa_sc_ha) "
           "values (%s, %s, %s, %s, %s, null) on conflict (plano_id, unidade_id) do nothing;"
           % (q(plano_id[u['fazenda_app']]), q(uid('unidade:' + u['codigo'])), q(u['area_ha']),
@@ -321,6 +334,9 @@ def main():
                                'Mn': 'sulfato_mn', 'B': 'acido_borico', 'Zn': 'sulfato_zn'}.items()}
     w('-- 6. plano_adubo_mes (%d linhas; via = null — não deduzida) ----------------' % len(adubo))
     w('--    siglas: U=ureia Ni=nitrato SA=sulfato_amonio K=kcl Ph=phusion Mn=sulfato_mn B=acido_borico Zn=sulfato_zn')
+    for a in adubo:
+        rows['plano_adubo_mes'].append({'plano_id': plano_id[por_codigo[a['codigo']]['fazenda_app']], 'unidade_id': uid('unidade:' + a['codigo']),
+                                        'mes': a['mes'], 'insumo': a['insumo'], 'kg': a['kg'], 'via': None, 'obs': a['obs']})
     LOTE = 400
     for i in range(0, len(adubo), LOTE):
         w('insert into public.plano_adubo_mes (plano_id, unidade_id, mes, insumo, kg, via, obs)')
@@ -342,6 +358,8 @@ def main():
     w('-- 7. plano_calagem (%d linhas; janela 01/09–31/10/2026) ------------------' % len(cal))
     for c in cal:
         u = por_codigo[c['codigo']]
+        rows['plano_calagem'].append({'plano_id': plano_id[u['fazenda_app']], 'unidade_id': uid('unidade:' + c['codigo']), 'subarea': c['subarea'],
+                                      't_ha': c['t_ha'], 't_total': c['t_total'], 'rateado': c['rateado'], 'janela_ini': '2026-09-01', 'janela_fim': '2026-10-31'})
         w("insert into public.plano_calagem (plano_id, unidade_id, subarea, t_ha, t_total, rateado, janela_ini, janela_fim) "
           "values (%s, %s, %s, %s, %s, %s, '2026-09-01', '2026-10-31') on conflict (plano_id, unidade_id, subarea) do nothing;"
           % (q(plano_id[u['fazenda_app']]), q(uid('unidade:' + c['codigo'])), q(c['subarea']), q(c['t_ha']), q(c['t_total']), q(c['rateado'])))
@@ -351,6 +369,7 @@ def main():
     w('-- 8. plano_fito_mes (registro do grupo: plano_id nulo) e exceções ----------')
     n_exc = 0
     for fm in seed['fito_mes']:
+        rows['plano_fito_mes'].append({'plano_id': None, 'mes': fm['mes'], 'fase': fm['fase'], 'alvos': fm['alvos'], 'produtos': fm['produtos'], 'via_solo': fm['via_solo']})
         w("insert into public.plano_fito_mes (plano_id, mes, fase, alvos, produtos, via_solo) values (null, %d, %s, %s, %s, %s) "
           "on conflict (mes) where plano_id is null do nothing;"
           % (fm['mes'], q(fm['fase']), arr(fm['alvos']), arr(fm['produtos']), arr(fm['via_solo'])))
@@ -359,6 +378,7 @@ def main():
                 if fz not in nome_db:
                     erros.append(f'exceção fito cita fazenda desconhecida: {fz}')
                     continue
+                rows['plano_fito_excecao'].append({'mes': fm['mes'], 'produto': prod, 'fazenda_app': nome_db[fz]})
                 w("insert into public.plano_fito_excecao (mes, produto, fazenda_app) values (%d, %s, %s) on conflict (mes, produto, fazenda_app) do nothing;"
                   % (fm['mes'], q(prod), q(nome_db[fz])))
                 n_exc += 1
@@ -373,6 +393,7 @@ def main():
                 erros.append(f'atividade do Gantt sem evidência definida: {ativ}')
                 continue
             tipo, ev_app, ev_ext = EVIDENCIA[ativ]
+            rows['plano_gantt'].append({'modelo': modelo, 'atividade': ativ, 'meses': meses, 'tipo': tipo, 'evidencia_app': ev_app, 'evidencia_externa': ev_ext})
             w("insert into public.plano_gantt (modelo, atividade, meses, tipo, evidencia_app, evidencia_externa) values (%s, %s, %s, %s, %s, %s) "
               "on conflict (modelo, atividade) do nothing;"
               % (q(modelo), q(ativ), arr(meses, 'integer'), q(tipo), q(ev_app), q(ev_ext)))
@@ -382,6 +403,7 @@ def main():
     # plano_parametros ------------------------------------------------------
     w('-- 10. plano_parametros (editáveis pelo ADMIN) -------------------------------')
     for chave, valor, desc in PARAMETROS:
+        rows['plano_parametros'].append({'chave': chave, 'valor': valor, 'descricao': desc})
         w("insert into public.plano_parametros (chave, valor, descricao) values (%s, %s, %s) on conflict (chave) do nothing;"
           % (q(chave), q(valor), q(desc)))
     w('')
@@ -438,6 +460,20 @@ def main():
         w('')
 
     SAIDA.write_text('\n'.join(L), encoding='utf-8')
+
+    # mesma carga em JSON, para scripts/carregar_plano_api.py (carga pela API do Supabase)
+    carga = OrderedDict()
+    carga['_leia'] = 'Gerado por scripts/gerar_seed_plano.py junto com sql/006. Mesmas linhas, para carregar pela API (scripts/carregar_plano_api.py). Não editar à mão.'
+    carga['safra'] = SAFRA
+    carga['versao'] = VERSAO
+    carga['renomear'] = rows['renomear']
+    for tb in ['unidade_manejo', 'unidade_alias', 'plano_safra', 'plano_unidade', 'plano_adubo_mes', 'plano_calagem',
+               'plano_fito_mes', 'plano_fito_excecao', 'plano_gantt', 'plano_parametros']:
+        carga[tb] = rows[tb]
+    carga['conferencia'] = OrderedDict([('unidades', len(unidades)), ('codigos', codigos), ('adubo_linhas', len(adubo)),
+                                        ('calagem_linhas', len(cal)), ('calagem_t', soma_t),
+                                        ('somas_kg', OrderedDict((fz, OrderedDict((i, somas[fz][i]) for i in INSUMOS)) for fz in sorted(somas)))])
+    CARGA.write_text(json.dumps(carga, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
 
     # relatório ---------------------------------------------------------------
     print(f'✔ {SAIDA.relative_to(RAIZ)} gerado ({SAIDA.stat().st_size // 1024} KB)')

@@ -74,9 +74,10 @@ Arquivos, na ordem em que nascem:
 | 4 | `docs/plano/2026-27/depara_fazendas.json` | Nome no plano → unidade do app. Só exato; `confirmado: false` para os três que não batem. |
 | 5 | `docs/plano/2026-27/alias_app.json` | Unidade → talhão do app, só quando inequívoco (mesmo nome ou mesmo número na mesma fazenda, conferido pela área), com a evidência; e a lista `sem_alias` com o motivo. |
 | 6 | `scripts/gerar_seed_plano.py` | Lê 3, 4, 5 e o cadastro real do `index.html`, confere tudo e gera `sql/006-plano-safra-seed-2627.sql` (ids fixos por uuid5; `on conflict do nothing`; conferência final que desfaz a carga se as somas não baterem). |
-| 7 | `sql/005-plano-safra.sql` → `sql/006-plano-safra-seed-2627.sql` | Rodar nesta ordem no SQL Editor. Os 8 planos entram como **versão 1 em rascunho**. |
+| 7 | `sql/005-plano-safra.sql` | **Só no SQL Editor** (cria tabelas, gatilhos e policies — a API pública não faz isso). |
+| 7b | `sql/006-plano-safra-seed-2627.sql` **ou** `scripts/carregar_plano_api.py` | Carga dos dados: colar o 006 no SQL Editor, ou rodar o script, que faz a mesma carga pela API pública do app (chave publishable), não duplica se repetido e confere contagens e somas no banco. `carga_2627.json` é gerado junto com o 006 pelo mesmo gerador. Os 8 planos entram como **versão 1 em rascunho**. |
 | 8 | Tela Escritório › Cadastros › **Unidades e Plano** | Rodar auditoria → preencher "Aprovado por" (agrônomo) → **Publicar como vigente**. |
-| 8b | `sql/007-publicar-planos-2627.sql` (opcional) | Atalho gerado por `scripts/gerar_publicacao_plano.py` a partir de `auditoria_v1_resultado.json`: grava a auditoria e publica as 8 versões 1 de uma vez. Só quando o agrônomo aprovar. |
+| 8b | `sql/007-publicar-planos-2627.sql` ou `carregar_plano_api.py --publicar` (opcional) | Atalho gerado por `scripts/gerar_publicacao_plano.py` a partir de `auditoria_v1_resultado.json`: grava a auditoria e publica as 8 versões 1 de uma vez. Só quando o agrônomo aprovar. |
 
 Como carregar uma **nova versão** do plano (PPTX novos):
 PPTX → `importar_plano.py` (JSON bruto) → resolver cada nome contra
