@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v52** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v53** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -135,10 +135,22 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   no ERP AgroGestão — a visão pecuaria_movimentos entrega um
   movimento por linha. O app não lê essa tabela (o boletim completo
   continua em boletins).
-- Robô iCrop (pg_cron + pg_net no Supabase): grava icrop_manejo toda
-  madrugada; o app LÊ (icropDo) e mostra medição do dia, compara
-  lâmina informada × medida e alerta parcela vencida (icrop_fazendas
-  e icrop_parcelas).
+- Robô iCrop (pg_cron + pg_net no Supabase): corrente de 3 funções —
+  icrop_passo1_parcelas (03h50), icrop_passo2_manejo (04h05) e
+  icrop_passo3_gravar (04h20, Brasília) — mais a rodada de reforço
+  9h45/10h00/10h15 (sql/003-robo-icrop-reforco.sql, 01/09/2026). Os
+  passos NUNCA podem rodar no mesmo minuto: cada um espera a resposta
+  da iCrop ao anterior (pg_net é assíncrono). O robô não pede data —
+  grava o que a iCrop tiver — e o app LÊ (icropDo): medição do dia,
+  lâmina informada × medida e alerta de parcela vencida
+  (icrop_fazendas e icrop_parcelas). O vigia do painel (v53) usa o
+  atualizado_em de icrop_manejo para separar "iCrop sem medição nova"
+  (robô e token OK — atraso da iCrop ou ciclo vencido na Vision) de
+  "Robô iCrop parado" (nada gravado há mais de um dia — aí sim
+  token/Vision). Histórico 04/09/2026: token rotacionado pelo Nilo
+  (ok) e os motores pg_cron/pg_net do projeto travaram e foram
+  revividos com Restart project no painel do Supabase — se os robôs
+  pararem TODOS de uma vez (Solinftec junto), o remédio é esse.
 - Cartão iCrop enriquecido (v47) com os campos que o robô já grava na
   coluna bruto (baixarIcrop lê via bruto->>: percentímetro
   recomendado, tempo de irrigação, umidade/capacidade de campo/
@@ -271,7 +283,7 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
      MCC-CXR (recepa?), AGL-T1 (Catuaí × Catucaí), MTP-3PT (área e
      identidade), Auto 400 × Alto 400, via da uréia mai–jul, e conferir
      os apelidos inferidos (Rio Preto 1º plantio, Caxico represa).
-- **Fase B (v53)**: cartão "Plano do mês", chips ordenados pelo plano,
+- **Fase B (versão futura)**: cartão "Plano do mês", chips ordenados pelo plano,
   modo safra zerada, chip "chumbinho visível", faróis do plano na
   Diretoria e texto "Plano × Semana" — só depois do merge da v52 e de
   pelo menos uma fazenda com plano vigente.
@@ -301,8 +313,15 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   fim do arquivo) e ajustar solinftec_depara.
 - Pedir à Solinftec a lista de operações (código → nome) e preencher
   solinftec_operacoes; enquanto isso o app mostra "Operação NNN".
-- Token da iCrop (tabela segredos do Supabase) pendente de troca
-  (rotação) — trocar direto no SQL Editor, nunca no código.
+- Token da iCrop: rotação FEITA pelo Nilo em 04/09/2026 (validada,
+  respostas 200). Próximas trocas: direto no SQL Editor (tabela
+  segredos), nunca no código.
+- **Ciclos vencidos na iCrop (04/09/2026)**: parte das fazendas está
+  devolvendo lista de parcelas vazia e nenhuma medição depois de
+  30/08 — ciclos encerraram sem novo plantio cadastrado na Vision
+  (ex.: feijão da Floramill venceu 04/09). Quem resolve: agrônomo
+  (Salvino) cadastrando os plantios; sem isso não há medição nova,
+  com qualquer token.
 - Porto Buriti (f35): talhões reais a cadastrar (hoje só "Área geral
   (a cadastrar)"); pivôs entram pelo campo "Cadastrar pivô desta
   fazenda" da seção Irrigação (cadastro local da unidade).

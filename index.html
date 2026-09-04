@@ -1523,7 +1523,7 @@ async function baixarIcrop(){
     const d=new Date(); d.setDate(d.getDate()-3);
     const de=d.toISOString().slice(0,10);
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
-    const sel="fazenda,equipamento,parcela,data,irrigacao_mm,precipitacao_mm,etc,eto,"
+    const sel="fazenda,equipamento,parcela,data,atualizado_em,irrigacao_mm,precipitacao_mm,etc,eto,"
       +"custo_mm:bruto->>reais_mm_ha,deficit:bruto->>deficit_consolidado,"
       +"atraso:bruto->>dias_em_atraso,area:bruto->>area_da_parcela,"
       /* campos ricos que o robô já grava no bruto (nomes da própria iCrop) */
@@ -2124,7 +2124,7 @@ function vCodigo(){
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v52</p>
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v53</p>
   </div>`;
 }
 /* ---------- Tela: entrada ---------- */
@@ -2152,7 +2152,7 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
-    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v52 ·
+    <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · v53 ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
 }
@@ -3420,9 +3420,20 @@ function vPainel(){
       const ultima=dados.length?dados.map(l=>l.data).sort().slice(-1)[0]:null;
       if(!ultima || ultima<ontem){
         const desde=ultima?new Date(ultima+"T12:00:00").toLocaleDateString("pt-BR"):null;
-        return `<div class="aviso" style="border-color:var(--amarelo)"><b>⚠️ Robô iCrop sem dados novos</b>
+        /* o robô carimba atualizado_em a cada rodada; medição velha com gravação recente
+           = robô e token bons, a iCrop é que não entregou medição nova (atraso do cálculo
+           ou ciclo vencido/sem parcela ativa na Vision) */
+        const gravou=dados.length?dados.map(l=>l.atualizado_em||"").sort().slice(-1)[0]:"";
+        const roboVivo=gravou.slice(0,10)>=ontem;
+        if(roboVivo){
+          return `<div class="aviso" style="border-color:var(--amarelo)"><b>⚠️ iCrop sem medição nova</b>
+            <p class="mut" style="margin:4px 0 0;font-size:.8rem">O robô está funcionando e o token está válido (gravou em ${new Date(gravou).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}),
+            mas a iCrop entregou medições só até ${desde}. Ou o cálculo deles está atrasado, ou o ciclo venceu sem novo plantio na Vision (confira o cartão de cadastro abaixo, quem resolve é o agrônomo). Se ficar 2 dias assim, avisar o Nilo.</p></div>`;
+        }
+        return `<div class="aviso" style="border-color:var(--amarelo)"><b>⚠️ Robô iCrop parado</b>
           <p class="mut" style="margin:4px 0 0;font-size:.8rem">${desde?"Última medição: "+desde+".":"Nenhuma medição baixada ainda."}
-          Se persistir por 2 dias: verificar o token na Vision e avisar o Nilo.</p></div>`;
+          ${gravou?"Última gravação do robô: "+new Date(gravou).toLocaleDateString("pt-BR")+".":""}
+          Nada é gravado há mais de um dia — verificar o token na Vision e avisar o Nilo.</p></div>`;
       }
       return ""; })()}
     ${(()=>{const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
