@@ -167,6 +167,31 @@ begin
   return v;
 end $$;
 
+-- Grava (ou troca) a chave da API no cofre — usada pelo sql/031 (uma linha só,
+-- para não ter que editar bloco no celular). Descobre sozinha se a tabela
+-- segredos usa chave/valor ou nome/valor. Nunca devolve a chave.
+create or replace function public.redator_gravar_chave(p_chave text)
+returns text language plpgsql security definer set search_path = public as $$
+declare c_chave text; c_valor text;
+begin
+  if p_chave is null or p_chave like 'COLE_AQUI%' or length(p_chave) < 20 then
+    return 'nada gravado: troque COLE_AQUI pela chave da API (começa com sk-ant-)';
+  end if;
+  select column_name into c_chave from information_schema.columns
+    where table_schema = 'public' and table_name = 'segredos' and column_name in ('chave', 'nome', 'id')
+    order by array_position(array['chave', 'nome', 'id'], column_name::text) limit 1;
+  select column_name into c_valor from information_schema.columns
+    where table_schema = 'public' and table_name = 'segredos' and column_name in ('valor', 'token', 'value')
+    order by array_position(array['valor', 'token', 'value'], column_name::text) limit 1;
+  if c_chave is null or c_valor is null then
+    return 'tabela segredos sem colunas chave/valor reconhecíveis — conferir: select column_name from information_schema.columns where table_name = ''segredos''';
+  end if;
+  execute format('insert into public.segredos (%I, %I) values (%L, %L) on conflict (%I) do update set %I = excluded.%I',
+    c_chave, c_valor, 'anthropic_key', p_chave, c_chave, c_valor, c_valor);
+  execute 'alter table public.segredos enable row level security';
+  return 'chave gravada (' || length(p_chave) || ' caracteres, termina em …' || right(p_chave, 4) || ')';
+end $$;
+
 -- Compacta o JSON da fase 1 antes de mandar para a IA (menos tokens, mesma informação
 -- essencial). nivel 1 = devolutiva (tira só o dia a dia redundante); nivel 2 = painel
 -- (fica só resumo/totais por unidade).
@@ -359,6 +384,7 @@ end $$;
 
 -- Trancar: nunca pela chave publishable do app
 revoke all on function public.redator_chave() from public, anon, authenticated;
+revoke all on function public.redator_gravar_chave(text) from public, anon, authenticated;
 revoke all on function public.redator_compactar(jsonb, int) from public, anon, authenticated;
 revoke all on function public.redator_montar(text, date, date, text) from public, anon, authenticated;
 revoke all on function public.redigir_relatorio(text, date, date, text) from public, anon, authenticated;
