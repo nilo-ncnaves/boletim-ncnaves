@@ -67,7 +67,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 | Quando | Relatórios previstos |
 |---|---|
-| Todo dia (motor, 05:00) | 1 (farol 7 e 30), 5 diário, 7 diário, 15 diário — sozinhos, em Diretoria › 📊 Relatórios |
+| Todo dia (motor, 05:00) | 1 (farol 7 e 30), 5 diário, 7 diário, 15 diário — sozinhos, no app em 📊 Relatórios |
 | Segunda | 3 (vistoria do sistema, Code); 4 parcial do mês (motor, 05:30) |
 | Sexta | 2 (devolutiva semanal); 5, 6 e 7 da semana (motor, 05:10) |
 | Dia 1 (motor, 05:20) | 9 (custo físico), 14 (rebanho) e 4 (plano) do mês fechado |
@@ -82,8 +82,10 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 Desde a v55 os relatórios marcados "motor" saem sozinhos: o Supabase
 calcula em horário agendado (pg_cron) e grava o resultado pronto na
-tabela `relatorios_gerados`; o app só lê e mostra (Diretoria › seção
-📊 Relatórios; gerente › cartão 📊 Meus relatórios, só da unidade dele).
+tabela `relatorios_gerados`; o app só lê e mostra (Diretoria/ADMIN ›
+botão 📊 Relatórios no topo do painel ou atalho na tela de entrada →
+tela com "Textos para revisar" em cima e "Números" embaixo, v58;
+gerente › cartão 📊 Meus relatórios, só da unidade dele).
 Nada é calculado no celular além de formatação (nome do talhão pelo
 cadastro do `index.html`, datas, números). Arquivos:
 `sql/020-relatorios-motor.sql` (tabelas, funções, agenda) e

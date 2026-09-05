@@ -1755,25 +1755,44 @@ const relTabela=(cab,linhas,classes)=>`<div class="rel-tab"><table><tr>${cab.map
   ${linhas.map((l,i)=>`<tr${classes&&classes[i]?` class="${classes[i]}"`:""}>${l.map((c,k)=>`<td${/^#/.test(cab[k])?' class="num"':""}>${c==null?"—":c}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cab.length}" class="mut">nada registrado no período</td></tr>`}</table></div>`;
 
 /* ---- Seção do painel da Diretoria ---- */
-function secaoRelatoriosPainel(){
-  const per=relFiltro.per;
-  const itens=Object.keys(REL_CATALOGO).filter(k=>!per||REL_CATALOGO[k].per===per).map(k=>{
+/* ---- Tela "📊 Relatórios" (v58): um toque no painel ou na entrada; textos do redator
+   para revisar em cima, números da fase 1 embaixo. Só Diretoria/ADMIN. ---- */
+function relItensNumeros(per){
+  return Object.keys(REL_CATALOGO).filter(k=>!REL_CATALOGO[k].texto && (!per||REL_CATALOGO[k].per===per)).map(k=>{
     const ps=relPeriodos(k); if(!ps.length) return "";
     const [ini,fim]=ps[0].split("|"), ls=relLinhas(k,ini,fim), uni=ls.filter(l=>l.unidade_id);
-    const conf=uni.filter(relAlerta).length, comTexto=ls.filter(l=>l.texto).length;
+    const conf=uni.filter(relAlerta).length;
     return `<li><button class="linha-flex" style="width:100%;text-align:left" data-relab="${k}|${ini}|${fim}">
-      <span class="farol ${conf?"espera":(REL_CATALOGO[k].texto&&!comTexto?"vazio":"ok")}"></span>
-      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${REL_CATALOGO[k].texto?(comTexto+" texto"+(comTexto===1?"":"s")+" de "+ls.length):uni.length+" unidade"+(uni.length===1?"":"s")}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
+      <span class="farol ${conf?"espera":"ok"}"></span>
+      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${uni.length} unidade${uni.length===1?"":"s"}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
       <span class="mut">›</span></button></li>`;
   }).join("");
+}
+function vRelatorios(){
+  const per=relFiltro.per;
+  /* textos: o último período de cada relatório narrativo, um cartão por unidade */
+  const textos=Object.keys(REL_CATALOGO).filter(k=>REL_CATALOGO[k].texto).flatMap(k=>{
+    const ps=relPeriodos(k); if(!ps.length) return [];
+    const [ini,fim]=ps[0].split("|");
+    const ls=relLinhas(k,ini,fim).filter(l=>l.texto).sort((a,b)=>relUni(a.unidade_id).localeCompare(relUni(b.unidade_id),"pt-BR"));
+    if(!ls.length) return [];
+    return [`<p class="mut" style="font-size:.78rem;margin:12px 0 4px"><b>${esc(REL_CATALOGO[k].nome)}</b> · ${relRotuloPer(k,ini,fim)} · ${ls.length} texto${ls.length>1?"s":""}
+        <button class="btn suave mini" data-relab="${k}|${ini}|${fim}" style="display:inline-flex;padding:2px 8px;margin-left:6px">ver com os números ›</button></p>`
+      +relTextos(ls)];
+  }).join("");
   const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
-  return `<details class="secao"><summary><span class="ico">📊</span>Relatórios<span class="resumo">${relCache.length?"automáticos":"—"}</span><span class="seta">›</span></summary>
-    <div class="corpo">
-      ${relCache.length?`<div class="chips mt no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
-      <ul class="lista-limpa mt">${itens||"<li class='mut'>Nenhum relatório neste filtro ainda.</li>"}</ul>
+  const itens=relItensNumeros(per);
+  return topo("Relatórios", sessao.papel==="admin"?"Administrador":"Diretoria", true)+`
+    ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}
+    <h2 style="margin-bottom:6px">📝 Textos para revisar</h2>
+    <p class="mut" style="font-size:.8rem">Escritos pelo robô-redator a partir dos números. Leia, ajuste se quiser e toque em copiar para mandar no WhatsApp.</p>
+    ${textos||`<div class="cartao"><p class="mut">Nenhum texto ainda. O redator escreve as devolutivas toda sexta às 5h20 e o painel executivo no dia 8; os textos aparecem aqui depois de sincronizar.</p></div>`}
+    <h2 style="margin:18px 0 6px">📊 Números</h2>
+    ${relCache.length?`<div class="chips mb no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
+      <div class="cartao"><ul class="lista-limpa">${itens||"<li class='mut'>Nenhum relatório neste filtro ainda.</li>"}</ul></div>
       <p class="mut" style="font-size:.72rem">Calculado no Supabase toda madrugada (motor sql/020); o app só mostra. Último cálculo: ${ultimo?new Date(ultimo).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}. Diferença entre dito e medido é "para conferir", nunca erro.</p>`
-      :`<p class="mut mt" style="font-size:.85rem">Ainda não há relatório calculado. O motor do Supabase (sql/020) roda toda madrugada e o app baixa ao sincronizar.</p>`}
-    </div></details>`;
+    :`<div class="cartao"><p class="mut">Ainda não há relatório calculado. O motor do Supabase (sql/020) roda toda madrugada e o app baixa ao sincronizar.</p></div>`}
+    <button class="btn sec mt no-print" data-voltar="1">‹ Voltar ao painel</button>`;
 }
 /* ---- Cartão do gerente: farol e dito × medido SÓ da unidade dele ---- */
 function cartaoRelatoriosGerente(fz){
@@ -2461,7 +2480,7 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","relatorio","historico"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","relatorio","historico","relatorios"].includes(tela) && !podePainel()) tela="entrada";
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
   const app = $("#app");
@@ -2481,6 +2500,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="unidplano") app.innerHTML = vUnidPlano();
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="relat") app.innerHTML = vRelat();
+  else if(tela==="relatorios") app.innerHTML = vRelatorios();
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
 }
@@ -2527,7 +2547,9 @@ function vEntrada(){
     ${temPos?`<button class="perfil-btn" data-perfil="pos"><span class="ava">🏭</span>
       <span><b>Terreiro / Secador / Benefício</b><span class="mut">Registro diário do pós-colheita</span></span></button>`:""}
     ${podePainel()?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
-      <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
+      <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
+    <button class="perfil-btn" data-perfil="relatorios"><span class="ava">📊</span>
+      <span><b>Relatórios</b><span class="mut">Textos para revisar e números prontos</span></span></button>`:""}
     ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
@@ -3792,6 +3814,8 @@ function vPainel(){
       <div class="cresce"><h2>${enviadasHoje} de ${unidadesAtv.length} unidades enviaram hoje</h2>
       <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
+    ${(()=>{ const nt=relCache.filter(l=>l.texto).length, nn=relCache.filter(l=>!l.texto&&l.unidade_id).length;
+      return `<button class="btn mb no-print" id="bt-relatorios-tela">📊 Relatórios${relCache.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nt?nt+" texto"+(nt>1?"s":"")+" para revisar":""}${nt&&nn?" · ":""}${nn?"números prontos":""}</span>`:""}</button>`; })()}
     ${cartaoFarolBoletins()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
@@ -3856,7 +3880,6 @@ function vPainel(){
     ${cartaoGraosPainel()}
     ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
-    ${secaoRelatoriosPainel()}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
@@ -3902,7 +3925,7 @@ function vPainel(){
     <div class="linha-flex mb no-print" style="gap:8px">
       <button class="btn sec mini" id="bt-csv">⬇ Excel/CSV</button>
       <button class="btn sec mini" id="bt-pdf">🖨 PDF do período</button>
-      <button class="btn sec mini" id="bt-rel">📊 Relatório</button>
+      <button class="btn sec mini" id="bt-rel">📈 Resumo do período</button>
       ${sessao.papel==="admin"?`<button class="btn sec mini" id="bt-cad">⚙ Cadastros</button>`:""}
     </div>
     <div class="cartao"><h3>Boletins (${lista.length})${filtroPainel.fazenda?" — "+esc(fazenda(filtroPainel.fazenda).nome):""}</h3>
@@ -4182,7 +4205,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v57";
+const APP_VERSAO="v58";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5236,7 +5259,7 @@ async function baixarCodigos(){
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
   try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); } finally { syncOcupado=false; }
-  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa"].includes(telaAtual))
+  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios"].includes(telaAtual))
     ir(telaAtual, null, true);
 }
 function syncStatus(){
@@ -5645,6 +5668,10 @@ function ligarEventos(tela){
       if(!unidadesPermitidas().some(f=>atividadeDe(f.id)===d.atividade)) return;
       sessao={userId:u.id, papel:"gerente", nome:u.nome, atividade:d.atividade, fazendaId:null};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
+    if(d.perfil==="relatorios"){ if(!podePainel()) return;
+      const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
+      sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("relatorios"); return; }
+    if(t.id==="bt-relatorios-tela"){ ir("relatorios"); return; }
     if(d.perfil){ const u=D.usuarios.find(x=>x.papel===d.perfil); if(!u) return;
       if(d.perfil==="admin" && !podeCadastros()) return;
       if(d.perfil==="proprietario" && !podePainel()) return;
@@ -5782,6 +5809,7 @@ function ligarEventos(tela){
       sessao={userId:u.id,papel:u.papel,nome:u.nome};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("casa"); return; }
     if(t.id==="bt-sair"||t.id==="bt-topo-sair"){ sessao=null; Persist.del("bdf:sessao"); ir("entrada"); return; }
+    if(d.voltar && telaAtual==="relat" && sessao && sessao.papel!=="gerente"){ ir("relatorios"); return; }
     if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
     if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }
