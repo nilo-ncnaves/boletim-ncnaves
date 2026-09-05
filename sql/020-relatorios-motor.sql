@@ -187,7 +187,8 @@ begin
   insert into public.relatorios_gerados (relatorio, periodo_ini, periodo_fim, unidade_id, gerado_em, dados, texto)
   values (p_rel, p_ini, p_fim, p_unidade, now(), p_dados, p_texto)
   on conflict (relatorio, periodo_ini, periodo_fim, (coalesce(unidade_id, '')))
-  do update set dados = excluded.dados, texto = excluded.texto, gerado_em = now();
+  do update set dados = excluded.dados, gerado_em = now(),
+    texto = coalesce(excluded.texto, public.relatorios_gerados.texto);   -- texto do redator (fase 2) não some na regravação
 end $$;
 
 -- linhas da iCrop do período já com a UNIDADE do app resolvida (mesma regra do

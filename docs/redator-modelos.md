@@ -8,8 +8,11 @@ semeados na tabela `relatorios_modelos` do Supabase (chave = nome do
 modelo, valor = texto). Mudou o texto aqui, regrava a tabela — os dois
 nunca podem divergir.
 
-Estado (05/09/2026): a tabela `relatorios_modelos` ainda não existe;
-por enquanto os modelos vivem só aqui. Nada disso muda o app.
+Estado (05/09/2026, v57): `sql/030-redator.sql` cria a tabela
+`relatorios_modelos` e semeia estes três textos (com cadência, fontes e
+max_tokens); o robô-redator usa `instrucoes` como system prompt. Mudou o
+texto aqui → editar o mesmo bloco no sql/030 e rodá-lo de novo (o INSERT
+regrava).
 
 Regras comuns a todos (as mesmas do projeto): nunca inventar número;
 falta de registro é "sem registro", nunca "não fez"; diferença entre

@@ -1683,7 +1683,12 @@ const REL_CATALOGO={
   irrigacao_rec_exec_semana:{nome:"Irrigação: recomendado × executado — semana", per:"semana"},
   custo_fisico_talhao_mes:{nome:"Custo físico por talhão — mês", per:"mes"},
   rebanho_mes:{nome:"Rebanho — mês", per:"mes"},
-  plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"}
+  plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"},
+  /* fase 2 (v57): relatórios narrativos redigidos pelo robô-redator (sql/030) — texto acima dos números,
+     marcado "gerado automaticamente — revisar antes de enviar"; só Diretoria/ADMIN, nunca o gerente */
+  devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", per:"semana", texto:true},
+  painel_executivo:{nome:"Painel executivo aos sócios (texto)", per:"mes", texto:true},
+  alerta_divergencia:{nome:"Alerta de divergência (texto)", per:"dia", texto:true}
 };
 let relCache=[];                 /* linhas de relatorios_gerados guardadas no aparelho (bdf:relatorios) */
 let relFiltro={per:""};          /* filtro da seção do painel: "" | dia | semana | mes */
@@ -1699,14 +1704,16 @@ async function baixarRelatorios(){
     if(!tudo && !ids.length) return;
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
     const dAtras=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+    /* rascunhos do redator (texto) só descem para quem tem painel: o gerente recebe a devolutiva pelo WhatsApp, depois de revisada */
+    const soNum=k=>tudo||!REL_CATALOGO[k].texto;
     const pedidos=[
       ["farol_7,farol_30", dAtras(8)],
-      ["dito_medido_icrop_dia,dito_medido_solinftec_dia,balanco_hidrico_dia", dAtras(14)],
-      ["dito_medido_icrop_semana,dito_medido_solinftec_semana,irrigacao_rec_exec_semana,custo_fisico_talhao_mes,rebanho_mes,plano_executado_mes", dAtras(60)]
+      [["dito_medido_icrop_dia","dito_medido_solinftec_dia","balanco_hidrico_dia","alerta_divergencia"].filter(soNum).join(","), dAtras(14)],
+      [["dito_medido_icrop_semana","dito_medido_solinftec_semana","irrigacao_rec_exec_semana","custo_fisico_talhao_mes","rebanho_mes","plano_executado_mes","devolutiva_semanal","painel_executivo"].filter(soNum).join(","), dAtras(60)]
     ];
     let novas=[];
     for(const [rels,de] of pedidos){
-      let url=syncCfg.url+"/rest/v1/relatorios_gerados?select=id,relatorio,periodo_ini,periodo_fim,unidade_id,gerado_em,dados"
+      let url=syncCfg.url+"/rest/v1/relatorios_gerados?select=id,relatorio,periodo_ini,periodo_fim,unidade_id,gerado_em,dados,texto,texto_em,texto_modelo"
         +"&relatorio=in.("+rels+")&periodo_fim=gte."+de+"&order=periodo_fim.desc,gerado_em.desc&limit=1000";
       if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
       const r=await fetch(url,cab); if(!r.ok) return;
@@ -1714,7 +1721,7 @@ async function baixarRelatorios(){
       novas=novas.concat(linhas);
     }
     /* trava: unidade fora do escopo nunca fica no aparelho, venha o que vier do banco */
-    novas=novas.filter(l=>l && REL_CATALOGO[l.relatorio] && l.dados && (tudo || (l.unidade_id && ids.includes(l.unidade_id))));
+    novas=novas.filter(l=>l && REL_CATALOGO[l.relatorio] && l.dados && (tudo || (l.unidade_id && ids.includes(l.unidade_id) && !REL_CATALOGO[l.relatorio].texto)));
     const vistos=new Set(); relCache=novas.filter(l=>{ if(vistos.has(l.id)) return false; vistos.add(l.id); return true; });
     await Persist.set("bdf:relatorios", JSON.stringify(relCache));
   }catch(e){}
@@ -1753,10 +1760,10 @@ function secaoRelatoriosPainel(){
   const itens=Object.keys(REL_CATALOGO).filter(k=>!per||REL_CATALOGO[k].per===per).map(k=>{
     const ps=relPeriodos(k); if(!ps.length) return "";
     const [ini,fim]=ps[0].split("|"), ls=relLinhas(k,ini,fim), uni=ls.filter(l=>l.unidade_id);
-    const conf=uni.filter(relAlerta).length;
+    const conf=uni.filter(relAlerta).length, comTexto=ls.filter(l=>l.texto).length;
     return `<li><button class="linha-flex" style="width:100%;text-align:left" data-relab="${k}|${ini}|${fim}">
-      <span class="farol ${conf?"espera":"ok"}"></span>
-      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${uni.length} unidade${uni.length===1?"":"s"}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
+      <span class="farol ${conf?"espera":(REL_CATALOGO[k].texto&&!comTexto?"vazio":"ok")}"></span>
+      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${REL_CATALOGO[k].texto?(comTexto+" texto"+(comTexto===1?"":"s")+" de "+ls.length):uni.length+" unidade"+(uni.length===1?"":"s")}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
       <span class="mut">›</span></button></li>`;
   }).join("");
   const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
@@ -1807,7 +1814,7 @@ function vRelat(){
     <button class="btn sec mini" data-relnav="ant" ${i<0||i>=ps.length-1?"disabled":""}>‹ anterior</button>
     <span class="cresce centro" style="font-size:.85rem"><b>${relRotuloPer(rel,ini,fim)}</b></span>
     <button class="btn sec mini" data-relnav="prox" ${i<=0?"disabled":""}>próximo ›</button></div>`;
-  const corpo=ls.length?relRender(rel,ls):`<div class="cartao"><p class="mut">Nada calculado para este período${sessao&&sessao.papel==="gerente"?" na sua unidade":""}.</p></div>`;
+  const corpo=ls.length?relTextos(ls)+relRender(rel,ls):`<div class="cartao"><p class="mut">Nada calculado para este período${sessao&&sessao.papel==="gerente"?" na sua unidade":""}.</p></div>`;
   return topo(cat.nome, relRotuloPer(rel,ini,fim)+(sessao&&sessao.papel==="gerente"?" · "+fazenda(sessao.fazendaId).nome:""), true)+nav+corpo+`
     <div class="linha-flex mt no-print" style="gap:8px">
       <button class="btn sec mini" id="bt-rel-zap">📲 Compartilhar</button>
@@ -1820,8 +1827,28 @@ function relNavegar(sentido){
   const j=sentido==="ant"?i+1:i-1; if(j<0||j>=ps.length) return;
   const [ini,fim]=ps[j].split("|"); relVista={...relVista,ini,fim}; ir("relat");
 }
+/* texto redigido pelo robô-redator (fase 2): acima dos números, sempre com o marcador de revisão */
+function relTextos(ls){
+  return ls.filter(l=>l.texto).map(l=>`<div class="cartao" style="border-color:var(--amarelo)">
+    <div class="linha-flex" style="align-items:flex-start;gap:8px"><h3 class="cresce">📝 ${esc(relUni(l.unidade_id))}</h3>
+      <span class="tag amarelo" style="flex:none">gerado automaticamente — revisar antes de enviar</span></div>
+    <p style="white-space:pre-wrap;font-size:.95rem;margin-top:8px">${esc(l.texto)}</p>
+    <p class="mut" style="font-size:.72rem;margin-top:6px">Redigido no Supabase${l.texto_modelo?" por "+esc(l.texto_modelo):""}${l.texto_em?" em "+new Date(l.texto_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):""} a partir dos números abaixo. Confira e ajuste antes de mandar.</p>
+    <button class="btn sec mini mt no-print" data-relcopiar="${esc(String(l.id))}">📲 copiar para WhatsApp</button></div>`).join("");
+}
 /* renderização por relatório: tabelas compactas, âmbar onde há divergência/atraso */
 function relRender(rel,ls){
+  /* relatório narrativo (composto): os números são as fontes da fase 1, uma atrás da outra */
+  if((REL_CATALOGO[rel]||{}).texto || ls.some(l=>(l.dados||{}).composto)){
+    return ls.map(l=>{ const d=l.dados||{}, fs=(d.fontes||[]);
+      if(!fs.length) return `<div class="cartao"><h3>${esc(relUni(l.unidade_id))}</h3><p class="mut">Sem números anexados neste período (a fase 1 ainda não gerou as fontes).</p></div>`;
+      /* números fechados por padrão: o texto é o protagonista; toque abre as fontes */
+      return `<details class="secao"><summary><span class="ico">📊</span>Números — ${esc(relUni(l.unidade_id))}<span class="resumo">${fs.length} fonte${fs.length>1?"s":""}</span><span class="seta">›</span></summary><div class="corpo">`
+        +fs.map(f=>`<p class="mut" style="font-size:.78rem;margin:10px 0 2px"><b>${esc((REL_CATALOGO[f.relatorio]||{nome:f.relatorio}).nome)}</b> · ${relRotuloPer(f.relatorio,f.periodo_ini||l.periodo_ini,f.periodo_fim||l.periodo_fim)}</p>`
+          +relRender(f.relatorio,[{...l, relatorio:f.relatorio, unidade_id:f.unidade===undefined?l.unidade_id:f.unidade, dados:f.dados, texto:null}])).join("")
+        +`</div></details>`;
+    }).join("");
+  }
   const conf=t=>`<span class="rel-conf">⚠ ${t}</span>`;
   const bloco=(titulo,html,sub)=>`<div class="cartao"><h3>${titulo}</h3>${sub?`<p class="mut" style="font-size:.78rem">${sub}</p>`:""}${html}</div>`;
   if(rel.startsWith("farol")){
@@ -1935,6 +1962,7 @@ function relRender(rel,ls){
 function relTexto(){
   const {rel,ini,fim}=relVista, cat=REL_CATALOGO[rel]||{nome:rel};
   const ls=relLinhasVista(), L=["📊 *"+cat.nome.toUpperCase()+"* — "+relRotuloPer(rel,ini,fim)];
+  if(ls.some(l=>l.texto)) return ls.filter(l=>l.texto).map(l=>(ls.length>1?"*"+relUni(l.unidade_id)+"*\n":"")+l.texto).join("\n\n");
   ls.forEach(l=>{ const d=l.dados||{}, r=d.resumo||{};
     if(rel.startsWith("farol")){
       if(!l.unidade_id){ L.push(d.placar||""); (d.unidades||[]).filter(u=>!u.em_dia).forEach(u=>L.push("○ "+u.nome+": "+n0(u.enviados)+"/"+n0(u.uteis)+(u.ultimo_envio?" · último "+fmtDataCurta(u.ultimo_envio):" · sem registro"))); }
@@ -4154,7 +4182,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v56";
+const APP_VERSAO="v57";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5763,6 +5791,10 @@ function ligarEventos(tela){
     if(d.relper!==undefined){ relFiltro.per=d.relper; ir(telaAtual,null,true); return; }
     if(d.relnav){ relNavegar(d.relnav); return; }
     if(t.id==="bt-rel-zap"){ abrirTextoZap(relTexto()); return; }
+    if(d.relcopiar){ const l=relCache.find(x=>String(x.id)===d.relcopiar); if(!l||!l.texto) return;
+      const txt=l.texto; const fim=()=>{ t.textContent="✔ copiado"; abrirTextoZap(txt); };
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(fim,fim); else fim();
+      return; }
     if(t.id==="bt-rel-pdf"){ window.print(); return; }
     if(t.id==="bt-preencher"){
       const b=boletimDoDia(hojeISO(), sessao.fazendaId);
