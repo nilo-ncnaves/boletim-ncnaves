@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v57** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v58** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -354,9 +354,15 @@ automáticos".
 - **App**: `baixarRelatorios()` em `syncTudo` baixa só as unidades do
   escopo do código (filtro na REST + trava local), guarda em
   `bdf:relatorios`, funciona offline com o último baixado; tabela
-  inexistente = silêncio. Diretoria: seção "📊 Relatórios" (fechada) com
-  filtro dia/semana/mês, último período gerado, "N para conferir" em
-  âmbar; toque abre a tela do relatório (tabelas compactas `.rel-tab`,
+  inexistente = silêncio. Diretoria/ADMIN (v58): botão grande
+  "📊 Relatórios" no topo do painel e atalho "Relatórios" na tela de
+  entrada abrem a tela própria `vRelatorios` — em cima "📝 Textos para
+  revisar" (devolutivas e painel executivo do último período, texto
+  visível, botão copiar para WhatsApp), embaixo "📊 Números" com filtro
+  dia/semana/mês, último período gerado e "N para conferir" em âmbar
+  (a seção fechada dentro do painel, da v55, deixou de existir; o botão
+  antigo "📊 Relatório" do painel virou "📈 Resumo do período"); toque
+  abre a tela do relatório (tabelas compactas `.rel-tab`,
   fonte tabular, âmbar = para conferir, vermelho só janela fechada) com
   navegação anterior/próximo, "📲 Compartilhar" (texto limpo para
   WhatsApp) e "🖨 PDF" (impressão). Gerente: cartão "📊 Meus relatórios"
@@ -416,7 +422,9 @@ relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
 e sql/001-002, listadas nas PENDÊNCIAS).
 
 ## PENDÊNCIAS
-- **Robô-redator (v57) — para o Nilo:** colar no SQL Editor, nesta ordem:
+- **Robô-redator (v57) — para o Nilo:** (feito em 05/09/2026: sql/020,
+  030 e 031 rodados, primeira devolutiva da Floramill gerada) colar no
+  SQL Editor, nesta ordem:
   `sql/030-redator.sql` (depois do 020), `sql/031-redator-cofre.sql`
   trocando COLE_AQUI pela chave sk-ant-… da Anthropic (a chave nunca entra
   no repositório), e `sql/032-redator-teste.sql` (dispara uma devolutiva de
