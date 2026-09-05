@@ -34,7 +34,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 |---:|---|---|---|---|---|---|
 | **NÍVEL 1 — SUSTENTAÇÃO** | | | | | | |
 | 1 | Farol de completude | quem enviou/não enviou boletim | app | diário | painel + motor (`farol_7`, `farol_30`) | EXISTE |
-| 2 | Devolutiva semanal por unidade | adesão, dito × medido, elogio | app + iCrop + Solinftec | sexta | Cowork | PRONTO — `docs/relatorios/02-devolutiva-semanal.md` |
+| 2 | Devolutiva semanal por unidade | adesão, dito × medido, elogio | app + iCrop + Solinftec | sexta | robô-redator (`devolutiva_semanal`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase) — prompt `docs/relatorios/02-devolutiva-semanal.md` |
 | 3 | Vistoria do sistema | site × código, robôs, segurança | repo + REST | segunda | Code | EXISTE — roteiro em `docs/vistoria-semanal.md` |
 | **NÍVEL 2 — CONTROLE OPERACIONAL** | | | | | | |
 | 4 | Plano × executado do mês | adubação/calagem/fito previstos × feitos | plano v52 + boletim | segunda (parcial) / dia 1 (fechado) | motor (`plano_executado_mes`) + Cowork | EXISTE (motor, v55 — grava aviso enquanto sql/005–007 não rodarem) — prompt `docs/relatorios/04-plano-x-executado.md` |
@@ -60,7 +60,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | 21 | Matriz de acesso | quem tem qual código/escopo | app | trimestral | Cowork | PRONTO — `docs/relatorios/21-matriz-de-acesso.md` |
 | 22 | Divergências de cadastro | app × ERP × inventário | docs | por censo | Cowork | PRONTO — `docs/relatorios/22-divergencias-cadastro.md` |
 | **NÍVEL 6 — DIREÇÃO** | | | | | | |
-| 23 | Painel executivo mensal | 1 página: produção, custo, água, máquinas, rebanho, adesão, 3 decisões | todos | dia 10 | Cowork | PRONTO — `docs/relatorios/23-painel-executivo.md` |
+| 23 | Painel executivo mensal | 1 página: produção, custo, água, máquinas, rebanho, adesão, 3 decisões | todos | dia 8 | robô-redator (`painel_executivo`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase; custo por saca AGUARDA ERP) — prompt `docs/relatorios/23-painel-executivo.md` |
 | 24 | Fechamento de safra por cultura | produtividade, custo, margem, decisões (renovar/arrancar/rotação/vender lote) | todos | anual | Cowork | AGUARDA fechamento da safra (e ERP para custo/margem) |
 
 ## Calendário resumido (para a vistoria de segunda)
@@ -122,6 +122,32 @@ da lista), tabelas por pivô/talhão/lote e `divergencias[]` com texto
 pronto ("para conferir", nunca "erro"). Ver exemplos rodando
 `sql/021-relatorios-teste.sql`. Unidade nova no app precisa de um `insert`
 em `rel_unidades` (o farol lista quem existe por essa tabela).
+
+## Robô-redator (fase 2, v57)
+
+`sql/030-redator.sql` liga a API da Claude ao motor: para cada relatório
+narrativo cadastrado em `relatorios_modelos` (texto-modelo em
+`docs/redator-modelos.md`), o Supabase monta uma linha composta em
+`relatorios_gerados` (`dados.fontes` = fontes da fase 1 compactadas) e
+pede o texto à API (`net.http_post` → `net._http_response`, dispara/colhe
+como o robô iCrop). O texto vai para `relatorios_gerados.texto`; o app o
+mostra acima dos números, marcado "gerado automaticamente — revisar antes
+de enviar", com o botão "copiar para WhatsApp". A chave da API vive só em
+`segredos` (sql/031); nenhuma chamada sai do app.
+
+| chave | cadência | quem | fontes (fase 1) | agenda (UTC) |
+|---|---|---|---|---|
+| `devolutiva_semanal` | semana (últimos 7 dias até quinta) | uma por unidade ativa | `farol_7`, `dito_medido_icrop_semana`, `dito_medido_solinftec_semana` | sexta 08:20 dispara / 08:35 colhe |
+| `painel_executivo` | mês anterior fechado | linha do grupo | `farol_30`, `custo_fisico_talhao_mes`, `rebanho_mes`, `plano_executado_mes`, semanas de `irrigacao_rec_exec_semana` e dito × medido, resumos do mês anterior | dia 8 08:20 / 08:35 |
+| `alerta_divergencia` | manual (sql/032) | por unidade e dia | `dito_medido_icrop_dia`, `dito_medido_solinftec_dia` | — |
+
+Pedido: modelo `claude-sonnet-4-6`, `max_tokens` 1500 (300 no alerta),
+system = instruções do modelo, uma mensagem de usuário com data, unidade,
+período e o JSON das fontes. Custo típico: devolutiva ≈ 2,5 mil tokens de
+entrada + 300 de saída (≈ US$ 0,01); painel ≈ 10 mil + 800 (≈ US$ 0,05);
+alerta ≈ 1 mil + 100. Diário de bordo: `relatorios_reqs` (status e tokens)
+e `relatorios_execucoes`. Erro 401/403 = chave errada (rodar sql/031);
+429 = limite de taxa; "perdido" = resposta não chegou em 6 h.
 
 ## Como rodar um relatório PRONTO no Cowork
 

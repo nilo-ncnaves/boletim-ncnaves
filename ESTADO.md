@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v56** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v57** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -367,11 +367,34 @@ automáticos".
 - Vocabulário obrigatório: "sem registro" (nunca "não fez"); diferença
   entre dito e medido é "para conferir" (nunca "erro"); produto do plano só
   como "previsto pelo agrônomo".
-- Redator (05/09/2026): os textos-modelo que transformam os relatórios em
-  texto para pessoas (devolutiva semanal ao gerente, painel executivo aos
-  sócios, alerta de divergência ao controller) estão em
-  `docs/redator-modelos.md`; serão semeados na tabela `relatorios_modelos`,
-  que ainda não existe. Só documentação — nada mudou no app.
+- **Fase 2 (v57): robô-redator com a API da Claude dentro do Supabase**
+  (`sql/030-redator.sql`). Tabela `relatorios_modelos` (um texto-modelo por
+  relatório narrativo, semeada com `docs/redator-modelos.md` — os dois nunca
+  divergem; cadência, por_unidade, fontes, max_tokens), `relatorios_reqs`
+  (pedidos em andamento: req_id, status enviado/ok/erro/perdido, tokens) e
+  colunas texto_em/texto_modelo em relatorios_gerados. Função
+  `redigir_relatorio(relatorio, ini, fim, unidade)` monta a linha composta
+  (fontes da fase 1 compactadas em `dados.fontes`) e DISPARA via
+  `net.http_post` para https://api.anthropic.com/v1/messages (modelo
+  claude-sonnet-4-6, max_tokens 1500, system = instruções do modelo);
+  `redator_colher()` lê `net._http_response` minutos depois e grava
+  `relatorios_gerados.texto`. Padrão assíncrono igual ao robô iCrop.
+  Agenda pg_cron (UTC): sexta 08:20/08:35 (devolutiva por unidade), dia 8
+  08:20/08:35 (painel executivo do mês anterior); `redator_disparar(cadencia)`
+  reaproveita o par para qualquer modelo cadastrado. `alerta_divergencia`
+  fica manual (sql/032). A chave da API vive SÓ em `segredos`
+  (chave anthropic_key, gravada por `sql/031-redator-cofre.sql`), lida por
+  `redator_chave()` (security definer); nenhuma função é chamável pela chave
+  publishable; o app nunca chama a API. `rel_gravar` passou a preservar o
+  texto quando a fase 1 regrava os números.
+- App (v57): relatórios narrativos (`devolutiva_semanal`, `painel_executivo`,
+  `alerta_divergencia`) entram na seção 📊 Relatórios da Diretoria; a tela
+  mostra o texto ACIMA dos números, com o marcador "gerado automaticamente —
+  revisar antes de enviar" e o botão "📲 copiar para WhatsApp" (copia e abre
+  o compartilhar); os números (fontes) ficam fechados abaixo. Só aparelhos
+  com painel baixam texto: o gerente não recebe rascunho nenhum (a devolutiva
+  chega a ele pelo WhatsApp, depois de revisada). Telas do gerente idênticas
+  à v56 (regressão em scripts/regressao_render.cjs).
 
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
@@ -393,6 +416,14 @@ relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
 e sql/001-002, listadas nas PENDÊNCIAS).
 
 ## PENDÊNCIAS
+- **Robô-redator (v57) — para o Nilo:** colar no SQL Editor, nesta ordem:
+  `sql/030-redator.sql` (depois do 020), `sql/031-redator-cofre.sql`
+  trocando COLE_AQUI pela chave sk-ant-… da Anthropic (a chave nunca entra
+  no repositório), e `sql/032-redator-teste.sql` (dispara uma devolutiva de
+  teste da Floramill e mostra o texto). Sem a chave, o disparo falha com
+  aviso claro no diário `relatorios_execucoes` e nada mais muda. Custo
+  estimado: ~US$ 0,01 por devolutiva (24 por semana), ~US$ 0,05 por painel
+  executivo — menos de US$ 2 por mês.
 - **Relatórios automáticos (v55) — para o Nilo:** colar no SQL Editor,
   nesta ordem, o que ainda faltar: `sql/003-solinftec.sql` (se não rodou),
   `sql/005` → `006` → `007` (plano; sem eles o relatório plano × executado
