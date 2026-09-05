@@ -304,6 +304,11 @@ automáticos".
 - Vocabulário obrigatório: "sem registro" (nunca "não fez"); diferença
   entre dito e medido é "para conferir" (nunca "erro"); produto do plano só
   como "previsto pelo agrônomo".
+- Redator (05/09/2026): os textos-modelo que transformam os relatórios em
+  texto para pessoas (devolutiva semanal ao gerente, painel executivo aos
+  sócios, alerta de divergência ao controller) estão em
+  `docs/redator-modelos.md`; serão semeados na tabela `relatorios_modelos`,
+  que ainda não existe. Só documentação — nada mudou no app.
 
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros (só ADMIN)
