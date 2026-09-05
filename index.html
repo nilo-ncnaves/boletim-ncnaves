@@ -84,28 +84,38 @@ h3{font-size:.95rem;font-weight:700}
 .mat-seco{background:var(--terra)}
 /* Acordeão do formulário */
 .secao{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio);margin-bottom:10px;overflow:hidden}
-.secao>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px;font-weight:700;cursor:pointer;min-height:56px}
+.secao>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px;font-weight:800;cursor:pointer;min-height:56px}
 .secao>summary::-webkit-details-marker{display:none}
 .secao>summary .ico{width:34px;height:34px;border-radius:9px;background:var(--verde-claro);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex:none}
 .secao>summary .seta{margin-left:auto;color:var(--tinta-2);transition:transform .15s;flex:none}
 .secao[open]>summary .seta{transform:rotate(90deg)}
 .secao .corpo{padding:0 14px 16px;border-top:1px solid var(--linha)}
-/* sub-acordeões da pecuária (dentro da seção 🐂): mesmo desenho, um degrau menor */
-.subsec{border:1px solid var(--linha);border-radius:10px;margin-top:10px;background:var(--papel)}
-.subsec>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px;font-weight:700;font-size:.95rem;cursor:pointer;min-height:48px}
+/* Hierarquia de títulos (v59) — três degraus que não se confundem:
+   1. seção (.secao): cartão branco com ícone em quadrado verde e título em negrito — a "aba";
+   2. subseção (.subsec, .fase-op): NÃO é caixa; é linha de lista dentro do cartão, pendurada numa
+      guia à esquerda (cinza fechada, verde aberta ou com algo lançado), texto um degrau menor;
+   3. subtítulo (.subtitulo): título de grupo de campos — negrito escuro, caixa normal, filete tracejado
+      em cima; NÃO se parece com rótulo de campo (que é pequeno, cinza e em caixa alta). */
+.subsec{border:none;border-top:1px solid var(--linha);border-radius:0;margin:0;background:transparent}
+.subsec>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0 12px 12px;border-left:3px solid var(--linha);font-weight:600;font-size:.95rem;color:var(--tinta);cursor:pointer;min-height:48px}
 .subsec>summary::-webkit-details-marker{display:none}
+.subsec[open]>summary,.subsec:has(>summary .resumo:not(:empty))>summary{border-left-color:var(--verde)}
 .subsec>summary .resumo{margin-left:auto;margin-right:6px;font-size:.76rem;color:var(--verde);font-weight:700;white-space:nowrap}
 .subsec>summary .seta{color:var(--tinta-2);transition:transform .15s;flex:none}
 .subsec[open]>summary .seta{transform:rotate(90deg)}
-.subsec .corpo{padding:0 12px 14px;border-top:1px solid var(--linha)}
+.subsec .corpo{padding:0 0 14px 12px;border-top:none;border-left:3px solid var(--verde-claro);margin-bottom:6px}
+.subtitulo{font-size:.9rem;font-weight:700;color:var(--tinta);border-top:1px dashed var(--linha);padding-top:12px;margin:16px 0 0}
+.subtitulo .mut{font-size:.8rem;font-weight:500}
+.corpo>.subtitulo:first-child{border-top:none;padding-top:0;margin-top:12px}
 .secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
-/* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
-.fase-op{border:1px solid var(--linha);border-radius:10px;margin-top:8px;background:var(--cartao)}
-.fase-op>summary{list-style:none;padding:12px 14px;font-weight:700;cursor:pointer;display:flex;align-items:center}
+/* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir — mesmo degrau da subseção */
+.fase-op{border:none;border-top:1px solid var(--linha);border-radius:0;margin:0;background:transparent}
+.fase-op>summary{list-style:none;padding:12px 0 12px 12px;border-left:3px solid var(--linha);font-weight:600;font-size:.95rem;min-height:48px;cursor:pointer;display:flex;align-items:center}
 .fase-op>summary::-webkit-details-marker{display:none}
 .fase-op>summary::after{content:"›";margin-left:auto;color:var(--tinta-2);transition:transform .15s}
+.fase-op[open]>summary{border-left-color:var(--verde)}
 .fase-op[open]>summary::after{transform:rotate(90deg)}
-.fase-op .chips{padding:0 12px 4px}
+.fase-op .chips{padding:0 0 4px 12px;border-left:3px solid var(--verde-claro)}
 .subcartao{background:var(--papel);border:1px dashed var(--linha);border-radius:10px;padding:12px;margin-top:10px;position:relative}
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
@@ -2696,7 +2706,7 @@ function secaoGraos(r){
           <button class="btn suave mini" data-novo-ciclo="${t.id}">🌱 Novo plantio</button></div>`;
         return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px">
           <b>${esc(t.nome)}</b> <span class="mut">— ${rotuloCultura(c.cultura)}${c.plantio?", plantado "+fmtData(c.plantio):""}${c.colheitaPrevista?" · colheita prevista "+fmtData(c.colheitaPrevista):""}</span>
-          ${fasesDa(c.cultura).map(([fase,ops])=>`<p class="mut" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px">${esc(fase)}</p>
+          ${fasesDa(c.cultura).map(([fase,ops])=>`<p class="subtitulo">${esc(fase)}</p>
           <div class="chips">${ops.map(op=>{
             const on=(r.atividades||[]).some(a=>a.talhaoId===t.id && a.tipo===op);
             return `<button class="chip ${on?"on":""}" data-opgrao="${t.id}|${esc(op)}">${esc(op)}</button>`;
@@ -3311,10 +3321,10 @@ function secaoPecuaria(r){
         <button class="btn suave mini mt" id="bt-add-mov-pec">＋ movimento (nascimento, morte, mudança…)</button>`)}
 
       ${sub("💉 Sanidade","res-pec-san",nSan?nSan+" registro"+(nSan>1?"s":""):"",nSan>0,`
-        <label class="mt">Animal doente / tratado</label>
+        <p class="subtitulo">Animal doente / tratado</p>
         <div id="lista-pec-san">${(p.san||[]).map((s,i)=>cardSanPec(s,i)).join("")}</div>
         <button class="btn suave mini mt" id="bt-add-san-pec">＋ animal ou lote tratado</button>
-        <label class="mt">Vacinação / vermifugação em massa</label>
+        <p class="subtitulo">Vacinação / vermifugação em massa</p>
         <div id="lista-pec-massa">${(p.massa||[]).map((v,i)=>cardMassaPec(v,i)).join("")}</div>
         <button class="btn suave mini mt" id="bt-add-massa-pec">＋ manejo em massa</button>`)}
 
@@ -3323,7 +3333,7 @@ function secaoPecuaria(r){
       ${sub("🧂 Cocho e nutrição","res-pec-nut",nNut?nNut+" pasto"+(nNut>1?"s":""):(temNutRapida?"✓":""),nNut>0||temNutRapida,`
         <div id="lista-pec-nut">${(p.nut||[]).map((u,i)=>cardNutPec(u,i,r.fazendaId)).join("")}</div>
         <button class="btn suave mini mt" id="bt-add-nut-pec">＋ pasto (sal, ração, cocho, água)</button>
-        <label class="mt">Resumo rápido da fazenda inteira <span class="mut">(um toque)</span></label>
+        <p class="subtitulo">Resumo rápido da fazenda inteira <span class="mut">(um toque)</span></p>
         <label>Cocho / ração</label><div class="chips">${chips("cocho","pec-cocho")}</div>
         <label>Sal mineral</label><div class="chips">${chips("sal","pec-sal")}</div>
         <label>Água / aguadas</label><div class="chips">${chips("agua","pec-agua")}</div>
@@ -3408,7 +3418,7 @@ function vForm(){
       <div id="lista-mofn">${(r.mo.funcoes||[]).map((f,i)=>cardFn(f,i)).join("")}</div>
       <button class="btn suave mini mt" id="bt-add-fn">＋ função / serviço</button>
       <p class="mut mt" id="dist-mofn" style="font-weight:700">${distTexto(r.mo)}</p>
-      <p class="mt" style="font-weight:800;font-size:.8rem;letter-spacing:.6px;border-top:1px dashed var(--linha);padding-top:12px;margin-bottom:2px">TOTAIS DO DIA</p>
+      <p class="subtitulo">Totais do dia</p>
       <p class="mut" style="margin-top:0">O app soma sozinho quando você lança as funções acima.</p>
       ${stepper("Funcionários próprios presentes","proprios",r.mo.proprios)}
       ${stepper("Diaristas / terceiros","diaristas",r.mo.diaristas)}
@@ -4205,7 +4215,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v58";
+const APP_VERSAO="v59";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

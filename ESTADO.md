@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v58** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v59** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -66,6 +66,24 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   formato novo — esses aparelhos pedem o código novo uma vez.
 
 ## Seções do boletim por atividade
+Hierarquia visual dos títulos (v59 — vale para toda tela do boletim):
+1. **Seção** ("aba", classe secao): cartão branco com ícone em quadrado
+   verde e título em negrito forte — é o que o gerente abre primeiro.
+2. **Subseção** (subsec na pecuária, fase-op nas fases de grãos): NÃO
+   é caixa; é linha de lista dentro do cartão, pendurada numa guia à
+   esquerda (cinza fechada; verde aberta ou com algo lançado), texto um
+   degrau menor. Antes da v59 tinha a mesma caixa da seção e o gerente
+   não distinguia título de subtítulo.
+3. **Título de grupo** (classe subtitulo): negrito escuro em caixa
+   normal com filete tracejado em cima — "Totais do dia" (Mão de
+   obra), "Animal doente / tratado" e "Vacinação / vermifugação em
+   massa" (Sanidade), "Resumo rápido da fazenda inteira" (Cocho) e as
+   fases em "Talhões e ciclos" (grãos). Antes eram rótulos de campo ou
+   estilo na mão.
+4. **Rótulo de campo** (label): pequeno, cinza, caixa alta — só acima
+   de um campo ou de uma fileira de chips.
+Sem gradiente, sombra ou canto novo; as caixas das subseções perderam
+o canto arredondado. Nenhum campo, texto ou comportamento mudou.
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
   irrigação (gotejo), colheita, pós-colheita, fito, ocorrências.
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
@@ -425,8 +443,9 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v58, 05/09/2026:
-**209 ✅ · 41 ❌**). Esta lista é o retrato dos ❌ herdados: cada tarefa
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v59, 05/09/2026:
+**209 ✅ · 41 ❌** — mesmo retrato da v58; a v59 só mudou a hierarquia
+visual dos títulos). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -463,6 +482,11 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   - Mão de obra: idem café ❌ ❌.
   - Seção 🐂 Pecuária: fechada ✅ · **acordeão dentro de acordeão ❌** (7
     sub-acordeões) · campo "Observações de pecuária" visível ao abrir.
+    Na v59 os sub-acordeões viraram linhas de lista com guia (não são
+    mais caixas iguais à seção), mas continuam sendo acordeões dentro
+    da seção: zerar este ❌ é trocar o fluxo por menu → tela própria
+    por assunto (como Cadastros), decisão de fluxo que fica para o
+    Nilo — não cabia numa tarefa só visual.
     - Movimentação do rebanho: ao abrir ✅ · "＋ movimento" ✅ (chips "O
       que houve" sozinhos; pasto vem depois, em seletor — ordem O QUÊ →
       ONDE, a ajustar quando a seção for tocada).
