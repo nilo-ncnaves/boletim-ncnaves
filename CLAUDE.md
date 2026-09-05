@@ -98,6 +98,68 @@ o boletim funciona exatamente como antes.
 - Cartões novos seguem o padrão dos existentes (classe "cartao",
   avisos com classe "aviso").
 
+## PADRÕES DE TELA (obrigatórios em qualquer tela nova ou alterada)
+Lei da casa desde 05/09/2026: poluição de tela é barrada na entrada —
+em toda tarefa, antes do PR. Vale para tela nova e para tela alterada
+(mexeu numa seção, a seção inteira passa a ter de cumprir o padrão).
+
+### a) Boletim — padrão de lançamento em 3 passos
+Toda seção de lançamento (atividade, operação, colheita, praga,
+ocorrência, pivô, função de mão de obra, movimento de rebanho,
+sanidade, cocho, contagem, manejo) segue a mesma sequência:
+1. ONDE — chips de talhão / pivô / lote / pasto;
+2. O QUÊ — chips de fase / tipo / grupo;
+3. DETALHES — só os campos pertinentes ao que foi escolhido.
+Nada visível antes do toque anterior: ao tocar em "＋" aparecem só os
+chips do ONDE; escolhido o ONDE, só os chips do O QUÊ; escolhido o
+O QUÊ, só os campos daquela escolha. Seção fechada por padrão. Ao
+abrir, mostra só a lista compacta do que já foi lançado e o botão
+"＋". Depois de adicionar, o registro vira linha compacta e a seção
+volta ao estado compacto. Seletor (select) não substitui chip no
+ONDE nem no O QUÊ.
+
+### b) Cadastros e telas administrativas — padrões P1 a P10
+- P1 Uma tela, um propósito.
+- P2 Navegação menu → lista → detalhe, no máximo 3 níveis.
+- P3 Altura-alvo de 2 telas (2 × 844 px a 390 px de largura); busca
+  obrigatória em toda lista com mais de 12 itens.
+- P4 Cabeçalho fixo com "‹ Voltar" e ação principal fixa no rodapé,
+  visível sem rolar.
+- P5 Progressive disclosure: "Mais opções" e "Zona de cuidado"
+  existem e nascem fechados; o raro e o perigoso moram lá.
+- P6 Ordem por frequência de uso: o que se faz todo dia vem primeiro.
+- P7 Estado visível na própria linha da lista (ativo/inativo, ciclo,
+  área, código), sem precisar abrir o item.
+- P8 Retorno ao contexto depois de salvar: volta à lista, na posição
+  do item, com "Salvo" discreto.
+- P9 Sem popup em cadeia (alert/prompt/confirm em sequência) e sem
+  acordeão dentro de acordeão.
+- P10 Padrão visual da casa: sem gradiente, sem sombra, sem canto
+  arredondado, sem botão-pílula; alvo de toque ≥ 44 px. Tela nova usa
+  as classes de Cadastros (cad-menu, cad-item, cad-busca, cad-rodape,
+  cad-bloco), que já cumprem o padrão.
+
+### c) Regra de exibição por atividade
+Nenhuma seção, campo, chip, rótulo ou termo de uma atividade aparece
+na tela de outra: café não vê pivô nem cabeça; grãos não vê lata nem
+cocho; pecuária não vê talhão de café nem soja. A lista oficial de
+termos exclusivos está em docs/catalogos-por-atividade.md, seção
+"Termos exclusivos por atividade" — termo novo no catálogo de uma
+atividade entra lá na mesma tarefa.
+
+### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
+1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho
+   do script; roda sem rede, a 390 px) e colar o checklist ✅/❌
+   inteiro no resumo do PR.
+2. PR com item ❌ NOVO não pode ser aberto — corrige antes. Os ❌ que
+   já existiam estão listados no ESTADO.md (seção "Telas × padrões de
+   tela"); tarefa que mexer numa tela com ❌ herdado deve zerá-lo, ou
+   dizer no PR por que não zerou. A lista de ❌ só encolhe; nunca
+   cresce.
+3. Tela ou seção nova entra no ESTADO.md na mesma tarefa, com ✅ em
+   todos os itens, e ganha cenário no script se ele ainda não a
+   alcança.
+
 ## Documentação viva (OBRIGATÓRIO em toda tarefa)
 - ESTADO.md (na raiz) descreve o que o app tem hoje e as pendências.
   TODA tarefa que mudar comportamento, catálogo, chave ou versão deve
@@ -118,3 +180,8 @@ o boletim funciona exatamente como antes.
   scripts/regressao_render.cjs contra a versão anterior (origin/main)
   e a nova, e conferir que as telas de gerente ficaram idênticas onde
   deviam (instruções no cabeçalho do script).
+- Antes de abrir QUALQUER PR que mexa em tela, rodar
+  scripts/checar-poluicao.cjs e colar o checklist no resumo do PR
+  (DEFINIÇÃO DE PRONTO, seção PADRÕES DE TELA). Mudou o resultado de
+  alguma tela? Atualize a seção "Telas × padrões de tela" do ESTADO.md
+  junto.

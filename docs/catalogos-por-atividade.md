@@ -240,3 +240,36 @@ sempre) E espelhada na tabela boletim_pecuaria
 (sql/004-boletim-pecuaria.sql), item t:"pec" da mesma fila offline.
 A visão pecuaria_movimentos abre um movimento por linha para o ERP
 AgroGestão.
+
+---
+
+## Termos exclusivos por atividade (checagem de poluição)
+
+Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar
+vocabulário de uma atividade na tela de outra (regra do CLAUDE.md,
+seção PADRÕES DE TELA, item c). Só entram aqui palavras que NÃO têm
+uso legítimo fora da própria atividade — "sacas", "colheita",
+"lâmina", "umidade", "lote", "plantio" e "roçada" ficaram de fora
+porque aparecem em mais de uma. Comparação sem acento, sem
+maiúscula e por palavra inteira. Termo novo em catálogo de uma
+atividade? Acrescente aqui na mesma tarefa.
+
+### Café
+café, cafezal, cereja, florada, requeima, lata, latas, terreiro,
+secador, tulha, gotejo, gotejadores, derriça, desbrota, arruação,
+esparramação, peneira, catação, bicho-mineiro, broca-do-café,
+passada, repasse, maturação, benefício
+
+### Grãos
+pivô, pivôs, soja, milho, feijão, percentímetro, dessecação,
+estande, cultivar, híbrido, palhada, vazio sanitário, semeadura,
+inoculação, população, espaçamento, subsolador, sementeira,
+arrendado, quimigação, buva, capim-amargoso, ferrugem-asiática,
+percevejo, cigarrinha, lagarta, mosca-branca, silo, grãos ardidos
+
+### Pecuária
+cabeça, cabeças, cocho, bezerro, bezerra, garrote, novilha, touro,
+touros, vaca, vacas, boi, rebanho, pasto, pastos, retiro, retiros,
+IATF, bicheira, berro, desmama, brinco, sal mineral, proteinado,
+vermifugação, everminou, apartação, castração, pesagem, embarque,
+gado, aguadas, porteira, capataz, prenhes, gestação, carrapato
