@@ -1,0 +1,430 @@
+#!/usr/bin/env node
+/*
+ checar-poluicao.cjs — checagem de poluição de tela do Boletim NCNaves.
+
+ É a "DEFINIÇÃO DE PRONTO" do CLAUDE.md (seção PADRÕES DE TELA): roda em
+ TODA tarefa que mexa no index.html, antes de abrir o pull request, e o
+ resultado (checklist ✅/❌) vai colado no resumo do PR. PR com ❌ novo não
+ pode ser aberto — corrige antes. Os ❌ que já existiam estão listados no
+ ESTADO.md (seção "Telas × padrões") e vão sendo zerados tarefa a tarefa.
+
+ O que ela faz (tudo sem rede, como um celular offline, largura 390 px):
+   1. Renderiza uma unidade de café (f23), uma de grãos (f33), uma de
+      pecuária (f26), o boletim de pós-colheita (f23), o painel da
+      Diretoria, a tela Relatórios e TODOS os níveis de Cadastros (ADMIN).
+   2. Mede a altura de cada tela ao abrir: no boletim nenhuma seção pode
+      nascer aberta; em Cadastros nenhuma tela acima de 2 alturas (2 × 844 px)
+      sem campo de busca.
+   3. Abre cada seção de lançamento (as que têm botão "＋") e conta o que
+      fica visível: só a lista compacta e o "＋" — nenhum campo, chip ou
+      seletor antes do toque em "＋".
+   4. Toca em "＋" e confere o padrão de 3 passos: primeiro só o ONDE
+      (chips de talhão/pivô/pasto), nada de campo ou seletor junto.
+   5. Procura termos de café nas telas de grãos/pecuária e vice-versa.
+      A lista de termos exclusivos vive em docs/catalogos-por-atividade.md,
+      seção "Termos exclusivos por atividade" — o script lê de lá.
+   6. Confere que toda lista com mais de 12 itens tem busca e que todo
+      detalhe tem a ação principal visível sem rolar.
+   7. Padrão visual da casa: sem gradiente, sem sombra, sem canto
+      arredondado, toque ≥ 44 px — medido no CSS calculado de cada tela.
+
+ Uso (na raiz do repositório):
+   node scripts/checar-poluicao.cjs                # imprime o checklist
+   node scripts/checar-poluicao.cjs /tmp/poluicao  # + grava JSON e o .md
+   node scripts/checar-poluicao.cjs --so-resumo    # só a linha final
+
+ Precisa do pacote playwright (global) e do Chromium dele — mesma
+ exigência do scripts/regressao_render.cjs. Não é parte do app.
+ Sai com código 1 quando há algum ❌ (para servir de trava em CI).
+*/
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+let pw;
+try { pw = require('playwright'); } catch (e) { pw = require('/opt/node22/lib/node_modules/playwright'); }
+
+const RAIZ = path.resolve(__dirname, '..');
+const argv = process.argv.slice(2);
+const soResumo = argv.includes('--so-resumo');
+const saida = argv.find(a => !a.startsWith('--')) || null;
+const VP = { width: 390, height: 844 };   /* iPhone 12–14: largura ≤ 400 px */
+const ALVO_TELAS = 2;                       /* altura-alvo: 2 telas */
+const TOQUE_MIN = 44;                       /* alvo de toque mínimo, px */
+const LISTA_MAX_SEM_BUSCA = 12;
+const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
+
+/* ---------- termos exclusivos por atividade (fonte: docs/catalogos-por-atividade.md) ---------- */
+function lerTermos() {
+  const md = fs.readFileSync(path.join(RAIZ, 'docs/catalogos-por-atividade.md'), 'utf8').split('\n');
+  const ini = md.findIndex(l => /^## .*Termos exclusivos por atividade/i.test(l));
+  if (ini < 0) throw new Error('docs/catalogos-por-atividade.md sem a seção "Termos exclusivos por atividade"');
+  const termos = {}; let atual = null;
+  for (let i = ini + 1; i < md.length; i++) {
+    const l = md[i];
+    if (/^## /.test(l)) break;
+    const h = /^### (Caf[ée]|Gr[ãa]os|Pecu[áa]ria)/i.exec(l);
+    if (h) { atual = norm(h[1]).startsWith('caf') ? 'CAFE' : norm(h[1]).startsWith('gra') ? 'GRAOS' : 'PECUARIA'; termos[atual] = termos[atual] || []; continue; }
+    if (!atual || !l.trim() || l.trim().startsWith('>') || l.trim().startsWith('<!--')) continue;
+    l.split(/[,;·]/).map(t => t.trim()).filter(Boolean).forEach(t => termos[atual].push(t));
+  }
+  ['CAFE', 'GRAOS', 'PECUARIA'].forEach(a => { if (!termos[a] || !termos[a].length) throw new Error('lista de termos vazia para ' + a); });
+  return termos;
+}
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function acharTermos(texto, lista) {
+  const t = ' ' + norm(texto).replace(/[^a-z0-9]+/g, ' ') + ' ';
+  return lista.filter(termo => t.includes(' ' + norm(termo).replace(/[^a-z0-9]+/g, ' ') + ' '));
+}
+
+/* ---------- servidor estático (só os arquivos do app) ---------- */
+function servir(dir) {
+  return new Promise(res => {
+    const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+    const srv = http.createServer((req, r) => {
+      let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
+      const f = path.join(dir, p);
+      if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); return r.end(); }
+      r.writeHead(200, { 'content-type': tipos[path.extname(f)] || 'application/octet-stream' });
+      fs.createReadStream(f).pipe(r);
+    });
+    srv.listen(0, '127.0.0.1', () => res({ srv, base: 'http://127.0.0.1:' + srv.address().port }));
+  });
+}
+
+/* ---------- código que roda DENTRO da página ---------- */
+const NA_PAGINA = {
+  /* medidas gerais da tela como ela abre */
+  medir: () => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const app = document.querySelector('#app');
+    const acao = [...app.querySelectorAll('.rodape .btn, .cad-rodape .btn, #bt-enviar, #bt-enviar-pos')].find(vis);
+    let acaoVisivel = null;
+    if (acao) { const r = acao.getBoundingClientRect(); acaoVisivel = r.top >= 0 && r.bottom <= innerHeight; }
+    return {
+      altura: document.documentElement.scrollHeight,
+      largura: document.documentElement.scrollWidth,
+      secoesAbertas: [...app.querySelectorAll('details.secao[open]')].map(d => d.querySelector('summary').textContent.trim().split('\n')[0].replace(/\s+/g, ' ').slice(0, 40)),
+      subsecoesAbertas: app.querySelectorAll('details.subsec[open]').length,
+      temBusca: !!app.querySelector('.cad-busca, input[placeholder^="Buscar"]'),
+      itensLista: app.querySelectorAll('.cad-item, .cad-menu, .perfil-btn').length,
+      acaoPrincipal: acao ? acao.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) : null,
+      acaoVisivel,
+      /* formulário visível fora de "Mais opções"/"Zona de cuidado" (a busca não conta) */
+      temForm: [...app.querySelectorAll('input:not(.cad-busca):not([type=file]), select, textarea')].filter(vis).length > 0,
+      temVoltar: !!app.querySelector('.topo [data-cadvoltar], .topo [data-voltar], .topo #bt-voltar') || [...app.querySelectorAll('.topo button')].some(b => b.textContent.includes('‹')),
+      topoFixo: (() => { const t = app.querySelector('.topo'); return !!t && ['sticky', 'fixed'].includes(getComputedStyle(t).position); })(),
+      blocosAbertos: [...app.querySelectorAll('details.cad-bloco[open]')].map(d => d.querySelector('summary').textContent.trim().replace(/\s+/g, ' ').slice(0, 30)),
+      titulo: (app.querySelector('.topo h1, h1') || {}).textContent || '',
+    };
+  },
+  /* padrão visual da casa, medido no CSS calculado do que está visível */
+  visual: () => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const rot = el => (el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') + ' "' + (el.textContent || el.placeholder || '').trim().replace(/\s+/g, ' ').slice(0, 24) + '"');
+    const app = document.querySelector('#app');
+    const out = { raio: [], sombra: [], gradiente: [], toque: [] };
+    const junta = (arr, el) => { const r = rot(el); if (!arr.includes(r)) arr.push(r); };
+    [...app.querySelectorAll('*')].filter(vis).forEach(el => {
+      const cs = getComputedStyle(el);
+      if (cs.backgroundImage && cs.backgroundImage.includes('gradient')) junta(out.gradiente, el);
+      if (cs.boxShadow && cs.boxShadow !== 'none') junta(out.sombra, el);
+      if (el.matches('button, input, select, textarea, .cartao, .secao, .subcartao, .aviso, .cad-item, .cad-menu, .cad-bloco, .chip, .tag, .perfil-btn, img, .farol, .ico') && parseFloat(cs.borderTopLeftRadius) > 0 && el.offsetWidth > 20) junta(out.raio, el);
+      if (el.matches('button, input, select, textarea, a[href], summary, .chip, .cad-item, .cad-menu') && !el.matches('input[type=file]')) {
+        const b = el.getBoundingClientRect(); if (b.height > 0 && b.height < 44) junta(out.toque, el);
+      }
+    });
+    return out;
+  },
+  /* seções de lançamento: abre uma a uma e conta o que aparece antes do "＋" */
+  secoes: () => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const app = document.querySelector('#app');
+    const txt = el => el.textContent.trim().replace(/\s+/g, ' ');
+    const inspecionar = (det, nivel) => {
+      const corpo = det.querySelector(':scope > .corpo') || det;
+      const campos = [...corpo.querySelectorAll('input, select, textarea, .chip')].filter(vis).filter(el => !el.closest('details.subsec, details.fase-op') || el.closest('details.subsec, details.fase-op') === det);
+      const botoes = [...corpo.querySelectorAll('button')].filter(vis).filter(b => !b.classList.contains('chip') && !b.closest('details.subsec') || b.closest('details.subsec') === det);
+      const mais = botoes.filter(b => txt(b).startsWith('＋'));
+      const outros = botoes.filter(b => !txt(b).startsWith('＋'));
+      const camposFora = campos.filter(el => !el.closest('details.subsec') || el.closest('details.subsec') === det);
+      return {
+        titulo: txt(det.querySelector(':scope > summary')).replace(/›$/, '').trim().slice(0, 48),
+        nivel, ehLancamento: mais.length > 0,
+        mais: mais.map(txt), camposVisiveis: camposFora.length,
+        exemplosCampos: camposFora.slice(0, 5).map(el => el.tagName.toLowerCase() + (el.placeholder ? ' "' + el.placeholder.slice(0, 22) + '"' : el.classList.contains('chip') ? ' "' + txt(el).slice(0, 22) + '"' : '')),
+        outrosBotoes: outros.map(txt).slice(0, 6),
+        subsecoes: nivel === 1 ? [...det.querySelectorAll('details.subsec')].map(s => { s.open = true; const r = inspecionar(s, 2); s.open = false; return r; }) : [],
+      };
+    };
+    const res = [];
+    [...app.querySelectorAll('details.secao')].forEach(det => { det.open = true; res.push(inspecionar(det, 1)); det.open = false; });
+    return res;
+  },
+  /* depois do toque em "＋": o que o cartão novo mostra de uma vez */
+  cartaoNovo: (idBotao) => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const app = document.querySelector('#app');
+    const bt = app.querySelector(idBotao); if (!bt) return null;
+    const det = bt.closest('details'); if (det) { det.open = true; let d2 = det.parentElement.closest('details'); while (d2) { d2.open = true; d2 = d2.parentElement.closest('details'); } }
+    const antes = app.querySelectorAll('input, select, textarea, .chip').length;
+    bt.click();
+    /* o cartão novo é o que apareceu perto do botão (lista logo acima); a seção pode ter sido re-renderizada */
+    const bt2 = app.querySelector(idBotao) || bt;
+    const lista = bt2.previousElementSibling && bt2.previousElementSibling.matches('div[id^="lista"], div[id^="bloco"]') ? bt2.previousElementSibling : (bt2.parentElement || app);
+    const cartao = lista.lastElementChild && lista.lastElementChild.matches('.subcartao, [data-pecmov], [data-pecsan], [data-pecmassa], [data-pecnut], [data-peclote], [data-pecev], [data-irg], [data-fnrow]') ? lista.lastElementChild : lista;
+    const q = s => [...cartao.querySelectorAll(s)].filter(vis);
+    const labels = q('label').map(l => l.textContent.trim().replace(/\s+/g, ' ').slice(0, 30));
+    return {
+      botao: bt.textContent.trim().replace(/\s+/g, ' '),
+      selects: q('select').length, inputs: q('input:not([type=file]), textarea').length, chips: q('.chip').length,
+      rotulos: labels.slice(0, 8), totalRotulos: labels.length,
+      primeiroRotulo: labels[0] || '',
+      primeiroControle: (() => { const c = [...cartao.querySelectorAll('select, input:not([type=file]), textarea, .chip')].filter(vis)[0]; return c ? (c.classList.contains('chip') ? 'chip' : c.tagName.toLowerCase()) : ''; })(),
+      apareceu: app.querySelectorAll('input, select, textarea, .chip').length - antes,
+    };
+  },
+  /* todo o texto que o gerente pode ver na tela (tudo aberto), com placeholders e opções */
+  textoTudo: () => {
+    const app = document.querySelector('#app');
+    app.querySelectorAll('details').forEach(d => { d.open = true; });
+    const partes = [app.innerText];
+    app.querySelectorAll('[placeholder]').forEach(el => partes.push(el.placeholder));
+    app.querySelectorAll('select option, select optgroup').forEach(o => partes.push(o.label || o.textContent));
+    app.querySelectorAll('[title]').forEach(el => partes.push(el.title));
+    return partes.join('\n');
+  },
+};
+
+/* ---------- cenários ---------- */
+async function novaPagina(browser, base, acesso, sessao) {
+  const ctx = await browser.newContext({ viewport: VP, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
+  await ctx.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
+  const page = await ctx.newPage();
+  const erros = [];
+  page.on('pageerror', e => erros.push(String(e).split('\n')[0]));
+  /* pedidos de rede abortados (Supabase) são o esperado offline — não contam como erro */
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FAILED|net::/.test(m.text())) erros.push('console: ' + m.text().slice(0, 120)); });
+  await page.goto(base + '/index.html');
+  await page.evaluate(([a, s]) => { localStorage.clear(); localStorage.setItem('bdf:acesso', JSON.stringify(a)); if (s) localStorage.setItem('bdf:sessao', JSON.stringify(s)); }, [acesso, sessao]);
+  await page.reload(); await page.waitForTimeout(900);
+  return { page, ctx, erros };
+}
+const gerente = (fz, atv) => ({ userId: 'u1', papel: 'gerente', nome: 'Gerente', atividade: atv, fazendaId: fz });
+
+async function medirTela(page, nome, grupo, extra) {
+  const m = await page.evaluate(NA_PAGINA.medir);
+  const v = await page.evaluate(NA_PAGINA.visual);
+  return Object.assign({ nome, grupo, telas: +(m.altura / VP.height).toFixed(2) }, m, { visual: v }, extra || {});
+}
+
+async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS[fz], chave: fz }, gerente(fz, atv));
+  const casa = await medirTela(page, rot + ' — casa do gerente', 'gerente');
+  await page.click('#bt-preencher'); await page.waitForTimeout(400);
+  const form = await medirTela(page, rot + ' — boletim (ao abrir)', 'boletim', { atividade: atv });
+  form.secoes = await page.evaluate(NA_PAGINA.secoes);
+  /* toca em cada "＋" (um por seção/subseção) e olha o cartão novo */
+  /* "＋ adicionar todos os pivôs" é ação em massa, não abre cartão — fica de fora */
+  const ids = await page.evaluate(() => [...document.querySelectorAll('#app details.secao button')].filter(b => b.textContent.trim().startsWith('＋') && b.id && !/todos/i.test(b.textContent)).map(b => '#' + b.id));
+  form.cartoes = [];
+  for (const id of ids) {
+    const c = await page.evaluate(NA_PAGINA.cartaoNovo, id).catch(e => ({ botao: id, erro: String(e).split('\n')[0] }));
+    await page.waitForTimeout(150);
+    if (c) form.cartoes.push(Object.assign({ id }, c));
+  }
+  /* pecuária: as pastagens têm select "Outro…"; grãos: escolher um talhão para ver o 2º passo */
+  form.texto = await page.evaluate(NA_PAGINA.textoTudo);
+  const outras = { CAFE: ['GRAOS', 'PECUARIA'], GRAOS: ['CAFE', 'PECUARIA'], PECUARIA: ['CAFE', 'GRAOS'] }[atv];
+  form.termosAlheios = {};
+  outras.forEach(o => { form.termosAlheios[o] = acharTermos(form.texto, termos[o]); });
+  form.termosProprios = acharTermos(form.texto, termos[atv]).length;
+  form.erros = erros.slice();
+  R.telas.push(casa, form);
+  await ctx.close();
+}
+
+async function cenarioPos(browser, base, R, termos) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.f23, chave: 'f23' }, { userId: 'u4', papel: 'pos', nome: 'Pós-colheita', fazendaId: 'f23' });
+  await page.click('#bt-preencher-pos').catch(() => {}); await page.waitForTimeout(400);
+  const form = await medirTela(page, 'Pós-colheita (f23) — registro (ao abrir)', 'boletim', { atividade: 'CAFE' });
+  form.secoes = await page.evaluate(NA_PAGINA.secoes);
+  form.cartoes = [];
+  form.texto = await page.evaluate(NA_PAGINA.textoTudo);
+  form.termosAlheios = { GRAOS: acharTermos(form.texto, termos.GRAOS), PECUARIA: acharTermos(form.texto, termos.PECUARIA) };
+  form.erros = erros.slice();
+  R.telas.push(form);
+  await ctx.close();
+}
+
+async function cenarioDiretoria(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null);
+  await page.click('[data-perfil="proprietario"]').catch(() => {}); await page.waitForTimeout(500);
+  R.telas.push(await medirTela(page, 'Diretoria — painel', 'diretoria'));
+  await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
+  await page.evaluate(() => ir('relatorio')); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Diretoria — Resumo do período', 'diretoria'));
+  R.errosDiretoria = erros.slice();
+  await ctx.close();
+}
+
+async function cenarioCadastros(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(400);
+  const ids = await page.evaluate(() => ({
+    fz: D.fazendas[0].id, tal: D.talhoes[0].id,
+    grao: (D.talhoes.find(t => t.tipo === 'GRAO_ANUAL') || {}).id || '',
+    pec: (D.fazendas.find(f => temCultura(f.id, 'PECUARIA')) || {}).id || '',
+    plano: Object.keys(PLANO_FAZENDA_APP)[0],
+  }));
+  const niveis = [
+    ['Cadastros — menu', [{ v: 'menu' }], 'lista'],
+    ['Cadastros › Fazendas e unidades', [{ v: 'fazendas' }], 'lista'],
+    ['Cadastros › Fazendas › detalhe', [{ v: 'fazendas' }, { v: 'fazenda', id: ids.fz }], 'detalhe'],
+    ['Cadastros › Talhões, pivôs e pastos', [{ v: 'talhoes' }], 'lista'],
+    ['Cadastros › Talhões › detalhe', [{ v: 'talhoes' }, { v: 'talhao', id: ids.tal }], 'detalhe'],
+    ['Cadastros › Talhões › novo', [{ v: 'talhoes' }, { v: 'talhao', id: 'novo' }], 'detalhe'],
+    ['Cadastros › Ciclos e plantios', [{ v: 'ciclos' }], 'lista'],
+    ['Cadastros › Ciclos › detalhe', [{ v: 'ciclos' }, { v: 'ciclo', id: ids.grao }], 'detalhe'],
+    ['Cadastros › Lotes e inventário', [{ v: 'lotes' }], 'lista'],
+    ['Cadastros › Lotes › detalhe', [{ v: 'lotes' }, { v: 'lote', id: ids.pec }], 'detalhe'],
+    ['Cadastros › Plano do mês', [{ v: 'plano' }], 'lista'],
+    ['Cadastros › Plano › fazenda', [{ v: 'plano' }, { v: 'planofz', id: ids.plano }], 'detalhe'],
+    ['Cadastros › Códigos de acesso', [{ v: 'codigos' }], 'lista'],
+    ['Cadastros › Códigos › detalhe', [{ v: 'codigos' }, { v: 'codigo', id: ids.fz }], 'detalhe'],
+    ['Cadastros › Códigos › novo combinado', [{ v: 'codigos' }, { v: 'codigonovo' }], 'detalhe'],
+    ['Cadastros › Catálogos', [{ v: 'catalogos' }], 'lista'],
+    ['Cadastros › Catálogos › Café', [{ v: 'catalogos' }, { v: 'catalogo', id: 'CAFE' }], 'lista'],
+    ['Cadastros › Catálogos › Grãos', [{ v: 'catalogos' }, { v: 'catalogo', id: 'GRAOS' }], 'lista'],
+    ['Cadastros › Catálogos › Pecuária', [{ v: 'catalogos' }, { v: 'catalogo', id: 'PECUARIA' }], 'lista'],
+    ['Cadastros › Catálogos › Máquinas', [{ v: 'catalogos' }, { v: 'maquinas' }], 'lista'],
+    ['Cadastros › Catálogos › Insumos', [{ v: 'catalogos' }, { v: 'insumos' }], 'lista'],
+    ['Cadastros › Integrações e robôs', [{ v: 'integracoes' }], 'detalhe'],
+    ['Cadastros › Importações manuais', [{ v: 'importacoes' }], 'lista'],
+    ['Cadastros › Sincronização e dados', [{ v: 'sync' }], 'detalhe'],
+    ['Cadastros › Sobre', [{ v: 'sobre' }], 'lista'],
+  ];
+  for (const [nome, pilha, tipo] of niveis) {
+    await page.evaluate(p => { cadNav = [{ v: 'menu' }]; cadLimpar(); p.filter(x => x.v !== 'menu').forEach(x => cadNav.push(x)); if (p.length && p[p.length - 1].v === 'codigonovo') novoCombo = { ativs: [], unis: [] }; ir('cadastros'); }, pilha);
+    await page.waitForTimeout(250);
+    R.telas.push(await medirTela(page, nome, 'cadastros', { tipo, niveis: pilha.length }));
+  }
+  await page.evaluate(() => ir('importar')); await page.waitForTimeout(250);
+  R.telas.push(await medirTela(page, 'Escritório › Importar telemetria', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  R.errosCadastros = erros.slice();
+  await ctx.close();
+}
+
+/* ---------- avaliação: transforma medidas em ✅/❌ ---------- */
+function avaliar(R) {
+  const itens = []; /* {grupo, nome, ok, detalhe} */
+  const add = (grupo, nome, ok, detalhe) => itens.push({ grupo, nome, ok: !!ok, detalhe: detalhe || '' });
+  const boletins = R.telas.filter(t => t.grupo === 'boletim');
+  const cads = R.telas.filter(t => t.grupo === 'cadastros');
+
+  /* 1. renderização a ≤ 400 px, sem erro e sem rolagem lateral */
+  R.telas.forEach(t => add('1. Renderiza a ≤ 400 px', t.nome, t.largura <= VP.width && !(t.erros || []).length,
+    t.largura > VP.width ? `rola de lado: ${t.largura} px de largura` : (t.erros || []).length ? 'erro de página: ' + t.erros[0] : `${t.largura} px`));
+
+  /* 2. altura ao abrir */
+  boletins.forEach(t => add('2. Altura ao abrir', t.nome + ' — nenhuma seção aberta por padrão', !t.secoesAbertas.length && !t.subsecoesAbertas,
+    t.secoesAbertas.length ? 'abertas: ' + t.secoesAbertas.join(', ') : `${t.telas} telas de altura, tudo fechado`));
+  cads.forEach(t => add('2. Altura ao abrir', `${t.nome} — ${t.telas} telas` + (t.temBusca ? ' (com busca)' : ''), t.telas <= ALVO_TELAS || t.temBusca,
+    t.telas > ALVO_TELAS && !t.temBusca ? `acima de ${ALVO_TELAS} telas sem busca` : ''));
+  R.telas.filter(t => t.grupo === 'diretoria' || t.grupo === 'gerente').forEach(t => add('2. Altura ao abrir', `${t.nome} — ${t.telas} telas` + (t.temBusca ? ' (com busca)' : ''), t.telas <= ALVO_TELAS || t.temBusca,
+    t.telas > ALVO_TELAS ? (t.temBusca ? `acima de ${ALVO_TELAS} telas, mas com busca` : `acima de ${ALVO_TELAS} telas sem busca`) : ''));
+
+  /* 3. seções de lançamento: só lista compacta + ＋ */
+  boletins.forEach(t => (t.secoes || []).forEach(s => {
+    const olhar = (sec, pref) => {
+      if (!sec.ehLancamento) return;
+      const ok = sec.camposVisiveis === 0 && sec.outrosBotoes.length === 0;
+      add('3. Seção de lançamento ao abrir: só lista + ＋', `${t.nome.split(' — ')[0]} › ${pref}${sec.titulo}`, ok,
+        ok ? sec.mais.join(' · ') : `${sec.camposVisiveis} campo(s) visíveis antes do ＋` + (sec.exemplosCampos.length ? ' (' + sec.exemplosCampos.join(', ') + ')' : '') + (sec.outrosBotoes.length ? '; botões extras: ' + sec.outrosBotoes.join(', ') : ''));
+    };
+    olhar(s, '');
+    (s.subsecoes || []).forEach(sub => olhar(sub, s.titulo + ' › '));
+    if ((s.subsecoes || []).length) add('3. Seção de lançamento ao abrir: só lista + ＋', `${t.nome.split(' — ')[0]} › ${s.titulo} — sem acordeão dentro de acordeão`, false, `${s.subsecoes.length} sub-acordeões dentro da seção`);
+  }));
+
+  /* 4. três passos após o ＋ */
+  boletins.forEach(t => (t.cartoes || []).forEach(c => {
+    if (c.erro) { add('4. Três passos após o ＋ (ONDE em chips, só ele)', `${t.nome.split(' — ')[0]} › ${c.botao}`, false, c.erro); return; }
+    const soOnde = c.selects === 0 && c.inputs === 0 && c.chips > 0;
+    add('4. Três passos após o ＋ (ONDE em chips, só ele)', `${t.nome.split(' — ')[0]} › ${c.botao}`, soOnde,
+      soOnde ? `${c.chips} chips de ${c.primeiroRotulo || 'ONDE'}` : `aparecem de uma vez: ${c.selects} seletor(es), ${c.inputs} campo(s), ${c.chips} chip(s)` + (c.totalRotulos ? ` — ${c.totalRotulos} rótulos: ${c.rotulos.join(' / ')}${c.totalRotulos > c.rotulos.length ? '…' : ''}` : ''));
+  }));
+
+  /* 5. termos de outra atividade (a própria atividade serve de prova de que o detector enxerga) */
+  boletins.forEach(t => {
+    const propria = t.termosProprios ? ` (detector ativo: ${t.termosProprios} termos da própria atividade na tela)` : '';
+    Object.entries(t.termosAlheios || {}).forEach(([atv, achados]) => {
+      const rot = { CAFE: 'café', GRAOS: 'grãos', PECUARIA: 'pecuária' }[atv];
+      add('5. Zero termos de outra atividade', `${t.nome.split(' — ')[0]} — termos de ${rot}`, !achados.length, achados.length ? achados.join(', ') : 'nenhum' + propria);
+    });
+  });
+
+  /* 6. listas > 12 com busca; detalhe com ação principal visível; níveis; cabeçalho; blocos fechados */
+  cads.forEach(t => {
+    if (t.tipo === 'lista') add('6a. Lista > 12 itens tem busca', `${t.nome} — ${t.itensLista} itens`, t.itensLista <= LISTA_MAX_SEM_BUSCA || t.temBusca, t.itensLista > LISTA_MAX_SEM_BUSCA && !t.temBusca ? 'sem busca' : (t.temBusca ? 'com busca' : ''));
+    if (t.acaoPrincipal !== null) add('6b. Ação principal visível sem rolar', `${t.nome} — "${t.acaoPrincipal}"`, t.acaoVisivel, t.acaoVisivel ? 'fixa no rodapé' : 'fora da tela ao abrir');
+    else if (t.tipo === 'detalhe') add('6b. Ação principal visível sem rolar', `${t.nome}`, !t.temForm, t.temForm ? 'formulário sem botão principal fixo no rodapé' : 'tela só de leitura (ações em Zona de cuidado / Mais opções)');
+    add('6c. Menu → lista → detalhe (máx. 3 níveis)', `${t.nome} — nível ${t.niveis}`, t.niveis <= 3, '');
+    add('6d. Cabeçalho fixo com voltar', t.nome, t.topoFixo && (t.temVoltar || t.niveis === 1), !t.topoFixo ? 'cabeçalho não é fixo' : (!t.temVoltar && t.niveis > 1 ? 'sem "‹ Voltar"' : ''));
+    add('6e. "Mais opções" e "Zona de cuidado" fechados ao abrir', t.nome, !t.blocosAbertos.length, t.blocosAbertos.length ? 'abertos: ' + t.blocosAbertos.join(', ') : '');
+  });
+  boletins.forEach(t => add('6b. Ação principal visível sem rolar', `${t.nome} — "${t.acaoPrincipal || '—'}"`, t.acaoVisivel === true, t.acaoVisivel ? 'fixa no rodapé' : 'fora da tela ao abrir'));
+
+  /* 7. padrão visual */
+  const porGrupo = {};
+  R.telas.forEach(t => { const g = porGrupo[t.grupo] = porGrupo[t.grupo] || { raio: new Set(), sombra: new Set(), gradiente: new Set(), toque: new Set() }; ['raio', 'sombra', 'gradiente', 'toque'].forEach(k => t.visual[k].forEach(x => g[k].add(x))); });
+  const rotG = { gerente: 'Gerente (casa)', boletim: 'Boletim (café, grãos, pecuária, pós)', diretoria: 'Diretoria', cadastros: 'Cadastros / Escritório' };
+  Object.entries(porGrupo).forEach(([g, v]) => {
+    const ex = s => [...s].slice(0, 4).join('; ') + (s.size > 4 ? ` … (+${s.size - 4})` : '');
+    add('7. Padrão visual — sem gradiente', rotG[g], !v.gradiente.size, v.gradiente.size ? ex(v.gradiente) : '');
+    add('7. Padrão visual — sem sombra', rotG[g], !v.sombra.size, v.sombra.size ? ex(v.sombra) : '');
+    add('7. Padrão visual — sem canto arredondado', rotG[g], !v.raio.size, v.raio.size ? ex(v.raio) : '');
+    add('7. Padrão visual — toque ≥ 44 px', rotG[g], !v.toque.size, v.toque.size ? ex(v.toque) : '');
+  });
+  /* agrupa por item, mantendo a ordem de chegada dentro de cada um */
+  return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
+}
+
+function relatorio(itens, R) {
+  const versao = (/APP_VERSAO="(v\d+)"/.exec(fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8')) || [])[1] || '?';
+  const ok = itens.filter(i => i.ok).length, nok = itens.length - ok;
+  const linhas = [`# Checagem de poluição — Boletim NCNaves ${versao} — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    `Largura ${VP.width} px · altura de referência ${VP.height} px · alvo ${ALVO_TELAS} telas · toque ≥ ${TOQUE_MIN} px · sem rede`, ''];
+  let grupo = '';
+  itens.forEach(i => {
+    if (i.grupo !== grupo) { grupo = i.grupo; linhas.push(`## ${grupo}`); }
+    linhas.push(`- ${i.ok ? '✅' : '❌'} ${i.nome}${i.detalhe ? ' — ' + i.detalhe : ''}`);
+  });
+  linhas.push('', `## Resultado: ${ok} ✅ · ${nok} ❌${nok ? ' — corrigir antes do PR (ou constar como ❌ herdado no ESTADO.md)' : ''}`);
+  return linhas.join('\n');
+}
+
+(async () => {
+  const termos = lerTermos();
+  const { srv, base } = await servir(RAIZ);
+  const browser = await pw.chromium.launch();
+  const R = { telas: [] };
+  try {
+    await cenarioBoletim(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', termos);
+    await cenarioBoletim(browser, base, R, 'Grãos (f33 Floramill)', 'f33', 'GRAOS', termos);
+    await cenarioBoletim(browser, base, R, 'Pecuária (f26 Água Santa)', 'f26', 'PECUARIA', termos);
+    await cenarioPos(browser, base, R, termos);
+    await cenarioDiretoria(browser, base, R);
+    await cenarioCadastros(browser, base, R);
+  } finally { await browser.close(); srv.close(); }
+  const itens = avaliar(R);
+  const md = relatorio(itens, R);
+  if (saida) {
+    fs.mkdirSync(saida, { recursive: true });
+    R.telas.forEach(t => { delete t.texto; });
+    fs.writeFileSync(path.join(saida, 'checagem.json'), JSON.stringify({ itens, telas: R.telas }, null, 1));
+    fs.writeFileSync(path.join(saida, 'checagem.md'), md);
+  }
+  console.log(soResumo ? md.split('\n').slice(-1)[0] : md);
+  process.exit(itens.some(i => !i.ok) ? 1 : 0);
+})().catch(e => { console.error('FALHOU: ' + e.stack); process.exit(2); });

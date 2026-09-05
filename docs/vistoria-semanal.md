@@ -35,9 +35,24 @@ precisar de conserto vira tarefa própria (branch + pull request).
 7. **Relatórios da semana**: conferir em `docs/relatorios.md` quais
    estavam previstos para a semana (cadência) e perguntar ao Nilo se
    rodaram; listar os não rodados.
+8. **Checagem de poluição**: executar `node scripts/checar-poluicao.cjs`
+   na raiz, com o `main` atualizado (roda sem rede, a 390 px; precisa
+   do Playwright, como a regressão), e listar qualquer ❌. Comparar com
+   a seção "Telas × padrões de tela" do ESTADO.md: ❌ que não consta lá
+   é regressão — entrou sem passar pela DEFINIÇÃO DE PRONTO do
+   CLAUDE.md (PADRÕES DE TELA) — e ❌ que sumiu de lá foi corrigido
+   (atualizar o ESTADO.md vira tarefa). Se houver ❌, gerar o prompt de
+   correção pronto para o Nilo colar no Claude Code: tela e seção,
+   item reprovado com o dado medido (campos visíveis, altura em telas,
+   termo achado), o que o padrão exige (letra e número do CLAUDE.md:
+   a, P3, c…), a instrução de manter o resto da tela idêntico
+   (regressão em scripts/regressao_render.cjs) e de rodar a checagem de
+   novo antes do PR, colando o checklist no resumo.
 
 ## Saída
 
 Mensagem curta em português, por item: OK / atenção / problema, com o
 dado que sustenta (data, versão, tabela). Encerrar com a lista de
-relatórios não rodados na semana e o que precisa de decisão do Nilo.
+relatórios não rodados na semana, a lista de ❌ da checagem de poluição
+(com o prompt de correção pronto, se houver) e o que precisa de
+decisão do Nilo.

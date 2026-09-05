@@ -421,7 +421,108 @@ relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
 (matriz de acesso) dependem de tabelas ainda não criadas (sql/005-007
 e sql/001-002, listadas nas PENDÊNCIAS).
 
+## Telas × padrões de tela (checagem de poluição — desde 05/09/2026)
+Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
+passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
+outra; d: DEFINIÇÃO DE PRONTO). A medição é de
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v58, 05/09/2026:
+**209 ✅ · 41 ❌**). Esta lista é o retrato dos ❌ herdados: cada tarefa
+que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
+mudar o resultado atualiza esta seção no mesmo PR.
+
+### Boletim do gerente (padrão a)
+Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
+(ONDE em chips, um passo por vez) · termos de outra atividade.
+- ☕ Café (f23) — telas casa e boletim ✅ (1,1 telas, tudo fechado);
+  termos de grãos/pecuária ✅ zero.
+  - Clima · Irrigação (gotejo) · Observações: formulários, não são de
+    lançamento — fechados ✅.
+  - Mão de obra: fechada ✅ · ao abrir ❌ (5 totais com ＋/− visíveis
+    antes do "＋ função") · "＋ função" ❌ (seletor + 3 campos de uma vez).
+  - Atividades por talhão: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão e
+    atividade em seletor, 7 rótulos e calda/máquinas de uma vez).
+  - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
+    rótulos de uma vez).
+  - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ · "＋" ❌ (tipo
+    em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ → ONDE).
+  - Ocorrências gerais: fechada ✅ · ao abrir ✅ · "＋" ❌ (tipo em
+    seletor + gravidade + texto + foto de uma vez).
+- 🌾 Grãos (f33) — casa e boletim ✅ (1 tela, tudo fechado); termos de
+  café/pecuária ✅ zero.
+  - Mão de obra: idem café ❌ ❌.
+  - Operações do dia: fechada ✅ · ao abrir ✅ · "＋ operação" ❌ parcial
+    — só o ONDE aparece (progressivo ✓), mas em seletor, não chips; O
+    QUÊ por fase em chips ✓; DETALHES só da operação ✓.
+  - Irrigação (pivôs): fechada ✅ · ao abrir ❌ (além do "＋ pivô": botão
+    "adicionar todos os pivôs" e link "cadastrar outro pivô") · "＋ pivô"
+    ❌ (pivô em seletor; depois vira linha compacta ✓).
+  - Pragas, doenças e ocorrências: fechada ✅ · ao abrir ✅ · "＋" ❌ ❌
+    (mesmos cartões do café).
+- 🐂 Pecuária (f26) — casa e boletim ✅ (1 tela, tudo fechado); termos
+  de café/grãos ✅ zero.
+  - Mão de obra: idem café ❌ ❌.
+  - Seção 🐂 Pecuária: fechada ✅ · **acordeão dentro de acordeão ❌** (7
+    sub-acordeões) · campo "Observações de pecuária" visível ao abrir.
+    - Movimentação do rebanho: ao abrir ✅ · "＋ movimento" ✅ (chips "O
+      que houve" sozinhos; pasto vem depois, em seletor — ordem O QUÊ →
+      ONDE, a ajustar quando a seção for tocada).
+    - Sanidade: ao abrir ✅ · "＋ animal tratado" ❌ (21 chips + 4 campos
+      de uma vez) · "＋ manejo em massa" ❌ (11 chips + 2 campos).
+    - Reprodução · Pasto e estrutura: formulários, fechados ✅.
+    - Cocho e nutrição: ao abrir ❌ (resumo rápido OK/Problema visível)
+      · "＋ pasto" ❌ (pasto em seletor + 10 chips de uma vez).
+    - Contagem por lote/pasto: ao abrir ✅ · "＋ lote" ❌ (seletor + 2
+      campos).
+    - Outros manejos: ao abrir ✅ · "＋ manejo" ❌ (2 seletores + 3
+      campos).
+  - Ocorrências e sanidade: ao abrir ✅ · "＋" ❌ (idem café).
+- 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
+  Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
+  "Enviar registro do dia" não é fixo no rodapé ❌; termos de
+  grãos/pecuária ✅ zero.
+- Botão principal do boletim (Enviar/Descartar) fixo no rodapé ✅ nas
+  três atividades.
+
+### Diretoria e Escritório (padrões b e c)
+- Painel da Diretoria: renderiza ✅ · 2,9 telas de altura com a busca
+  de boletins ✅ (referência) · Relatórios 1 tela ✅ · Resumo do período
+  1,2 telas ✅.
+- Cadastros (25 telas medidas: menu, 11 assuntos, detalhes e "novo"):
+  P2 níveis ≤ 3 ✅ em todas · P3 altura ≤ 2 telas ou busca ✅ em todas
+  (Talhões 2,0 telas com busca) · P3 lista > 12 com busca ✅ (Fazendas
+  24, Talhões 103, Ciclos 30, Códigos 32, Catálogos 77/80/124,
+  Máquinas 407 — todas com busca) · P4 cabeçalho fixo com voltar ✅ em
+  todas · P4 ação principal fixa no rodapé ✅ em todas as telas com
+  formulário; Lotes › detalhe, Plano › fazenda e Códigos › detalhe são
+  só de leitura (ações na Zona de cuidado) ✅ · P5 "Mais opções"/"Zona
+  de cuidado" fechados ✅ em todas.
+- Escritório › Importar telemetria: formulário sem ação principal fixa
+  no rodapé ❌ ("1 · Ler o arquivo" dentro do cartão).
+- Escritório › Unidades e Plano: precisa de rede — fora da medição
+  offline (conferir à mão quando for tocada).
+
+### P10 — padrão visual (❌ em TODAS as telas: é o CSS-base do app)
+Sem gradiente ✅ em tudo. Sombra ❌ (`.cartao` e `.btn` usam
+`--sombra`), canto arredondado ❌ (`--raio:12px` em cartão, seção e
+botão; 10 px em input/select; chips são pílula de 24 px), toque < 44 px
+❌ (`.btn-topo` 40 px, `.btn.mini` 40 px, chips de salto 40 px, filtro
+de fazenda do painel, "Sair" da entrada). Só as classes `cad-*` da v56
+já cumprem o padrão. **Zerar isto é uma versão própria (troca do
+CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
+classes `cad-*` e não acrescenta raio/sombra/pílula novos.
+
 ## PENDÊNCIAS
+- **Padrão visual P10 — decisão do Nilo:** o CSS-base do app (raio 12
+  px, sombra, chips-pílula, botões de 40 px) contraria o padrão visual
+  do CLAUDE.md em todas as telas (ver "Telas × padrões de tela"). Trocar
+  é uma versão só de CSS, com regressão visual antes/depois; enquanto
+  não decidir, nenhuma tela nova pode acrescentar raio, sombra ou
+  pílula.
+- **❌ herdados dos padrões de tela** (lista acima): Mão de obra (3
+  atividades), cartões "＋" do café (4), grãos (4) e pecuária (6),
+  sub-acordeões da pecuária, Irrigação (pivôs) ao abrir, Pós-colheita
+  (seções abertas + botão solto), Importar telemetria sem rodapé. Cada
+  um é zerado na tarefa que tocar a tela; nenhum ❌ novo entra.
 - **Robô-redator (v57) — para o Nilo:** (feito em 05/09/2026: sql/020,
   030 e 031 rodados, primeira devolutiva da Floramill gerada) colar no
   SQL Editor, nesta ordem:
