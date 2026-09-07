@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v58** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v59** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -402,6 +402,35 @@ automáticos".
   chega a ele pelo WhatsApp, depois de revisada). Telas do gerente idênticas
   à v56 (regressão em scripts/regressao_render.cjs).
 
+## Dias sem registro (v59) — visão no Supabase, leitura sem tela
+Métrica que diz há quantos dias uma operação não é registrada em uma
+unidade operacional (o farol nº 1 é binário; esta separa "3 dias" de "47
+dias" sem ranking e sem dizer "não fez"). Detalhe em `docs/relatorios.md`,
+seção "Visão vw_dias_sem_registro".
+- **Supabase** (`sql/040-dias-sem-registro.sql`, bloco único com passo a
+  passo; precisa do `sql/020` já rodado): `operacao_catalogo` (catálogo
+  mestre de operações — id imutável CAFE-…/GRAOS-…/PEC-…, espelho de
+  LISTA_ATIV, OPS_GRAOS_FASES e OPS_PECUARIA_FASES; seed por
+  `scripts/gerar_catalogo_operacoes.cjs`; 75 operações), `operacao_alias`
+  (texto exato do payload → operação, igualdade exata, nunca LIKE; 90
+  apelidos, inclusive os blocos estruturados da pecuária: mov, massa,
+  san.problema, lotes, nut, rep), `vw_dsr_registros` e
+  `vw_dias_sem_registro` (unidade_id, operacao_id, atividade,
+  operacao_nome, fase, data_ultimo_registro, dias_sem_registro,
+  nunca_registrado). **Nunca registrado = dias NULL + nunca_registrado
+  true**, nunca 0. Sem coluna de status/farol/atraso: a janela é de outra
+  camada (backlog). Leitura anon, escrita só pelo SQL Editor; visões com
+  security_invoker. Café entra só como dado; nenhuma tela de café lê.
+- **App**: `baixarDiasSemRegistro({atividade, unidade})` (junto de
+  `baixarRelatorios`) lê a visão pela REST só para as unidades do escopo,
+  guarda em `dsrCache` / `bdf:diasSemRegistro`; `diasSemRegistroDe` e
+  `textoDiasSemRegistro` ("há 12 dias" / "hoje" / "sem registro") ficam
+  prontos para telas futuras. Não roda em `syncTudo`; nenhuma tela mostra
+  o número na v59 (as telas candidatas — painel e 📊 Relatórios — são
+  compartilhadas com o café; Cadastros › Lotes é outro assunto, P1).
+  Telas idênticas à v58 (prova em scripts/regressao_render.cjs).
+- Diário de validação por entrega: `docs/qualidade-log.md` (novo na v59).
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -425,8 +454,8 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v58, 05/09/2026:
-**209 ✅ · 41 ❌**). Esta lista é o retrato dos ❌ herdados: cada tarefa
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v59, 07/09/2026:
+**209 ✅ · 41 ❌** — mesmo retrato da v58; a v59 não mexeu em tela). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -512,6 +541,12 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Dias sem registro (v59) — para o Nilo:** colar `sql/040-dias-sem-registro.sql`
+  no SQL Editor (passo a passo no cabeçalho; um bloco só, pode repetir).
+  Enquanto não rodar, `baixarDiasSemRegistro` recebe 404 e devolve lista
+  vazia — nada muda no app. Depois, item seguinte do backlog: janela por
+  operação e farol (verde/âmbar/vermelho só com janela fechada) na
+  Diretoria, lendo esta visão.
 - **Padrão visual P10 — decisão do Nilo:** o CSS-base do app (raio 12
   px, sombra, chips-pílula, botões de 40 px) contraria o padrão visual
   do CLAUDE.md em todas as telas (ver "Telas × padrões de tela"). Trocar

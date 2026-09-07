@@ -10,6 +10,14 @@
 > e não constam aqui.
 
 
+> **Espelho no Supabase (v59).** As operações deste catálogo também
+> vivem na tabela `operacao_catalogo` (id imutável + apelidos em
+> `operacao_alias`), usada pela visão `vw_dias_sem_registro`
+> (`sql/040-dias-sem-registro.sql`). O seed é gerado por
+> `scripts/gerar_catalogo_operacoes.cjs` a partir das constantes do
+> `index.html` — mudou operação aqui e no código? Rode o script e recole
+> o trecho marcado do `sql/040`. Detalhes em `docs/relatorios.md`.
+
 Este arquivo é a especificação oficial das operações e dos campos do
 boletim, por atividade. O código (index.html) implementa EXATAMENTE
 o que está aqui — nem mais, nem menos. Mudou aqui? Muda no código no

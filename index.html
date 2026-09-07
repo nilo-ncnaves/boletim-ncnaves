@@ -1726,6 +1726,42 @@ async function baixarRelatorios(){
     await Persist.set("bdf:relatorios", JSON.stringify(relCache));
   }catch(e){}
 }
+/* ---- dias sem registro (v59): leitura da visão vw_dias_sem_registro (sql/040) ----
+   Uma linha por unidade × operação do catálogo (operacao_catalogo): data_ultimo_registro,
+   dias_sem_registro (NULL quando nunca houve registro) e nunca_registrado. Só leitura: nesta
+   versão nenhuma tela mostra o número; o resultado fica em dsrCache (e em bdf:diasSemRegistro)
+   para telas futuras. Não roda na sincronização — quem precisar chama
+   baixarDiasSemRegistro({atividade:"GRAOS"|"PECUARIA"|"CAFE", unidade:"f33"}) (os dois filtros
+   são opcionais). Vocabulário: "sem registro", nunca "não fez" / "atrasado" / "pendente". */
+let dsrCache=[];
+async function baixarDiasSemRegistro(filtro){
+  if(!syncAtivo()) return [];
+  filtro=filtro||{};
+  try{
+    const esc0=escopoAtual(); if(!esc0) return [];
+    const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
+    if(!tudo && !ids.length) return [];
+    if(filtro.unidade && !tudo && !ids.includes(filtro.unidade)) return [];
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    let url=syncCfg.url+"/rest/v1/vw_dias_sem_registro?select=unidade_id,operacao_id,atividade,operacao_nome,fase,data_ultimo_registro,dias_sem_registro,nunca_registrado&order=unidade_id,operacao_id&limit=5000";
+    if(filtro.atividade) url+="&atividade=eq."+encodeURIComponent(filtro.atividade);
+    if(filtro.unidade) url+="&unidade_id=eq."+encodeURIComponent(filtro.unidade);
+    else if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
+    const r=await fetch(url,cab); if(!r.ok) return [];
+    const linhas=await r.json(); if(!Array.isArray(linhas)) return [];
+    /* trava: unidade fora do escopo nunca fica no aparelho, venha o que vier do banco */
+    const ok=linhas.filter(l=>l && l.unidade_id && l.operacao_id && (tudo || ids.includes(l.unidade_id)));
+    dsrCache=ok; await Persist.set("bdf:diasSemRegistro", JSON.stringify(ok));
+    return ok;
+  }catch(e){ return []; }
+}
+const diasSemRegistroDe=(unidade,operacao)=>dsrCache.find(l=>l.unidade_id===unidade && l.operacao_id===operacao)||null;
+/* texto para tela: "há 12 dias" / "hoje" quando há registro anterior; "sem registro" quando nunca houve */
+function textoDiasSemRegistro(l){
+  if(!l || l.nunca_registrado || l.dias_sem_registro===null || l.dias_sem_registro===undefined) return "sem registro";
+  const n=Math.max(0,Math.round(Number(l.dias_sem_registro)||0));
+  return n===0?"hoje":"há "+n+(n===1?" dia":" dias");
+}
 const relLinhas=(rel,ini,fim)=>relCache.filter(l=>l.relatorio===rel && (!ini || (l.periodo_ini===ini && l.periodo_fim===fim)));
 const relPeriodos=rel=>[...new Set(relCache.filter(l=>l.relatorio===rel).map(l=>l.periodo_ini+"|"+l.periodo_fim))].sort().reverse();
 const relNum=(v,d)=>(v==null||v==="")?"—":n0(v).toLocaleString("pt-BR",{maximumFractionDigits:d==null?1:d});
@@ -4205,7 +4241,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v58";
+const APP_VERSAO="v59";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
