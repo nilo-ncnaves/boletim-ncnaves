@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v60** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v61** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -466,6 +466,63 @@ e farol de registro".
   `scripts/checar-poluicao.cjs` mede as telas novas com os padrões de
   Cadastros, usando linhas de exemplo no formato da visão.
 
+## Estados de lista (v61) — carregando · erro · vazio com recorte
+Regra permanente (CLAUDE.md item c2; detalhe em
+`docs/definicao-de-pronto.md`, item 6). Motivação: grãos e pecuária
+começam com pouco histórico e um vazio mudo faz o gerente achar que o
+app quebrou; o vazio bem escrito diz o que está vazio e sob qual
+filtro, sem imputar omissão.
+- **Função única** no `index.html`: `fraseVazio(recorte)` monta a frase
+  ("Sem boletim registrado em Floramill. Os boletins aparecem aqui
+  depois do primeiro envio."; "Sem boletim de grãos em Capoeira Grande
+  de 01/09 a 07/09/2026. Último registro há 7 dias (31/08).") e
+  `htmlEstado("carregando"|"erro"|"vazio", recorte, {tag, classe,
+  colspan, acao})` embrulha em `p`/`li`/`td`/`div`; `periodoVazio(de,
+  ate)` e `haDias(iso)` são apoio. Nomes só por id (`fazenda(id).nome`,
+  `talhao(id).nome`); vocabulário "sem registro", nunca "não fez" /
+  "pendente" / "atrasado" / "faltou"; sem exclamação nem emoji.
+- **Onde vale (29 pontos):** casa do gerente de grãos e pecuária
+  ("Últimos boletins"), seção Talhões e ciclos (sem talhão de grãos),
+  Irrigação por pivô (sem pivô cadastrado), painel da Diretoria (lista
+  de boletins nomeando atividade, unidade, operação, busca e período,
+  com "último registro" quando há unidade escolhida; cartão da unidade;
+  Resumo do período), escolha de fazenda (código sem unidade da
+  atividade), tela 📊 Relatórios (textos, números por filtro, sem
+  cache), tela do relatório (período + unidade), tabelas dos
+  relatórios ("Sem registro neste período") e 15 listas/buscas de
+  Cadastros (busca global, fazendas, talhões, ciclos e histórico,
+  lotes e inventário e histórico, plano por fazenda e busca de unidade,
+  códigos, catálogo com busca, máquinas, insumos, importações manuais).
+  Cinco desses pontos ficavam em branco absoluto antes da v61.
+- **Faróis de registro (v60)** entraram na mesma regra na v61:
+  `farolEstado` em `baixarFarolRegistro` (carregando / erro com Tentar
+  de novo) e vazios "Sem farol baixado para as unidades deste código.
+  Com internet, toque em Atualizar…", "Sem operação com janela nas
+  unidades deste código." e, na unidade, "Sem operação com janela em
+  {unidade}."
+- **Carregando e erro** (Relatórios e Faróis leem da rede sem já ter
+  os três estados): `relEstado` em `baixarRelatorios` separa "baixando"
+  ("Carregando relatórios…", também enquanto `syncOcupado`) e "não
+  conseguiu baixar" ("Não foi possível carregar os relatórios." +
+  botão Tentar de novo, `data-sync`, que redesenha já em carregando) de
+  "o motor não gerou nada" (vazio). Com cache no aparelho, o cache é
+  mostrado e nenhum desses aparece. Unidades e Plano (v52) já tinha os
+  três estados e é a referência.
+- **Café intocado** (regra 1): casa do gerente de café e pós-colheita
+  mantêm "Nenhum boletim ainda." / "Nenhum registro ainda." (decisão por
+  `atividadeDe(fz)`), tela do relatório para gerente de café mantém
+  "Nada calculado para este período na sua unidade.", cartão de cargas
+  de café intocado. Legenda do farol do painel passou de "○ faltou"
+  para "○ sem registro" (Diretoria, compartilhada).
+- **Fica de fora, por desenho:** listas de lançamento do boletim (só o
+  "＋", padrão a), cartões que somem sem dado (Solinftec, iCrop, Meus
+  relatórios), avisos dos robôs. Para decisão do Nilo: os títulos
+  "Boletim de hoje pendente" / "Registro de hoje pendente" (rótulo de
+  situação nas casas do gerente e do pós-colheita, mexer toca o café)
+  e "pendente" no relatório de rebanho (GMD/lotação, texto do motor).
+  Enriquecer com `vw_dias_sem_registro` (por operação) fica para o
+  item "janela por operação e farol".
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -489,9 +546,11 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v60, 07/09/2026:
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v61, 07/09/2026:
 **221 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
-telas de faróis, todas ✅). Esta lista é o retrato dos ❌ herdados: cada tarefa
+telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
+os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
+seção nova). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -581,6 +640,10 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Estados vazios (v61) — para o Nilo:** revisar as frases (lista no
+  PR da v61 e em docs/qualidade-log.md) e decidir sobre "Boletim de
+  hoje pendente" / "Registro de hoje pendente" nas casas do gerente e
+  do pós-colheita (rótulo de situação; trocar toca o café).
 - **Janela e farol (v60):** `sql/042-janela-farol.sql` RODADO pelo Nilo em
   07/09/2026 e conferido pela REST (10 janelas propostas ativas; 582
   combinações; Capoeira Grande × monitoramento amarelo "sem registro desde

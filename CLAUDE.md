@@ -151,7 +151,22 @@ termos exclusivos está em docs/catalogos-por-atividade.md, seção
 "Termos exclusivos por atividade" — termo novo no catálogo de uma
 atividade entra lá na mesma tarefa.
 
+### c2) Estados de lista: carregando, erro e vazio (desde a v61)
+Toda tela ou seção de leitura distingue os três estados e passa
+pela função única `htmlEstado(estado, recorte, embrulho)` /
+`fraseVazio(recorte)` do index.html — nenhuma tela escreve a própria
+frase de vazio. O vazio NOMEIA o recorte ativo (unidade, atividade,
+operação, talhão, busca, período: "Sem boletim registrado em
+Floramill de 01/09 a 07/09/2026") e relata ausência de REGISTRO,
+nunca de trabalho: proibidos "não fez", "não realizou", "pendente",
+"atrasado", "faltou", "esqueceu"; sem exclamação, sem emoji, sem
+culpar quem usa; uma frase, no máximo duas linhas no iPhone. Nomes
+só pelo cadastro por id. Café mantém os textos que já tinha (regra
+1). Detalhe, parâmetros e exemplos em docs/definicao-de-pronto.md,
+item 6.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
+Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho
    do script; roda sem rede, a 390 px) e colar o checklist ✅/❌
    inteiro no resumo do PR.
