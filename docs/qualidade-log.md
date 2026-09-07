@@ -6,6 +6,78 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 07/09/2026 · v63 · de quando é o dado de integração (vw_status_integracoes + linha de origem)
+
+**Entrega.** `sql/045-status-integracoes.sql` (de-para `integracao_job`,
+diário persistente `integracao_execucoes`, função `integracao_colher_icrop`
+agendada 07:35/13:30 UTC, visão `vw_status_integracoes` — uma linha por
+fonte com tentativa, sucesso, dado gravado e dia na origem, tudo em UTC),
+leitura `baixarStatusIntegracoes` na sincronização (cache
+`bdf:statusIntegracoes`; aparelho só de café não baixa), formatador
+`textoOrigemDado` / `linhaOrigemDado` com fuso `America/Sao_Paulo`
+explícito, linha "Dados do iCrop de hoje, 04:05" no rodapé do cartão iCrop
+do gerente de grãos e do cartão Solinftec do gerente de grãos e pecuária,
+variante "Última atualização do iCrop há N dias" em âmbar acima de 26 h sem
+sucesso, bloco "Estado dos robôs" em Escritório › Integrações e robôs,
+sementes de exemplo em `scripts/checar-poluicao.cjs`, docs (relatorios.md
+"Estado das integrações" com a tabela dos três horários;
+definicao-de-pronto.md item 7; CLAUDE.md c3; ESTADO.md). Versão v63.
+Decisão registrada: `icrop_reqs` não guarda sucesso/falha (só req_id,
+criado_em, tipo, id_fazenda) e o status HTTP em `net._http_response`
+expira em horas — por isso o diário persistente + colheita, em vez de
+inferir sucesso do "succeeded" do pg_cron (que na iCrop só diz que a
+função disparou). Sucesso da iCrop = qualquer pedido com HTTP 200; NULL
+até a primeira colheita.
+
+**Verificado (automático, sem tocar o Supabase).**
+- Esquema real conferido pela REST pública (chave publishable):
+  colunas de `icrop_manejo`, `icrop_fazendas`, `icrop_parcelas`,
+  `solinftec_diario`; `icrop_reqs` só expõe req_id/criado_em/tipo/
+  id_fazenda (RLS: anon vê 0 linhas); diário do pg_cron copiado num
+  registro de depuração de 04/09 (telemetria) mostra os nomes dos jobs
+  usados no de-para. Fotografia de 07/09/2026: icrop_manejo max data
+  30/08, max atualizado_em 02/09 13:15 UTC; solinftec_diario 06/09,
+  gravado 07/09 06:05 UTC.
+- Bloco SQL rodado 2× num PostgreSQL 16 local com `cron.job`,
+  `cron.job_run_details`, `cron.schedule`, `net._http_response`,
+  `icrop_reqs` (RLS sem policy), `icrop_manejo` e `solinftec_diario`
+  emulados: sem erro, idempotente; cenário com função OK às 07:20, resposta
+  200 às 07:05:40 e uma 401, dado de 02/09 → os três horários saem
+  distintos (07:20 / 07:05:40 / 02/09 13:15, origem 30/08); Solinftec
+  com falha às 12:35 e sucesso às 06:05 → tentativa 12:35, sucesso 06:05;
+  cenário NULL (sem diário, sem disparo, sem dado) → NULL, nada
+  inventado; anon lê a visão, não chama a colheita nem lê `cron.*`; tipos
+  das colunas conferidos; 0 palavras proibidas nos comentários.
+- Formatador testado em Node com relógio fixo (07/09/2026 15:00 BRT) e
+  fuso do aparelho UTC, America/Sao_Paulo e Europe/Lisbon: 13 casos
+  (hoje, ontem, dd/mm, 26 h exatas não é velho, 26 h + 1 min é velho,
+  ok NULL com horas da visão, sem dado → nada, fonte desconhecida →
+  nada, meia-noite em Brasília) — saída idêntica nos três fusos, sem
+  "agora", "tempo real" ou exclamação.
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: 221 ✅ · 41 ❌, igual ao retrato da v62
+  (nenhum ❌ novo), com dado de integração e status de exemplo semeados em
+  grãos, pecuária e Integrações (casa 1,0 tela; Integrações 1,2 telas;
+  termos de outra atividade zero).
+- `scripts/regressao_render.cjs` main × branch, 53 telas: sem dados
+  simulados, as 6 cenas idênticas (só versão e horários); com dados
+  simulados (mocks de icrop_manejo, solinftec_diario e
+  vw_status_integracoes), café e pós-colheita idênticos, Diretoria
+  idêntica, grãos e pecuária com a linha nova no cartão iCrop (boletim) e
+  no cartão Solinftec (casa).
+- `git grep` por "não fez", "atrasad", "pendente", "tempo real", "agora"
+  no que foi tocado — nada fora do botão "Baixar agora" já existente.
+
+**Teste manual (Nilo).** Rodar `sql/045` no SQL Editor (a tabelinha final
+mostra as duas linhas); sincronizar com código de grãos ou pecuária e ver
+a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, abrir Escritório
+› Integrações e robôs › "Estado dos robôs". Decidir: painel da Diretoria
+(compartilhado) e dica de chuva na seção Clima ficaram sem a linha.
+
+**Não tocado.** Telas do gerente de café e pós-colheita (idênticas ao
+main, com e sem dados simulados), painel da Diretoria, funções do robô
+iCrop (não estão no repositório), tabelas existentes do Supabase.
+
 ## 07/09/2026 · v62 · intervalo entre operações (ritmo por unidade × operação)
 
 **Entrega.** `sql/043-intervalo-operacoes.sql` (visões

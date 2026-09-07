@@ -218,8 +218,30 @@ async function medirTela(page, nome, grupo, extra) {
   return Object.assign({ nome, grupo, telas: +(m.altura / VP.height).toFixed(2) }, m, { visual: v }, extra || {});
 }
 
+/* v63: linhas de exemplo no formato de vw_status_integracoes (uma fonte em dia, outra sem sucesso há 30 h,
+   para a variante "velho" aparecer). Horários em UTC, como a visão manda. */
+const statusIntegracoesExemplo = () => {
+  const agora = Date.now(), t = ms => new Date(agora - ms).toISOString(), dia = ms => new Date(agora - ms).toISOString().slice(0, 10);
+  return [
+    { fonte: 'icrop', ultima_execucao_em: t(2 * 36e5), ultima_execucao_ok_em: t(2 * 36e5), ultimo_dado_em: t(2 * 36e5), ultimo_dado_origem: dia(0), horas_desde_ultimo_sucesso: 2 },
+    { fonte: 'solinftec', ultima_execucao_em: t(1 * 36e5), ultima_execucao_ok_em: t(30 * 36e5), ultimo_dado_em: t(30 * 36e5), ultimo_dado_origem: dia(864e5), horas_desde_ultimo_sucesso: 30 },
+  ];
+};
+
 async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS[fz], chave: fz }, gerente(fz, atv));
+  /* v63: grãos e pecuária recebem dado de integração do dia + estado dos robôs, para os cartões iCrop/Solinftec
+     e a linha "Dados do iCrop de hoje, 04:05" entrarem na medição. Café fica sem semente (regra 1: tela intocada). */
+  if (atv !== 'CAFE') {
+    await page.evaluate(([f, st]) => {
+      const hoje = hojeISO();
+      statusIntegracoes = st;
+      D.solinftecDados = [{ fazenda_id: f, data: hoje, equipamento: 'Trator 01', operacao: 'Operação 205', talhao: '', horas: 3.2, area_ha: 12, consumo_l: 40 }];
+      if (temCultura(f, 'GRAOS')) D.icropDados = [{ fazenda: 'NC Naves - Floramill', equipamento: 'Pivô 01', parcela: 'Gleba A', data: hoje, atualizado_em: new Date().toISOString(), irrigacao_mm: 4.2, precipitacao_mm: 0, etc: 3, eto: 4 }];
+      ir('casa');
+    }, [fz, statusIntegracoesExemplo()]);
+    await page.waitForTimeout(300);
+  }
   const casa = await medirTela(page, rot + ' — casa do gerente', 'gerente');
   await page.click('#bt-preencher'); await page.waitForTimeout(400);
   const form = await medirTela(page, rot + ' — boletim (ao abrir)', 'boletim', { atividade: atv });
@@ -293,6 +315,8 @@ async function cenarioDiretoria(browser, base, R) {
 async function cenarioCadastros(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
   await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(400);
+  /* v63: estado dos robôs (vw_status_integracoes) para o bloco de leitura de Integrações e robôs aparecer preenchido */
+  await page.evaluate(st => { statusIntegracoes = st; }, statusIntegracoesExemplo());
   const ids = await page.evaluate(() => ({
     fz: D.fazendas[0].id, tal: D.talhoes[0].id,
     grao: (D.talhoes.find(t => t.tipo === 'GRAO_ANUAL') || {}).id || '',

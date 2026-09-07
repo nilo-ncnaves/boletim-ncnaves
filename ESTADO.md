@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v61** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v63** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -197,6 +197,28 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   mostra "Operação NNN") ajustáveis no SQL Editor. A importação
   manual por arquivo continua como plano B.
 
+- Estado das integrações (v63 — `sql/045-status-integracoes.sql`):
+  a visão **vw_status_integracoes** devolve uma linha por fonte (icrop,
+  solinftec) com quatro horários que NÃO se misturam — ultima_execucao_em
+  (última tentativa: diário do pg_cron, jobs listados por nome exato em
+  `integracao_job`), ultima_execucao_ok_em (último sucesso: iCrop = HTTP
+  200 colhido de net._http_response para o diário persistente
+  `integracao_execucoes` pela função `integracao_colher_icrop`, agendada
+  07:35 e 13:30 UTC; Solinftec = função sem erro no pg_cron), ultimo_dado_em
+  (max de atualizado_em) e ultimo_dado_origem (max da coluna data) — mais
+  horas_desde_ultimo_sucesso. Tudo em UTC; NULL é "ainda não existe",
+  nunca estimativa. O app lê na sincronização (`baixarStatusIntegracoes`,
+  cache bdf:statusIntegracoes; aparelho só de café não baixa) e mostra
+  UMA linha secundária no rodapé de cada bloco de dado externo
+  (`linhaOrigemDado`): "Dados do iCrop de hoje, 04:05" / "de ontem,
+  04:20" / "de 05/09, 04:05", convertido para Brasília com
+  America/Sao_Paulo explícito; com mais de 26 h sem sucesso do robô vira
+  "Última atualização do iCrop há 2 dias" em âmbar, sem ícone ou
+  bloqueio. Onde: cartão iCrop do gerente de grãos, cartão Solinftec do
+  gerente de grãos e pecuária, bloco "Estado dos robôs" em Escritório ›
+  Integrações e robôs. Café e painel da Diretoria (compartilhado) não
+  mudaram. Detalhe em docs/relatorios.md, "Estado das integrações".
+
 ## Plano de safra 2026/27 (v52 — fase A, "Fundação")
 Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
 - **O plano do agrônomo (Salvino) entra no app só como referência e
@@ -316,7 +338,11 @@ passou a morar:
 8. **🔌 Integrações e robôs** — Supabase, robô iCrop (última medição ×
    última gravação, de-para, parcelas vencendo), robô Solinftec
    (SOLINFTEC_AUTO, última data, linhas sem de-para, operações sem
-   nome), plano de safra; "Baixar agora" = syncTudo.
+   nome), plano de safra; "Baixar agora" = syncTudo. Desde a v63, logo
+   abaixo do Supabase, o bloco de leitura **Estado dos robôs
+   (vw_status_integracoes)**: por fonte, última tentativa · último
+   sucesso · último dado gravado (e o dia do dado na origem) · horas
+   desde o último sucesso, em Brasília; sem cache, frase de vazio.
 9. **📡 Importações manuais** — importador de planilha Solinftec/iCrop
    (era "Telemetria — Importar arquivo do dia") e a lista das
    importações feitas; a tela de importar volta para cá.
@@ -584,12 +610,17 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v62, 07/09/2026:
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v63, 07/09/2026:
 **221 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
 telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
 os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
 seção nova; a v62 acrescentou um texto secundário "ritmo: a cada N dias"
-em Faróis › unidade, medido com linhas de exemplo de ritmo: 1 tela, ✅). Esta lista é o retrato dos ❌ herdados: cada tarefa
+em Faróis › unidade, medido com linhas de exemplo de ritmo: 1 tela, ✅;
+a v63 acrescentou a linha de origem "Dados do iCrop de hoje, 04:05" nos
+cartões iCrop/Solinftec de grãos e pecuária e o bloco "Estado dos robôs"
+em Integrações e robôs — medidos com dado de integração e status de
+exemplo semeados no script: casa de grãos/pecuária 1,0 tela, Integrações
+1,2 telas, termos de outra atividade zero, ✅). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -681,6 +712,20 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Estado das integrações (v63) — para o Nilo:** rodar
+  `sql/045-status-integracoes.sql` no SQL Editor (bloco único; passo a
+  passo no cabeçalho). Cria `integracao_job`, `integracao_execucoes`, a
+  função de colheita e a visão `vw_status_integracoes`, agenda a
+  colheita (07:35 e 13:30 UTC) e mostra as duas linhas no fim. Sem o SQL
+  o app segue igual (a leitura falha em silêncio e nenhuma linha de
+  origem aparece). Depois: sincronizar com código de grãos/pecuária e
+  ver a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, o bloco
+  "Estado dos robôs" em Escritório › Integrações e robôs. Decisões que
+  ficaram para o Nilo: (a) painel da Diretoria é compartilhado e NÃO
+  ganhou a linha; (b) a dica de chuva da estação iCrop na seção Clima
+  também não (o cartão iCrop do mesmo boletim já a carrega); (c)
+  `ultima_execucao_ok_em` da iCrop conta qualquer pedido com HTTP 200
+  (manejo ou parcelas) — a coluna `tipo` do diário permite apertar isso.
 - **Intervalo entre operações (v62) — para o Nilo:** rodar
   `sql/043-intervalo-operacoes.sql` no SQL Editor (bloco único; passo a
   passo no cabeçalho; só cria duas visões). Depois, opcional,

@@ -88,3 +88,37 @@ e `estilo` opcionais.
 Antes do PR: `git grep -n "não fez\|não realizou\|pendente\|atrasad\|faltou\|esqueceu"`
 no que foi tocado, e a lista de todas as frases de vazio criadas ou
 alteradas vai no resumo do PR, tela por tela, para o Nilo revisar.
+
+## 7. Dado de fonte externa informa de quando é (desde a v63)
+Toda tela ou bloco que mostre dado vindo de integração (iCrop,
+Solinftec ou fonte futura) traz, no rodapé do bloco, UMA linha em
+tipografia secundária dizendo de quando é aquele dado — pela função
+única `linhaOrigemDado(fonte)` do `index.html`, que lê
+`vw_status_integracoes` (`sql/045`; detalhe em docs/relatorios.md,
+"Estado das integrações"). Nenhuma tela escreve a própria frase.
+
+Regras:
+1. **A data é a do dado gravado** (`ultimo_dado_em`), nunca a da busca
+   nem a de abertura da tela: "Dados do iCrop de hoje, 04:05" / "de
+   ontem, 04:20" / "de 05/09, 04:05". Hoje/ontem para as duas datas
+   mais recentes; data curta dd/mm daí em diante.
+2. **Fuso explícito**: o banco manda UTC; a tela converte para
+   `America/Sao_Paulo` sempre, independente do fuso do aparelho.
+3. **Dado velho** (mais de 26 h sem sucesso do robô —
+   `ultima_execucao_ok_em`): "Última atualização do iCrop há 2 dias"
+   em cor de atenção (`--amarelo`), sem ícone, sem exclamação, sem
+   modal, sem bloquear a tela. Nunca culpa a conexão de quem usa: a
+   falha pode estar na API de origem.
+4. **Proibido** em qualquer tela: "atualizado agora", "em tempo real",
+   "ao vivo" ou equivalente.
+5. **Uma linha por bloco de dado externo, no máximo.** Tela com duas
+   fontes no mesmo bloco consolida numa linha só quando couber.
+6. **Sem status conhecido, nada aparece** (visão não criada, sem rede
+   e sem cache): a tela fica exatamente como antes. Nunca estimar.
+7. **Café** (regra 1): as telas do gerente de café não mostram a linha;
+   quem chama decide por `perfilDe(fz)`. Tela compartilhada entre
+   atividades (painel da Diretoria) só ganha a linha por decisão do
+   Nilo.
+8. **Tentativa ≠ sucesso ≠ dado**: quem mexer na visão ou na tela
+   mantém os três horários separados (tabela em docs/relatorios.md).
+   Colapsar qualquer um deles faz dado velho parecer novo.

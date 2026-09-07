@@ -380,6 +380,81 @@ REST de leitura (chave publishable, filtros opcionais):
 `rest/v1/vw_ritmo_operacoes?select=*&atividade=in.(GRAOS,PECUARIA)&unidade_id=eq.f33&order=operacao_id`
 e `rest/v1/vw_intervalo_operacoes?select=*&unidade_id=eq.f33&operacao_id=eq.GRAOS-FUNGICIDA&order=data_registro`.
 
+## Estado das integrações — `vw_status_integracoes` (v63)
+
+Visão de leitura que diz **de quando é o dado que veio de fora** (iCrop e
+Solinftec). Vem do app Sigma (Fundação ABC), que carimba cada bloco de
+estação meteorológica com "Transmitido em 07/09/2026 às 08:00": quem lê
+nunca confunde "agora" com "a última vez que o sistema conseguiu buscar".
+Arquivo: `sql/045-status-integracoes.sql` (bloco único, passo a passo no
+cabeçalho; pré-requisitos: robô iCrop no ar, `sql/003` rodado, pg_cron e
+pg_net ligados). Uma linha por fonte (`icrop`, `solinftec`), tudo em UTC.
+
+### Três horários que nunca se colapsam
+
+| coluna | pergunta que responde | de onde vem | avança quando |
+|---|---|---|---|
+| `ultima_execucao_em` | quando o robô **tentou** pela última vez? | `cron.job_run_details` (diário do pg_cron), pelos jobs listados em `integracao_job` | a cada disparo do pg_cron, deu certo ou não |
+| `ultima_execucao_ok_em` | quando a API de origem **respondeu OK** pela última vez? | iCrop: `integracao_execucoes` (HTTP 200 colhido de `net._http_response`); Solinftec: o mesmo diário do pg_cron com `status = 'succeeded'` (a função lança erro em resposta ≠ 200) | só com resposta boa da API |
+| `ultimo_dado_em` | quando o último **dado foi gravado** no Supabase? | `max(atualizado_em)` de `icrop_manejo` / `solinftec_diario` | só quando o robô escreve linha nova ou regrava |
+| `ultimo_dado_origem` | a que **dia** o dado mais recente se refere, lá na origem? | `max(data)` das mesmas tabelas | só com medição de dia novo |
+| `horas_desde_ultimo_sucesso` | há quantas horas inteiras a API não responde OK? | conta sobre `ultima_execucao_ok_em`; NULL sem sucesso conhecido | — |
+
+Exemplos reais (07/09/2026): a iCrop respondeu 200 de madrugada
+(`ultima_execucao_ok_em` de hoje), mas a última gravação é de 02/09 e o
+dado mais novo é de 30/08 — robô e token bons; ciclos vencidos na Vision.
+Se um dia o robô rodar e a API falhar, `ultima_execucao_em` avança sozinha.
+Colapsar qualquer um desses horários no outro é o que faz dado velho
+parecer novo; por isso a visão devolve os quatro e a tela escolhe o que
+mostrar (`ultimo_dado_em` na linha de origem; `ultima_execucao_ok_em` para
+decidir se o dado está velho).
+
+### Por que a iCrop precisa de um diário próprio
+
+O robô iCrop é assíncrono (pg_net): a função `icrop_passo2_manejo` termina
+"succeeded" no pg_cron **antes** de a iCrop responder, e `icrop_reqs` guarda
+só `req_id`, `criado_em`, `tipo` e `id_fazenda` — nenhum status. O status
+HTTP fica em `net._http_response`, que a pg_net apaga em poucas horas. O
+`sql/045` cria `integracao_execucoes` (fonte, req_id, tipo, pedido_em,
+respondido_em, status_code, ok) e a função `integracao_colher_icrop()`, que
+copia para lá o status de cada pedido ainda vivo; o pg_cron a chama às
+07:35 e 13:30 UTC (04:35 e 10:30 em Brasília), 15 minutos depois de cada
+rodada do robô, e o próprio bloco faz uma colheita na hora. Até a primeira
+colheita, `ultima_execucao_ok_em` da iCrop é NULL — nunca estimado.
+"Sucesso" da iCrop = qualquer pedido do robô (manejo ou parcelas) com
+resposta 200; a coluna `tipo` do diário permite separar isso no futuro.
+
+### Identidade, fuso e segurança
+
+- Fonte ↔ job do pg_cron por tabela de-para (`integracao_job`), nome
+  **exato** — nunca LIKE nem pedaço de nome (regra 6). Job novo do robô =
+  linha nova (exemplo no fim do arquivo SQL).
+- Tudo sai em UTC (`timestamptz`). Converter para Brasília é papel da
+  tela: o `index.html` usa `America/Sao_Paulo` explícito
+  (`textoOrigemDado`, `fmtDHBRT`), independente do fuso do aparelho.
+- A visão roda com as permissões de quem a criou (postgres), porque
+  `cron.*` e `net.*` não são legíveis pela chave pública; expõe SÓ
+  horários agregados e o nome da fonte — nenhuma mensagem de erro,
+  nenhum conteúdo de resposta. A função de colheita fica revogada para
+  anon/authenticated.
+- A visão não julga: sem farol, sem "parado", sem "atrasado". O limiar
+  de "dado velho" (26 h sem sucesso) é decisão da tela.
+
+### Como o app usa (v63)
+
+`baixarStatusIntegracoes` (na sincronização; aparelho só de café não
+baixa) guarda as linhas em `bdf:statusIntegracoes`. `textoOrigemDado(fonte)`
+monta uma linha por bloco de dado externo, no rodapé, em tipografia
+secundária: "Dados do iCrop de hoje, 04:05" / "de ontem, 04:20" / "de
+05/09, 04:05" (hoje/ontem pelas duas datas mais recentes em Brasília).
+Com mais de 26 h sem sucesso: "Última atualização do iCrop há 2 dias" em
+cor de atenção, sem ícone, sem exclamação, sem bloquear. As horas são
+recontadas no aparelho (o número da visão envelhece no cache). Onde
+aparece: cartão iCrop do gerente de grãos, cartão Solinftec do gerente de
+grãos e pecuária, e o bloco "Estado dos robôs" em Escritório › Integrações
+e robôs. Telas de café e o painel da Diretoria (compartilhado) não foram
+tocados.
+
 ## Como rodar um relatório PRONTO no Cowork
 
 Caminho curto (v54): no app, com código ADMIN, Escritório › Cadastros ›
