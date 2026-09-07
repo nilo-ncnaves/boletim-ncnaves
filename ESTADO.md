@@ -581,12 +581,15 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Janela e farol (v60) — para o Nilo:** colar `sql/042-janela-farol.sql`
-  no SQL Editor (passo a passo no cabeçalho). Depois sincronizar com
-  código DIRETORIA/ADMIN e abrir painel › "Faróis de registro". As janelas
-  são PROPOSTAS: revisar com o agrônomo (grãos) e o veterinário (pecuária)
-  e ajustar por SQL (exemplos no cabeçalho do 042). Enquanto o 042 não
-  rodar, a tela diz que não há farol baixado e nada mais muda.
+- **Janela e farol (v60):** `sql/042-janela-farol.sql` RODADO pelo Nilo em
+  07/09/2026 e conferido pela REST (10 janelas propostas ativas; 582
+  combinações; Capoeira Grande × monitoramento amarelo "sem registro desde
+  o 1º boletim (há 7 dias) · janela aberta, fecha em 3 dias"; 4 unidades
+  de grãos e as 9 de pecuária cinza por não terem boletim; café sem farol;
+  0 violações de "vermelho só com janela fechada"). Pendente: revisar as
+  janelas PROPOSTAS com o agrônomo (grãos) e o veterinário (pecuária) e
+  ajustar por SQL (exemplos no cabeçalho do 042); conferir no app, com
+  código DIRETORIA/ADMIN, painel › "Faróis de registro".
 - **Dias sem registro (v59):** `sql/040-dias-sem-registro.sql` RODADO
   pelo Nilo em 07/09/2026 e conferido pela REST (75 operações, 90
   apelidos, 582 combinações; Capoeira Grande × Plantio / semeadura = 7
