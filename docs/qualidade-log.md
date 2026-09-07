@@ -31,12 +31,13 @@ códigos com painel, cenários novos em `scripts/checar-poluicao.cjs` e
   `scripts/regressao_render.cjs` main × branch: resultado no PR e no
   ESTADO.md ("Telas × padrões de tela").
 
-**Depende de teste manual (Nilo).**
-- Rodar o `sql/042` no SQL Editor e conferir a tabelinha final (linhas por
-  atividade e farol). Com o banco de hoje: pecuária toda cinza (nenhum
-  boletim de pecuária); em grãos, Capoeira Grande × monitoramento amarelo
-  ("sem registro desde o 1º boletim (há 7 dias) · janela aberta, fecha em
-  3 dias") e as outras quatro unidades de grãos cinza (sem boletim).
+**Teste manual (Nilo) — `sql/042` FEITO em 07/09/2026.** Conferência pela
+REST pública logo depois: 10 janelas propostas ativas; 582 combinações
+(café 190 sem janela; grãos 135 sem janela + 1 amarelo + 4 cinza;
+pecuária 171 sem janela + 81 cinza); Capoeira Grande × monitoramento
+amarelo "sem registro desde o 1º boletim (há 7 dias) · janela aberta,
+fecha em 3 dias"; 0 vermelhos com janela aberta; 0 verdes sem registro;
+café sem farol; nenhum texto proibido. Ainda manual:
 - Sincronizar o app com código DIRETORIA ou ADMIN e abrir o painel ›
   "Faróis de registro".
 - Ajustar as janelas propostas com o agrônomo e o veterinário (SQL no
