@@ -134,6 +134,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   await cenario(browser, 'diretoria', { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null, [
     ['10-painel-fz', async p => { await p.click('[data-fz="f23"]'); }],
     ['20-relatorio', async p => { await clique(p, '#bt-rel'); }],
+    ['30-farois', async p => { await p.evaluate(() => ir('farois')); await pausa(p, 300); }],
+    ['40-farol-f26', async p => { await p.evaluate(() => ir('farol', 'f26')); await pausa(p, 300); }],
   ]);
 
   /* ⚙️ admin — entrada, painel, cadastros, unidades e plano (v52) */

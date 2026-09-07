@@ -11,7 +11,8 @@
  O que ela faz (tudo sem rede, como um celular offline, largura 390 px):
    1. Renderiza uma unidade de café (f23), uma de grãos (f33), uma de
       pecuária (f26), o boletim de pós-colheita (f23), o painel da
-      Diretoria, a tela Relatórios e TODOS os níveis de Cadastros (ADMIN).
+      Diretoria, a tela Relatórios, os Faróis de registro (v60, com linhas de
+      exemplo, medidos como Cadastros) e TODOS os níveis de Cadastros (ADMIN).
    2. Mede a altura de cada tela ao abrir: no boletim nenhuma seção pode
       nascer aberta; em Cadastros nenhuma tela acima de 2 alturas (2 × 844 px)
       sem campo de busca.
@@ -264,6 +265,25 @@ async function cenarioDiretoria(browser, base, R) {
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
   await page.evaluate(() => ir('relatorio')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Resumo do período', 'diretoria'));
+  /* Faróis de registro (v60): tela nova da Diretoria, medida com os padrões de Cadastros (P1–P10).
+     Offline não há visão baixada, então a página recebe linhas de exemplo no formato de vw_farol_registro. */
+  await page.evaluate(() => {
+    const OPS = {
+      PECUARIA: [['PEC-SUPLEMENTACAO', 'Suplementação (sal mineral / proteinado / ração)', 7, 3], ['PEC-CONTAGEM', 'Contagem', 30, 10], ['PEC-VACINACAO', 'Vacinação (especificar)', 180, 30], ['PEC-ROCADA', 'Roçada', null, null]],
+      GRAOS: [['GRAOS-MONITORAMENTO_DE_PRAGAS_E_DOENCAS', 'Monitoramento de pragas e doenças', 7, 3], ['GRAOS-FUNGICIDA', 'Fungicida', null, null]],
+    };
+    const EX = [[0, 'verde', 'registrado hoje'], [12, 'amarelo', 'sem registro há 12 dias · janela aberta, fecha em 2 dias'], [47, 'vermelho', 'sem registro há 47 dias · janela fechada há 7 dias'], [3, 'verde', 'registrado há 3 dias']];
+    farolCache = D.fazendas.filter(f => temCultura(f.id, 'GRAOS') || temCultura(f.id, 'PECUARIA')).flatMap((f, k) => {
+      const atv = temCultura(f.id, 'PECUARIA') ? 'PECUARIA' : 'GRAOS';
+      return OPS[atv].map(([id, nome, c, tol], i) => { const e = EX[(i + k) % 4]; return { unidade_id: f.id, operacao_id: id, atividade: atv, operacao_nome: nome, fase: null, data_ultimo_registro: '2026-08-20', dias_sem_registro: e[0], nunca_registrado: false, primeiro_boletim: '2026-07-01', cadencia_dias: c, tolerancia_dias: tol, janela_origem: c ? 'proposta' : null, farol: c ? e[1] : null, fecha_em_dias: c ? 2 : null, situacao: c ? e[2] : null }; });
+    });
+    farolBaixadoEm = '2026-09-07T12:00:00Z';
+    ir('farois');
+  }); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Diretoria › Faróis de registro', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  const unFarol = await page.evaluate(() => (D.fazendas.find(f => temCultura(f.id, 'PECUARIA')) || {}).id || '');
+  await page.evaluate(u => ir('farol', u), unFarol); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Diretoria › Faróis › unidade', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   R.errosDiretoria = erros.slice();
   await ctx.close();
 }

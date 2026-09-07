@@ -38,7 +38,9 @@ plano_safra, plano_unidade, plano_adubo_mes, plano_calagem,
 plano_fito_mes, plano_fito_excecao, plano_gantt, plano_parametros
 (o app lê; só a tela de ADMIN escreve).
 Desde a v59: operacao_catalogo, operacao_alias e a visão
-vw_dias_sem_registro (sql/040; o app só lê, sob demanda).
+vw_dias_sem_registro (sql/040; o app só lê, sob demanda). Desde a v60:
+operacao_janela e a visão vw_farol_registro (sql/042; só aparelhos com
+painel baixam).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -149,7 +151,7 @@ termos exclusivos está em docs/catalogos-por-atividade.md, seção
 "Termos exclusivos por atividade" — termo novo no catálogo de uma
 atividade entra lá na mesma tarefa.
 
-### c2) Estados de lista: carregando, erro e vazio (desde a v60)
+### c2) Estados de lista: carregando, erro e vazio (desde a v61)
 Toda tela ou seção de leitura distingue os três estados e passa
 pela função única `htmlEstado(estado, recorte, embrulho)` /
 `fraseVazio(recorte)` do index.html — nenhuma tela escreve a própria

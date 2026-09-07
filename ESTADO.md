@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v60** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v61** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -431,7 +431,42 @@ seção "Visão vw_dias_sem_registro".
   Telas idênticas à v58 (prova em scripts/regressao_render.cjs).
 - Diário de validação por entrega: `docs/qualidade-log.md` (novo na v59).
 
-## Estados de lista (v60) — carregando · erro · vazio com recorte
+## Janela e farol de registro na Diretoria (v60)
+Em cima da métrica da v59. Detalhe em `docs/relatorios.md`, seção "Janela
+e farol de registro".
+- **Supabase** (`sql/042-janela-farol.sql`, bloco único; precisa dos
+  sql/020 e 040): `operacao_janela` (cadência esperada de registro por
+  operação — cadencia_dias + tolerancia_dias; linha geral da atividade ou
+  por unidade, que vence a geral e pode desligar com ativo = false; origem
+  proposta/agronomo/veterinario/nilo; só o SQL Editor escreve),
+  `vw_dsr_boletim_unidade` (1º e último boletim por unidade) e
+  `vw_farol_registro` (tudo da vw_dias_sem_registro + janela + **farol** +
+  **situacao** em texto pronto). Farol: verde = registrado na cadência;
+  amarelo = sem registro com a janela aberta; **vermelho só depois de a
+  janela fechar**; cinza = unidade sem boletim; sem janela = sem farol.
+  Nunca registrado conta desde o 1º boletim da unidade e o texto diz isso.
+  Janela não é prescrição (não diz o que fazer, produto nem dose).
+  Seed proposto só para grãos (monitoramento 7+3) e pecuária (9
+  operações: suplementação 7+3 … vacinação 180+30) — **café sem janela**
+  (já tem os faróis do plano). Ajuste por SQL, exemplos no cabeçalho.
+- **App**: `baixarFarolRegistro()` em `syncTudo` só para códigos com painel
+  (gerente não baixa nem vê), cache em `bdf:farolRegistro`. Painel da
+  Diretoria ganhou o botão **"Faróis de registro"** (abaixo de 📊
+  Relatórios, com "N com janela fechada · N com janela aberta"). Telas
+  novas, nas classes cad-*: **Faróis de registro** (lista por unidade
+  agrupada por atividade, pior cor manda, contagem em dia / janela aberta /
+  janela fechada / sem histórico na linha, busca) e **unidade** (operações
+  com janela ordenadas por cor com o texto da situação e a janela; bloco
+  "Operações sem janela" fechado com "há N dias" / "sem registro"). Farol
+  quadrado (`.farol.reto`) e botões sem sombra/raio nas telas novas (P10).
+  Vocabulário: "sem registro", "janela aberta/fechada", "em dia", "sem
+  histórico" — nunca "não fez", "atrasado", "pendente".
+- Telas do gerente e da pós-colheita idênticas à v59 (regressão em
+  scripts/regressao_render.cjs, que agora também abre as duas telas novas);
+  `scripts/checar-poluicao.cjs` mede as telas novas com os padrões de
+  Cadastros, usando linhas de exemplo no formato da visão.
+
+## Estados de lista (v61) — carregando · erro · vazio com recorte
 Regra permanente (CLAUDE.md item c2; detalhe em
 `docs/definicao-de-pronto.md`, item 6). Motivação: grãos e pecuária
 começam com pouco histórico e um vazio mudo faz o gerente achar que o
@@ -458,8 +493,14 @@ filtro, sem imputar omissão.
   Cadastros (busca global, fazendas, talhões, ciclos e histórico,
   lotes e inventário e histórico, plano por fazenda e busca de unidade,
   códigos, catálogo com busca, máquinas, insumos, importações manuais).
-  Cinco desses pontos ficavam em branco absoluto antes da v60.
-- **Carregando e erro** (só a tela Relatórios lê da rede sem já ter
+  Cinco desses pontos ficavam em branco absoluto antes da v61.
+- **Faróis de registro (v60)** entraram na mesma regra na v61:
+  `farolEstado` em `baixarFarolRegistro` (carregando / erro com Tentar
+  de novo) e vazios "Sem farol baixado para as unidades deste código.
+  Com internet, toque em Atualizar…", "Sem operação com janela nas
+  unidades deste código." e, na unidade, "Sem operação com janela em
+  {unidade}."
+- **Carregando e erro** (Relatórios e Faróis leem da rede sem já ter
   os três estados): `relEstado` em `baixarRelatorios` separa "baixando"
   ("Carregando relatórios…", também enquanto `syncOcupado`) e "não
   conseguiu baixar" ("Não foi possível carregar os relatórios." +
@@ -505,10 +546,11 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v60, 07/09/2026:
-**209 ✅ · 41 ❌** — mesmo retrato da v58/v59; a v60 só trocou textos de
-vazio e acrescentou os estados carregando/erro em Relatórios, sem
-campo, chip ou seção nova). Esta lista é o retrato dos ❌ herdados: cada tarefa
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v61, 07/09/2026:
+**221 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
+telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
+os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
+seção nova). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -566,9 +608,13 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   três atividades.
 
 ### Diretoria e Escritório (padrões b e c)
-- Painel da Diretoria: renderiza ✅ · 2,9 telas de altura com a busca
+- Painel da Diretoria: renderiza ✅ · 3,0 telas de altura com a busca
   de boletins ✅ (referência) · Relatórios 1 tela ✅ · Resumo do período
   1,2 telas ✅.
+- Diretoria › Faróis de registro (v60, medida como Cadastros): lista 1,5
+  telas com busca ✅ (14 unidades > 12 → busca) · nível 2 ✅ · cabeçalho
+  fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
+  só leitura ✅ · nível 3 ✅ · "Operações sem janela" fechado ✅.
 - Cadastros (25 telas medidas: menu, 11 assuntos, detalhes e "novo"):
   P2 níveis ≤ 3 ✅ em todas · P3 altura ≤ 2 telas ou busca ✅ em todas
   (Talhões 2,0 telas com busca) · P3 lista > 12 com busca ✅ (Fazendas
@@ -594,10 +640,19 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Estados vazios (v60) — para o Nilo:** revisar as frases (lista no
-  PR da v60 e em docs/qualidade-log.md) e decidir sobre "Boletim de
+- **Estados vazios (v61) — para o Nilo:** revisar as frases (lista no
+  PR da v61 e em docs/qualidade-log.md) e decidir sobre "Boletim de
   hoje pendente" / "Registro de hoje pendente" nas casas do gerente e
   do pós-colheita (rótulo de situação; trocar toca o café).
+- **Janela e farol (v60):** `sql/042-janela-farol.sql` RODADO pelo Nilo em
+  07/09/2026 e conferido pela REST (10 janelas propostas ativas; 582
+  combinações; Capoeira Grande × monitoramento amarelo "sem registro desde
+  o 1º boletim (há 7 dias) · janela aberta, fecha em 3 dias"; 4 unidades
+  de grãos e as 9 de pecuária cinza por não terem boletim; café sem farol;
+  0 violações de "vermelho só com janela fechada"). Pendente: revisar as
+  janelas PROPOSTAS com o agrônomo (grãos) e o veterinário (pecuária) e
+  ajustar por SQL (exemplos no cabeçalho do 042); conferir no app, com
+  código DIRETORIA/ADMIN, painel › "Faróis de registro".
 - **Dias sem registro (v59):** `sql/040-dias-sem-registro.sql` RODADO
   pelo Nilo em 07/09/2026 e conferido pela REST (75 operações, 90
   apelidos, 582 combinações; Capoeira Grande × Plantio / semeadura = 7

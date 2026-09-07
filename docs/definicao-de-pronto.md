@@ -33,7 +33,7 @@ docs/catalogos-por-atividade.md (catálogos), docs/PLANO-DE-SAFRA.md
 (plano), docs/qualidade-log.md (uma entrada por entrega) e, quando
 houver tabela nova, o `sql/NNN-nome.sql` pronto para o SQL Editor.
 
-## 6. Estados de lista: carregando, erro e vazio (desde a v60)
+## 6. Estados de lista: carregando, erro e vazio (desde a v61)
 Toda tela ou seção DE LEITURA (lista de apontamentos, histórico,
 relatório, farol, lista de cadastro, resultado de busca) distingue
 três estados e passa os três pela função única do `index.html`:

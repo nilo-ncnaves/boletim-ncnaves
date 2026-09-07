@@ -10,8 +10,8 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 - **Fonte**: de onde saem os números. "app" = tabelas do Boletim
   (boletins, pos_colheitas, remessas, telemetria, boletim_pecuaria,
-  codigos_acesso; desde a v59 também a visão vw_dias_sem_registro,
-  seção própria abaixo); "iCrop" = icrop_manejo, icrop_fazendas,
+  codigos_acesso; desde a v59 a visão vw_dias_sem_registro e, na v60,
+  operacao_janela + vw_farol_registro — seções próprias abaixo); "iCrop" = icrop_manejo, icrop_fazendas,
   icrop_parcelas (robô da madrugada); "Solinftec" = solinftec_diario
   (robô, integrada desde a v49); "plano v52" = tabelas do plano de
   safra (plano_safra, plano_adubo_mes, plano_calagem, plano_fito_mes,
@@ -224,6 +224,55 @@ atividades).
 
 REST de leitura (chave publishable, filtros opcionais):
 `rest/v1/vw_dias_sem_registro?select=*&atividade=eq.PECUARIA&unidade_id=eq.f26&order=operacao_id`.
+
+## Janela e farol de registro — `operacao_janela` + `vw_farol_registro` (v60)
+
+Camada de julgamento em cima da visão de dias sem registro: a **janela** de
+uma operação é a cadência com que a Diretoria espera ver um registro dela
+no boletim (`cadencia_dias`) mais uma tolerância (`tolerancia_dias`, a
+janela fica aberta por mais N dias). Arquivo: `sql/042-janela-farol.sql`
+(bloco único, passo a passo no cabeçalho; pré-requisitos: sql/020 e 040).
+Janela **não é prescrição**: não diz o que fazer no campo, com que produto
+ou dose — diz onde a Diretoria deve olhar.
+
+| objeto | o que é |
+|---|---|
+| `operacao_janela` | operacao_id, unidade_id (nulo = geral da atividade; linha por unidade vence a geral e pode desligar com `ativo = false`), cadencia_dias, tolerancia_dias, origem (proposta / agronomo / veterinario / nilo), obs, ativo. Só o SQL Editor escreve. |
+| `vw_dsr_boletim_unidade` | primeiro e último boletim por unidade (referência para "nunca registrado"). |
+| `vw_farol_registro` | todas as colunas de `vw_dias_sem_registro` + primeiro_boletim, cadencia_dias, tolerancia_dias, janela_origem, janela_da_unidade, **farol**, fecha_em_dias, **situacao** (texto pronto). |
+
+Regras do farol (calculadas no Supabase; o app só mostra):
+
+| farol | quando | texto (`situacao`) |
+|---|---|---|
+| nulo | operação sem janela (ou janela desligada) | — (o app mostra "há N dias" / "sem registro") |
+| cinza | unidade sem nenhum boletim | "unidade sem boletim · sem histórico" |
+| verde | registrado há ≤ cadência dias | "registrado hoje" / "registrado há N dias" |
+| amarelo | sem registro, mas dentro de cadência + tolerância | "sem registro há N dias · janela aberta, fecha em M dias" |
+| vermelho | **só depois de a janela fechar** (> cadência + tolerância) | "sem registro há N dias · janela fechada há M dias" |
+
+Nunca registrado: os dias contam desde o **1º boletim da unidade** e o
+texto diz isso ("sem registro desde o 1º boletim (há N dias) · …"); nunca
+vira verde. Vocabulário fixo: "sem registro", "janela aberta", "janela
+fechada", "em dia" — nunca "não fez", "atrasado", "pendente".
+
+Janelas propostas no seed (origem `proposta`, para o Nilo, o agrônomo e o
+veterinário ajustarem por SQL): pecuária — suplementação 7 (+3),
+conferência de água 7 (+3), contagem 30 (+10), controle de carrapato /
+mosca 30 (+15), manutenção de cerca / cocho / bebedouro 30 (+15), controle
+de formiga 60 (+30), pesagem 90 (+30), vermifugação 90 (+30), vacinação
+180 (+30); grãos — monitoramento de pragas e doenças 7 (+3), que só faz
+sentido com lavoura no campo (desligar por unidade no vazio: linha com
+`unidade_id` e `ativo = false`). **Café não tem janela** nesta versão: já
+tem os faróis do plano de safra (`plano_executado_mes`).
+
+Consumo no app (v60): `baixarFarolRegistro()` (dentro de `syncTudo`, só
+para códigos com painel) lê a visão para as unidades do escopo e guarda em
+`bdf:farolRegistro`; telas **Faróis de registro** (`farois`: lista por
+unidade, pior cor manda, busca) e **unidade** (`farol`: operações com
+janela ordenadas por cor; "Operações sem janela" fechado embaixo), abertas
+pelo botão "Faróis de registro" do painel da Diretoria. O gerente não baixa
+nem vê. REST: `rest/v1/vw_farol_registro?select=*&farol=not.is.null&order=unidade_id`.
 
 ## Como rodar um relatório PRONTO no Cowork
 

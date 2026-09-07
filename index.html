@@ -60,6 +60,7 @@ h3{font-size:.95rem;font-weight:700}
 .farol.espera{background:var(--amarelo)}
 .farol.critico{background:var(--cereja)}
 .farol.vazio{background:var(--linha)}
+.farol.reto{border-radius:0}
 /* Etiquetas */
 .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700}
 .tag.verde{background:var(--verde-claro);color:var(--verde-esc)}
@@ -207,7 +208,7 @@ const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const n0 = v => { const x=parseFloat(String(v).replace(",",".")); return isNaN(x)?0:x; };
 const emSafra = () => { const m=new Date().getMonth()+1; return m>=5 && m<=9; };
 
-/* ---------- Estados de lista (v60): carregando · erro · vazio ----------
+/* ---------- Estados de lista (v61): carregando · erro · vazio ----------
    REGRA DA CASA (docs/definicao-de-pronto.md): toda lista de leitura passa por aqui —
    nenhuma tela escreve o próprio texto de vazio. O vazio NOMEIA O RECORTE que o produziu
    (unidade, atividade, operação, talhão, busca, período) e relata ausência de REGISTRO,
@@ -1026,6 +1027,8 @@ async function carregarTudo(){
   try{ const pc=await Persist.get("bdf:plano"); planoCache=pc?(JSON.parse(pc)||{}):{}; }catch(e){ planoCache={}; }
   /* relatórios automáticos já baixados (v55) — sem rede vale o último; sem cache, nada aparece */
   try{ const rc=await Persist.get("bdf:relatorios"); relCache=rc?(JSON.parse(rc)||[]):[]; }catch(e){ relCache=[]; }
+  /* faróis de registro (v60) — só aparelhos com painel baixam; sem cache a tela diz que não há dados */
+  try{ const fc=await Persist.get("bdf:farolRegistro"); const o=fc?JSON.parse(fc):null; farolCache=(o&&Array.isArray(o.linhas))?o.linhas:[]; farolBaixadoEm=(o&&o.em)||""; }catch(e){ farolCache=[]; farolBaixadoEm=""; }
   D.remessas = D.remessas||[];
   D.estruturas = D.estruturas||{};
   D.telemetria = D.telemetria||[];
@@ -1750,7 +1753,7 @@ const REL_CATALOGO={
   alerta_divergencia:{nome:"Alerta de divergência (texto)", per:"dia", texto:true}
 };
 let relCache=[];                 /* linhas de relatorios_gerados guardadas no aparelho (bdf:relatorios) */
-let relEstado={carregando:false, erro:false};   /* v60: separa "carregando" e "erro" de "vazio" na tela Relatórios */
+let relEstado={carregando:false, erro:false};   /* v61: separa "carregando" e "erro" de "vazio" na tela Relatórios */
 let relFiltro={per:""};          /* filtro da seção do painel: "" | dia | semana | mes */
 let relVista={rel:"",ini:"",fim:""};  /* relatório aberto na tela "relat" */
 /* Baixa os resultados prontos (últimos 60 dias) SÓ das unidades do escopo do
@@ -1825,6 +1828,82 @@ function textoDiasSemRegistro(l){
   const n=Math.max(0,Math.round(Number(l.dias_sem_registro)||0));
   return n===0?"hoje":"há "+n+(n===1?" dia":" dias");
 }
+/* ---- Faróis de registro (v60): janela por operação + farol, calculados no Supabase
+   (vw_farol_registro, sql/042). Só Diretoria/ADMIN; o gerente nunca baixa nem vê.
+   verde = registrado na cadência · amarelo = sem registro, janela aberta ·
+   vermelho = só com a janela fechada · cinza = unidade sem boletim · sem janela = sem farol.
+   Vocabulário: "sem registro", nunca "não fez" / "atrasado" / "pendente". ---- */
+let farolCache=[], farolBaixadoEm="";   /* linhas de vw_farol_registro (bdf:farolRegistro) */
+let farolVista={unidade:"",q:""};
+let farolEstado={carregando:false, erro:false};   /* v61: separa "baixando" e "erro" de "vazio" na tela Faróis */
+async function baixarFarolRegistro(){
+  if(!syncAtivo() || !podePainel()) return [];
+  farolEstado.carregando=true;
+  try{
+    const esc0=escopoAtual(); if(!esc0) return [];
+    const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
+    if(!tudo && !ids.length) return [];
+    farolEstado.erro=false;
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    let url=syncCfg.url+"/rest/v1/vw_farol_registro?select=unidade_id,operacao_id,atividade,operacao_nome,fase,data_ultimo_registro,dias_sem_registro,nunca_registrado,primeiro_boletim,cadencia_dias,tolerancia_dias,janela_origem,farol,fecha_em_dias,situacao&order=unidade_id,operacao_id&limit=5000";
+    if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
+    const r=await fetch(url,cab); if(!r.ok){ farolEstado.erro=true; return []; }
+    const linhas=await r.json(); if(!Array.isArray(linhas)){ farolEstado.erro=true; return []; }
+    const ok=linhas.filter(l=>l && l.unidade_id && l.operacao_id && (tudo || ids.includes(l.unidade_id)));
+    farolCache=ok; farolBaixadoEm=new Date().toISOString();
+    await Persist.set("bdf:farolRegistro", JSON.stringify({em:farolBaixadoEm, linhas:ok}));
+    return ok;
+  }catch(e){ farolEstado.erro=true; return []; }
+  finally{ farolEstado.carregando=false; }
+}
+const FAROL_ORDEM={vermelho:0,amarelo:1,cinza:2,verde:3};
+const farolLinhas=()=>farolCache.filter(l=>l && podeVer(l.unidade_id));
+/* resumo por unidade: só as operações com janela; a pior cor manda */
+function farolPorUnidade(){
+  const uns={};
+  farolLinhas().filter(l=>l.farol).forEach(l=>{
+    const u=uns[l.unidade_id]=uns[l.unidade_id]||{id:l.unidade_id,atividade:l.atividade,n:{vermelho:0,amarelo:0,cinza:0,verde:0}};
+    u.n[l.farol]=(u.n[l.farol]||0)+1;
+  });
+  return Object.values(uns).map(u=>{ u.pior=["vermelho","amarelo","cinza","verde"].find(k=>u.n[k])||"verde"; u.nome=fazenda(u.id).nome; return u; })
+    .sort((a,b)=>FAROL_ORDEM[a.pior]-FAROL_ORDEM[b.pior] || a.nome.localeCompare(b.nome,"pt-BR"));
+}
+const farolRodape=()=>`<p class="mut" style="font-size:.72rem;margin-top:12px">Calculado no Supabase (janelas em operacao_janela, sql/042); o app só mostra. ${farolBaixadoEm?"Baixado em "+new Date(farolBaixadoEm).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""} Vermelho só depois de a janela fechar. "Sem registro" não quer dizer que não foi feito — quer dizer que não está no boletim.</p>`;
+function vFarois(){
+  const uns=farolPorUnidade();
+  const grupos=[["GRAOS","🌾 Grãos"],["PECUARIA","🐂 Pecuária"],["CAFE","☕ Café"]].map(([k,r])=>[r,uns.filter(u=>u.atividade===k)]).filter(([,l])=>l.length);
+  const rot={vermelho:"janela fechada",amarelo:"janela aberta",verde:"em dia",cinza:"sem histórico"};
+  const item=u=>`<button class="cad-item" data-farolun="${u.id}" data-nome="${esc(u.nome)}">
+      <span class="farol reto ${relFarolCor(u.pior)}"></span>
+      <span class="cresce"><b>${esc(u.nome)}</b><span class="mut">${["vermelho","amarelo","verde","cinza"].filter(k=>u.n[k]).map(k=>u.n[k]+" "+rot[k]).join(" · ")}</span></span>
+      <span class="seta">›</span></button>`;
+  const fechadas=uns.filter(u=>u.n.vermelho).length;
+  return topo("Faróis de registro", (sessao&&sessao.papel==="admin")?"Administrador":"Diretoria", true)+`
+    ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px;min-height:44px;box-shadow:none;border-radius:0;">🔄 Atualizar</button></p>`:""}
+    <p class="mut" style="font-size:.8rem">Por unidade: quantas operações com janela estão em dia, com a janela aberta ou com a janela fechada. ${uns.length?(fechadas?fechadas+" unidade"+(fechadas>1?"s":"")+" com janela fechada.":"Nenhuma janela fechada."):""}</p>
+    ${uns.length?`<input class="cad-busca" id="farol-busca" placeholder="Buscar unidade" value="${esc(farolVista.q||"")}" autocomplete="off" autocapitalize="off">
+      ${grupos.map(([r,l])=>cadGrupo(r+" · "+l.length)+l.map(item).join("")).join("")}`
+    :`<div class="cartao">${!farolCache.length&&(farolEstado.carregando||syncOcupado)?htmlEstado("carregando",{que:"faróis"})
+      :!farolCache.length&&farolEstado.erro?htmlEstado("erro",{que:"os faróis"},{acao:true})
+      :!farolCache.length?htmlEstado("vazio",{que:"farol baixado",onde:"para as unidades deste código",dica:"Com internet, toque em Atualizar. Se continuar vazio, o sql/042 ainda não rodou no Supabase."})
+      :htmlEstado("vazio",{que:"operação com janela",onde:"nas unidades deste código"})}</div>`}
+    ${farolRodape()}
+    <button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar ao painel</button>`;
+}
+function vFarol(un){
+  un=un||farolVista.unidade; farolVista.unidade=un;
+  const f=fazenda(un), ls=farolLinhas().filter(l=>l.unidade_id===un);
+  const comJ=ls.filter(l=>l.farol).sort((a,b)=>FAROL_ORDEM[a.farol]-FAROL_ORDEM[b.farol] || String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
+  const semJ=ls.filter(l=>!l.farol).sort((a,b)=>String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
+  const linha=l=>`<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
+      <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}</span></span></div>`;
+  return topo(f.nome||un, "Faróis de registro", true)+`
+    ${comJ.length?comJ.map(linha).join(""):`<div class="cartao">${htmlEstado("vazio",{que:"operação com janela",unidade:un})}</div>`}
+    ${semJ.length?`<details class="cad-bloco"><summary>Operações sem janela <span class="mut num">· ${semJ.length}</span></summary><div class="corpo" style="padding:0">
+      ${semJ.map(l=>`<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b></span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`).join("")}</div></details>`:""}
+    ${farolRodape()}
+    <button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar aos faróis</button>`;
+}
 const relLinhas=(rel,ini,fim)=>relCache.filter(l=>l.relatorio===rel && (!ini || (l.periodo_ini===ini && l.periodo_fim===fim)));
 const relPeriodos=rel=>[...new Set(relCache.filter(l=>l.relatorio===rel).map(l=>l.periodo_ini+"|"+l.periodo_fim))].sort().reverse();
 const relNum=(v,d)=>(v==null||v==="")?"—":n0(v).toLocaleString("pt-BR",{maximumFractionDigits:d==null?1:d});
@@ -1885,7 +1964,7 @@ function vRelatorios(){
   const cab=topo("Relatórios", sessao.papel==="admin"?"Administrador":"Diretoria", true)+`
     ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}`;
   const voltar=`<button class="btn sec mt no-print" data-voltar="1">‹ Voltar ao painel</button>`;
-  /* v60: sem nada no aparelho, distingue "baixando" e "não conseguiu baixar" de "o motor não gerou nada" */
+  /* v61: sem nada no aparelho, distingue "baixando" e "não conseguiu baixar" de "o motor não gerou nada" */
   if(!relCache.length && (relEstado.carregando||syncOcupado)) return cab+`<div class="cartao">${htmlEstado("carregando",{que:"relatórios"})}</div>`+voltar;
   if(!relCache.length && relEstado.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"os relatórios"},{acao:true})}</div>`+voltar;
   return cab+`
@@ -1938,7 +2017,7 @@ function vRelat(){
     <button class="btn sec mini" data-relnav="ant" ${i<0||i>=ps.length-1?"disabled":""}>‹ anterior</button>
     <span class="cresce centro" style="font-size:.85rem"><b>${relRotuloPer(rel,ini,fim)}</b></span>
     <button class="btn sec mini" data-relnav="prox" ${i<=0?"disabled":""}>próximo ›</button></div>`;
-  /* v60: o vazio nomeia o período e a unidade; o gerente de café mantém o texto da v59 (regra 1) */
+  /* v61: o vazio nomeia o período e a unidade; o gerente de café mantém o texto da v59 (regra 1) */
   const ger=sessao&&sessao.papel==="gerente";
   const vazio=(ger&&atividadeDe(sessao.fazendaId)==="CAFE")
     ?`<p class="mut">Nada calculado para este período na sua unidade.</p>`
@@ -2590,7 +2669,7 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","relatorio","historico","relatorios"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","relatorio","historico","relatorios","farois","farol"].includes(tela) && !podePainel()) tela="entrada";
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
   const app = $("#app");
@@ -2611,6 +2690,8 @@ function ir(tela, arg, manterScroll){
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="relat") app.innerHTML = vRelat();
   else if(tela==="relatorios") app.innerHTML = vRelatorios();
+  else if(tela==="farois") app.innerHTML = vFarois();
+  else if(tela==="farol") app.innerHTML = vFarol(arg);
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
 }
@@ -3928,6 +4009,8 @@ function vPainel(){
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
     ${(()=>{ const nt=relCache.filter(l=>l.texto).length, nn=relCache.filter(l=>!l.texto&&l.unidade_id).length;
       return `<button class="btn mb no-print" id="bt-relatorios-tela">📊 Relatórios${relCache.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nt?nt+" texto"+(nt>1?"s":"")+" para revisar":""}${nt&&nn?" · ":""}${nn?"números prontos":""}</span>`:""}</button>`; })()}
+    ${(()=>{ const uns=farolPorUnidade(), nf=uns.filter(u=>u.n.vermelho).length, na=uns.filter(u=>!u.n.vermelho&&u.n.amarelo).length;
+      return `<button class="btn sec mb no-print" id="bt-farois-tela" style="box-shadow:none;border-radius:0;">Faróis de registro${uns.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nf?nf+" com janela fechada":""}${nf&&na?" · ":""}${na?na+" com janela aberta":""}${!nf&&!na?"tudo em dia":""}</span>`:""}</button>`; })()}
     ${cartaoFarolBoletins()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
@@ -4050,7 +4133,7 @@ function vPainel(){
     <button class="btn sec mt no-print" id="bt-sair">Sair</button>`;
 }
 const escopoKpi=()=>filtroPainel.fazenda?esc(fazenda(filtroPainel.fazenda).nome):"grupo";
-/* v60: vazio da lista de boletins do painel — nomeia cada filtro ativo (atividade, unidade,
+/* v61: vazio da lista de boletins do painel — nomeia cada filtro ativo (atividade, unidade,
    operação, busca, período) e, com unidade escolhida, diz quando foi o último boletim dela */
 function msgVazio(){
   const f=filtroPainel;
@@ -4319,7 +4402,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v60";
+const APP_VERSAO="v61";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5374,9 +5457,9 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); } finally { syncOcupado=false; }
-  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios"].includes(telaAtual))
-    ir(telaAtual, null, true);
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); if(podePainel()) await baixarFarolRegistro(); } finally { syncOcupado=false; }
+  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol"].includes(telaAtual))
+    ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
 function syncStatus(){
   if(!syncAtivo()) return "";
@@ -5722,6 +5805,8 @@ function concluirEnvio(){
 function ligarEventos(tela){
   const app=$("#app");
   if(tela==="cadastros") cadPosRender();
+  if(tela==="farois"){ const b=$("#farol-busca"); if(b) b.oninput=()=>{ farolVista.q=b.value;
+      app.querySelectorAll("[data-farolun]").forEach(el=>{ el.style.display=cadBate(farolVista.q, el.dataset.nome)?"":"none"; }); }; }
   if(tela==="codigo"){ const cod=$("#cod-acesso");
     if(cod) cod.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=$("#bt-cod-entrar"); if(b) b.click(); } }; }
   const marcarChips=(raiz,attr,valor)=>raiz.querySelectorAll("[data-"+attr+"]").forEach(ch=>ch.classList.toggle("on",ch.dataset[attr.replace(/-(.)/g,(m,c)=>c.toUpperCase())]===valor));
@@ -5788,6 +5873,7 @@ function ligarEventos(tela){
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("relatorios"); return; }
     if(t.id==="bt-relatorios-tela"){ ir("relatorios"); return; }
+    if(t.id==="bt-farois-tela"){ ir("farois"); return; }
     if(d.perfil){ const u=D.usuarios.find(x=>x.papel===d.perfil); if(!u) return;
       if(d.perfil==="admin" && !podeCadastros()) return;
       if(d.perfil==="proprietario" && !podePainel()) return;
@@ -5810,7 +5896,7 @@ function ligarEventos(tela){
       else ir("fazendas");
       return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
-    if(d.sync!==undefined){ syncTudo(); ir(telaAtual,null,true); return; } /* "Tentar de novo" do estado de erro (v60): redesenha já em "carregando" */
+    if(d.sync!==undefined){ syncTudo(); ir(telaAtual,null,true); return; } /* "Tentar de novo" do estado de erro (v61): redesenha já em "carregando" */
     if(t.id==="bt-sync-salvar"){
       const u=(app.querySelector("#sync-url")||{}).value||"", k=(app.querySelector("#sync-key")||{}).value||"";
       syncCfg={ url:u.trim().replace(/\/+$/,""), chave:k.trim() };
@@ -5927,6 +6013,8 @@ function ligarEventos(tela){
       Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("casa"); return; }
     if(t.id==="bt-sair"||t.id==="bt-topo-sair"){ sessao=null; Persist.del("bdf:sessao"); ir("entrada"); return; }
     if(d.voltar && telaAtual==="relat" && sessao && sessao.papel!=="gerente"){ ir("relatorios"); return; }
+    if(d.voltar && telaAtual==="farol"){ ir("farois"); return; }
+    if(d.farolun){ ir("farol", d.farolun); return; }
     if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
     if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }

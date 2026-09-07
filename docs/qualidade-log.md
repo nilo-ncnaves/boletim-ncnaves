@@ -6,7 +6,7 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
-## 07/09/2026 · v60 · estados vazios informativos (carregando · erro · vazio com recorte)
+## 07/09/2026 · v61 · estados vazios informativos (carregando · erro · vazio com recorte)
 
 **Entrega.** Função única `fraseVazio` / `htmlEstado` (+ `periodoVazio`,
 `haDias`) no `index.html`; 29 pontos passaram por ela (27 vazios +
@@ -19,9 +19,15 @@ novo", tela do relatório, tabelas dos relatórios, escolha de fazenda e
 absoluto (Lotes, Plano › fazenda com busca, Catálogo com busca,
 Importações manuais, escolha de fazenda); legenda do farol do
 painel "○ faltou" → "○ sem registro"; `relEstado` separa "baixando" e
-"não conseguiu baixar" de "o motor não gerou nada". Docs:
+"não conseguiu baixar" de "o motor não gerou nada". Ao trazer a main
+(v60, Faróis de registro), as duas telas novas de faróis entraram na
+mesma regra: `farolEstado` (carregando / erro com Tentar de novo) e
+vazios "Sem farol baixado para as unidades deste código…", "Sem
+operação com janela nas unidades deste código." e "Sem operação com
+janela em Água Santa." (era "Nenhum farol baixado ainda…" / "Nenhuma
+operação com janela nesta unidade."). Docs:
 `docs/definicao-de-pronto.md` (novo, item 6 = regra permanente),
-CLAUDE.md (item c2), ESTADO.md. Versão v60 (rodapé + cache do sw.js).
+CLAUDE.md (item c2), ESTADO.md. Versão v61 (rodapé + cache do sw.js).
 
 **Verificado (automático, sem rede).**
 - `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
@@ -30,11 +36,14 @@ CLAUDE.md (item c2), ESTADO.md. Versão v60 (rodapé + cache do sw.js).
   "esqueceu", "você ainda" ou "!"; a mais longa com todos os filtros do
   painel ao mesmo tempo tem 120 caracteres (3 linhas — caso extremo com
   5 filtros), as demais ≤ 92 (2 linhas a 390 px).
-- `scripts/regressao_render.cjs` main × branch: 53 telas; café (f23) e
-  pós-colheita idênticos fora o relógio de "Enviado às"; as únicas
-  diferenças reais são as pedidas — casa do gerente de grãos (f33) e de
-  pecuária (f26) com o vazio novo, e a legenda do farol no painel.
-- `scripts/checar-poluicao.cjs`: 209 ✅ · 41 ❌, igual ao retrato da v59
+- `scripts/regressao_render.cjs` main (v60) × branch: 55 telas; café
+  (f23) e pós-colheita idênticos fora o relógio de "Enviado às"; as
+  únicas diferenças reais são as pedidas — casa do gerente de grãos
+  (f33) e de pecuária (f26) com o vazio novo, a legenda do farol no
+  painel e as duas telas de faróis (sem rede a lista mostra o estado de
+  erro com Tentar de novo, que é o correto: o pedido falhou, não
+  "não há dados").
+- `scripts/checar-poluicao.cjs`: 221 ✅ · 41 ❌, igual ao retrato da v60
   (nenhum ❌ novo; nenhum termo de outra atividade nas frases novas).
 - `git grep` pelos termos proibidos nos trechos alterados: nada.
 
@@ -60,6 +69,47 @@ vindo do motor). O enriquecimento com a visão `vw_dias_sem_registro`
 (por operação) fica para o item do backlog "janela por operação e
 farol": hoje não há vazio por operação em tela, e o "último registro"
 do painel usa os boletins já baixados no aparelho.
+
+## 07/09/2026 · v60 · janela e farol de registro na Diretoria
+
+**Entrega.** `sql/042-janela-farol.sql` (tabela `operacao_janela` com
+janelas propostas para grãos e pecuária, visões `vw_dsr_boletim_unidade`
+e `vw_farol_registro`), telas **Faróis de registro** e **unidade** na
+Diretoria (botão no painel), `baixarFarolRegistro` em `syncTudo` só para
+códigos com painel, cenários novos em `scripts/checar-poluicao.cjs` e
+`scripts/regressao_render.cjs`, docs.
+
+**Verificado (automático, sem tocar o Supabase).**
+- SQL 040 + 042 rodados 2× no PostgreSQL local (idempotentes) com
+  boletins de teste: verde (registrado hoje), amarelo (35 dias numa
+  janela 30+10, fecha em 5), vermelho (130 dias numa janela 90+30,
+  fechada há 10), nunca registrado desde o 1º boletim (amarelo com
+  histórico de 130 dias; vermelho com 300), cinza (unidade sem boletim),
+  janela desligada por unidade (sem farol), operação sem janela (sem
+  farol), café sem farol, "vermelho só com janela fechada" e "verde só
+  com registro dentro da cadência" sem violações, nenhum texto proibido,
+  definição sem LIKE, anon lê, 582 linhas — 17 checagens ✅.
+- `node --check` no JavaScript do `index.html`, `sw.js` e nos dois scripts.
+- `scripts/checar-poluicao.cjs` (telas novas medidas com os padrões de
+  Cadastros, com linhas de exemplo no formato da visão) e
+  `scripts/regressao_render.cjs` main × branch: resultado no PR e no
+  ESTADO.md ("Telas × padrões de tela").
+
+**Teste manual (Nilo) — `sql/042` FEITO em 07/09/2026.** Conferência pela
+REST pública logo depois: 10 janelas propostas ativas; 582 combinações
+(café 190 sem janela; grãos 135 sem janela + 1 amarelo + 4 cinza;
+pecuária 171 sem janela + 81 cinza); Capoeira Grande × monitoramento
+amarelo "sem registro desde o 1º boletim (há 7 dias) · janela aberta,
+fecha em 3 dias"; 0 vermelhos com janela aberta; 0 verdes sem registro;
+café sem farol; nenhum texto proibido. Ainda manual:
+- Sincronizar o app com código DIRETORIA ou ADMIN e abrir o painel ›
+  "Faróis de registro".
+- Ajustar as janelas propostas com o agrônomo e o veterinário (SQL no
+  cabeçalho do 042).
+
+**Não tocado.** Telas do gerente e da pós-colheita (idênticas ao main na
+regressão), seções de café, tabelas existentes. O painel da Diretoria
+ganhou um botão; a tela 📊 Relatórios não mudou.
 
 ## 07/09/2026 · v59 · métrica "dias sem registro" (visão no Supabase + leitura no app)
 
