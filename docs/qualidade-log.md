@@ -38,13 +38,13 @@ no `index.html` (sem tela), docs.
 - Vocabulário: `git grep` por "não fez", "atrasad", "pendente" nos
   arquivos novos — nada.
 
-**Depende de teste manual (Nilo).**
-- Rodar o `sql/040` no SQL Editor e conferir a tabelinha final (3
-  linhas: CAFE, GRAOS, PECUARIA). Com o banco de hoje (10 boletins, 1
-  de grãos, 0 de pecuária) só Capoeira Grande × "Plantio / semeadura"
-  terá `dias_sem_registro` numérico; todo o resto sai `nunca_registrado`.
-- Opcional: `sql/041-dias-sem-registro-teste.sql` lista as combinações
-  com registro.
+**Teste manual (Nilo) — FEITO em 07/09/2026.** `sql/040` rodado no SQL
+Editor; conferência pela REST pública logo depois: 75 operações, 90
+apelidos, 582 combinações (café 190, grãos 140, pecuária 252), 0
+violações da regra NULL ≠ 0, Capoeira Grande × "Plantio / semeadura"
+= 7 dias (último boletim 31/08), pecuária toda "sem registro".
+Opcional: `sql/041-dias-sem-registro-teste.sql` lista as combinações
+com registro.
 
 **Não tocado.** Nenhuma tela (gerente, pós-colheita, Diretoria,
 Cadastros), nenhuma seção de café, nenhuma tabela existente do

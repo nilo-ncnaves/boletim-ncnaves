@@ -541,12 +541,12 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Dias sem registro (v59) — para o Nilo:** colar `sql/040-dias-sem-registro.sql`
-  no SQL Editor (passo a passo no cabeçalho; um bloco só, pode repetir).
-  Enquanto não rodar, `baixarDiasSemRegistro` recebe 404 e devolve lista
-  vazia — nada muda no app. Depois, item seguinte do backlog: janela por
-  operação e farol (verde/âmbar/vermelho só com janela fechada) na
-  Diretoria, lendo esta visão.
+- **Dias sem registro (v59):** `sql/040-dias-sem-registro.sql` RODADO
+  pelo Nilo em 07/09/2026 e conferido pela REST (75 operações, 90
+  apelidos, 582 combinações; Capoeira Grande × Plantio / semeadura = 7
+  dias; pecuária toda "sem registro" por não haver boletim). Item
+  seguinte do backlog: janela por operação e farol (verde/âmbar/vermelho
+  só com janela fechada) na Diretoria, lendo esta visão.
 - **Padrão visual P10 — decisão do Nilo:** o CSS-base do app (raio 12
   px, sombra, chips-pílula, botões de 40 px) contraria o padrão visual
   do CLAUDE.md em todas as telas (ver "Telas × padrões de tela"). Trocar
