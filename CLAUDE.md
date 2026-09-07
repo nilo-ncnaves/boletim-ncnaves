@@ -37,6 +37,8 @@ de safra: unidade_manejo, unidade_alias, unidade_manejo_log,
 plano_safra, plano_unidade, plano_adubo_mes, plano_calagem,
 plano_fito_mes, plano_fito_excecao, plano_gantt, plano_parametros
 (o app lê; só a tela de ADMIN escreve).
+Desde a v59: operacao_catalogo, operacao_alias e a visão
+vw_dias_sem_registro (sql/040; o app só lê, sob demanda).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 

@@ -10,7 +10,8 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 - **Fonte**: de onde saem os números. "app" = tabelas do Boletim
   (boletins, pos_colheitas, remessas, telemetria, boletim_pecuaria,
-  codigos_acesso); "iCrop" = icrop_manejo, icrop_fazendas,
+  codigos_acesso; desde a v59 também a visão vw_dias_sem_registro,
+  seção própria abaixo); "iCrop" = icrop_manejo, icrop_fazendas,
   icrop_parcelas (robô da madrugada); "Solinftec" = solinftec_diario
   (robô, integrada desde a v49); "plano v52" = tabelas do plano de
   safra (plano_safra, plano_adubo_mes, plano_calagem, plano_fito_mes,
@@ -150,6 +151,79 @@ entrada + 300 de saída (≈ US$ 0,01); painel ≈ 10 mil + 800 (≈ US$ 0,05);
 alerta ≈ 1 mil + 100. Diário de bordo: `relatorios_reqs` (status e tokens)
 e `relatorios_execucoes`. Erro 401/403 = chave errada (rodar sql/031);
 429 = limite de taxa; "perdido" = resposta não chegou em 6 h.
+
+## Visão `vw_dias_sem_registro` (v59) — dias sem registro por unidade × operação
+
+Métrica de leitura, calculada no Supabase, que diz **há quantos dias uma
+operação não é registrada em uma unidade operacional**. Hoje o farol de
+completude (nº 1) é binário — boletim enviado ou não; esta visão separa
+"3 dias sem registro" de "47 dias sem registro" sem criar ranking entre
+fazendas e sem afirmar que alguém deixou de fazer algo. Arquivo:
+`sql/040-dias-sem-registro.sql` (bloco único, passo a passo no cabeçalho;
+pré-requisito: `sql/020`, já rodado). Conferência opcional:
+`sql/041-dias-sem-registro-teste.sql`.
+
+O que o bloco cria:
+
+| objeto | o que é |
+|---|---|
+| `operacao_catalogo` | catálogo mestre de operações (id imutável `CAFE-…`, `GRAOS-…`, `PEC-…`; atividade, fase, nome, ordem, ativo). Espelho de LISTA_ATIV, OPS_GRAOS_FASES e OPS_PECUARIA_FASES do `index.html`, gerado por `scripts/gerar_catalogo_operacoes.cjs` (75 operações; "Outra" do café fica de fora). Só o SQL Editor escreve. |
+| `operacao_alias` | de-para **texto exato gravado no payload → operacao_id** (origem + termo). 90 apelidos. Mesmo modelo de `unidade_manejo` + `unidade_alias`: identidade é o código, o nome é apelido. Um termo pode apontar para duas operações ("Mudança de pasto" = entrada e saída de lote). |
+| `vw_dsr_registros` | ocorrências extraídas de `boletins.payload`: (unidade, data, origem, termo). Base da visão principal. |
+| `vw_dias_sem_registro` | a métrica, uma linha por unidade ativa × operação ativa da atividade dela. |
+
+Colunas de `vw_dias_sem_registro`:
+
+| coluna | descrição |
+|---|---|
+| `unidade_id` | id da unidade no app (`rel_unidades.id`: f33, f26…) — ids antigos passam por `rel_fz_atual` |
+| `operacao_id` | `operacao_catalogo.id` |
+| `atividade` | CAFE / GRAOS / PECUARIA (a da unidade em `rel_unidades.perfil`) |
+| `operacao_nome`, `fase` | nome e fase do catálogo (só para exibição) |
+| `data_ultimo_registro` | data do boletim mais recente com essa operação nessa unidade; NULL se nunca houve |
+| `dias_sem_registro` | inteiro: hoje (Brasília, `rel_hoje_brt`) − `data_ultimo_registro`; **NULL se nunca houve** |
+| `nunca_registrado` | true quando não há nenhum registro dessa combinação |
+
+**NULL ≠ 0.** `dias_sem_registro = 0` significa "registrado hoje";
+`dias_sem_registro` NULL com `nunca_registrado = true` significa "não há
+histórico nenhum" — são situações diferentes e a visão nunca as confunde
+(nem usa 0, nem um número grande, para a ausência). A visão **não julga**:
+não há coluna de status, farol, atraso ou equivalente; a janela e a cor
+são decisão de outra camada (item futuro do backlog). Não filtra por
+perfil de acesso — isso é da camada de leitura.
+
+De onde vem cada registro (`boletins.payload`, boletins "exemplo" fora):
+
+| origem no payload | termo casado (igualdade exata) | operação |
+|---|---|---|
+| `atividades[].tipo` | nome da LISTA_ATIV (café) / OPS_GRAOS_FASES (grãos) | a própria |
+| `pecuaria.eventos[].tipo` | nome da OPS_PECUARIA_FASES ("Outros manejos") | a própria |
+| `pecuaria.mov[].tipo` | Nascimento · Morte · Desmama · Entrada · Saída · Mudança de pasto | Parto / nascimento · Mortalidade · Desmama · Compra / entrada · Embarque / venda · Rotação de pasto (entrada E saída) |
+| `pecuaria.massa[].tipo` | Vacinação · Vermifugação | Vacinação · Vermifugação |
+| `pecuaria.san[].problema` | Bicheira · Carrapato / mosca em excesso | Cura de bicheira · Controle de carrapato / mosca-do-chifre |
+| `pecuaria.lotes[]` (cabeças > 0) | `*` (basta existir) | Contagem |
+| `pecuaria.nut[]` (insumo preenchido) | `*` | Suplementação |
+| `pecuaria.rep.iatfEtapa` | `*` | IATF |
+| `pecuaria.rep.dgPrenhes` / `dgVazias` (> 0) | `*` | Diagnóstico de gestação |
+
+Nenhuma junção usa LIKE ou pedaço de nome: "Capina" gravado à mão não
+vira "Capina manual". Termo do app que não esteja em `operacao_alias`
+simplesmente não conta — para incluir, inserir o apelido (SQL Editor).
+Termo novo no catálogo do `index.html`: rodar o script gerador e recolar
+o trecho entre os marcadores do `sql/040`. Unidade nova no app: inserir
+em `rel_unidades` (como já vale para o motor).
+
+Consumo no app (v59): `baixarDiasSemRegistro({atividade, unidade})` lê a
+visão pela REST (só unidades do escopo do código, com trava local),
+guarda em `dsrCache` e em `bdf:diasSemRegistro`; `diasSemRegistroDe(unidade,
+operacao)` e `textoDiasSemRegistro(linha)` ("há 12 dias" / "hoje" / "sem
+registro") ficam prontos para telas futuras. Nenhuma tela mostra o número
+ainda e a função não roda na sincronização. Telas de café não leem a
+visão (o café entra nela só como dado, pela mesma regra das outras
+atividades).
+
+REST de leitura (chave publishable, filtros opcionais):
+`rest/v1/vw_dias_sem_registro?select=*&atividade=eq.PECUARIA&unidade_id=eq.f26&order=operacao_id`.
 
 ## Como rodar um relatório PRONTO no Cowork
 
