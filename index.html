@@ -1029,6 +1029,7 @@ async function carregarTudo(){
   try{ const rc=await Persist.get("bdf:relatorios"); relCache=rc?(JSON.parse(rc)||[]):[]; }catch(e){ relCache=[]; }
   /* faróis de registro (v60) — só aparelhos com painel baixam; sem cache a tela diz que não há dados */
   try{ const fc=await Persist.get("bdf:farolRegistro"); const o=fc?JSON.parse(fc):null; farolCache=(o&&Array.isArray(o.linhas))?o.linhas:[]; farolBaixadoEm=(o&&o.em)||""; }catch(e){ farolCache=[]; farolBaixadoEm=""; }
+  try{ const rc=await Persist.get("bdf:ritmoOperacoes"); const o=rc?JSON.parse(rc):null; ritmoCache=Array.isArray(o)?o:[]; }catch(e){ ritmoCache=[]; }
   D.remessas = D.remessas||[];
   D.estruturas = D.estruturas||{};
   D.telemetria = D.telemetria||[];
@@ -1828,6 +1829,55 @@ function textoDiasSemRegistro(l){
   const n=Math.max(0,Math.round(Number(l.dias_sem_registro)||0));
   return n===0?"hoje":"há "+n+(n===1?" dia":" dias");
 }
+/* ---- Intervalo entre operações (v62): leitura das visões vw_intervalo_operacoes e vw_ritmo_operacoes
+   (sql/043). Ritmo = mediana dos dias entre um registro e o anterior da mesma operação na mesma
+   unidade — fecha o par com "dias sem registro" (que olha do último registro até hoje). Um registro
+   é um dia com a operação no boletim da unidade. Só leitura, filtros opcionais
+   {atividade:"GRAOS"|"PECUARIA"|["GRAOS","PECUARIA"], unidade:"f33"}; o app pede só grãos e pecuária
+   (em syncTudo, só códigos com painel) e nenhuma tela de café lê. Na tela: "a cada N dias" quando há
+   mediana (qtd_intervalos > 0); sem intervalo a linha é omitida — nada de "sem ritmo" nem traço. */
+let ritmoCache=[];   /* linhas de vw_ritmo_operacoes (bdf:ritmoOperacoes) */
+async function lerVisaoRitmo(visao, colunas, filtro){
+  if(!syncAtivo()) return [];
+  filtro=filtro||{};
+  try{
+    const esc0=escopoAtual(); if(!esc0) return [];
+    const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
+    if(!tudo && !ids.length) return [];
+    if(filtro.unidade && !tudo && !ids.includes(filtro.unidade)) return [];
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    let url=syncCfg.url+"/rest/v1/"+visao+"?select="+colunas+"&order=unidade_id,operacao_id&limit=5000";
+    const atv=Array.isArray(filtro.atividade)?filtro.atividade:(filtro.atividade?[filtro.atividade]:[]);
+    if(atv.length===1) url+="&atividade=eq."+encodeURIComponent(atv[0]);
+    else if(atv.length) url+="&atividade=in.("+atv.map(encodeURIComponent).join(",")+")";
+    if(filtro.unidade) url+="&unidade_id=eq."+encodeURIComponent(filtro.unidade);
+    else if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
+    const r=await fetch(url,cab); if(!r.ok) return [];
+    const linhas=await r.json(); if(!Array.isArray(linhas)) return [];
+    /* trava: unidade fora do escopo nunca fica no aparelho, venha o que vier do banco */
+    return linhas.filter(l=>l && l.unidade_id && l.operacao_id && (tudo || ids.includes(l.unidade_id)) && (!atv.length || atv.includes(l.atividade)));
+  }catch(e){ return []; }
+}
+/* pares consecutivos (uma linha por registro; intervalo_dias NULL no primeiro) — sob demanda, sem cache */
+const baixarIntervaloOperacoes=filtro=>lerVisaoRitmo("vw_intervalo_operacoes","unidade_id,operacao_id,atividade,data_registro,data_registro_anterior,intervalo_dias,lancamentos_no_dia",filtro);
+/* resumo por unidade × operação: guarda em ritmoCache (só as linhas do filtro são trocadas) */
+async function baixarRitmoOperacoes(filtro){
+  filtro=filtro||{};
+  const ok=await lerVisaoRitmo("vw_ritmo_operacoes","unidade_id,operacao_id,atividade,qtd_registros,qtd_intervalos,intervalo_mediano_dias,intervalo_minimo_dias,intervalo_maximo_dias,data_ultimo_registro",filtro);
+  if(!ok.length) return [];
+  const atv=Array.isArray(filtro.atividade)?filtro.atividade:(filtro.atividade?[filtro.atividade]:[]);
+  const dentro=l=>(!filtro.unidade || l.unidade_id===filtro.unidade) && (!atv.length || atv.includes(l.atividade));
+  ritmoCache=ritmoCache.filter(l=>!dentro(l)).concat(ok);
+  await Persist.set("bdf:ritmoOperacoes", JSON.stringify(ritmoCache));
+  return ok;
+}
+const ritmoDe=(unidade,operacao)=>ritmoCache.find(l=>l.unidade_id===unidade && l.operacao_id===operacao)||null;
+/* texto para tela: "a cada 18 dias" só com mediana calculável (2 registros ou mais); senão "" e a linha é omitida */
+function textoRitmo(l){
+  if(!l || !(Number(l.qtd_intervalos)>0) || l.intervalo_mediano_dias===null || l.intervalo_mediano_dias===undefined) return "";
+  const n=Math.round(Number(l.intervalo_mediano_dias)); if(!(n>=1)) return "";
+  return "a cada "+n+(n===1?" dia":" dias");
+}
 /* ---- Faróis de registro (v60): janela por operação + farol, calculados no Supabase
    (vw_farol_registro, sql/042). Só Diretoria/ADMIN; o gerente nunca baixa nem vê.
    verde = registrado na cadência · amarelo = sem registro, janela aberta ·
@@ -1868,7 +1918,7 @@ function farolPorUnidade(){
   return Object.values(uns).map(u=>{ u.pior=["vermelho","amarelo","cinza","verde"].find(k=>u.n[k])||"verde"; u.nome=fazenda(u.id).nome; return u; })
     .sort((a,b)=>FAROL_ORDEM[a.pior]-FAROL_ORDEM[b.pior] || a.nome.localeCompare(b.nome,"pt-BR"));
 }
-const farolRodape=()=>`<p class="mut" style="font-size:.72rem;margin-top:12px">Calculado no Supabase (janelas em operacao_janela, sql/042); o app só mostra. ${farolBaixadoEm?"Baixado em "+new Date(farolBaixadoEm).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""} Vermelho só depois de a janela fechar. "Sem registro" não quer dizer que não foi feito — quer dizer que não está no boletim.</p>`;
+const farolRodape=comRitmo=>`<p class="mut" style="font-size:.72rem;margin-top:12px">Calculado no Supabase (janelas em operacao_janela, sql/042); o app só mostra. ${farolBaixadoEm?"Baixado em "+new Date(farolBaixadoEm).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""} Vermelho só depois de a janela fechar. "Sem registro" não quer dizer que não foi feito — quer dizer que não está no boletim.${comRitmo?" Ritmo = mediana dos dias entre um registro e o anterior da mesma operação (vw_ritmo_operacoes, sql/043); só aparece com dois registros ou mais.":""}</p>`;
 function vFarois(){
   const uns=farolPorUnidade();
   const grupos=[["GRAOS","🌾 Grãos"],["PECUARIA","🐂 Pecuária"],["CAFE","☕ Café"]].map(([k,r])=>[r,uns.filter(u=>u.atividade===k)]).filter(([,l])=>l.length);
@@ -1895,13 +1945,15 @@ function vFarol(un){
   const f=fazenda(un), ls=farolLinhas().filter(l=>l.unidade_id===un);
   const comJ=ls.filter(l=>l.farol).sort((a,b)=>FAROL_ORDEM[a.farol]-FAROL_ORDEM[b.farol] || String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
   const semJ=ls.filter(l=>!l.farol).sort((a,b)=>String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
-  const linha=l=>`<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
-      <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}</span></span></div>`;
+  /* v62: ritmo observado ("a cada N dias", mediana entre registros) só em grãos e pecuária e só com 2 registros ou mais; senão nada */
+  const ritmo=l=>l.atividade==="CAFE"?"":textoRitmo(ritmoDe(l.unidade_id,l.operacao_id));
+  const linha=l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
+      <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}${rt?" · ritmo: "+esc(rt):""}</span></span></div>`; };
   return topo(f.nome||un, "Faróis de registro", true)+`
     ${comJ.length?comJ.map(linha).join(""):`<div class="cartao">${htmlEstado("vazio",{que:"operação com janela",unidade:un})}</div>`}
     ${semJ.length?`<details class="cad-bloco"><summary>Operações sem janela <span class="mut num">· ${semJ.length}</span></summary><div class="corpo" style="padding:0">
-      ${semJ.map(l=>`<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b></span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`).join("")}</div></details>`:""}
-    ${farolRodape()}
+      ${semJ.map(l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b>${rt?`<span class="mut">ritmo: ${esc(rt)}</span>`:""}</span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`; }).join("")}</div></details>`:""}
+    ${farolRodape(ls.some(l=>l.atividade!=="CAFE"))}
     <button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar aos faróis</button>`;
 }
 const relLinhas=(rel,ini,fim)=>relCache.filter(l=>l.relatorio===rel && (!ini || (l.periodo_ini===ini && l.periodo_fim===fim)));
@@ -4402,7 +4454,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v61";
+const APP_VERSAO="v62";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5457,7 +5509,7 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); if(podePainel()) await baixarFarolRegistro(); } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes({atividade:["GRAOS","PECUARIA"]}); } } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol"].includes(telaAtual))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }

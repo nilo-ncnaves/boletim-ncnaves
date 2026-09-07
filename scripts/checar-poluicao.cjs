@@ -278,6 +278,8 @@ async function cenarioDiretoria(browser, base, R) {
       return OPS[atv].map(([id, nome, c, tol], i) => { const e = EX[(i + k) % 4]; return { unidade_id: f.id, operacao_id: id, atividade: atv, operacao_nome: nome, fase: null, data_ultimo_registro: '2026-08-20', dias_sem_registro: e[0], nunca_registrado: false, primeiro_boletim: '2026-07-01', cadencia_dias: c, tolerancia_dias: tol, janela_origem: c ? 'proposta' : null, farol: c ? e[1] : null, fecha_em_dias: c ? 2 : null, situacao: c ? e[2] : null }; });
     });
     farolBaixadoEm = '2026-09-07T12:00:00Z';
+    /* v62: ritmo observado (vw_ritmo_operacoes) — linhas de exemplo só para grãos e pecuária; a 2ª operação de cada unidade fica sem intervalo (linha omitida) */
+    ritmoCache = farolCache.map((l, i) => ({ unidade_id: l.unidade_id, operacao_id: l.operacao_id, atividade: l.atividade, qtd_registros: i % 2 ? 1 : 6, qtd_intervalos: i % 2 ? 0 : 5, intervalo_mediano_dias: i % 2 ? null : 7 + (i % 3) * 5, intervalo_minimo_dias: i % 2 ? null : 5, intervalo_maximo_dias: i % 2 ? null : 30, data_ultimo_registro: '2026-08-20' }));
     ir('farois');
   }); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria › Faróis de registro', 'cadastros', { tipo: 'lista', niveis: 2 }));

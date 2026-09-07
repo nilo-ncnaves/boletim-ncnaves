@@ -10,8 +10,9 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 
 - **Fonte**: de onde saem os números. "app" = tabelas do Boletim
   (boletins, pos_colheitas, remessas, telemetria, boletim_pecuaria,
-  codigos_acesso; desde a v59 a visão vw_dias_sem_registro e, na v60,
-  operacao_janela + vw_farol_registro — seções próprias abaixo); "iCrop" = icrop_manejo, icrop_fazendas,
+  codigos_acesso; desde a v59 a visão vw_dias_sem_registro, na v60
+  operacao_janela + vw_farol_registro e, na v62, vw_intervalo_operacoes +
+  vw_ritmo_operacoes — seções próprias abaixo); "iCrop" = icrop_manejo, icrop_fazendas,
   icrop_parcelas (robô da madrugada); "Solinftec" = solinftec_diario
   (robô, integrada desde a v49); "plano v52" = tabelas do plano de
   safra (plano_safra, plano_adubo_mes, plano_calagem, plano_fito_mes,
@@ -273,6 +274,111 @@ unidade, pior cor manda, busca) e **unidade** (`farol`: operações com
 janela ordenadas por cor; "Operações sem janela" fechado embaixo), abertas
 pelo botão "Faróis de registro" do painel da Diretoria. O gerente não baixa
 nem vê. REST: `rest/v1/vw_farol_registro?select=*&farol=not.is.null&order=unidade_id`.
+
+## Intervalo entre operações — `vw_intervalo_operacoes` + `vw_ritmo_operacoes` (v62)
+
+Métrica de leitura, calculada no Supabase, que diz **de quanto em quanto
+tempo uma operação vem sendo registrada em uma unidade operacional** — o
+ritmo. Vem do rodapé de cada manejo do app Sigma (Fundação ABC):
+"Intervalo de 35 dias entre manejos". Arquivo:
+`sql/043-intervalo-operacoes.sql` (bloco único, passo a passo no
+cabeçalho; pré-requisitos: `sql/020` e `sql/040`, já rodados). Conferência
+opcional: `sql/044-intervalo-operacoes-teste.sql`. Não cria tabela nem
+grava nada: são duas visões.
+
+### Não confundir com "dias sem registro"
+
+| métrica | olha para | mede | muda quando |
+|---|---|---|---|
+| `dias_sem_registro` (v59, `vw_dias_sem_registro`) | do **último registro até hoje** | a lacuna corrente, **aberta** | todo dia, mesmo sem boletim novo |
+| `intervalo_dias` (v62, `vw_intervalo_operacoes`) | entre **dois registros consecutivos do passado** | o ritmo histórico, **fechado** | só quando entra um registro novo |
+
+Uma unidade pode ter ritmo mediano de 20 dias e estar há 3 dias sem
+registro (normal) ou há 60 dias sem registro (vale olhar). O par das duas
+diz mais que qualquer uma sozinha; em relatório, as duas vêm lado a lado e
+nunca uma no lugar da outra. `data_ultimo_registro` é a mesma nas duas
+visões (conferido).
+
+### O que é um registro
+
+Um **dia** em que a operação aparece no boletim da unidade. O boletim é um
+por unidade por dia (índice único `fazenda_id` + `data`); a mesma operação
+lançada em vários talhões, lotes ou pastos do mesmo boletim é o **mesmo
+registro do dia** — a coluna `lancamentos_no_dia` guarda quantos foram.
+Por isso `intervalo_dias = 0` não acontece com o app de hoje. Se um dia
+dois boletins da mesma unidade caírem na mesma data (ids antigos que
+apontam para a mesma unidade, por exemplo), continuam sendo um registro
+do dia: nada é descartado como erro. Contar cada lançamento em vez de cada
+dia faria a mediana de uma unidade com 4 pivôs (4 lançamentos de fungicida
+no mesmo boletim) cair para 0 — testado: 0 por lançamento contra 14 por
+dia — e o ritmo mentiria.
+
+### Objetos e colunas
+
+| objeto | o que é |
+|---|---|
+| `vw_intervalo_operacoes` | uma linha por registro (dia) de cada unidade × operação, com o registro anterior da mesma combinação. Base: `vw_dsr_registros` + `operacao_alias` (mesma extração da v59, nada repetido) filtrada por `operacao_catalogo.ativo` e `rel_unidades.ativo` com a atividade no perfil da unidade (mesmas combinações da `vw_dias_sem_registro`). `LAG()` particionado por unidade e operação, ordenado por data. |
+| `vw_ritmo_operacoes` | agrega a anterior: uma linha por unidade × operação **com pelo menos um registro**. |
+
+Colunas de `vw_intervalo_operacoes`:
+
+| coluna | descrição |
+|---|---|
+| `unidade_id` | `rel_unidades.id` (ids antigos passam por `rel_fz_atual`) |
+| `operacao_id` | `operacao_catalogo.id` |
+| `atividade` | CAFE / GRAOS / PECUARIA (a da operação no catálogo, igual à do perfil da unidade) |
+| `data_registro` | data do boletim com a operação |
+| `data_registro_anterior` | data do registro imediatamente anterior da mesma combinação; **NULL no primeiro** |
+| `intervalo_dias` | `data_registro − data_registro_anterior`; **NULL no primeiro registro** (nunca 0 no lugar de "não há anterior") |
+| `lancamentos_no_dia` | quantos lançamentos da operação havia naquele boletim (talhões, lotes, pastos) |
+
+Colunas de `vw_ritmo_operacoes`:
+
+| coluna | descrição |
+|---|---|
+| `unidade_id`, `operacao_id`, `atividade` | identificação, como acima |
+| `qtd_registros` | total de registros (dias) da combinação |
+| `qtd_intervalos` | total de intervalos observados = `qtd_registros − 1` |
+| `intervalo_mediano_dias` | **mediana** dos intervalos (`percentile_cont(0.5)`, 1 casa decimal); NULL com menos de 2 registros |
+| `intervalo_minimo_dias`, `intervalo_maximo_dias` | menor e maior intervalo; NULL com menos de 2 registros |
+| `data_ultimo_registro` | data mais recente |
+
+**Mediana, não média.** Um único intervalo longo (paralisação por chuva,
+troca de equipe) puxa a média para cima e ela passa a mentir sobre o ritmo
+típico; a mediana não se mexe. Exemplo testado: roçada em −60, −50, −40 e
+−3 dias → intervalos 10, 10 e 37 → mediana 10, média 19. Mínimo e máximo
+vão junto para quem quiser ver a faixa.
+
+**Amostra de 1 não vira estatística.** Combinação com um registro só traz
+`qtd_intervalos = 0` e as três colunas de intervalo NULL — nada é
+fabricado sobre amostra que não existe (o erro do Sigma ao desenhar dois
+pontos como série).
+
+**As visões não julgam.** Não há coluna de status, farol, "atrasado",
+"fora do padrão" nem "ritmo esperado": não existe padrão cadastrado e
+inventá-lo seria prescrição. Janela e cor continuam na `vw_farol_registro`
+(v60). Não filtram por perfil de acesso (isso é da camada de leitura) e
+café entra só como dado, pela mesma regra das três atividades — nenhuma
+tela de café lê. Nenhuma junção usa LIKE ou pedaço de nome. Nenhum texto
+compara unidades ou fazendas.
+
+Consumo no app (v62): `baixarRitmoOperacoes({atividade, unidade})` lê a
+visão de resumo pela REST (só unidades do escopo, com trava local; a
+atividade pode ser uma ou uma lista), guarda em `ritmoCache` /
+`bdf:ritmoOperacoes`; `baixarIntervaloOperacoes(filtro)` lê os pares sob
+demanda, sem cache; `ritmoDe(unidade, operacao)` e `textoRitmo(linha)`
+("a cada 18 dias"; vazio quando `qtd_intervalos = 0`) servem as telas. Em
+`syncTudo`, só códigos com painel baixam, e só GRAOS e PECUARIA. Onde
+aparece: Diretoria › Faróis de registro › unidade, como texto secundário
+"ritmo: a cada N dias" ao lado de "sem registro há N dias" — as duas
+métricas juntas — apenas em unidades de grãos e pecuária e apenas com dois
+registros ou mais; sem intervalo a linha é omitida (nada de "sem ritmo" ou
+traço). A tela de uma unidade de café e a lista de Faróis ficaram
+idênticas à v61.
+
+REST de leitura (chave publishable, filtros opcionais):
+`rest/v1/vw_ritmo_operacoes?select=*&atividade=in.(GRAOS,PECUARIA)&unidade_id=eq.f33&order=operacao_id`
+e `rest/v1/vw_intervalo_operacoes?select=*&unidade_id=eq.f33&operacao_id=eq.GRAOS-FUNGICIDA&order=data_registro`.
 
 ## Como rodar um relatório PRONTO no Cowork
 
