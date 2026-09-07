@@ -6,6 +6,77 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 07/09/2026 · v62 · intervalo entre operações (ritmo por unidade × operação)
+
+**Entrega.** `sql/043-intervalo-operacoes.sql` (visões
+`vw_intervalo_operacoes` — `LAG()` por unidade × operação, uma linha por
+registro com o anterior — e `vw_ritmo_operacoes` — mediana, mínimo,
+máximo, contagens, último registro), `sql/044-intervalo-operacoes-teste.sql`
+(conferência opcional), funções de leitura `baixarRitmoOperacoes` /
+`baixarIntervaloOperacoes` / `ritmoDe` / `textoRitmo` no `index.html`,
+texto secundário "ritmo: a cada N dias" em Diretoria › Faróis de registro
+› unidade (só grãos e pecuária, só com dois registros ou mais), cenário
+com linhas de ritmo em `scripts/checar-poluicao.cjs`, docs (relatorios.md
+com a distinção dias_sem_registro × intervalo_dias e o porquê da
+mediana; ESTADO.md; CLAUDE.md). Versão v62 (rodapé + cache do sw.js).
+Decisão de modelagem registrada: um registro é um DIA com a operação no
+boletim (vários talhões no mesmo boletim = mesmo registro), porque contar
+cada lançamento faria a mediana de uma unidade com 4 pivôs cair para 0
+(testado: 0 por lançamento × 14 por dia).
+
+**Verificado (automático, sem tocar o Supabase).**
+- Bloco SQL rodado 2× num PostgreSQL 16 local com `rel_unidades`,
+  `rel_fz_atual`, `rel_hoje_brt`, `rel_num` copiados do `sql/020`, uma
+  tabela `boletins` igual à do app e o `sql/040` aplicado antes: sem erro,
+  idempotente. 12 checagens com 17 boletins de teste (grãos com fungicida
+  em 4 pivôs a cada 14 dias, plantio único, pecuária com roçada em −60,
+  −50, −40, −3 e contagem 3 dias seguidos, café, id antigo f19 + f03c no
+  mesmo dia, boletim "exemplo", payload malformado, "Capina" solta): linhas
+  para GRAOS e PECUARIA; primeiro registro de cada combinação com
+  anterior NULL e intervalo NULL (0 violações; 0 intervalos zero);
+  combinação com 1 registro → qtd_intervalos 0 e três estatísticas NULL
+  (0 violações); mediana 10 contra média 19 na roçada; qtd_intervalos =
+  qtd_registros − 1, mínimo ≤ mediana ≤ máximo e data_ultimo = max em
+  todas; café entra como dado (Colheita a cada 7 dias) e f19 + f03c no
+  mesmo dia viram 1 registro com 2 lançamentos; exemplo, malformado e
+  "Capina" não contam; colunas exatas, nenhuma com status/alerta/atraso/
+  farol/esperado; definição sem LIKE/ILIKE/regex/nome; mesma
+  data_ultimo_registro da `vw_dias_sem_registro` em toda combinação e
+  nenhuma combinação fora dela; papel anon lê.
+- `node --check` no JavaScript extraído do `index.html`, no `sw.js` e no
+  `scripts/checar-poluicao.cjs`.
+- Prova Playwright (sem rede, main × branch, mesmas linhas injetadas nos
+  caches, inclusive ritmo de CAFÉ de propósito): tela Faróis › unidade de
+  café e lista de Faróis byte a byte iguais à main, sem "ritmo"/"a cada";
+  grãos mostra "ritmo: a cada 7 dias" (mediana 6,5 arredondada) na
+  operação com janela e "a cada 14 dias" na sem janela, e nada — nem
+  traço — na operação com 1 registro; pecuária idem; nenhum termo
+  proibido; nenhum texto comparando unidades. A primeira rodada pegou a
+  frase nova do rodapé vazando para a unidade de café; foi restrita a
+  grãos/pecuária e a prova passou.
+- `scripts/checar-poluicao.cjs`: 221 ✅ · 41 ❌, igual ao retrato da v61
+  (nenhum ❌ novo); Faróis › unidade com as linhas de ritmo: 1 tela, ✅.
+- `scripts/regressao_render.cjs` main (v61) × branch: telas do gerente
+  (café, grãos, pecuária), pós-colheita, Diretoria e Cadastros idênticas
+  fora o rodapé de versão e horários (offline as telas de faróis mostram
+  o estado de erro nas duas versões).
+- `git grep` por "não fez", "não realizou", "pendente", "atrasad",
+  "ranking", "melhor que" nos trechos novos: nada.
+
+**Teste manual (Nilo).** Rodar `sql/043` no SQL Editor (a tabelinha final
+mostra, por atividade, quantas combinações têm registro e quantas já têm
+ritmo). Opcional: `sql/044`. Com código DIRETORIA/ADMIN, sincronizar e
+abrir painel › Faróis de registro › uma unidade de grãos ou pecuária: com
+o banco de 07/09/2026 quase nenhuma combinação tem dois registros, então
+a linha de ritmo deve ser rara ou ausente — é o esperado, não erro.
+
+**Não tocado.** Telas do gerente (as três atividades) e da pós-colheita,
+casa do gerente, painel da Diretoria, tela 📊 Relatórios, lista de Faróis,
+tela de unidade de café nos Faróis, `vw_dias_sem_registro` /
+`vw_farol_registro` e demais objetos do sql/040 e 042, tabelas existentes,
+catálogos. Nenhum campo novo de digitação; nenhuma linguagem de produto ou
+dose; nenhum ranking, custo ou push.
+
 ## 07/09/2026 · v61 · estados vazios informativos (carregando · erro · vazio com recorte)
 
 **Entrega.** Função única `fraseVazio` / `htmlEstado` (+ `periodoVazio`,

@@ -40,7 +40,9 @@ plano_fito_mes, plano_fito_excecao, plano_gantt, plano_parametros
 Desde a v59: operacao_catalogo, operacao_alias e a visão
 vw_dias_sem_registro (sql/040; o app só lê, sob demanda). Desde a v60:
 operacao_janela e a visão vw_farol_registro (sql/042; só aparelhos com
-painel baixam).
+painel baixam). Desde a v62: as visões vw_intervalo_operacoes e
+vw_ritmo_operacoes (sql/043; ritmo entre registros, só leitura, só
+grãos e pecuária no app).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 

@@ -523,6 +523,44 @@ filtro, sem imputar omissão.
   Enriquecer com `vw_dias_sem_registro` (por operação) fica para o
   item "janela por operação e farol".
 
+## Intervalo entre operações (v62) — ritmo por unidade × operação
+A outra metade da métrica da v59: **de quanto em quanto tempo** uma
+operação vem sendo registrada em uma unidade (ideia do rodapé de manejo do
+app Sigma, Fundação ABC). Detalhe em `docs/relatorios.md`, seção
+"Intervalo entre operações". Não confundir: `dias_sem_registro` olha do
+último registro até hoje (lacuna aberta); `intervalo_dias` olha entre dois
+registros consecutivos do passado (ritmo fechado). Ritmo de 20 dias com 3
+dias sem registro é normal; com 60, vale olhar.
+- **Supabase** (`sql/043-intervalo-operacoes.sql`, bloco único com passo a
+  passo; precisa dos sql/020 e 040; conferência opcional em `sql/044`):
+  `vw_intervalo_operacoes` (uma linha por registro com o anterior da mesma
+  unidade × operação: data_registro, data_registro_anterior,
+  intervalo_dias, lancamentos_no_dia; `LAG()` por unidade e operação) e
+  `vw_ritmo_operacoes` (qtd_registros, qtd_intervalos, **mediana** — não
+  média —, mínimo, máximo, data_ultimo_registro). Base é a
+  `vw_dsr_registros` + `operacao_alias` da v59 (nada de extração
+  repetido); mesmas combinações da `vw_dias_sem_registro`. **Um registro
+  = um dia** com a operação no boletim da unidade (vários talhões no
+  mesmo boletim = mesmo registro; `lancamentos_no_dia` guarda quantos).
+  **Primeiro registro = intervalo NULL**, nunca 0; **1 registro só =
+  qtd_intervalos 0 e estatísticas NULL**. Sem status, alerta, atraso ou
+  "ritmo esperado" (não há padrão cadastrado; seria prescrição). Leitura
+  anon herdada, security_invoker, nenhuma escrita. Café entra só como
+  dado; nenhuma tela de café lê.
+- **App**: `baixarRitmoOperacoes({atividade, unidade})` (cache
+  `ritmoCache` / `bdf:ritmoOperacoes`; em `syncTudo` só para códigos com
+  painel e só GRAOS + PECUARIA), `baixarIntervaloOperacoes` (pares, sob
+  demanda), `ritmoDe`, `textoRitmo` ("a cada 18 dias"; vazio sem
+  intervalo). Única tela: **Diretoria › Faróis de registro › unidade**
+  ganha o texto secundário "ritmo: a cada N dias" na linha da operação
+  (com janela: depois da janela; sem janela: abaixo do nome), só em
+  unidades de grãos e pecuária e só com dois registros ou mais — sem
+  intervalo a linha é omitida (nada de "sem ritmo" nem traço); o rodapé
+  explica o ritmo só nessas unidades. Tela de unidade de café e lista de
+  Faróis idênticas à v61 (prova com linhas de ritmo de café no cache:
+  nada aparece). Gerente não baixa nem vê. Nenhum campo novo.
+- Versão v62 (rodapé + cache do sw.js).
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -546,11 +584,12 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v61, 07/09/2026:
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v62, 07/09/2026:
 **221 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
 telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
 os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
-seção nova). Esta lista é o retrato dos ❌ herdados: cada tarefa
+seção nova; a v62 acrescentou um texto secundário "ritmo: a cada N dias"
+em Faróis › unidade, medido com linhas de exemplo de ritmo: 1 tela, ✅). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -614,7 +653,9 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 - Diretoria › Faróis de registro (v60, medida como Cadastros): lista 1,5
   telas com busca ✅ (14 unidades > 12 → busca) · nível 2 ✅ · cabeçalho
   fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
-  só leitura ✅ · nível 3 ✅ · "Operações sem janela" fechado ✅.
+  só leitura ✅ · nível 3 ✅ · "Operações sem janela" fechado ✅ · v62:
+  "ritmo: a cada N dias" como texto secundário, sem campo, chip ou seção
+  nova, omitido sem intervalo ✅.
 - Cadastros (25 telas medidas: menu, 11 assuntos, detalhes e "novo"):
   P2 níveis ≤ 3 ✅ em todas · P3 altura ≤ 2 telas ou busca ✅ em todas
   (Talhões 2,0 telas com busca) · P3 lista > 12 com busca ✅ (Fazendas
@@ -640,6 +681,15 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Intervalo entre operações (v62) — para o Nilo:** rodar
+  `sql/043-intervalo-operacoes.sql` no SQL Editor (bloco único; passo a
+  passo no cabeçalho; só cria duas visões). Depois, opcional,
+  `sql/044-intervalo-operacoes-teste.sql` lista o ritmo ao lado dos dias
+  sem registro. No app, com código DIRETORIA/ADMIN: sincronizar e abrir
+  painel › Faróis de registro › uma unidade de grãos ou pecuária — a
+  linha "ritmo: a cada N dias" só aparece onde já há dois registros ou
+  mais (com o banco de 07/09/2026, quase nada ainda). Sem o SQL rodado o
+  app segue igual (a leitura falha em silêncio e nada aparece).
 - **Estados vazios (v61) — para o Nilo:** revisar as frases (lista no
   PR da v61 e em docs/qualidade-log.md) e decidir sobre "Boletim de
   hoje pendente" / "Registro de hoje pendente" nas casas do gerente e
