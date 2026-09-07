@@ -33,6 +33,8 @@ h1{font-size:1.35rem;font-weight:800;letter-spacing:-.01em}
 h2{font-size:1.1rem;font-weight:800;letter-spacing:-.01em}
 h3{font-size:.95rem;font-weight:700}
 .mut{color:var(--tinta-2);font-size:.88rem}
+.origem-dado{font-size:.75rem;margin-top:6px}       /* v63: de quando é o dado de integração (rodapé do bloco) */
+.origem-dado.velho{color:var(--amarelo)}            /* sem sucesso do robô há mais de 26 h: cor de atenção, só isso */
 .num{font-variant-numeric:tabular-nums}
 #app{max-width:520px;margin:0 auto;padding:0 14px 90px}
 #app.largo{max-width:860px}
@@ -1030,6 +1032,8 @@ async function carregarTudo(){
   /* faróis de registro (v60) — só aparelhos com painel baixam; sem cache a tela diz que não há dados */
   try{ const fc=await Persist.get("bdf:farolRegistro"); const o=fc?JSON.parse(fc):null; farolCache=(o&&Array.isArray(o.linhas))?o.linhas:[]; farolBaixadoEm=(o&&o.em)||""; }catch(e){ farolCache=[]; farolBaixadoEm=""; }
   try{ const rc=await Persist.get("bdf:ritmoOperacoes"); const o=rc?JSON.parse(rc):null; ritmoCache=Array.isArray(o)?o:[]; }catch(e){ ritmoCache=[]; }
+  /* estado das integrações (v63) — de quando é o dado do iCrop/Solinftec; sem cache nenhuma linha de origem aparece */
+  try{ const si=await Persist.get("bdf:statusIntegracoes"); const o=si?JSON.parse(si):null; statusIntegracoes=Array.isArray(o)?o:[]; }catch(e){ statusIntegracoes=[]; }
   D.remessas = D.remessas||[];
   D.estruturas = D.estruturas||{};
   D.telemetria = D.telemetria||[];
@@ -1713,7 +1717,7 @@ function cartaoSolinftecGerente(fz){
   const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
   return `<div class="cartao"><h3>📡 Solinftec — medição automática do dia</h3>
     ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p></div>`;
+    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${perfilDe(fz).includes("CAFE")?"":linhaOrigemDado("solinftec")}</div>`;
 }
 function cartaoSolinftecPainel(){
   if(!SOLINFTEC_AUTO) return "";
@@ -1728,6 +1732,66 @@ function cartaoSolinftecPainel(){
   return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
     ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
     <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
+}
+/* ---- Estado das integrações (v63): leitura da visão vw_status_integracoes (sql/045) ----
+   Uma linha por fonte externa (icrop, solinftec) com três horários que NÃO se misturam:
+   ultima_execucao_em (última TENTATIVA do robô), ultima_execucao_ok_em (último SUCESSO: a API de
+   origem respondeu OK) e ultimo_dado_em (última GRAVAÇÃO de dado no Supabase), mais
+   ultimo_dado_origem (dia a que o dado se refere). Tudo chega em UTC; a conversão para Brasília
+   é feita aqui, com America/Sao_Paulo explícito (o gerente está em Monte Carmelo). Só leitura, na
+   sincronização; sem a visão (404) ou sem rede fica o último baixado; sem cache nenhuma linha de
+   origem aparece e as telas ficam exatamente como antes. Aparelho só de café não baixa nem mostra
+   (regra 1). Regra: "Dados do iCrop de hoje, 04:05" no rodapé de cada bloco de dado externo; com
+   mais de ORIGEM_LIMIAR_H horas sem sucesso do robô a linha vira "Última atualização do iCrop há N
+   dias" em cor de atenção — sem ícone, sem exclamação, sem bloquear. Nunca "agora" nem "tempo real". */
+let statusIntegracoes=[];   /* linhas de vw_status_integracoes (bdf:statusIntegracoes) */
+const ORIGEM_LIMIAR_H=26;   /* uma janela diária inteira + folga */
+const ORIGEM_FONTES={ icrop:{nome:"iCrop", de:"do"}, solinftec:{nome:"Solinftec", de:"da"} };
+const FUSO_BRT="America/Sao_Paulo";
+async function baixarStatusIntegracoes(){
+  if(!syncAtivo()) return [];
+  try{
+    const uns=unidadesPermitidas();
+    if(uns.length && uns.every(f=>perfilDe(f.id).includes("CAFE"))) return [];   /* aparelho só de café: nenhuma tela lê */
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    const r=await fetch(syncCfg.url+"/rest/v1/vw_status_integracoes?select=fonte,ultima_execucao_em,ultima_execucao_ok_em,ultimo_dado_em,ultimo_dado_origem,horas_desde_ultimo_sucesso&order=fonte", cab);
+    if(!r.ok) return [];
+    const linhas=await r.json(); if(!Array.isArray(linhas)) return [];
+    statusIntegracoes=linhas.filter(l=>l && ORIGEM_FONTES[l.fonte]);
+    await Persist.set("bdf:statusIntegracoes", JSON.stringify(statusIntegracoes));
+    return statusIntegracoes;
+  }catch(e){ return []; }
+}
+const statusFonte=fonte=>statusIntegracoes.find(l=>l && l.fonte===fonte)||null;
+/* horas desde o último sucesso, contadas no aparelho (o número da visão envelhece no cache) */
+function horasSemSucesso(l){
+  if(!l) return null;
+  const ok=l.ultima_execucao_ok_em?new Date(l.ultima_execucao_ok_em):null;
+  if(ok && !isNaN(ok)) return (Date.now()-ok.getTime())/36e5;
+  return (l.horas_desde_ultimo_sucesso==null)?null:Number(l.horas_desde_ultimo_sucesso);
+}
+/* data (AAAA-MM-DD) e hora em Brasília, explícitas — o banco manda UTC */
+const diaBRT=d=>new Date(d).toLocaleDateString("sv-SE",{timeZone:FUSO_BRT});
+const fmtDHBRT=s=>{ if(!s) return "—"; const d=new Date(s); return isNaN(d)?"—":d.toLocaleString("pt-BR",{timeZone:FUSO_BRT,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+/* texto da linha de origem: {texto, velho} ou null quando não há o que dizer */
+function textoOrigemDado(fonte){
+  const l=statusFonte(fonte), f=ORIGEM_FONTES[fonte];
+  if(!l || !f || !l.ultimo_dado_em) return null;
+  const horas=horasSemSucesso(l);
+  if(horas!=null && horas>ORIGEM_LIMIAR_H){
+    const dias=Math.max(1,Math.floor(horas/24));
+    return { texto:"Última atualização "+f.de+" "+f.nome+" há "+dias+(dias===1?" dia":" dias"), velho:true };
+  }
+  const d=new Date(l.ultimo_dado_em); if(isNaN(d)) return null;
+  const dia=diaBRT(d), hoje=diaBRT(new Date()), ontem=diaBRT(new Date(Date.now()-864e5));
+  const quando=dia===hoje?"hoje":dia===ontem?"ontem":d.toLocaleDateString("pt-BR",{timeZone:FUSO_BRT,day:"2-digit",month:"2-digit"});
+  const hora=d.toLocaleTimeString("pt-BR",{timeZone:FUSO_BRT,hour:"2-digit",minute:"2-digit"});
+  return { texto:"Dados "+f.de+" "+f.nome+" de "+quando+", "+hora, velho:false };
+}
+/* uma linha por bloco de dado externo, no rodapé, tipografia secundária; vazio quando não há status */
+function linhaOrigemDado(fonte){
+  const o=textoOrigemDado(fonte);
+  return o?`<p class="mut origem-dado${o.velho?" velho":""}">${esc(o.texto)}</p>`:"";
 }
 /* ---------- Relatórios automáticos (v55): o Supabase calcula em horário agendado
    (sql/020-relatorios-motor.sql, pg_cron) e grava o resultado pronto em
@@ -2921,7 +2985,7 @@ function cartaoIcropDia(r){
           ${linhaDet("Hoje",hojeRes,hojeCorpo)}
           ${recCorpo?linhaDet("Recomendação iCrop",maxPct?`percentímetro até ${num(maxPct,0)}%`:"",recCorpo):""}
           ${soloCorpo?linhaDet("Solo e planta",soloRes,soloCorpo):""}
-          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p></div>`;
+          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p>${perfilDe(r.fazendaId).includes("CAFE")?"":linhaOrigemDado("icrop")}</div>`;
 }
 function secaoGraos(r){
   const perfil=perfilDe(r.fazendaId);
@@ -4454,7 +4518,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v62";
+const APP_VERSAO="v63";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -4887,6 +4951,14 @@ function cadVIntegracoes(){
   return cadTopo("Integrações e robôs","Última execução e pendências")+`
     <div class="cartao"><div class="linha-flex">${farol(syncAtivo()?(syncUltima?true:null):false)}<h3 class="cresce">Supabase (banco central)</h3></div>
       <p class="mut" style="font-size:.8rem">${syncAtivo()?"Ligado · "+(syncUltima?"última sincronização "+syncUltima.toTimeString().slice(0,5):"ainda não sincronizou nesta sessão")+" · fila: "+syncFila.length:"Desligado — configure em Sincronização e dados."}</p></div>
+    ${(()=>{ /* v63: estado dos robôs pela visão vw_status_integracoes (sql/045) — só leitura, horários em Brasília */
+      const ls=statusIntegracoes.filter(l=>l && ORIGEM_FONTES[l.fonte]);
+      const velho=l=>{ const h=horasSemSucesso(l); return h!=null && h>ORIGEM_LIMIAR_H; };
+      return `<div class="cartao"><div class="linha-flex">${farol(ls.length?!ls.some(velho):null)}<h3 class="cresce">Estado dos robôs (vw_status_integracoes)</h3></div>
+      ${ls.length?ls.map(l=>{ const h=horasSemSucesso(l);
+        return `<p class="mut" style="font-size:.8rem"><b>${esc(ORIGEM_FONTES[l.fonte].nome)}</b> · última tentativa <b>${fmtDHBRT(l.ultima_execucao_em)}</b> · último sucesso <b${velho(l)?' style="color:var(--amarelo)"':""}>${fmtDHBRT(l.ultima_execucao_ok_em)}</b> · último dado gravado <b>${fmtDHBRT(l.ultimo_dado_em)}</b>${l.ultimo_dado_origem?" (dado de "+fmtData(l.ultimo_dado_origem)+")":""}${h!=null?" · <span class='num'>"+Math.floor(h)+" h</span> desde o último sucesso":""}</p>`; }).join("")
+        :htmlEstado("vazio",{que:"estado de robô baixado",onde:"neste aparelho",dica:"Com internet, toque em Baixar agora; sem o sql/045 rodado a visão não existe."},{classe:"mut",estilo:"font-size:.8rem"})}
+      <p class="mut" style="font-size:.72rem">Tentativa = o pg_cron disparou o robô · sucesso = a API de origem respondeu OK · dado gravado = última escrita no Supabase. Vazio (—) é informação que ainda não existe, não estimativa.</p></div>`; })()}
     <div class="cartao"><div class="linha-flex">${farol(ic.length?icGrav.slice(0,10)>=ontem:null)}<h3 class="cresce">Robô iCrop (irrigação)</h3></div>
       <p class="mut" style="font-size:.8rem">Roda no Supabase (pg_cron) de madrugada e às 9h45. Última medição: <b>${icUlt?fmtData(icUlt):"—"}</b> · última gravação do robô: <b>${fmtDH(icGrav)}</b>${ic.length&&icGrav.slice(0,10)<ontem?" · <b>robô parado há mais de um dia</b> (token na Vision / Restart project)":""}${ic.length&&icGrav.slice(0,10)>=ontem&&icUlt<ontem?" · robô OK, iCrop sem medição nova (ciclo vencido ou atraso)":""}</p>
       <p class="mut" style="font-size:.8rem">De-para iCrop → app: ${DEPARA_ICROP.map(([n,id])=>esc(n)+" → "+id).join(" · ")}.</p>
@@ -5509,7 +5581,7 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes({atividade:["GRAOS","PECUARIA"]}); } } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes({atividade:["GRAOS","PECUARIA"]}); } } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol"].includes(telaAtual))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }

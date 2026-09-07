@@ -42,7 +42,11 @@ vw_dias_sem_registro (sql/040; o app só lê, sob demanda). Desde a v60:
 operacao_janela e a visão vw_farol_registro (sql/042; só aparelhos com
 painel baixam). Desde a v62: as visões vw_intervalo_operacoes e
 vw_ritmo_operacoes (sql/043; ritmo entre registros, só leitura, só
-grãos e pecuária no app).
+grãos e pecuária no app). Desde a v63: integracao_job,
+integracao_execucoes e a visão vw_status_integracoes (sql/045; de
+quando é o dado do iCrop/Solinftec — tentativa, sucesso e dado
+gravado são horários distintos; o app só lê, aparelho só de café não
+baixa).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -166,6 +170,16 @@ culpar quem usa; uma frase, no máximo duas linhas no iPhone. Nomes
 só pelo cadastro por id. Café mantém os textos que já tinha (regra
 1). Detalhe, parâmetros e exemplos em docs/definicao-de-pronto.md,
 item 6.
+
+### c3) Dado de fonte externa diz de quando é (desde a v63)
+Todo bloco que mostre dado de integração (iCrop, Solinftec, fonte
+futura) leva no rodapé UMA linha secundária pela função única
+`linhaOrigemDado(fonte)` — "Dados do iCrop de hoje, 04:05" (data do
+dado gravado, em Brasília; hoje/ontem/dd/mm) — e, com mais de 26 h sem
+sucesso do robô, "Última atualização do iCrop há 2 dias" em cor de
+atenção, sem ícone, exclamação ou bloqueio. Proibido "agora" / "tempo
+real". Café não mostra; tela compartilhada só com decisão do Nilo.
+Detalhe em docs/definicao-de-pronto.md, item 7.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
