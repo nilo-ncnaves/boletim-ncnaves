@@ -6,6 +6,61 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 07/09/2026 · v60 · estados vazios informativos (carregando · erro · vazio com recorte)
+
+**Entrega.** Função única `fraseVazio` / `htmlEstado` (+ `periodoVazio`,
+`haDias`) no `index.html`; 29 pontos passaram por ela (27 vazios +
+carregando + erro): casa do gerente de grãos/pecuária, seção Talhões e
+ciclos, Irrigação por pivô, painel da Diretoria (lista de boletins com
+todos os filtros e "último registro" da unidade, cartão da unidade,
+Resumo do período), tela Relatórios com os três estados e "Tentar de
+novo", tela do relatório, tabelas dos relatórios, escolha de fazenda e
+15 listas e buscas de Cadastros — 5 pontos antes ficavam em branco
+absoluto (Lotes, Plano › fazenda com busca, Catálogo com busca,
+Importações manuais, escolha de fazenda); legenda do farol do
+painel "○ faltou" → "○ sem registro"; `relEstado` separa "baixando" e
+"não conseguiu baixar" de "o motor não gerou nada". Docs:
+`docs/definicao-de-pronto.md` (novo, item 6 = regra permanente),
+CLAUDE.md (item c2), ESTADO.md. Versão v60 (rodapé + cache do sw.js).
+
+**Verificado (automático, sem rede).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- Frases geradas fora do navegador (21 combinações de recorte): nenhuma
+  com "não fez", "não realizou", "pendente", "atrasado", "faltou",
+  "esqueceu", "você ainda" ou "!"; a mais longa com todos os filtros do
+  painel ao mesmo tempo tem 120 caracteres (3 linhas — caso extremo com
+  5 filtros), as demais ≤ 92 (2 linhas a 390 px).
+- `scripts/regressao_render.cjs` main × branch: 53 telas; café (f23) e
+  pós-colheita idênticos fora o relógio de "Enviado às"; as únicas
+  diferenças reais são as pedidas — casa do gerente de grãos (f33) e de
+  pecuária (f26) com o vazio novo, e a legenda do farol no painel.
+- `scripts/checar-poluicao.cjs`: 209 ✅ · 41 ❌, igual ao retrato da v59
+  (nenhum ❌ novo; nenhum termo de outra atividade nas frases novas).
+- `git grep` pelos termos proibidos nos trechos alterados: nada.
+
+**Teste manual (Nilo).** Com rede e código DIRETORIA: abrir 📊
+Relatórios num aparelho sem cache em modo avião (deve mostrar "Não foi
+possível carregar os relatórios" + Tentar de novo), ligar a rede e tocar
+em Tentar de novo (passa por "Carregando relatórios…" e chega aos
+relatórios); no painel, filtrar por uma unidade sem boletim na semana e
+conferir a frase com "Último registro há N dias". Com código de grãos ou
+pecuária num aparelho novo: conferir o vazio da casa do gerente.
+
+**Não tocado.** Telas do gerente de café e de pós-colheita (textos
+"Nenhum boletim ainda." / "Nenhum registro ainda." preservados por
+`atividadeDe(fz)`), cartão de cargas de café, Unidades e Plano (já tinha
+os três estados: é o padrão de referência), avisos dos robôs, cartões
+que somem sem dado (Solinftec, iCrop, Meus relatórios — decisão da v55),
+listas de lançamento do boletim (vazio silencioso por desenho do padrão
+a: só o "＋"), Supabase, `syncTudo`. Deixado para decisão do Nilo: o
+título "Boletim de hoje pendente" / "Registro de hoje pendente" das
+casas do gerente e do pós-colheita (rótulo de situação, não vazio; mexer
+toca o café) e "pendente" no relatório de rebanho (GMD e lotação, texto
+vindo do motor). O enriquecimento com a visão `vw_dias_sem_registro`
+(por operação) fica para o item do backlog "janela por operação e
+farol": hoje não há vazio por operação em tela, e o "último registro"
+do painel usa os boletins já baixados no aparelho.
+
 ## 07/09/2026 · v59 · métrica "dias sem registro" (visão no Supabase + leitura no app)
 
 **Entrega.** `sql/040-dias-sem-registro.sql` (catálogo mestre

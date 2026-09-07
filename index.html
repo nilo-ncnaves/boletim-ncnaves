@@ -207,6 +207,65 @@ const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const n0 = v => { const x=parseFloat(String(v).replace(",",".")); return isNaN(x)?0:x; };
 const emSafra = () => { const m=new Date().getMonth()+1; return m>=5 && m<=9; };
 
+/* ---------- Estados de lista (v60): carregando · erro · vazio ----------
+   REGRA DA CASA (docs/definicao-de-pronto.md): toda lista de leitura passa por aqui —
+   nenhuma tela escreve o próprio texto de vazio. O vazio NOMEIA O RECORTE que o produziu
+   (unidade, atividade, operação, talhão, busca, período) e relata ausência de REGISTRO,
+   nunca de trabalho: proibidos "não fez", "não realizou", "pendente", "atrasado", "faltou",
+   "esqueceu"; sem exclamação, sem emoji, sem culpar quem usa; uma frase, no máximo duas
+   linhas no iPhone. Nomes vêm do cadastro pelo id (fazenda(id).nome, talhao(id).nome),
+   nunca de pedaço de nome. Café (regra 1 do projeto): as telas do gerente de café
+   mantêm o texto que já tinham — quem chama decide por atividadeDe(fz) e só manda
+   grãos/pecuária e as telas compartilhadas (Diretoria, Relatórios, Cadastros) para cá.
+   Uso:
+     fraseVazio({que:"boletim", atividade:"GRAOS", operacao:"Capina manual", unidade:"f33",
+       talhao:"t125", filtro:"texto digitado", periodo:periodoVazio(de,ate), ultimo:"2026-08-31",
+       dica:"Os boletins aparecem aqui depois do primeiro envio."})
+       → 'Sem boletim de grãos de capina manual em Floramill em Pivô 01 com "texto digitado"
+          de 01/09 a 07/09/2026. Último registro há 7 dias (31/08). Os boletins aparecem…'
+     htmlEstado("vazio"|"carregando"|"erro", o, {tag:"p"|"li"|"td"|"div", classe, colspan, acao})
+       → o elemento pronto; "erro" ganha o botão "Tentar de novo" (data-sync) quando w.acao=true. */
+function periodoVazio(de,ate){
+  if(de&&ate) return de===ate?"em "+fmtData(de):"de "+fmtDataCurta(de)+" a "+fmtData(ate);
+  if(de) return "a partir de "+fmtData(de);
+  if(ate) return "até "+fmtData(ate);
+  return "";
+}
+/* "hoje" / "ontem" / "há N dias (dd/mm)" — a data vem do registro, nunca é estimada */
+function haDias(iso){
+  if(!iso) return "";
+  const n=Math.round((new Date(hojeISO()+"T12:00:00")-new Date(String(iso).slice(0,10)+"T12:00:00"))/864e5);
+  if(n<=0) return "hoje";
+  if(n===1) return "ontem ("+fmtDataCurta(iso)+")";
+  return "há "+n+" dias ("+fmtDataCurta(iso)+")";
+}
+function fraseVazio(o){
+  o=o||{};
+  const p=["Sem "+(o.que||"registro")];
+  if(o.atividade) p.push("de "+rotuloAtividade(o.atividade).toLowerCase());
+  if(o.operacao) p.push("de "+String(o.operacao).toLowerCase());
+  if(o.unidade) p.push((o.prep||"em")+" "+fazenda(o.unidade).nome);
+  else if(o.onde) p.push(o.onde);                 /* recorte sem id de unidade: "nas unidades do grupo" */
+  if(o.talhao) p.push("em "+talhao(o.talhao).nome);
+  if(o.filtro) p.push('com "'+o.filtro+'"');
+  if(o.periodo) p.push(o.periodo);
+  let s=p.join(" ")+".";
+  if(o.ultimo) s+=" Último registro "+haDias(o.ultimo)+".";
+  if(o.dica) s+=" "+o.dica;
+  return s;
+}
+function htmlEstado(estado,o,w){
+  o=o||{}; w=w||{};
+  const tag=w.tag||"p", classe=w.classe||"mut";
+  let txt;
+  if(estado==="carregando") txt=esc("Carregando "+(o.que||"registros")+"…");
+  else if(estado==="erro") txt=esc("Não foi possível carregar "+(o.que||"os registros")+".")
+    +(w.acao?` <button class="btn suave mini" data-sync="1" style="display:inline-flex;padding:2px 8px">Tentar de novo</button>`:"");
+  else txt=esc(fraseVazio(o))+(o.dicaHtml?" "+o.dicaHtml:"");
+  if(tag==="td") return `<tr><td colspan="${w.colspan||1}" class="${classe}">${txt}</td></tr>`;
+  return `<${tag} class="${classe}"${w.estilo?` style="${w.estilo}"`:""}>${txt}</${tag}>`;
+}
+
 /* ---------- Dados iniciais (Fazenda Lagamar — exemplo) ---------- */
 function dadosSemente(){
   const dm = dias => { const d=new Date(); d.setDate(d.getDate()-dias);
@@ -1691,6 +1750,7 @@ const REL_CATALOGO={
   alerta_divergencia:{nome:"Alerta de divergência (texto)", per:"dia", texto:true}
 };
 let relCache=[];                 /* linhas de relatorios_gerados guardadas no aparelho (bdf:relatorios) */
+let relEstado={carregando:false, erro:false};   /* v60: separa "carregando" e "erro" de "vazio" na tela Relatórios */
 let relFiltro={per:""};          /* filtro da seção do painel: "" | dia | semana | mes */
 let relVista={rel:"",ini:"",fim:""};  /* relatório aberto na tela "relat" */
 /* Baixa os resultados prontos (últimos 60 dias) SÓ das unidades do escopo do
@@ -1698,10 +1758,12 @@ let relVista={rel:"",ini:"",fim:""};  /* relatório aberto na tela "relat" */
    painel. Tabela ainda não criada ou sem rede: fica o último baixado. */
 async function baixarRelatorios(){
   if(!syncAtivo()) return;
+  relEstado.carregando=true;
   try{
     const esc0=escopoAtual(); if(!esc0) return;
     const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
     if(!tudo && !ids.length) return;
+    relEstado.erro=false;
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
     const dAtras=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
     /* rascunhos do redator (texto) só descem para quem tem painel: o gerente recebe a devolutiva pelo WhatsApp, depois de revisada */
@@ -1716,15 +1778,16 @@ async function baixarRelatorios(){
       let url=syncCfg.url+"/rest/v1/relatorios_gerados?select=id,relatorio,periodo_ini,periodo_fim,unidade_id,gerado_em,dados,texto,texto_em,texto_modelo"
         +"&relatorio=in.("+rels+")&periodo_fim=gte."+de+"&order=periodo_fim.desc,gerado_em.desc&limit=1000";
       if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
-      const r=await fetch(url,cab); if(!r.ok) return;
-      const linhas=await r.json(); if(!Array.isArray(linhas)) return;
+      const r=await fetch(url,cab); if(!r.ok){ relEstado.erro=true; return; }
+      const linhas=await r.json(); if(!Array.isArray(linhas)){ relEstado.erro=true; return; }
       novas=novas.concat(linhas);
     }
     /* trava: unidade fora do escopo nunca fica no aparelho, venha o que vier do banco */
     novas=novas.filter(l=>l && REL_CATALOGO[l.relatorio] && l.dados && (tudo || (l.unidade_id && ids.includes(l.unidade_id) && !REL_CATALOGO[l.relatorio].texto)));
     const vistos=new Set(); relCache=novas.filter(l=>{ if(vistos.has(l.id)) return false; vistos.add(l.id); return true; });
     await Persist.set("bdf:relatorios", JSON.stringify(relCache));
-  }catch(e){}
+  }catch(e){ relEstado.erro=true; }
+  finally{ relEstado.carregando=false; }
 }
 /* ---- dias sem registro (v59): leitura da visão vw_dias_sem_registro (sql/040) ----
    Uma linha por unidade × operação do catálogo (operacao_catalogo): data_ultimo_registro,
@@ -1788,7 +1851,7 @@ function relAlerta(l){
 }
 const relFarolCor=f=>({verde:"ok",amarelo:"espera",vermelho:"critico"}[f]||"vazio");
 const relTabela=(cab,linhas,classes)=>`<div class="rel-tab"><table><tr>${cab.map(c=>`<th${/^#/.test(c)?' class="num"':""}>${esc(c.replace(/^#/,""))}</th>`).join("")}</tr>
-  ${linhas.map((l,i)=>`<tr${classes&&classes[i]?` class="${classes[i]}"`:""}>${l.map((c,k)=>`<td${/^#/.test(cab[k])?' class="num"':""}>${c==null?"—":c}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cab.length}" class="mut">nada registrado no período</td></tr>`}</table></div>`;
+  ${linhas.map((l,i)=>`<tr${classes&&classes[i]?` class="${classes[i]}"`:""}>${l.map((c,k)=>`<td${/^#/.test(cab[k])?' class="num"':""}>${c==null?"—":c}</td>`).join("")}</tr>`).join("")||htmlEstado("vazio",{periodo:"neste período"},{tag:"td",colspan:cab.length})}</table></div>`;
 
 /* ---- Seção do painel da Diretoria ---- */
 /* ---- Tela "📊 Relatórios" (v58): um toque no painel ou na entrada; textos do redator
@@ -1818,17 +1881,23 @@ function vRelatorios(){
   }).join("");
   const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
   const itens=relItensNumeros(per);
-  return topo("Relatórios", sessao.papel==="admin"?"Administrador":"Diretoria", true)+`
-    ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}
+  const PER_ROT={dia:"Dia",semana:"Semana",mes:"Mês"};
+  const cab=topo("Relatórios", sessao.papel==="admin"?"Administrador":"Diretoria", true)+`
+    ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}`;
+  const voltar=`<button class="btn sec mt no-print" data-voltar="1">‹ Voltar ao painel</button>`;
+  /* v60: sem nada no aparelho, distingue "baixando" e "não conseguiu baixar" de "o motor não gerou nada" */
+  if(!relCache.length && (relEstado.carregando||syncOcupado)) return cab+`<div class="cartao">${htmlEstado("carregando",{que:"relatórios"})}</div>`+voltar;
+  if(!relCache.length && relEstado.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"os relatórios"},{acao:true})}</div>`+voltar;
+  return cab+`
     <h2 style="margin-bottom:6px">📝 Textos para revisar</h2>
     <p class="mut" style="font-size:.8rem">Escritos pelo robô-redator a partir dos números. Leia, ajuste se quiser e toque em copiar para mandar no WhatsApp.</p>
-    ${textos||`<div class="cartao"><p class="mut">Nenhum texto ainda. O redator escreve as devolutivas toda sexta às 5h20 e o painel executivo no dia 8; os textos aparecem aqui depois de sincronizar.</p></div>`}
+    ${textos||`<div class="cartao">${htmlEstado("vazio",{que:"texto do redator para revisar",dica:"Os textos aparecem aqui depois de sincronizar."})}</div>`}
     <h2 style="margin:18px 0 6px">📊 Números</h2>
     ${relCache.length?`<div class="chips mb no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
-      <div class="cartao"><ul class="lista-limpa">${itens||"<li class='mut'>Nenhum relatório neste filtro ainda.</li>"}</ul></div>
+      <div class="cartao"><ul class="lista-limpa">${itens||htmlEstado("vazio",{que:"relatório calculado",filtro:PER_ROT[per]||"Todos"},{tag:"li"})}</ul></div>
       <p class="mut" style="font-size:.72rem">Calculado no Supabase toda madrugada (motor sql/020); o app só mostra. Último cálculo: ${ultimo?new Date(ultimo).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}. Diferença entre dito e medido é "para conferir", nunca erro.</p>`
-    :`<div class="cartao"><p class="mut">Ainda não há relatório calculado. O motor do Supabase (sql/020) roda toda madrugada e o app baixa ao sincronizar.</p></div>`}
-    <button class="btn sec mt no-print" data-voltar="1">‹ Voltar ao painel</button>`;
+    :`<div class="cartao">${htmlEstado("vazio",{que:"relatório calculado",onde:"para as unidades deste código",dica:"O motor roda toda madrugada e o app baixa ao sincronizar."})}</div>`}
+    `+voltar;
 }
 /* ---- Cartão do gerente: farol e dito × medido SÓ da unidade dele ---- */
 function cartaoRelatoriosGerente(fz){
@@ -1869,7 +1938,12 @@ function vRelat(){
     <button class="btn sec mini" data-relnav="ant" ${i<0||i>=ps.length-1?"disabled":""}>‹ anterior</button>
     <span class="cresce centro" style="font-size:.85rem"><b>${relRotuloPer(rel,ini,fim)}</b></span>
     <button class="btn sec mini" data-relnav="prox" ${i<=0?"disabled":""}>próximo ›</button></div>`;
-  const corpo=ls.length?relTextos(ls)+relRender(rel,ls):`<div class="cartao"><p class="mut">Nada calculado para este período${sessao&&sessao.papel==="gerente"?" na sua unidade":""}.</p></div>`;
+  /* v60: o vazio nomeia o período e a unidade; o gerente de café mantém o texto da v59 (regra 1) */
+  const ger=sessao&&sessao.papel==="gerente";
+  const vazio=(ger&&atividadeDe(sessao.fazendaId)==="CAFE")
+    ?`<p class="mut">Nada calculado para este período na sua unidade.</p>`
+    :htmlEstado("vazio",{que:"relatório calculado",periodo:"para "+relRotuloPer(rel,ini,fim),unidade:ger?sessao.fazendaId:"",onde:ger?"":"nas unidades deste código"});
+  const corpo=ls.length?relTextos(ls)+relRender(rel,ls):`<div class="cartao">${vazio}</div>`;
   return topo(cat.nome, relRotuloPer(rel,ini,fim)+(sessao&&sessao.papel==="gerente"?" · "+fazenda(sessao.fazendaId).nome:""), true)+nav+corpo+`
     <div class="linha-flex mt no-print" style="gap:8px">
       <button class="btn sec mini" id="bt-rel-zap">📲 Compartilhar</button>
@@ -2596,8 +2670,9 @@ function vEscolheFazenda(){
   const atv=(sessao&&sessao.papel==="gerente")?(sessao.atividade||""):"";
   const lista=unidadesPermitidas().filter(f=>!atv || atividadeDe(f.id)===atv);
   return topo(atv?emojiAtividade(atv)+" "+rotuloAtividade(atv):"Qual fazenda?", atv?"Toque na sua unidade":"Toque na sua fazenda", true)+
-    lista.map(f=>`<button class="perfil-btn" data-fazenda="${f.id}">
-      <span class="ava">${atv?emojiAtividade(atv):"🌱"}</span><span><b>${esc(f.nome)}</b><span class="mut">${esc(f.municipio||"")}</span></span></button>`).join("")+
+    (lista.map(f=>`<button class="perfil-btn" data-fazenda="${f.id}">
+      <span class="ava">${atv?emojiAtividade(atv):"🌱"}</span><span><b>${esc(f.nome)}</b><span class="mut">${esc(f.municipio||"")}</span></span></button>`).join("")
+      ||htmlEstado("vazio",{que:"unidade",atividade:atv,onde:"liberada para este código"},{classe:"mut centro mt"}))+
     (atv?`<button class="btn sec mt" data-voltar="1">‹ Trocar atividade</button>`:"");
 }
 /* ---------- Tela: casa do gerente ---------- */
@@ -2641,7 +2716,8 @@ function vCasaGerente(){
         <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
           <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou")))?"critico":"ok"}"></span>
           <span class="cresce"><b>${fmtData(x.data)}</b> <span class="mut">· ${resumo1linha(x)}</span></span>
-          <span class="mut">›</span></button></li>`).join("")||"<li class='mut'>Nenhum boletim ainda.</li>"}
+          <span class="mut">›</span></button></li>`).join("")||(atCasa==="CAFE"?"<li class='mut'>Nenhum boletim ainda.</li>"
+          :htmlEstado("vazio",{que:"boletim registrado",unidade:fz,dica:"Os boletins aparecem aqui depois do primeiro envio."},{tag:"li"}))}
       </ul></div>
     <button class="btn suave mt" id="bt-ajuda">Como preencher (passo a passo)</button>
     <button class="btn sec mt" id="bt-trocar-faz">Trocar fazenda / atividade</button>
@@ -2737,7 +2813,7 @@ function secaoGraos(r){
             const on=(r.atividades||[]).some(a=>a.talhaoId===t.id && a.tipo===op);
             return `<button class="chip ${on?"on":""}" data-opgrao="${t.id}|${esc(op)}">${esc(op)}</button>`;
           }).join("")}</div>`).join("")}</div>`;
-      }).join(""):`<p class="mut mt">Nenhum talhão de grão cadastrado ainda.</p>`}
+      }).join(""):htmlEstado("vazio",{que:"talhão de grãos cadastrado",unidade:r.fazendaId},{classe:"mut mt"})}
       ${semCafe?`<label class="mt">Atividades e máquinas do dia</label>
       <div id="lista-ativ">${r.atividades.map(cardAtividade).join("")}</div>
       <button class="btn suave mt" id="bt-add-ativ">＋ Adicionar atividade / máquinas</button>`:""}
@@ -3106,7 +3182,7 @@ function cardIrg(r,e){
 }
 function topoIrgHtml(r){
   if(!pivosDa(r.fazendaId).length)
-    return `<p class="mut mt" style="font-size:.78rem">Nenhum pivô cadastrado nesta unidade ainda. Cadastre abaixo — fica guardado para os próximos dias.</p>`;
+    return htmlEstado("vazio",{que:"pivô cadastrado",unidade:r.fazendaId,dica:"Cadastre abaixo. Fica guardado para os próximos dias."},{classe:"mut mt",estilo:"font-size:.78rem"});
   return `<p class="mut mt" style="font-size:.78rem">Toque em ＋, escolha o pivô na lista e marque a situação. Lâmina e quimigação aparecem quando ele rodou.</p>`
     +(pivosLivresDa(r,null).length?`<button class="btn suave mini mt" id="bt-add-todos-pivos">＋ adicionar todos os pivôs</button>`:"");
 }
@@ -3777,7 +3853,7 @@ function cartaoFarolBoletins(){
           g.uns.map(u=>linhaHtml("· "+rotuloAtividade(atividadeDe(u.f.id)), u, true)).join("");
       }).join("")}
       <p class="mt" style="font-weight:700">${emDiaQtd} de ${linhas.length} unidades em dia <span class="mut" style="font-weight:400">(enviou ontem ou hoje)</span></p>
-      <p class="mut" style="font-size:.72rem">● enviado · ○ faltou · – domingo sem envio</p>
+      <p class="mut" style="font-size:.72rem">● enviado · ○ sem registro · – domingo sem envio</p>
     </div></details>`;
 }
 
@@ -3939,7 +4015,7 @@ function vPainel(){
             <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(ff=>ff.nivel==="Alto"))?"critico":"ok"}"></span>
             <span class="cresce"><b>${fmtData(x.data)}</b> <span class="mut">· ${resumo1linha(x)}</span></span>
             <span class="mut">›</span></button></li>`).join("")}</ul>`
-        :`<p class="mut mt">Esta fazenda ainda não enviou nenhum boletim. Assim que o gerente enviar o primeiro, ele aparece aqui.</p>`}
+        :htmlEstado("vazio",{que:"boletim registrado",unidade:f.id,dica:"Os boletins aparecem aqui depois do primeiro envio."},{classe:"mut mt"})}
         ${(()=>{ const ps=[...(D.posColheitas||[])].filter(x=>x.fazendaId===f.id).sort((a,b)=>a.data<b.data?1:-1).slice(0,3);
           return ps.length?`<h3 class="mt">🏭 Pós-colheita</h3><ul class="lista-limpa">${ps.map(x=>`
             <li><button class="linha-flex" style="width:100%;text-align:left" data-verpos="${x.id}">
@@ -3969,21 +4045,23 @@ function vPainel(){
         <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
           <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou")))?"critico":"ok"}"></span>
           <span class="cresce"><b>${fmtData(x.data)}</b> — ${esc(fazenda(x.fazendaId).nome)}<br><span class="mut">${resumo1linha(x)}</span></span>
-          ${x.visto?'<span class="tag verde">visto</span>':""}<span class="mut">›</span></button></li>`).join("")||`<li class="mut">${msgVazio()}</li>`}
+          ${x.visto?'<span class="tag verde">visto</span>':""}<span class="mut">›</span></button></li>`).join("")||msgVazio()}
       </ul></div>
     <button class="btn sec mt no-print" id="bt-sair">Sair</button>`;
 }
 const escopoKpi=()=>filtroPainel.fazenda?esc(fazenda(filtroPainel.fazenda).nome):"grupo";
+/* v60: vazio da lista de boletins do painel — nomeia cada filtro ativo (atividade, unidade,
+   operação, busca, período) e, com unidade escolhida, diz quando foi o último boletim dela */
 function msgVazio(){
-  const f=filtroPainel, partes=[];
-  if(f.atividade) partes.push("com a atividade \""+f.atividade+"\"");
-  if(f.busca) partes.push("com \""+f.busca+"\"");
-  if(f.fazenda) partes.push("de "+fazenda(f.fazenda).nome);
-  if(f.de||f.ate) partes.push("nesse período");
+  const f=filtroPainel;
+  const comFiltro=!!(f.atv||f.atividade||f.busca||f.fazenda||f.de||f.ate);
   const total=boletinsOrdenados().length;
-  const causa=partes.length?"Nenhum boletim "+partes.join(" e ")+"." : "Nenhum boletim registrado ainda.";
-  const dica=partes.length&&total?` Existem ${total} boletim(ns) no total — <button class="btn suave mini" data-limpar-filtros="1" style="display:inline-flex;padding:2px 8px">limpar filtros</button>`:(total?"":" Assim que um gerente enviar, aparece aqui.");
-  return causa+dica;
+  const ultimo=f.fazenda?(boletinsOrdenados().find(b=>b.fazendaId===f.fazenda)||{}).data:"";
+  const o={que:"boletim", atividade:f.atv||"", operacao:f.atividade||"", unidade:f.fazenda||"", onde:f.fazenda?"":"nas unidades deste código",
+    filtro:f.busca||"", periodo:periodoVazio(f.de,f.ate), ultimo:ultimo||""};
+  if(comFiltro&&total) o.dicaHtml=`Existem ${total} boletim(ns) no total. <button class="btn suave mini" data-limpar-filtros="1" style="display:inline-flex;padding:2px 8px">limpar filtros</button>`;
+  else if(!total) o.dica="Os boletins aparecem aqui depois do primeiro envio.";
+  return htmlEstado("vazio",o,{tag:"li"});
 }
 function filtrarBoletins(){
   const f=filtroPainel, q=f.busca.toLowerCase();
@@ -4241,7 +4319,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v59";
+const APP_VERSAO="v60";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -4382,7 +4460,7 @@ function cadResultadosBusca(q){
   ["CAFE","GRAOS","PECUARIA"].forEach(a=>cadCatalogosDe(a).forEach(([k,rot,lista])=>[...lista,...catExtra(k)].forEach(t=>{ if(cadBate(q,t)) r.push(cadItem("catalogo",a,esc(t),"catálogo · "+ROTULO_CULT[a]+" · "+esc(rot))); })));
   D.maquinas.forEach(m=>{ if(cadBate(q,m.nome,m.cat)) r.push(cadItem("maquinas","",esc(m.nome),"máquina · "+esc(m.cat||""))); });
   D.insumos.forEach(i=>{ if(cadBate(q,i.nome)) r.push(cadItem("insumos","",esc(i.nome),"insumo · "+esc(i.un||""))); });
-  return r.length?`<p class="mut" style="font-size:.78rem">${r.length} resultado(s)</p>`+r.slice(0,40).join("")+(r.length>40?`<p class="mut centro">mostrando 40 — refine a busca</p>`:""):`<p class="mut centro mt">Nada encontrado para "${esc(q)}".</p>`;
+  return r.length?`<p class="mut" style="font-size:.78rem">${r.length} resultado(s)</p>`+r.slice(0,40).join("")+(r.length>40?`<p class="mut centro">mostrando 40 — refine a busca</p>`:""):htmlEstado("vazio",{que:"resultado em Cadastros",filtro:q},{classe:"mut centro mt"});
 }
 
 /* ================= 1. FAZENDAS E UNIDADES ================= */
@@ -4394,7 +4472,7 @@ function cadVFazendas(){
       return cadItem("fazenda",f.id,esc(f.nome)+(f.inativa?' <span class="tag cereja">inativa</span>':""),
         emojiAtividade(a)+" "+rotuloAtividade(a)+" · "+nt+" talhões · código "+esc(codigoDe(f.id)||"—")); }).join("")}));
   return cadTopo("Fazendas e unidades",D.fazendas.length+" unidades")+cadBusca("cad-f-busca","Buscar fazenda ou unidade…")+cadSaltos(maes)+
-    (gs.length?cadListaAgrupada(gs):`<p class="mut centro mt">Nenhuma unidade com esse nome.</p>`);
+    (gs.length?cadListaAgrupada(gs):htmlEstado("vazio",{que:"unidade",filtro:q},{classe:"mut centro mt"}));
 }
 function cadVFazenda(id){
   const f=D.fazendas.find(x=>x.id===id); if(!f) return cadTopo("Unidade")+`<p class="mut">Unidade não encontrada.</p>`;
@@ -4442,7 +4520,7 @@ function cadVTalhoes(){
   const blocos=gs.length?cadListaAgrupada(gs):"";
   const semDono=D.talhoes.filter(t=>!D.fazendas.some(f=>f.id===t.fazendaId) && cadBate(q,t.nome));
   return cadTopo("Talhões, pivôs e pastos",D.talhoes.length+" talhões")+cadBusca("cad-t-busca","Buscar talhão, pivô ou unidade…")+cadSaltos(D.fazendas.filter(f=>D.talhoes.some(t=>t.fazendaId===f.id)||pivosLocaisDa(f.id).length).map(f=>f.nome))+
-    (blocos||`<p class="mut centro mt">Nada encontrado.</p>`)+
+    (blocos||htmlEstado("vazio",{que:"talhão, pivô ou pasto",filtro:q},{classe:"mut centro mt"}))+
     (semDono.length?cadGrupo("Sem unidade")+semDono.map(t=>cadItem("talhao",t.id,esc(t.nome),rotuloTipo(t.tipo),cadNum(t.area)+" ha")).join(""):"")+
     cadRodape(`<button class="btn" data-cadv="talhao" data-cadid="novo">＋ Novo talhão</button>`);
 }
@@ -4486,7 +4564,7 @@ function cadVCiclos(){
       return cadItem("ciclo",t.id,esc(t.nome),est,cadNum(t.area)+" ha"); }).join("")};
   }).filter(Boolean);
   const blocos=gs.length?cadListaAgrupada(gs):"";
-  return cadTopo("Ciclos e plantios","Talhões de grãos")+cadBusca("cad-c-busca","Buscar talhão ou unidade…")+cadSaltos(D.fazendas.filter(f=>temCultura(f.id,"GRAOS")).map(f=>f.nome))+(blocos||`<p class="mut centro mt">Nenhum talhão de grãos${q?" com esse nome":""}.</p>`);
+  return cadTopo("Ciclos e plantios","Talhões de grãos")+cadBusca("cad-c-busca","Buscar talhão ou unidade…")+cadSaltos(D.fazendas.filter(f=>temCultura(f.id,"GRAOS")).map(f=>f.nome))+(blocos||htmlEstado("vazio",{que:"talhão de grãos",filtro:q},{classe:"mut centro mt"}));
 }
 function cadVCiclo(talId){
   const t=D.talhoes.find(x=>x.id===talId); if(!t) return cadTopo("Ciclo")+`<p class="mut">Talhão não encontrado.</p>`;
@@ -4502,7 +4580,7 @@ function cadVCiclo(talId){
         <div class="chips">${CULTURAS_ANUAIS.map(([k,r])=>`<button class="chip ${fm.cultura===k?"on":""}" data-cadchip="cultura:${k}">${r}</button>`).join("")}</div>
         <label>Data do plantio</label><input type="date" data-cadc="plantio" value="${esc(fm.data)}">`}
     </div>
-    ${cadMais(hist.length?`<ul class="lista-limpa">${hist.map(h=>`<li><b>${rotuloCultura(h.cultura)}</b> <span class="mut">· ${fmtData(h.plantio)} → ${fmtData(h.encerradoEm)}</span></li>`).join("")}</ul>`:`<p class="mut">Nenhum ciclo encerrado ainda. O histórico nunca é apagado.</p>`,"Histórico do talhão ("+hist.length+")")}
+    ${cadMais(hist.length?`<ul class="lista-limpa">${hist.map(h=>`<li><b>${rotuloCultura(h.cultura)}</b> <span class="mut">· ${fmtData(h.plantio)} → ${fmtData(h.encerradoEm)}</span></li>`).join("")}</ul>`:htmlEstado("vazio",{que:"ciclo encerrado",talhao:t.id,dica:"O histórico nunca é apagado."}),"Histórico do talhão ("+hist.length+")")}
     ${(!c && t.tipo!=="ARRENDADO")?cadRodape(`<button class="btn" data-cadacao="novo-ciclo" data-cadid="${t.id}">Registrar plantio</button>`):""}`;
 }
 
@@ -4512,7 +4590,8 @@ function cadVLotes(){
   return cadTopo("Lotes e inventário","Pecuária · "+unis.length+" unidades")+
     unis.map(f=>{ const tot=cadInvTotal(f.id), ult=cadUltimaContagem(f.id), inv=cadInv(f.id);
       const est=(tot?cadNum(tot)+" cabeças no inventário":"sem inventário")+(inv.hist.length?" · último ajuste "+fmtData(inv.hist[inv.hist.length-1].data):"")+(ult?" · contagem do gerente em "+fmtData(ult.data):"");
-      return cadItem("lote",f.id,esc(f.nome),est,tot?cadNum(tot):""); }).join("");
+      return cadItem("lote",f.id,esc(f.nome),est,tot?cadNum(tot):""); }).join("")
+    ||htmlEstado("vazio",{que:"unidade de pecuária cadastrada"},{classe:"mut centro mt"});
 }
 function cadVLote(fz){
   const f=fazenda(fz), inv=cadInv(fz), tot=cadInvTotal(fz), ult=cadUltimaContagem(fz);
@@ -4520,12 +4599,12 @@ function cadVLote(fz){
   return cadTopo(f.nome,"Rebanho · "+cadNum(tot)+" cabeças")+`
     <div class="cartao"><h3>Inventário por categoria</h3>
       ${tot?`<table class="cad-tab"><tr><th>Categoria</th><th class="num">Cabeças</th></tr>${CATEGORIAS_ANIMAIS.filter(c=>n0(inv.cats[c])).map(c=>`<tr><td>${esc(c)}</td><td class="num">${cadNum(inv.cats[c])}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="num"><b>${cadNum(tot)}</b></td></tr></table>`
-        :`<p class="mut">Sem inventário. Registre o inventário inicial na Zona de cuidado.</p>`}
+        :htmlEstado("vazio",{que:"inventário registrado",prep:"para",unidade:fz,dica:"Registre o inventário inicial na Zona de cuidado."})}
     </div>
     ${ult?`<div class="cartao"><h3>Última contagem do gerente <span class="mut">· ${fmtData(ult.data)}</span></h3>
       <ul class="lista-limpa">${(ult.pecuaria.lotes||[]).filter(l=>n0(l.cabecas)).map(l=>`<li class="linha-flex"><span class="cresce">${esc(l.talhaoId?nomePastoPec(l.talhaoId):(l.lote||"Lote"))}${l.lote&&l.talhaoId?" · "+esc(l.lote):""}</span><b class="num">${cadNum(l.cabecas)}</b></li>`).join("")}</ul>
       <p class="mut" style="font-size:.78rem">Vem do boletim (contagem por lote/pasto). Não altera o inventário.</p></div>`:""}
-    ${cadMais(inv.hist.length?`<ul class="lista-limpa">${inv.hist.slice().reverse().slice(0,30).map(h=>`<li><b>${fmtData(h.data)}</b> · ${h.tipo==="inicial"?"inventário inicial":"ajuste"} · ${esc(h.cat)}: <span class="num">${cadNum(h.antes)} → ${cadNum(h.depois)}</span>${h.motivo?` <span class="mut">· ${esc(h.motivo)}</span>`:""}</li>`).join("")}</ul>`:`<p class="mut">Sem histórico.</p>`,"Histórico de inventário ("+inv.hist.length+")")}
+    ${cadMais(inv.hist.length?`<ul class="lista-limpa">${inv.hist.slice().reverse().slice(0,30).map(h=>`<li><b>${fmtData(h.data)}</b> · ${h.tipo==="inicial"?"inventário inicial":"ajuste"} · ${esc(h.cat)}: <span class="num">${cadNum(h.antes)} → ${cadNum(h.depois)}</span>${h.motivo?` <span class="mut">· ${esc(h.motivo)}</span>`:""}</li>`).join("")}</ul>`:htmlEstado("vazio",{que:"ajuste de inventário registrado",prep:"para",unidade:fz}),"Histórico de inventário ("+inv.hist.length+")")}
     ${cadZona(`
       ${modo==="inicial"?`<p><b>Inventário inicial</b> — substitui os números atuais.</p>
         ${CATEGORIAS_ANIMAIS.map(c=>`<div class="linha-flex" style="gap:8px;margin-top:6px"><span class="cresce">${esc(c)}</span><input data-cadc="inv:${esc(c)}" value="${n0(inv.cats[c])||""}" inputmode="numeric" class="num" style="max-width:110px;min-height:44px;padding:8px"></div>`).join("")}
@@ -4551,7 +4630,7 @@ function cadVPlano(){
 }
 function cadVPlanoFz(fz){
   const p=planoDe(fz), f=fazenda(fz);
-  if(!p) return cadTopo(f.nome,"Plano do mês")+`<p class="mut">Sem plano vigente baixado para esta fazenda. Publique a versão em "Unidades e versões do plano" e sincronize.</p>`;
+  if(!p) return cadTopo(f.nome,"Plano do mês")+htmlEstado("vazio",{que:"plano vigente baixado",prep:"para",unidade:fz,dica:'Publique a versão em "Unidades e versões do plano" e sincronize.'});
   const mes=cadUI.form&&cadUI.form.mes?cadUI.form.mes:p.mes, prox=p.mes===12?1:p.mes+1;
   const q=cadUI.filtro;
   const uns=p.unidades.filter(u=>cadBate(q,u.nome_curto,u.nome_plano,u.codigo)).sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo)));
@@ -4564,7 +4643,8 @@ function cadVPlanoFz(fz){
     ${uns.map(u=>{ const ad=(p.adubo||[]).filter(a=>a.unidade_id===u.id && a.mes===mes), cal=(p.calagem||[]).filter(c=>c.unidade_id===u.id), al=aliasDe(u.id);
       const est=[rotuloStatusUnidade(u.status), u.area_ha?cadNum(u.area_ha)+" ha":"", al?"talhão do app: "+al:"sem ligação com talhão do app"].filter(Boolean).join(" · ");
       const linhas=ad.map(a=>`<span class="num">${cadNum(a.kg)} kg</span> ${esc(a.insumo)}${a.via?" ("+esc(a.via)+")":""}`).concat(cal.map(c=>`calagem ${esc(c.subarea)}: <span class="num">${cadNum(c.t_total)} t</span> (${fmtData(c.janela_ini)}–${fmtData(c.janela_fim)})`));
-      return `<div class="cad-item" data-cadfoco="planou:${esc(u.id)}" style="cursor:default"><span class="cresce"><b>${esc(u.nome_curto||u.nome_plano)}</b><span class="mut">${esc(est)}</span>${linhas.length?`<span class="mut" style="color:var(--tinta)">${linhas.join(" · ")}</span>`:`<span class="mut">nada previsto em ${MESES_PT[mes]} (plano v${p.versao})</span>`}</span></div>`; }).join("")}`;
+      return `<div class="cad-item" data-cadfoco="planou:${esc(u.id)}" style="cursor:default"><span class="cresce"><b>${esc(u.nome_curto||u.nome_plano)}</b><span class="mut">${esc(est)}</span>${linhas.length?`<span class="mut" style="color:var(--tinta)">${linhas.join(" · ")}</span>`:`<span class="mut">nada previsto em ${MESES_PT[mes]} (plano v${p.versao})</span>`}</span></div>`; }).join("")
+    ||htmlEstado("vazio",{que:"unidade do plano",unidade:fz,filtro:q},{classe:"mut centro mt"})}`;
 }
 
 /* ================= 6. CÓDIGOS DE ACESSO ================= */
@@ -4575,7 +4655,7 @@ function cadVCodigos(){
   const g1=D.fazendas.map(f=>linha(f.id,"Por unidade")).join(""), g2=CHAVES_ATV.concat(chavesMix).map(k=>linha(k,"Por atividade e combinados")).join(""), g3=["DIRETORIA","ADMIN"].map(k=>linha(k,"Diretoria e administrador")).join("");
   return cadTopo("Códigos de acesso",chavesConhecidas().length+" códigos")+cadBusca("cad-k-busca","Buscar unidade, atividade ou código…")+cadSaltos(["Por unidade","Por atividade e combinados","Diretoria e administrador"])+
     cadListaAgrupada([["Por unidade",g1,D.fazendas.length],["Por atividade e combinados",g2,CHAVES_ATV.length+chavesMix.length],["Diretoria e administrador",g3,2]].filter(x=>x[1]).map(([nome,html,n])=>({nome,html,n:q?(html.match(/class="cad-item"/g)||[]).length:n})))+
-    (!g1&&!g2&&!g3?`<p class="mut centro mt">Nada encontrado.</p>`:"")+
+    (!g1&&!g2&&!g3?htmlEstado("vazio",{que:"código de acesso",filtro:q},{classe:"mut centro mt"}):"")+
     cadRodape(`<button class="btn" data-cadv="codigonovo" data-cadid="">＋ Novo código combinado</button>`);
 }
 function cadVCodigo(chave){
@@ -4625,12 +4705,12 @@ function cadVCatalogo(atv){
       ${cadSelect("Em qual lista",`catk`,editaveis.map(([k,rot])=>[k,rot]),fm.cat)}
       ${cadCampo("Termo","termo","","placeholder=\"Como o gerente vai ler no boletim\"")}
       <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="termo-add" data-cadid="${atv}">Acrescentar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
-    cats.map(([k,rot,lista,edit])=>{ const pad=lista.filter(t=>cadBate(q,t)), ex=catExtra(k).filter(t=>cadBate(q,t)); if(!pad.length&&!ex.length) return "";
+    (cats.map(([k,rot,lista,edit])=>{ const pad=lista.filter(t=>cadBate(q,t)), ex=catExtra(k).filter(t=>cadBate(q,t)); if(!pad.length&&!ex.length) return "";
       const aberto=!!q || cadUI.confirma.indexOf("rm-termo:"+k+"|")===0 || (cadUI.form&&cadUI.form.abertos||[]).includes(k);
       return `<details class="cad-bloco" ${aberto?"open":""} data-cadlista="${esc(k)}"><summary>${esc(rot)} <span class="mut num">· ${lista.length+catExtra(k).length}${edit?"":" · só leitura"}</span></summary><div class="corpo" style="padding:0">`
         +pad.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)}</span><span class="mut" style="font-size:.72rem">padrão</span></div>`).join("")
         +ex.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)} <span class="tag verde">acrescentado</span></span>${cadUI.confirma==="rm-termo:"+k+"|"+t?`<button class="btn mini" data-cadok="rm-termo:${esc(k)}|${esc(t)}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-termo:${esc(k)}|${esc(t)}">remover</button>`}</div>`).join("")+`</div></details>`;
-    }).join("")+
+    }).join("")||htmlEstado("vazio",{que:"termo",onde:"no catálogo de "+ROTULO_CULT[atv].toLowerCase(),filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="termo">＋ Acrescentar termo</button>`);
 }
 function cadVMaquinas(){
@@ -4646,7 +4726,7 @@ function cadVMaquinas(){
       ${cadUI.confirma==="rm-maq:"+m.id?`<button class="btn mini" data-cadok="rm-maq:${m.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-maq:${m.id}">remover</button>`}
       ${vincAberto===m.id?`<div class="chips mt" style="width:100%"><button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
         ${D.fazendas.map(f=>`<button class="chip ${(m.fazendas||[]).includes(f.id)?"on":""}" data-vinc-faz="${m.id}:${f.id}">${esc(f.nome)}</button>`).join("")}</div>`:""}</div>`).join("")+
-    (maqs.length?"":`<p class="mut centro mt">Nenhuma máquina${q?" com esse nome":""}.</p>`)+
+    (maqs.length?"":htmlEstado("vazio",{que:q?"máquina":"máquina cadastrada",filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="maquina">＋ Nova máquina</button>`);
 }
 function cadVInsumos(){
@@ -4656,7 +4736,7 @@ function cadVInsumos(){
       <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="insumo-add">Criar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
     ins.map(i=>`<div class="cad-item" data-cadfoco="ins:${i.id}" style="cursor:default"><span class="cresce"><b>${esc(i.nome)}</b><span class="mut">${esc(i.un||"")}</span></span>
       ${cadUI.confirma==="rm-ins:"+i.id?`<button class="btn mini" data-cadok="rm-ins:${i.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-ins:${i.id}">remover</button>`}</div>`).join("")+
-    (ins.length?"":`<p class="mut centro mt">Nenhum insumo cadastrado.</p>`)+
+    (ins.length?"":htmlEstado("vazio",{que:q?"insumo":"insumo cadastrado",filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="insumo">＋ Novo insumo</button>`);
 }
 
@@ -4691,7 +4771,7 @@ function cadVImportacoes(){
   return cadTopo("Importações manuais","Plano B do robô")+`
     <div class="cartao"><h3>Planilha Solinftec / iCrop</h3>
       <p class="mut" style="font-size:.78rem">Importe o export do dia: as horas de máquina e a lâmina de irrigação aparecem prontas no boletim do gerente, só para confirmar. Use só se o robô falhar.</p></div>
-    ${tel.length?cadGrupo("Importações feitas ("+tel.length+")")+tel.slice(0,12).map(r=>`<div class="cad-item" style="cursor:default"><span class="cresce"><b>${fmtData(r.data)}</b><span class="mut">${esc(r.fonte)} · ${(r.linhas||[]).length} linhas · ${r.atualizado?new Date(r.atualizado).toLocaleDateString("pt-BR"):""}</span></span></div>`).join(""):""}
+    ${tel.length?cadGrupo("Importações feitas ("+tel.length+")")+tel.slice(0,12).map(r=>`<div class="cad-item" style="cursor:default"><span class="cresce"><b>${fmtData(r.data)}</b><span class="mut">${esc(r.fonte)} · ${(r.linhas||[]).length} linhas · ${r.atualizado?new Date(r.atualizado).toLocaleDateString("pt-BR"):""}</span></span></div>`).join(""):htmlEstado("vazio",{que:"importação manual feita",onde:"neste aparelho"},{classe:"mut centro mt"})}
     ${cadRodape(`<button class="btn" data-cadacao="abrir-importar">Importar arquivo do dia</button>`)}`;
 }
 
@@ -5730,6 +5810,7 @@ function ligarEventos(tela){
       else ir("fazendas");
       return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
+    if(d.sync!==undefined){ syncTudo(); ir(telaAtual,null,true); return; } /* "Tentar de novo" do estado de erro (v60): redesenha já em "carregando" */
     if(t.id==="bt-sync-salvar"){
       const u=(app.querySelector("#sync-url")||{}).value||"", k=(app.querySelector("#sync-key")||{}).value||"";
       syncCfg={ url:u.trim().replace(/\/+$/,""), chave:k.trim() };
@@ -6416,7 +6497,7 @@ function vRelatorio(){
         ${Object.entries(porFaz).map(([k,o])=>`<tr style="border-bottom:1px solid var(--linha)">
           <td style="padding:6px 4px"><b>${esc(fazenda(k).nome)}</b></td><td class="num">${o.dias}</td><td class="num">${o.sacas}</td>
           <td class="num">${o.latas}</td><td class="num">${o.carretas||0}</td><td class="num">${o.hm}</td><td class="num">${o.comb}</td><td class="num">${o.chuva}</td>
-          <td class="num">${o.mo}</td><td class="num">${o.irrProb||""}</td><td class="num">${o.fito+o.ocorr||""}</td></tr>`).join("")||"<tr><td colspan=11 class='mut'>Sem boletins no período.</td></tr>"}
+          <td class="num">${o.mo}</td><td class="num">${o.irrProb||""}</td><td class="num">${o.fito+o.ocorr||""}</td></tr>`).join("")||htmlEstado("vazio",{que:"boletim",unidade:filtroRel.fazenda||"",onde:filtroRel.fazenda?"":"nas unidades deste código",periodo:periodoVazio(de,ate),ultimo:filtroRel.fazenda?(boletinsOrdenados().find(b=>b.fazendaId===filtroRel.fazenda)||{}).data:""},{tag:"td",colspan:11})}
       </table></div></div>
     ${rankTal.length?`<div class="cartao"><h3>Talhões que mais colheram</h3>
       <ul class="lista-limpa">${rankTal.map(([k,v])=>`<li class="linha-flex"><span class="cresce">${esc(k)}</span><b class="num">${v} sc</b></li>`).join("")}</ul></div>`:""}
