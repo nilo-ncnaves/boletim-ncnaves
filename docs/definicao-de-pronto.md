@@ -249,3 +249,39 @@ conferir:
 9. **Leitura:** "não respondido" = sem registro E sem linha em
    `boletim_secao_resposta` — nunca "não fez" (docs/relatorios.md,
    "Resposta explícita de ausência").
+
+## 12. Ação sujeita a perfil declara se fica oculta ou desabilitada visível (desde a v71)
+Toda ação NOVA (botão, chip de ação, item de menu) que algum perfil não
+executa entra no catálogo `ACOES_PERFIL` do `index.html` e é desenhada
+por `botaoAcao` / decidida por `estadoAcao` (CLAUDE.md, item c9) —
+nunca por condicional solta na tela. Antes do PR, conferir:
+1. **Declaração explícita:** a linha do catálogo diz `visivel` (quem vê
+   a ação esmaecida) e, se visível, o `papel` (texto do toque). A
+   tabela em docs/acoes-por-perfil.md ganha a linha correspondente com
+   ação, tela, quem executa, quem vê desabilitada (ou "oculta") e o
+   MOTIVO pelas três condições da regra de decisão. Sem motivo escrito,
+   a ação fica oculta.
+2. **Aprovação do Nilo antes de implementar** para toda linha nova com
+   "exibir desabilitada" — a classificação é de negócio e privacidade
+   (o que a ação revela: que existe, quem faz, que a pessoa não é
+   aquele papel).
+3. **Nunca visível:** ação de outra atividade; ação administrativa para
+   gerente/pós-colheita; rótulo com produto, dose ou custo; ação que
+   revele outra fazenda; código de acesso. Na dúvida, oculta.
+4. **Densidade:** ≤ metade das ações da linha/tela desabilitadas
+   (medido pelo script); zero na tela de apontamento em 3 passos.
+5. **Texto do toque:** "Ação do/da <papel>" (+ condição entre
+   parênteses quando houver prazo). `git grep -n "permiss\|negad\|autoriz\|bloquead\|privil"`
+   no que foi tocado não pode achar texto de tela.
+6. **Visual e acessibilidade:** cinza neutro, borda tracejada, sem
+   vermelho, sem cadeado/ícone; `aria-disabled`, `aria-label` com o
+   papel; sem id/data-* de ação no botão desabilitado.
+7. **Segurança inalterada:** o PR afirma que nenhuma política RLS e
+   nenhum passo da validação do código de acesso mudou.
+8. **Regressão:** a diferença main × branch nas telas do gerente é só o
+   botão `.acao-off`, igual nas três atividades; pós-colheita e tela de
+   apontamento byte a byte iguais.
+9. **Medição:** `scripts/checar-poluicao.cjs`, grupo "9. Ação
+   desabilitada por perfil" (painel da Diretoria, boletim enviado visto
+   pela Diretoria e pelo gerente das três atividades, e contagem zero
+   na tela de apontamento).

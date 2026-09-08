@@ -58,6 +58,13 @@ h3{font-size:.95rem;font-weight:700}
 .btn.perigo{background:var(--cereja)}
 .btn.mini{min-height:40px;width:auto;padding:0 14px;font-size:.88rem}
 .btn[disabled]{opacity:.5;cursor:default}
+/* v71: ação sujeita a perfil que este código não executa — mesma forma e posição da ação habilitada, esmaecida em
+   cinza neutro (nunca vermelho: cor é do farol), borda tracejada para não depender só do esmaecimento, sem cadeado
+   nem ícone; aria-disabled para leitor de tela. Toque mostra quem executa (data-papel) por 2,5 s, sem modal. */
+.acao-off,.btn.acao-off{background:var(--papel);color:var(--tinta-2);border:1.5px dashed var(--tinta-2);box-shadow:none;cursor:default;position:relative;font-weight:600}
+.acao-off:active,.btn.acao-off:active{background:var(--papel)}
+.acao-off.mostra::after{content:attr(data-papel);position:absolute;left:0;bottom:calc(100% + 4px);background:var(--tinta);color:var(--papel);font:600 .78rem/1.2 system-ui,-apple-system,sans-serif;padding:5px 8px;white-space:nowrap;z-index:8;letter-spacing:0;text-transform:none}
+.acao-off.mostra.dir::after{left:auto;right:0}
 /* Cartões */
 .cartao{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio);padding:14px;margin-bottom:12px;box-shadow:var(--sombra)}
 .cartao.toque{cursor:pointer}
@@ -1195,6 +1202,40 @@ const podePainel = () => { const e=escopoAtual(); return !!(e && e.painel); };
 const podeCadastros = () => { const e=escopoAtual(); return !!(e && e.cadastros); };
 const soLeitura = () => { const e=escopoAtual(); return !!(e && e.soLe); };
 const chaveDoAcesso = () => acesso ? acesso.chave : null;
+/* ---------- Ações sujeitas a perfil (v71) — três estados, componente ÚNICO ----------
+   estadoAcao(id, ctx) → "permitido" | "bloqueado_visivel" | "oculto". A decisão de VISIBILIDADE é de negócio e
+   privacidade (docs/acoes-por-perfil.md, tabela aprovada pelo Nilo em 08/09/2026): só aparece desabilitada a ação
+   que (1) ajuda quem usa a saber a quem pedir, (2) tem rótulo sem produto, dose, custo ou outra fazenda e (3) é do
+   domínio que a pessoa já enxerga. Ação de outra atividade e ação administrativa para gerente são sempre "oculto".
+   É interface, não segurança: a autorização real é do Supabase (RLS). `papel` é o texto do toque — nomeia quem faz,
+   nunca julga ("Ação da diretoria"; proibido "sem permissão", "acesso negado", "bloqueado"). Ação nova sujeita a
+   perfil entra AQUI (e na tabela do docs), declarando `visivel` — nunca condicional solta na tela. */
+const ACOES_PERFIL={
+  boletim_atividade:    {pode:c=>!soLeitura() && unidadesPermitidas().some(f=>atividadeDe(f.id)===c.atv), visivel:()=>false},
+  pos_colheita:         {pode:()=>!soLeitura() && unidadesPermitidas().some(f=>perfilDe(f.id).includes("CAFE")), visivel:()=>false},
+  painel_diretoria:     {pode:()=>podePainel(), visivel:()=>false},
+  relatorios_diretoria: {pode:()=>podePainel(), visivel:()=>false},
+  escritorio:           {pode:()=>podeCadastros(), visivel:()=>false},
+  cadastros_painel:     {pode:()=>!!sessao && sessao.papel==="admin", visivel:()=>!!sessao && sessao.papel==="proprietario", papel:"Ação do escritório (administrador)"},
+  corrigir_boletim:     {pode:c=>!!sessao && sessao.papel==="gerente" && !!c.prazo, visivel:()=>!!sessao && sessao.papel!=="gerente", papel:"Ação do gerente (até 48 h após o envio)"},
+  marcar_visto:         {pode:()=>!!sessao && sessao.papel!=="gerente", visivel:()=>!!sessao && sessao.papel==="gerente", papel:"Ação da diretoria"}
+};
+function estadoAcao(id, ctx){
+  const a=ACOES_PERFIL[id]; if(!a) return "oculto";
+  const c=ctx||{};
+  if(a.pode(c)) return "permitido";
+  return (a.papel && a.visivel(c)) ? "bloqueado_visivel" : "oculto";
+}
+const acaoOk = (id, ctx) => estadoAcao(id, ctx)==="permitido";
+/* botão nos três estados: permitido → o botão de sempre (o.attrs leva id/data-* da ação); bloqueado_visivel → mesma
+   forma e posição, classe acao-off, aria-disabled, SEM id nem data-* (nada executa ao tocar); oculto → "".
+   o = {rotulo, aria (rótulo sem emoji, para o leitor de tela), classe, attrs} */
+function botaoAcao(id, ctx, o){
+  const st=estadoAcao(id, ctx); if(st==="oculto") return "";
+  if(st==="permitido") return `<button class="${o.classe||"btn"}"${o.attrs?" "+o.attrs:""}>${o.rotulo}</button>`;
+  const p=ACOES_PERFIL[id].papel;
+  return `<button type="button" class="${o.classe||"btn"} acao-off" aria-disabled="true" aria-label="${esc(o.aria||o.rotulo)} — ${esc(p)}" title="${esc(p)}" data-papel="${esc(p)}">${o.rotulo}</button>`;
+}
 /* rótulo e descrição do escopo de uma chave (usados só nas telas de ADMIN) */
 function rotuloDaChave(chave){
   if(chave==="ADMIN") return "Administrador";
@@ -3102,9 +3143,9 @@ function vEntrada(){
   const avisoMem = Persist.usaMem ? `<div class="aviso">Este dispositivo não liberou o armazenamento permanente. Os dados valem só para esta sessão.</div>` : "";
   /* só aparecem as opções que o código deste aparelho abre
      (diretoria só lê: não preenche boletim nem pós-colheita) */
-  const uni=soLeitura()?[]:unidadesPermitidas();
-  const temAtv=a=>uni.some(f=>atividadeDe(f.id)===a);
-  const temPos=uni.some(f=>perfilDe(f.id).includes("CAFE"));
+  /* v71: decisão permitido/oculto pelo catálogo ACOES_PERFIL (estadoAcao); aqui tudo é "oculto" por regra */
+  const temAtv=a=>acaoOk("boletim_atividade",{atv:a});
+  const temPos=acaoOk("pos_colheita");
   return `<div class="entrada">
     <div class="marca"><div class="grao">☕</div><h1>Boletim Diário das Fazendas</h1>
       <p class="mut">Grupo LGS · informativo diário de campo</p></div>
@@ -3118,11 +3159,11 @@ function vEntrada(){
       <span><b>Pecuária</b><span class="mut">Boletim do gado e dos pastos</span></span></button>`:""}
     ${temPos?`<button class="perfil-btn" data-perfil="pos"><span class="ava">🏭</span>
       <span><b>Terreiro / Secador / Benefício</b><span class="mut">Registro diário do pós-colheita</span></span></button>`:""}
-    ${podePainel()?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
-      <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>
-    <button class="perfil-btn" data-perfil="relatorios"><span class="ava">📊</span>
+    ${acaoOk("painel_diretoria")?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
+      <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
+    ${acaoOk("relatorios_diretoria")?`<button class="perfil-btn" data-perfil="relatorios"><span class="ava">📊</span>
       <span><b>Relatórios</b><span class="mut">Textos para revisar e números prontos</span></span></button>`:""}
-    ${podeCadastros()?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
+    ${acaoOk("escritorio")?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
@@ -4530,11 +4571,11 @@ function vPainel(){
       <input id="f-de" type="date" value="${filtroPainel.de}" title="De">
       <input id="f-ate" type="date" value="${filtroPainel.ate}" title="Até">
     </div>
-    <div class="linha-flex mb no-print" style="gap:8px">
+    <div class="linha-flex mb no-print" style="gap:8px;flex-wrap:wrap">
       <button class="btn sec mini" id="bt-csv">⬇ Excel/CSV</button>
       <button class="btn sec mini" id="bt-pdf">🖨 PDF do período</button>
       <button class="btn sec mini" id="bt-rel">📈 Resumo do período</button>
-      ${sessao.papel==="admin"?`<button class="btn sec mini" id="bt-cad">⚙ Cadastros</button>`:""}
+      ${botaoAcao("cadastros_painel",null,{classe:"btn sec mini",attrs:'id="bt-cad"',rotulo:"⚙ Cadastros",aria:"Cadastros"})}
     </div>
     <div class="cartao"><h3>Boletins (${lista.length})${filtroPainel.fazenda?" — "+esc(fazenda(filtroPainel.fazenda).nome):""}</h3>
       <ul class="lista-limpa">${lista.map(x=>`
@@ -4630,7 +4671,6 @@ function vDetalhe(id){
   if(!b) return topo("Boletim","não encontrado",true);
   const g = sessao.papel==="gerente";
   const horas48 = (Date.now() - new Date(b.data+"T12:00:00").getTime()) < 48*3600*1000;
-  const podeEditar = g && horas48;
   return cabecalhoContexto(b.fazendaId,{sub:[fmtData(b.data),b.responsavel].filter(Boolean).join(" · "), voltar:true})+`
     ${b.editadoEm?`<p class="mut mb">Última alteração: ${esc(b.editadoEm)}</p>`:""}
     <div class="cartao"><h3>🌤️ Clima</h3><dl class="dl mt">
@@ -4690,8 +4730,8 @@ function vDetalhe(id){
     ${b.pendencias?`<div class="cartao"><h3>📌 Pendências para o dia seguinte</h3><p class="mt" style="white-space:pre-wrap">${esc(b.pendencias)}</p></div>`:""}
     <div class="linha-flex no-print" style="gap:8px;flex-wrap:wrap">
       <button class="btn sec mini" data-zap="${b.id}">📲 WhatsApp</button>
-      ${podeEditar?`<button class="btn mini" id="bt-editar" data-id="${b.id}">✏️ Corrigir</button>`:""}
-      ${!g?`<button class="btn sec mini" id="bt-visto" data-id="${b.id}">${b.visto?"✓ Visto":"Marcar como visto"}</button>`:""}
+      ${botaoAcao("corrigir_boletim",{prazo:horas48},{classe:"btn mini",attrs:`id="bt-editar" data-id="${b.id}"`,rotulo:"✏️ Corrigir",aria:"Corrigir"})}
+      ${botaoAcao("marcar_visto",null,{classe:"btn sec mini",attrs:`id="bt-visto" data-id="${b.id}"`,rotulo:b.visto?"✓ Visto":"Marcar como visto",aria:"Marcar como visto"})}
       <button class="btn sec mini" onclick="window.print()">🖨 PDF deste boletim</button>
     </div>
     ${g&&!horas48?`<p class="mut mt">Prazo de correção (48 h) encerrado — fale com o escritório.</p>`:""}`;
@@ -4815,7 +4855,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v70";
+const APP_VERSAO="v71";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6266,6 +6306,12 @@ function ligarEventos(tela){
     const bd=ev.target.closest(".op-cat");
     app.querySelectorAll(".op-cat.mostra").forEach(x=>{ if(x!==bd) x.classList.remove("mostra"); });
     if(bd){ const on=bd.classList.toggle("mostra"); if(on) setTimeout(()=>bd.classList.remove("mostra"),2500); return; }
+    /* v71: toque em ação desabilitada por perfil mostra quem a executa (data-papel) por 2,5 s; nada executa.
+       O botão não tem id nem data-* de ação, então nenhum tratador abaixo o alcançaria de todo modo. */
+    const off=ev.target.closest(".acao-off");
+    app.querySelectorAll(".acao-off.mostra").forEach(x=>{ if(x!==off) x.classList.remove("mostra","dir"); });
+    if(off){ const on=off.classList.toggle("mostra"); off.classList.toggle("dir", on && off.getBoundingClientRect().left>innerWidth/2);
+      if(on) setTimeout(()=>off.classList.remove("mostra","dir"),2500); return; }
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
     if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
