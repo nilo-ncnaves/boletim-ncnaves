@@ -230,9 +230,9 @@ const statusIntegracoesExemplo = () => {
 
 async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS[fz], chave: fz }, gerente(fz, atv));
-  /* v63: grãos e pecuária recebem dado de integração do dia + estado dos robôs, para os cartões iCrop/Solinftec
-     e a linha "Dados do iCrop de hoje, 04:05" entrarem na medição. Café fica sem semente (regra 1: tela intocada). */
-  if (atv !== 'CAFE') {
+  /* v63: dado de integração do dia + estado dos robôs, para os cartões iCrop/Solinftec e a linha
+     "Dados do iCrop de hoje, 04:05" entrarem na medição. v64: café também (decisão do Nilo, 08/09/2026). */
+  {
     await page.evaluate(([f, st]) => {
       const hoje = hojeISO();
       statusIntegracoes = st;
@@ -282,6 +282,14 @@ async function cenarioPos(browser, base, R, termos) {
 async function cenarioDiretoria(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null);
   await page.click('[data-perfil="proprietario"]').catch(() => {}); await page.waitForTimeout(500);
+  /* v64: medição de ontem (iCrop e Solinftec) + estado dos robôs, para os cartões do painel e a linha de origem entrarem na medição */
+  await page.evaluate(st => {
+    const ontem = ontemISO();
+    statusIntegracoes = st;
+    D.solinftecDados = [{ fazenda_id: 'f33', data: ontem, equipamento: 'Trator 01', operacao: 'Operação 205', talhao: '', horas: 3.2, area_ha: 12, consumo_l: 40 }];
+    D.icropDados = [{ fazenda: 'NC Naves - Floramill', equipamento: 'Pivô 01', parcela: 'Gleba A', data: ontem, atualizado_em: new Date().toISOString(), irrigacao_mm: 4.2, precipitacao_mm: 0, etc: 3, eto: 4 }];
+    ir('painel');
+  }, statusIntegracoesExemplo()); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — painel', 'diretoria'));
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
@@ -293,14 +301,16 @@ async function cenarioDiretoria(browser, base, R) {
     const OPS = {
       PECUARIA: [['PEC-SUPLEMENTACAO', 'Suplementação (sal mineral / proteinado / ração)', 7, 3], ['PEC-CONTAGEM', 'Contagem', 30, 10], ['PEC-VACINACAO', 'Vacinação (especificar)', 180, 30], ['PEC-ROCADA', 'Roçada', null, null]],
       GRAOS: [['GRAOS-MONITORAMENTO_DE_PRAGAS_E_DOENCAS', 'Monitoramento de pragas e doenças', 7, 3], ['GRAOS-FUNGICIDA', 'Fungicida', null, null]],
+      /* v65: café entra sem janela (decisão da v60) — a unidade aparece no fim da lista e a tela dela mostra só "Operações sem janela" */
+      CAFE: [['CAFE-ADUBACAO_VIA_LANCO', 'Adubação via lanço', null, null], ['CAFE-PULVERIZACAO', 'Pulverização', null, null], ['CAFE-DESBROTA', 'Desbrota', null, null]],
     };
     const EX = [[0, 'verde', 'registrado hoje'], [12, 'amarelo', 'sem registro há 12 dias · janela aberta, fecha em 2 dias'], [47, 'vermelho', 'sem registro há 47 dias · janela fechada há 7 dias'], [3, 'verde', 'registrado há 3 dias']];
-    farolCache = D.fazendas.filter(f => temCultura(f.id, 'GRAOS') || temCultura(f.id, 'PECUARIA')).flatMap((f, k) => {
-      const atv = temCultura(f.id, 'PECUARIA') ? 'PECUARIA' : 'GRAOS';
+    farolCache = D.fazendas.filter(f => temCultura(f.id, 'GRAOS') || temCultura(f.id, 'PECUARIA') || temCultura(f.id, 'CAFE')).flatMap((f, k) => {
+      const atv = temCultura(f.id, 'PECUARIA') ? 'PECUARIA' : temCultura(f.id, 'GRAOS') ? 'GRAOS' : 'CAFE';
       return OPS[atv].map(([id, nome, c, tol], i) => { const e = EX[(i + k) % 4]; return { unidade_id: f.id, operacao_id: id, atividade: atv, operacao_nome: nome, fase: null, data_ultimo_registro: '2026-08-20', dias_sem_registro: e[0], nunca_registrado: false, primeiro_boletim: '2026-07-01', cadencia_dias: c, tolerancia_dias: tol, janela_origem: c ? 'proposta' : null, farol: c ? e[1] : null, fecha_em_dias: c ? 2 : null, situacao: c ? e[2] : null }; });
     });
     farolBaixadoEm = '2026-09-07T12:00:00Z';
-    /* v62: ritmo observado (vw_ritmo_operacoes) — linhas de exemplo só para grãos e pecuária; a 2ª operação de cada unidade fica sem intervalo (linha omitida) */
+    /* v62: ritmo observado (vw_ritmo_operacoes) — linhas de exemplo (v65: nas três atividades); a 2ª operação de cada unidade fica sem intervalo (linha omitida) */
     ritmoCache = farolCache.map((l, i) => ({ unidade_id: l.unidade_id, operacao_id: l.operacao_id, atividade: l.atividade, qtd_registros: i % 2 ? 1 : 6, qtd_intervalos: i % 2 ? 0 : 5, intervalo_mediano_dias: i % 2 ? null : 7 + (i % 3) * 5, intervalo_minimo_dias: i % 2 ? null : 5, intervalo_maximo_dias: i % 2 ? null : 30, data_ultimo_registro: '2026-08-20' }));
     ir('farois');
   }); await page.waitForTimeout(300);
@@ -308,6 +318,10 @@ async function cenarioDiretoria(browser, base, R) {
   const unFarol = await page.evaluate(() => (D.fazendas.find(f => temCultura(f.id, 'PECUARIA')) || {}).id || '');
   await page.evaluate(u => ir('farol', u), unFarol); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria › Faróis › unidade', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  /* v65: unidade de café (sem janela): vazio pela função única + bloco "Operações sem janela" fechado, com dias sem registro e ritmo */
+  const unFarolCafe = await page.evaluate(() => (D.fazendas.find(f => temCultura(f.id, 'CAFE')) || {}).id || '');
+  await page.evaluate(u => ir('farol', u), unFarolCafe); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Diretoria › Faróis › unidade (café)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   R.errosDiretoria = erros.slice();
   await ctx.close();
 }

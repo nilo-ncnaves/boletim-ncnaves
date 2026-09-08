@@ -1717,7 +1717,7 @@ function cartaoSolinftecGerente(fz){
   const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
   return `<div class="cartao"><h3>📡 Solinftec — medição automática do dia</h3>
     ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${perfilDe(fz).includes("CAFE")?"":linhaOrigemDado("solinftec")}</div>`;
+    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${linhaOrigemDado("solinftec")}</div>`;
 }
 function cartaoSolinftecPainel(){
   if(!SOLINFTEC_AUTO) return "";
@@ -1731,7 +1731,7 @@ function cartaoSolinftecPainel(){
   const num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
   return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
     ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
+    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p>${linhaOrigemDado("solinftec")}</div>`;
 }
 /* ---- Estado das integrações (v63): leitura da visão vw_status_integracoes (sql/045) ----
    Uma linha por fonte externa (icrop, solinftec) com três horários que NÃO se misturam:
@@ -1740,8 +1740,8 @@ function cartaoSolinftecPainel(){
    ultimo_dado_origem (dia a que o dado se refere). Tudo chega em UTC; a conversão para Brasília
    é feita aqui, com America/Sao_Paulo explícito (o gerente está em Monte Carmelo). Só leitura, na
    sincronização; sem a visão (404) ou sem rede fica o último baixado; sem cache nenhuma linha de
-   origem aparece e as telas ficam exatamente como antes. Aparelho só de café não baixa nem mostra
-   (regra 1). Regra: "Dados do iCrop de hoje, 04:05" no rodapé de cada bloco de dado externo; com
+   origem aparece e as telas ficam exatamente como antes. Desde a v64 vale para café também (decisão do
+   Nilo, 08/09/2026: dado de irrigação iCrop e de máquinas é gestão do cafeicultor) e para o painel. Regra: "Dados do iCrop de hoje, 04:05" no rodapé de cada bloco de dado externo; com
    mais de ORIGEM_LIMIAR_H horas sem sucesso do robô a linha vira "Última atualização do iCrop há N
    dias" em cor de atenção — sem ícone, sem exclamação, sem bloquear. Nunca "agora" nem "tempo real". */
 let statusIntegracoes=[];   /* linhas de vw_status_integracoes (bdf:statusIntegracoes) */
@@ -1751,8 +1751,6 @@ const FUSO_BRT="America/Sao_Paulo";
 async function baixarStatusIntegracoes(){
   if(!syncAtivo()) return [];
   try{
-    const uns=unidadesPermitidas();
-    if(uns.length && uns.every(f=>perfilDe(f.id).includes("CAFE"))) return [];   /* aparelho só de café: nenhuma tela lê */
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
     const r=await fetch(syncCfg.url+"/rest/v1/vw_status_integracoes?select=fonte,ultima_execucao_em,ultima_execucao_ok_em,ultimo_dado_em,ultimo_dado_origem,horas_desde_ultimo_sucesso&order=fonte", cab);
     if(!r.ok) return [];
@@ -1897,8 +1895,8 @@ function textoDiasSemRegistro(l){
    (sql/043). Ritmo = mediana dos dias entre um registro e o anterior da mesma operação na mesma
    unidade — fecha o par com "dias sem registro" (que olha do último registro até hoje). Um registro
    é um dia com a operação no boletim da unidade. Só leitura, filtros opcionais
-   {atividade:"GRAOS"|"PECUARIA"|["GRAOS","PECUARIA"], unidade:"f33"}; o app pede só grãos e pecuária
-   (em syncTudo, só códigos com painel) e nenhuma tela de café lê. Na tela: "a cada N dias" quando há
+   {atividade:"GRAOS"|"PECUARIA"|["GRAOS","PECUARIA"], unidade:"f33"}; o app pede as três atividades
+   (em syncTudo, só códigos com painel; até a v64 só grãos e pecuária). Na tela: "a cada N dias" quando há
    mediana (qtd_intervalos > 0); sem intervalo a linha é omitida — nada de "sem ritmo" nem traço. */
 let ritmoCache=[];   /* linhas de vw_ritmo_operacoes (bdf:ritmoOperacoes) */
 async function lerVisaoRitmo(visao, colunas, filtro){
@@ -1972,15 +1970,20 @@ async function baixarFarolRegistro(){
 }
 const FAROL_ORDEM={vermelho:0,amarelo:1,cinza:2,verde:3};
 const farolLinhas=()=>farolCache.filter(l=>l && podeVer(l.unidade_id));
-/* resumo por unidade: só as operações com janela; a pior cor manda */
+/* resumo por unidade: as operações com janela contam por cor e a pior cor manda. Unidade cujas operações
+   não têm janela nenhuma (v65: o café, sem janela por decisão da v60) entra no fim da lista, sem cor, com
+   "N de M operações com registro" — assim os dias sem registro dela ficam alcançáveis na tela da unidade.
+   Unidade com pelo menos uma janela é mostrada exatamente como antes. */
 function farolPorUnidade(){
   const uns={};
-  farolLinhas().filter(l=>l.farol).forEach(l=>{
-    const u=uns[l.unidade_id]=uns[l.unidade_id]||{id:l.unidade_id,atividade:l.atividade,n:{vermelho:0,amarelo:0,cinza:0,verde:0}};
-    u.n[l.farol]=(u.n[l.farol]||0)+1;
+  farolLinhas().forEach(l=>{
+    const u=uns[l.unidade_id]=uns[l.unidade_id]||{id:l.unidade_id,atividade:l.atividade,n:{vermelho:0,amarelo:0,cinza:0,verde:0},semJanela:0,comRegistro:0};
+    if(l.farol) u.n[l.farol]=(u.n[l.farol]||0)+1; else u.semJanela++;
+    if(!l.nunca_registrado) u.comRegistro++;
   });
-  return Object.values(uns).map(u=>{ u.pior=["vermelho","amarelo","cinza","verde"].find(k=>u.n[k])||"verde"; u.nome=fazenda(u.id).nome; return u; })
-    .sort((a,b)=>FAROL_ORDEM[a.pior]-FAROL_ORDEM[b.pior] || a.nome.localeCompare(b.nome,"pt-BR"));
+  const ordem=u=>u.pior?FAROL_ORDEM[u.pior]:4;
+  return Object.values(uns).map(u=>{ u.pior=["vermelho","amarelo","cinza","verde"].find(k=>u.n[k])||""; u.nome=fazenda(u.id).nome; return u; })
+    .sort((a,b)=>ordem(a)-ordem(b) || a.nome.localeCompare(b.nome,"pt-BR"));
 }
 const farolRodape=comRitmo=>`<p class="mut" style="font-size:.72rem;margin-top:12px">Calculado no Supabase (janelas em operacao_janela, sql/042); o app só mostra. ${farolBaixadoEm?"Baixado em "+new Date(farolBaixadoEm).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""} Vermelho só depois de a janela fechar. "Sem registro" não quer dizer que não foi feito — quer dizer que não está no boletim.${comRitmo?" Ritmo = mediana dos dias entre um registro e o anterior da mesma operação (vw_ritmo_operacoes, sql/043); só aparece com dois registros ou mais.":""}</p>`;
 function vFarois(){
@@ -1989,7 +1992,7 @@ function vFarois(){
   const rot={vermelho:"janela fechada",amarelo:"janela aberta",verde:"em dia",cinza:"sem histórico"};
   const item=u=>`<button class="cad-item" data-farolun="${u.id}" data-nome="${esc(u.nome)}">
       <span class="farol reto ${relFarolCor(u.pior)}"></span>
-      <span class="cresce"><b>${esc(u.nome)}</b><span class="mut">${["vermelho","amarelo","verde","cinza"].filter(k=>u.n[k]).map(k=>u.n[k]+" "+rot[k]).join(" · ")}</span></span>
+      <span class="cresce"><b>${esc(u.nome)}</b><span class="mut">${u.pior?["vermelho","amarelo","verde","cinza"].filter(k=>u.n[k]).map(k=>u.n[k]+" "+rot[k]).join(" · "):"sem janela · "+u.comRegistro+" de "+u.semJanela+" operações com registro"}</span></span>
       <span class="seta">›</span></button>`;
   const fechadas=uns.filter(u=>u.n.vermelho).length;
   return topo("Faróis de registro", (sessao&&sessao.papel==="admin")?"Administrador":"Diretoria", true)+`
@@ -2009,15 +2012,15 @@ function vFarol(un){
   const f=fazenda(un), ls=farolLinhas().filter(l=>l.unidade_id===un);
   const comJ=ls.filter(l=>l.farol).sort((a,b)=>FAROL_ORDEM[a.farol]-FAROL_ORDEM[b.farol] || String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
   const semJ=ls.filter(l=>!l.farol).sort((a,b)=>String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
-  /* v62: ritmo observado ("a cada N dias", mediana entre registros) só em grãos e pecuária e só com 2 registros ou mais; senão nada */
-  const ritmo=l=>l.atividade==="CAFE"?"":textoRitmo(ritmoDe(l.unidade_id,l.operacao_id));
+  /* v62: ritmo observado ("a cada N dias", mediana entre registros) só com 2 registros ou mais; senão nada. v65: nas três atividades */
+  const ritmo=l=>textoRitmo(ritmoDe(l.unidade_id,l.operacao_id));
   const linha=l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
       <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}${rt?" · ritmo: "+esc(rt):""}</span></span></div>`; };
   return topo(f.nome||un, "Faróis de registro", true)+`
     ${comJ.length?comJ.map(linha).join(""):`<div class="cartao">${htmlEstado("vazio",{que:"operação com janela",unidade:un})}</div>`}
     ${semJ.length?`<details class="cad-bloco"><summary>Operações sem janela <span class="mut num">· ${semJ.length}</span></summary><div class="corpo" style="padding:0">
       ${semJ.map(l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b>${rt?`<span class="mut">ritmo: ${esc(rt)}</span>`:""}</span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`; }).join("")}</div></details>`:""}
-    ${farolRodape(ls.some(l=>l.atividade!=="CAFE"))}
+    ${farolRodape(!!ls.length)}
     <button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar aos faróis</button>`;
 }
 const relLinhas=(rel,ini,fim)=>relCache.filter(l=>l.relatorio===rel && (!ini || (l.periodo_ini===ini && l.periodo_fim===fim)));
@@ -2133,11 +2136,9 @@ function vRelat(){
     <button class="btn sec mini" data-relnav="ant" ${i<0||i>=ps.length-1?"disabled":""}>‹ anterior</button>
     <span class="cresce centro" style="font-size:.85rem"><b>${relRotuloPer(rel,ini,fim)}</b></span>
     <button class="btn sec mini" data-relnav="prox" ${i<=0?"disabled":""}>próximo ›</button></div>`;
-  /* v61: o vazio nomeia o período e a unidade; o gerente de café mantém o texto da v59 (regra 1) */
+  /* v61: o vazio nomeia o período e a unidade (v65: também para o gerente de café) */
   const ger=sessao&&sessao.papel==="gerente";
-  const vazio=(ger&&atividadeDe(sessao.fazendaId)==="CAFE")
-    ?`<p class="mut">Nada calculado para este período na sua unidade.</p>`
-    :htmlEstado("vazio",{que:"relatório calculado",periodo:"para "+relRotuloPer(rel,ini,fim),unidade:ger?sessao.fazendaId:"",onde:ger?"":"nas unidades deste código"});
+  const vazio=htmlEstado("vazio",{que:"relatório calculado",periodo:"para "+relRotuloPer(rel,ini,fim),unidade:ger?sessao.fazendaId:"",onde:ger?"":"nas unidades deste código"});
   const corpo=ls.length?relTextos(ls)+relRender(rel,ls):`<div class="cartao">${vazio}</div>`;
   return topo(cat.nome, relRotuloPer(rel,ini,fim)+(sessao&&sessao.papel==="gerente"?" · "+fazenda(sessao.fazendaId).nome:""), true)+nav+corpo+`
     <div class="linha-flex mt no-print" style="gap:8px">
@@ -2423,8 +2424,10 @@ async function upRecarregar(){ await upCarregar(); if(telaAtual==="unidplano") i
 function vUnidPlano(){
   const e=upEstado, d=e.dados;
   const cab=cadTopo("Unidades e Plano de safra","Escritório · referência do agrônomo");
-  if(e.erro) return cab+`<div class="aviso">${esc(e.erro)}</div><button class="btn sec mt" data-up="recarregar">Tentar de novo</button>`;
-  if(!d) return cab+`<p class="mut centro mt">Lendo o plano no Supabase…</p>`;
+  /* v65: carregando · erro · vazio pela função única (antes tinha textos próprios); o "Tentar de novo" continua
+     recarregando só o plano (data-up), por isso não usa o botão data-sync de htmlEstado */
+  if(e.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"o plano de safra"})}<p class="mut" style="font-size:.78rem">${esc(e.erro)}</p></div><button class="btn sec mt" data-up="recarregar">Tentar de novo</button>`;
+  if(!d) return cab+htmlEstado("carregando",{que:"o plano de safra"},{classe:"mut centro mt"});
   const fzs=[...new Set(d.unidades.map(u=>u.fazenda_app).concat(d.planos.map(p=>p.fazenda_app)))].sort((a,b)=>a.localeCompare(b));
   const fz=e.fz, fzId=planoFzDe(fz);
   const uns=d.unidades.filter(u=>u.fazenda_app===fz).sort((a,b)=>a.codigo.localeCompare(b.codigo));
@@ -2463,7 +2466,7 @@ function vUnidPlano(){
   const tagPlano=s=>`<span class="tag ${s==="vigente"?"verde":s==="rascunho"?"amarelo":"terra"}">${esc(s)}</span>`;
   return cab+`
     <div class="aviso verde" style="font-size:.8rem">O plano é a proposta técnica do agrônomo (Salvino) para 2026/27 — referência e comparação, nunca receituário. Aqui você cuida do cadastro mestre das unidades, dos apelidos por sistema e das versões do plano. O gerente não vê nada disto na v52.</div>
-    <div class="chips mb">${fzs.map(f=>`<button class="chip ${f===fz?"on":""}" data-up="fz" data-upv="${esc(f)}">${esc(f)}${planoFzDe(f)?"":" ⚠"}</button>`).join("")||"<span class='mut'>Nenhuma fazenda com plano ainda.</span>"}</div>
+    <div class="chips mb">${fzs.map(f=>`<button class="chip ${f===fz?"on":""}" data-up="fz" data-upv="${esc(f)}">${esc(f)}${planoFzDe(f)?"":" ⚠"}</button>`).join("")||htmlEstado("vazio",{que:"fazenda com plano de safra cadastrada"},{tag:"span"})}</div>
     ${fz&&!fzId?`<div class="aviso">⚠ "${esc(fz)}" não está ligada a nenhuma unidade do app: o nome no plano não é idêntico ao do cadastro. Enquanto o Nilo não confirmar (docs/plano/2026-27/depara_fazendas.json), o app não carrega este plano e não dá para criar apelidos "app".</div>`:""}
     <div class="cartao"><h3>📋 Plano de safra — ${esc(fz||"—")}</h3>
       ${planos.length?planos.map(p=>`<div class="subcartao">
@@ -2475,7 +2478,7 @@ function vUnidPlano(){
           <label>Aprovado por (nome do agrônomo)</label><input data-upc="aprovado_por:${esc(p.id)}" value="${esc(p.aprovado_por||"")}" placeholder="Ex.: Salvino">
           <button class="btn mt" data-up="publicar" data-upv="${esc(p.id)}" ${(p.auditoria_ok&&p.aprovado_por)?"":"disabled"}>Publicar como vigente</button>
           <p class="mut" style="font-size:.75rem">Só habilita com auditoria ✔ e o nome do agrônomo. Publicar passa a versão vigente atual para "superado"; os celulares baixam a nova na próxima sincronização.</p>`:""}
-      </div>`).join(""):`<p class="mut">Nenhuma versão do plano para esta fazenda.</p>`}
+      </div>`).join(""):htmlEstado("vazio",{que:"versão do plano",prep:"para",unidade:fzId,onde:fzId?"":(fz?"para "+fz:"")})}
     </div>
     <div class="cartao"><h3>🌱 Unidades <span class="mut">· ${uns.length} nesta fazenda</span></h3>
       <p class="mut" style="font-size:.78rem">O código é a identidade e não muda. Apelidos: <b>plano</b> = nomes do deck; <b>app</b> = talhão do cadastro do app (é o que liga o plano aos chips); solinftec / icrop / agrogestao = nomes nesses sistemas. Encerrar um apelido (✕) guarda a data de fim; inativar uma unidade não apaga nada.</p>
@@ -2489,7 +2492,7 @@ function vUnidPlano(){
         </div>
         <div class="chips mt" style="gap:6px">${als.map(a=>`<span class="tag ${corSis[a.sistema]||"amarelo"}" style="display:inline-flex;align-items:center;gap:6px">${esc(a.sistema)}: ${esc(nomeAlias(a))}${u.ativo?`<button data-up="alias-fim" data-upv="${esc(a.id)}" title="encerrar apelido" style="font-weight:800;padding:0 2px;min-height:0;line-height:1">✕</button>`:""}</span>`).join("")||'<span class="mut" style="font-size:.78rem">sem apelidos</span>'}</div>
         ${e.editando===u.id?formEdicao(u):""}${e.aliasEm===u.id?formAlias(u):""}
-      </li>`; }).join("")||"<li class='mut'>Nenhuma unidade cadastrada para esta fazenda.</li>"}</ul>
+      </li>`; }).join("")||htmlEstado("vazio",{que:"unidade do plano",unidade:fzId,onde:fzId?"":(fz?"em "+fz:"")},{tag:"li"})}</ul>
     </div>
     <button class="btn sec mt" data-up="recarregar">🔄 Recarregar do Supabase</button>`;
 }
@@ -2652,7 +2655,7 @@ function cartaoRemessasPainel(){
   return `<div class="cartao"><h3>🚚 Café em trânsito entre fazendas</h3>
     ${transito.length?`<ul class="lista-limpa">${transito.map(r=>`<li style="padding:6px 0;border-bottom:1px solid var(--linha)">
       <b>${fmtData(r.data)}</b> ${esc(fazenda(r.origem).nome)} → <b>${esc(fazenda(r.destino).nome)}</b><br>
-      <span class="mut">${esc(talhao(r.talhaoId).nome)} · ${qtdRemessa(r)} · aguardando confirmação do destino</span></li>`).join("")}</ul>`:`<p class="mut">Nenhuma carga aguardando.</p>`}
+      <span class="mut">${esc(talhao(r.talhaoId).nome)} · ${qtdRemessa(r)} · aguardando confirmação do destino</span></li>`).join("")}</ul>`:htmlEstado("vazio",{que:"carga de café aguardando confirmação do destino"})}
     ${diverg.length?`<p class="mt" style="color:var(--vermelho,#a33)"><b>⚠️ Divergências:</b></p><ul class="lista-limpa">${diverg.map(r=>`<li class="mut" style="padding:4px 0">${fmtData(r.data)} ${esc(fazenda(r.origem).nome)}→${esc(fazenda(r.destino).nome)}: enviou ${r.carretas}, chegou ${r.recebidoQtd}${r.obsReceb?" — "+esc(r.obsReceb):""}</li>`).join("")}</ul>`:""}
   </div>`;
 }
@@ -2913,8 +2916,7 @@ function vCasaGerente(){
         <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
           <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou")))?"critico":"ok"}"></span>
           <span class="cresce"><b>${fmtData(x.data)}</b> <span class="mut">· ${resumo1linha(x)}</span></span>
-          <span class="mut">›</span></button></li>`).join("")||(atCasa==="CAFE"?"<li class='mut'>Nenhum boletim ainda.</li>"
-          :htmlEstado("vazio",{que:"boletim registrado",unidade:fz,dica:"Os boletins aparecem aqui depois do primeiro envio."},{tag:"li"}))}
+          <span class="mut">›</span></button></li>`).join("")||htmlEstado("vazio",{que:"boletim registrado",unidade:fz,dica:"Os boletins aparecem aqui depois do primeiro envio."},{tag:"li"})}
       </ul></div>
     <button class="btn suave mt" id="bt-ajuda">Como preencher (passo a passo)</button>
     <button class="btn sec mt" id="bt-trocar-faz">Trocar fazenda / atividade</button>
@@ -2985,7 +2987,7 @@ function cartaoIcropDia(r){
           ${linhaDet("Hoje",hojeRes,hojeCorpo)}
           ${recCorpo?linhaDet("Recomendação iCrop",maxPct?`percentímetro até ${num(maxPct,0)}%`:"",recCorpo):""}
           ${soloCorpo?linhaDet("Solo e planta",soloRes,soloCorpo):""}
-          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p>${perfilDe(r.fazendaId).includes("CAFE")?"":linhaOrigemDado("icrop")}</div>`;
+          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p>${linhaOrigemDado("icrop")}</div>`;
 }
 function secaoGraos(r){
   const perfil=perfilDe(r.fazendaId);
@@ -4187,7 +4189,7 @@ function vPainel(){
             ${v.vencendo.map(x=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(x.fazenda.replace(/^NC Naves\s*-\s*/,""))} · ${esc(x.nome)}: ${x.dias<0?"venceu em "+new Date(x.fim+"T12:00:00").toLocaleDateString("pt-BR"):x.dias===0?"vence HOJE":"vence em "+x.dias+" dia"+(x.dias>1?"s":"")} — sem novo plantio cadastrado, a lâmina fica sem destino</p>`).join("")}
             ${v.zeradas.map(n=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(n.replace(/^NC Naves\s*-\s*/,""))}: <b>sem nenhuma parcela ativa</b> na iCrop</p>`).join("")}
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
-        <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p></div>`;})()}
+        <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p>${linhaOrigemDado("icrop")}</div>`;})()}
     ${cartaoGraosPainel()}
     ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
@@ -4518,7 +4520,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v63";
+const APP_VERSAO="v65";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5581,7 +5583,7 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes({atividade:["GRAOS","PECUARIA"]}); } } finally { syncOcupado=false; }
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes(); } } finally { syncOcupado=false; }
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol"].includes(telaAtual))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
@@ -5630,7 +5632,7 @@ function vCasaPos(){
     <div class="cartao mt"><h3>Últimos registros</h3>
       <ul class="lista-limpa">${ult.map(x=>`<li><button class="linha-flex" style="width:100%;text-align:left" data-verpos="${x.id}">
         <span class="farol ok"></span><span class="cresce"><b>${fmtData(x.data)}</b> <span class="mut">· ${esc(x.responsavel||"")}</span></span>
-        <span class="mut">›</span></button></li>`).join("")||"<li class='mut'>Nenhum registro ainda.</li>"}</ul></div>
+        <span class="mut">›</span></button></li>`).join("")||htmlEstado("vazio",{que:"registro de pós-colheita",unidade:fz,dica:"Os registros aparecem aqui depois do primeiro envio."},{tag:"li"})}</ul></div>
     <button class="btn sec mt" id="bt-trocar-faz">Trocar de fazenda</button>
     <button class="btn sec mt" id="bt-sair">Sair</button>`;
 }

@@ -218,10 +218,11 @@ Consumo no app (v59): `baixarDiasSemRegistro({atividade, unidade})` lê a
 visão pela REST (só unidades do escopo do código, com trava local),
 guarda em `dsrCache` e em `bdf:diasSemRegistro`; `diasSemRegistroDe(unidade,
 operacao)` e `textoDiasSemRegistro(linha)` ("há 12 dias" / "hoje" / "sem
-registro") ficam prontos para telas futuras. Nenhuma tela mostra o número
-ainda e a função não roda na sincronização. Telas de café não leem a
-visão (o café entra nela só como dado, pela mesma regra das outras
-atividades).
+registro") ficam prontos para telas futuras. A função não roda na
+sincronização; quem mostra o número é a `vw_farol_registro` (v60), em
+Diretoria › Faróis de registro › unidade. Desde a v65 as unidades de café
+também aparecem lá (sem janela: só "há N dias" / "sem registro" por
+operação, no bloco "Operações sem janela").
 
 REST de leitura (chave publishable, filtros opcionais):
 `rest/v1/vw_dias_sem_registro?select=*&atividade=eq.PECUARIA&unidade_id=eq.f26&order=operacao_id`.
@@ -357,10 +358,10 @@ pontos como série).
 **As visões não julgam.** Não há coluna de status, farol, "atrasado",
 "fora do padrão" nem "ritmo esperado": não existe padrão cadastrado e
 inventá-lo seria prescrição. Janela e cor continuam na `vw_farol_registro`
-(v60). Não filtram por perfil de acesso (isso é da camada de leitura) e
-café entra só como dado, pela mesma regra das três atividades — nenhuma
-tela de café lê. Nenhuma junção usa LIKE ou pedaço de nome. Nenhum texto
-compara unidades ou fazendas.
+(v60). Não filtram por perfil de acesso (isso é da camada de leitura);
+as três atividades entram pela mesma regra (até a v64 o app só lia grãos
+e pecuária; desde a v65 lê café também). Nenhuma junção usa LIKE ou
+pedaço de nome. Nenhum texto compara unidades ou fazendas.
 
 Consumo no app (v62): `baixarRitmoOperacoes({atividade, unidade})` lê a
 visão de resumo pela REST (só unidades do escopo, com trava local; a
@@ -368,13 +369,14 @@ atividade pode ser uma ou uma lista), guarda em `ritmoCache` /
 `bdf:ritmoOperacoes`; `baixarIntervaloOperacoes(filtro)` lê os pares sob
 demanda, sem cache; `ritmoDe(unidade, operacao)` e `textoRitmo(linha)`
 ("a cada 18 dias"; vazio quando `qtd_intervalos = 0`) servem as telas. Em
-`syncTudo`, só códigos com painel baixam, e só GRAOS e PECUARIA. Onde
-aparece: Diretoria › Faróis de registro › unidade, como texto secundário
-"ritmo: a cada N dias" ao lado de "sem registro há N dias" — as duas
-métricas juntas — apenas em unidades de grãos e pecuária e apenas com dois
-registros ou mais; sem intervalo a linha é omitida (nada de "sem ritmo" ou
-traço). A tela de uma unidade de café e a lista de Faróis ficaram
-idênticas à v61.
+`syncTudo`, só códigos com painel baixam (até a v64 só GRAOS e PECUARIA;
+desde a v65 as três atividades). Onde aparece: Diretoria › Faróis de
+registro › unidade, como texto secundário "ritmo: a cada N dias" ao lado
+de "sem registro há N dias" — as duas métricas juntas — nas três
+atividades e apenas com dois registros ou mais; sem intervalo a linha é
+omitida (nada de "sem ritmo" ou traço). O eixo de ciclo do café (florada,
+poda) não entra aqui: a métrica mede o intervalo entre dois registros
+consecutivos, sem marco (eixo de ciclo é item da Onda 2).
 
 REST de leitura (chave publishable, filtros opcionais):
 `rest/v1/vw_ritmo_operacoes?select=*&atividade=in.(GRAOS,PECUARIA)&unidade_id=eq.f33&order=operacao_id`
@@ -442,18 +444,21 @@ resposta 200; a coluna `tipo` do diário permite separar isso no futuro.
 
 ### Como o app usa (v63)
 
-`baixarStatusIntegracoes` (na sincronização; aparelho só de café não
-baixa) guarda as linhas em `bdf:statusIntegracoes`. `textoOrigemDado(fonte)`
+`baixarStatusIntegracoes` (na sincronização, em todo aparelho com
+sync) guarda as linhas em `bdf:statusIntegracoes`. `textoOrigemDado(fonte)`
 monta uma linha por bloco de dado externo, no rodapé, em tipografia
 secundária: "Dados do iCrop de hoje, 04:05" / "de ontem, 04:20" / "de
 05/09, 04:05" (hoje/ontem pelas duas datas mais recentes em Brasília).
 Com mais de 26 h sem sucesso: "Última atualização do iCrop há 2 dias" em
 cor de atenção, sem ícone, sem exclamação, sem bloquear. As horas são
 recontadas no aparelho (o número da visão envelhece no cache). Onde
-aparece: cartão iCrop do gerente de grãos, cartão Solinftec do gerente de
-grãos e pecuária, e o bloco "Estado dos robôs" em Escritório › Integrações
-e robôs. Telas de café e o painel da Diretoria (compartilhado) não foram
-tocados.
+aparece (v64, decisão do Nilo em 08/09/2026 de incluir o café): cartão
+iCrop do boletim do gerente (café e grãos), cartão Solinftec da casa do
+gerente (café, grãos e pecuária), cartões "iCrop — medição de ontem" e
+"Solinftec — medição de ontem" do painel da Diretoria, e o bloco "Estado
+dos robôs" em Escritório › Integrações e robôs. Sem linha: pós-colheita
+(não tem dado de integração) e a dica de chuva na seção Clima (o cartão
+iCrop do mesmo boletim já a carrega).
 
 ## Como rodar um relatório PRONTO no Cowork
 

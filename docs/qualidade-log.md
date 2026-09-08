@@ -6,6 +6,113 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v65 · Onda 1 estendida ao café (#17, #37, #13; #3 via v64; #19 inexistente)
+
+**Entrega.** Correção de escopo do Nilo (08/09/2026): a regra 1 isola
+comportamento, não arquivo — melhoria aplicável à cafeicultura entra no
+café pelo mesmo componente (CLAUDE.md, c4 nova). Revisitadas todas as
+telas reportadas como "não alteradas por serem de café ou compartilhadas"
+nos PRs #24, #28, #29 e #30. **#17 e #13:** unidades cujas operações não
+têm janela nenhuma (as 10 de café; o café segue sem janela, decisão da
+v60) entram no fim de Diretoria › Faróis de registro, sem cor, com "sem
+janela · N de M operações com registro" na linha; a tela da unidade
+mostra o vazio pela função única e o bloco "Operações sem janela"
+(fechado) com "há N dias" / "sem registro" e "ritmo: a cada N dias"
+(`syncTudo` baixa `vw_ritmo_operacoes` sem filtro de atividade; a
+condição `=== "CAFE"` de `vFarol` foi removida). **#37:** casa do gerente
+de café, casa da pós-colheita, tela do relatório do gerente de café,
+cartão "Café em trânsito" do painel e Escritório › Unidades e Plano
+(carregando · erro · 3 vazios) passam por `htmlEstado`/`fraseVazio`;
+removidas as duas decisões por `atividadeDe(fz)` que mantinham texto
+antigo. **#3:** já estendido na v64 (PR #31, commits trazidos para este
+branch): as telas de café consomem iCrop (Rio Preto-Lagamar e Vereda
+café, cartão do boletim) e Solinftec (Monte Carmelo e Mata Preta café,
+cartão da casa). **#19:** não existe no repositório (nenhum PR, branch
+ou código com régua) — nada a estender; registrado como tarefa nova.
+Nenhum SQL novo, nenhum campo novo, nenhuma variante por atividade.
+Versão v65 (rodapé + cache do sw.js).
+
+**Verificado (automático, sem rede).**
+- `node --check` no JavaScript extraído do `index.html`, `sw.js`,
+  `scripts/checar-poluicao.cjs` e `scripts/regressao_render.cjs`.
+- `scripts/checar-poluicao.cjs` v65: **227 ✅ · 41 ❌**; rodado também
+  contra a v64 exportada (221 ✅ · 41 ❌) e comparado linha a linha: o
+  conjunto de ❌ é idêntico; os 6 ✅ novos são a tela "Diretoria › Faróis
+  › unidade (café)" (renderiza, 1 tela, só leitura, nível 3, cabeçalho
+  fixo, blocos fechados). Lista de Faróis: 24 unidades, 2,2 telas com
+  busca (era 14 / 1,5); casa de café 1,01 tela (frase de vazio em duas
+  linhas); painel 3,2 telas, igual; termos de outra atividade zero.
+- `scripts/regressao_render.cjs` v64 × v65 **sem dados simulados** (6
+  cenas, 55 telas, versão/horários/ids normalizados): grãos, pecuária e
+  Cadastros byte a byte iguais; café muda só o vazio "Últimos boletins"
+  da casa; pós-colheita só o vazio "Últimos registros"; Diretoria só pela
+  cena nova `41-farol-f01` (unidade de café nos Faróis).
+- Regressão **com dados simulados** (`vw_farol_registro` e
+  `vw_ritmo_operacoes` com 2 unidades de café, 1 de grãos e 1 de
+  pecuária) v63 × v64 × v65: v63 = v64 fora pedidos de rede; v64 × v65:
+  unidade de pecuária (f26) nos Faróis idêntica; linhas de grãos e
+  pecuária da lista idênticas (a diferença começa no grupo "☕ Café · 2"
+  acrescentado no fim); unidade de café ganha "ritmo: a cada 21 dias" na
+  operação com 4 intervalos e nada nas demais; pedido do ritmo perde o
+  filtro `atividade=in.(GRAOS,PECUARIA)`; cache `bdf:ritmoOperacoes`
+  passa a ter as linhas de café. Gerente (café, grãos, pecuária) não faz
+  pedido novo.
+- Vocabulário: `git grep` no diff por "não fez / não realizou / pendente /
+  atrasad / faltou / esqueceu / agora / tempo real": nada.
+
+**Teste manual (Nilo).** DIRETORIA/ADMIN: painel › Faróis de registro —
+unidades de café no fim da lista, tela da unidade com "Operações sem
+janela" (dias sem registro e ritmo). Gerente de café sem boletim no
+aparelho: "Sem boletim registrado em …"; pós-colheita: "Sem registro de
+pós-colheita em …". Escritório › Unidades e Plano em modo avião: "Não foi
+possível carregar o plano de safra." + Tentar de novo.
+
+**Não tocado.** Tela de apontamento em 3 passos (as três atividades e
+pós-colheita), SQL (visões já devolviam café), catálogos, janelas
+(`operacao_janela` — café continua sem janela), títulos "Boletim de hoje
+pendente" (pendência antiga, decisão do Nilo), vigia do painel, marcador
+inline "sem apelidos".
+
+## 08/09/2026 · v64 · linha de origem também no café e no painel da Diretoria
+
+**Entrega.** Decisão do Nilo (08/09/2026): "o que for aplicável à
+cafeicultura e fizer sentido em gestão, pode fazer". Aplicado onde há dado
+de integração que é gestão do cafeicultor: cartão iCrop do boletim do
+gerente de café (Irrigação gotejo — Rio Preto-Lagamar e Vereda irrigam
+com iCrop), cartão Solinftec da casa do gerente de café (Monte Carmelo e
+Mata Preta têm máquinas medidas) e os cartões "iCrop — medição de ontem"
+e "Solinftec — medição de ontem" do painel da Diretoria. Aparelho só de
+café passa a baixar o estado das integrações. Sem linha, por não terem
+dado de integração ou por já estarem cobertos: pós-colheita, dica de
+chuva na seção Clima, vigia do painel (texto existente, intocado). No
+`index.html`: quatro chamadas de `linhaOrigemDado` e a remoção do pulo
+do café em `baixarStatusIntegracoes`; nada mais. Versão v64 (rodapé +
+cache do sw.js). Script de poluição semeia café e painel também. Docs:
+CLAUDE.md c3, definicao-de-pronto.md item 7 (regra 7), relatorios.md,
+ESTADO.md.
+
+**Verificado (automático).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: 221 ✅ · 41 ❌, os mesmos da v63 (nenhum
+  ❌ novo), agora com semente de integração também na casa de café e no
+  painel (café 1,0 tela; painel 3,2 telas com busca; termos de outra
+  atividade zero nas três).
+- `scripts/regressao_render.cjs` main (v63) × branch (v64), 53 telas:
+  sem dados simulados, as 6 cenas idênticas (só versão e horários); com
+  dados simulados, pós-colheita, grãos, pecuária e Diretoria idênticos
+  (já tinham a linha), café ganha só a linha no cartão Solinftec da casa
+  (f23 não é fazenda iCrop) e o painel (cena admin) ganha as duas linhas
+  nos cartões de ontem. Nada mais mudou.
+
+**Teste manual (Nilo).** Com o código de uma unidade de café irrigada
+(Rio Preto-Lagamar café ou Vereda café), abrir o boletim › Irrigação
+(gotejo) e ver a linha no rodapé do cartão iCrop; na casa de Monte
+Carmelo ou Mata Preta café, ver a linha no cartão Solinftec; com
+DIRETORIA, ver a linha nos cartões de ontem do painel.
+
+**Não tocado.** Pós-colheita, seção Clima, vigia do painel, tabelas e
+SQL (o `sql/045` de 08/09 serve como está), funções do robô iCrop.
+
 ## 07/09/2026 · v63 · de quando é o dado de integração (vw_status_integracoes + linha de origem)
 
 **Entrega.** `sql/045-status-integracoes.sql` (de-para `integracao_job`,
@@ -68,11 +175,19 @@ até a primeira colheita.
 - `git grep` por "não fez", "atrasad", "pendente", "tempo real", "agora"
   no que foi tocado — nada fora do botão "Baixar agora" já existente.
 
-**Teste manual (Nilo).** Rodar `sql/045` no SQL Editor (a tabelinha final
-mostra as duas linhas); sincronizar com código de grãos ou pecuária e ver
-a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, abrir Escritório
-› Integrações e robôs › "Estado dos robôs". Decidir: painel da Diretoria
-(compartilhado) e dica de chuva na seção Clima ficaram sem a linha.
+**Teste manual (Nilo) — `sql/045` FEITO em 08/09/2026.** Conferência pela
+REST pública logo depois (11:48 UTC): iCrop com tentativa 07:20 UTC,
+sucesso 07:05 UTC (pedido `manejo_rot` respondido 200), último dado
+gravado 02/09 13:15 UTC, origem 30/08, 4 h desde o sucesso — os quatro
+horários distintos, exatamente o retrato "robô e token bons, iCrop sem
+medição nova"; Solinftec com tentativa 06:05, sucesso 06:05:03, dado de
+07/09 gravado 06:05, 5 h. Diário `integracao_execucoes` com 44 respostas
+(a colheita imediata e a das 07:35 UTC já rodaram); `integracao_job` com
+os 8 jobs. Ainda manual: sincronizar com código de grãos ou pecuária e
+ver a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, abrir
+Escritório › Integrações e robôs › "Estado dos robôs". Decidir: painel da
+Diretoria (compartilhado) e dica de chuva na seção Clima ficaram sem a
+linha.
 
 **Não tocado.** Telas do gerente de café e pós-colheita (idênticas ao
 main, com e sem dados simulados), painel da Diretoria, funções do robô

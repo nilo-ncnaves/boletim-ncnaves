@@ -136,6 +136,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['20-relatorio', async p => { await clique(p, '#bt-rel'); }],
     ['30-farois', async p => { await p.evaluate(() => ir('farois')); await pausa(p, 300); }],
     ['40-farol-f26', async p => { await p.evaluate(() => ir('farol', 'f26')); await pausa(p, 300); }],
+    ['41-farol-f01', async p => { await p.evaluate(() => ir('farol', 'f01')); await pausa(p, 300); }],
   ]);
 
   /* ⚙️ admin — entrada, painel, cadastros, unidades e plano (v52) */

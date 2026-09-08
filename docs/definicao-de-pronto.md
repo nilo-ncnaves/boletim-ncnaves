@@ -15,9 +15,12 @@ cenário no script se ele ainda não a alcança.
 
 ## 2. Regressão das telas
 Rodar `scripts/regressao_render.cjs` contra `origin/main` e o branch e
-conferir que as telas do gerente ficaram idênticas onde deviam (café é
-intocável: regra 1 do projeto). Diferença que não foi pedida é
-regressão.
+conferir que as telas do gerente ficaram idênticas onde deviam. A
+regra 1 do projeto isola COMPORTAMENTO, não arquivo (CLAUDE.md, c4):
+tarefa de grãos ou pecuária deixa o café byte a byte igual, tarefa de
+café deixa grãos e pecuária byte a byte iguais, e a melhoria aplicável
+às três atividades entra nas três pelo mesmo componente. Diferença que
+não foi pedida é regressão.
 
 ## 3. Sintaxe
 `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
@@ -70,9 +73,13 @@ dado no app):
 7. **Nenhuma string de vazio solta pelo código:** tela nova chama
    `htmlEstado`; se precisar de um recorte que a função não monta,
    acrescente o parâmetro na função, não escreva a frase na tela.
-8. **Café** (regra 1): as telas do gerente de café mantêm o texto que
-   já tinham; quem chama decide por `atividadeDe(fz)`. Telas
-   compartilhadas (Diretoria, Relatórios, Cadastros) usam a função.
+8. **Café** (desde a v65): as telas de café usam a mesma função que
+   as demais — casa do gerente, pós-colheita, tela do relatório,
+   cartão de cargas de café em trânsito e Unidades e Plano (que já
+   tinha os três estados com textos próprios e foi padronizada). Até
+   a v64 o café mantinha os textos antigos por uma leitura
+   conservadora da regra 1; a leitura correta está em CLAUDE.md, c4.
+   Nenhuma tela decide texto de vazio por `atividadeDe(fz)`.
 
 Parâmetros de `fraseVazio(o)`: `que` (o que falta: "boletim
 registrado", "relatório calculado", "unidade"…), `atividade` (chave
@@ -115,10 +122,12 @@ Regras:
    fontes no mesmo bloco consolida numa linha só quando couber.
 6. **Sem status conhecido, nada aparece** (visão não criada, sem rede
    e sem cache): a tela fica exatamente como antes. Nunca estimar.
-7. **Café** (regra 1): as telas do gerente de café não mostram a linha;
-   quem chama decide por `perfilDe(fz)`. Tela compartilhada entre
-   atividades (painel da Diretoria) só ganha a linha por decisão do
-   Nilo.
+7. **Café e painel** (desde a v64, decisão do Nilo em 08/09/2026): a
+   linha vale para as três atividades e para o painel da Diretoria,
+   porque a data da medição de irrigação (iCrop) e de máquinas
+   (Solinftec) é informação de gestão do cafeicultor. Só entra onde há
+   dado de integração: pós-colheita e a dica de chuva na seção Clima
+   continuam sem a linha.
 8. **Tentativa ≠ sucesso ≠ dado**: quem mexer na visão ou na tela
    mantém os três horários separados (tabela em docs/relatorios.md).
    Colapsar qualquer um deles faz dado velho parecer novo.
