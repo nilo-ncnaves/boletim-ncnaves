@@ -43,6 +43,13 @@ h3{font-size:.95rem;font-weight:700}
 .topo h1{color:#fff;font-size:1.05rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topo .sub{font-size:.72rem;opacity:.85;font-weight:500;letter-spacing:.05em;text-transform:uppercase}
 .btn-topo{background:rgba(255,255,255,.14);border-radius:9px;padding:8px 12px;font-size:.85rem;font-weight:600;color:#fff;min-height:40px}
+/* Cabeçalho contextual (v66): linha 1 (Fazenda › Unidade (área)) mora na barra sticky de sempre;
+   a linha 2 é uma faixa estática logo abaixo, que rola por baixo da barra — colapsa e expande com a
+   própria rolagem, sem JS e sem mudar altura de nada (nenhum salto de layout) */
+.topo.ctx{margin-bottom:0}
+.topo.ctx h1{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.18}
+.topo.ctx .ctx-area{font-size:.8rem;font-weight:500;opacity:.85;white-space:nowrap}
+.ctx-l2{background:var(--verde);color:#fff;margin:0 -14px 14px;padding:0 16px 5px;font-size:.72rem;line-height:1.25;opacity:.98;font-weight:500;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Botões */
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border-radius:var(--raio);font-weight:700;font-size:1.02rem;background:var(--verde);color:#fff;box-shadow:var(--sombra)}
 .btn:active{background:var(--verde-esc)}
@@ -2016,7 +2023,7 @@ function vFarol(un){
   const ritmo=l=>textoRitmo(ritmoDe(l.unidade_id,l.operacao_id));
   const linha=l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
       <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}${rt?" · ritmo: "+esc(rt):""}</span></span></div>`; };
-  return topo(f.nome||un, "Faróis de registro", true)+`
+  return cabecalhoContexto(un,{sub:"Faróis de registro", voltar:true})+`
     ${comJ.length?comJ.map(linha).join(""):`<div class="cartao">${htmlEstado("vazio",{que:"operação com janela",unidade:un})}</div>`}
     ${semJ.length?`<details class="cad-bloco"><summary>Operações sem janela <span class="mut num">· ${semJ.length}</span></summary><div class="corpo" style="padding:0">
       ${semJ.map(l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b>${rt?`<span class="mut">ritmo: ${esc(rt)}</span>`:""}</span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`; }).join("")}</div></details>`:""}
@@ -2140,7 +2147,7 @@ function vRelat(){
   const ger=sessao&&sessao.papel==="gerente";
   const vazio=htmlEstado("vazio",{que:"relatório calculado",periodo:"para "+relRotuloPer(rel,ini,fim),unidade:ger?sessao.fazendaId:"",onde:ger?"":"nas unidades deste código"});
   const corpo=ls.length?relTextos(ls)+relRender(rel,ls):`<div class="cartao">${vazio}</div>`;
-  return topo(cat.nome, relRotuloPer(rel,ini,fim)+(sessao&&sessao.papel==="gerente"?" · "+fazenda(sessao.fazendaId).nome:""), true)+nav+corpo+`
+  return (ger?cabecalhoContexto(sessao.fazendaId,{sub:cat.nome+" · "+relRotuloPer(rel,ini,fim), voltar:true}):topo(cat.nome, relRotuloPer(rel,ini,fim), true))+nav+corpo+`
     <div class="linha-flex mt no-print" style="gap:8px">
       <button class="btn sec mini" id="bt-rel-zap">📲 Compartilhar</button>
       ${window.print?`<button class="btn sec mini" id="bt-rel-pdf">🖨 PDF</button>`:""}
@@ -2884,7 +2891,7 @@ function vCasaGerente(){
   const temRasc = rascunho && !rascunho.id && rascunho.fazendaId===fz;
   const rec = envioRecente && (boletimDoDia(hojeISO(),fz)||{}).id===envioRecente ? envioRecente : null;
   const atCasa=atividadeDe(fz);
-  return topo(fazenda(fz).nome, emojiAtividade(atCasa)+" "+rotuloAtividade(atCasa)+" · Gerente")
+  return cabecalhoContexto(fz,{sub:"Gerente"})
   +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`+`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
       <h2>✅ Boletim enviado!</h2>
@@ -2938,6 +2945,40 @@ function topo(titulo, sub, voltar){
     <h1>${esc(titulo)}<br><span class="sub">${esc(sub)}</span></h1>
     <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button>
   </div>`;
+}
+/* ---------- Cabeçalho contextual (v66) ----------
+   Componente ÚNICO das telas de leitura com unidade escolhida (casa do gerente, boletim enviado,
+   casa e registro do pós-colheita, relatório do gerente, Faróis › unidade), nas três atividades.
+   Linha 1 (sempre visível): Fazenda › Unidade (área ha) — fazenda = fazenda física (fazendaMae ou a
+   própria), unidade = rótulo da atividade pelo catálogo ATIVIDADES (unidade operacional = fazenda
+   física + atividade), área = soma dos talhões cadastrados da unidade (areaUnidade); sem área o
+   parêntese some. Linha 2 (só no topo da tela): ciclo da atividade pelo catálogo CTX_ATIVIDADE +
+   texto próprio da tela (papel, data, período). Sem produtor, sem custo, sem produto, sem dose.
+   Altura: barra 64 px (12+40+12, ditada pelos botões) + faixa ≈ 20 px = 84 px expandido,
+   64 px colapsado, a 390 × 844. Ordem de corte se não couber: atividade (já está na linha 1 como
+   unidade), depois ciclo; fazenda, unidade e área ficam. Documentação: CLAUDE.md, "Cabeçalho contextual". */
+const CTX_ATIVIDADE={
+  /* ciclo: função (id da unidade) → texto do ciclo/safra a partir do cadastro; null = a atividade
+     não tem ciclo nem safra modelados no app (café perene: o plano do agrônomo é referência, não
+     safra operacional; pecuária: sem safra). Vocabulário em docs/catalogos-por-atividade.md. */
+  CAFE:{ciclo:null},
+  GRAOS:{ciclo:fz=>{ const cs=[...new Set(talhoesAnuais(fz).map(t=>cicloAtivo(t.id)).filter(Boolean).map(c=>rotuloCultura(c.cultura)))]; return cs.length?"ciclo: "+cs.join(", "):""; }},
+  PECUARIA:{ciclo:null}
+};
+/* Área operacional da unidade = soma dos talhões cadastrados nela (D.talhoes por fazendaId), sem
+   ESTRUTURA (sede, represa, área geral — duplicariam) e sem ARRENDADO (sementeira). 0 = sem área. */
+const areaUnidade = fz => talhoesDa(fz).filter(t=>t.fazendaId===fz && t.tipo!=="ESTRUTURA" && t.tipo!=="ARRENDADO").reduce((s,t)=>s+n0(t.area),0);
+const fmtHa = v => Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+function cabecalhoContexto(fz, o){
+  o=o||{};
+  const f=fazenda(fz), mae=maeDe(f), atv=atividadeDe(fz), cat=CTX_ATIVIDADE[atv]||{};
+  const area=areaUnidade(fz), ciclo=cat.ciclo?cat.ciclo(fz):"";
+  const l2=[ciclo,o.sub].filter(Boolean).join(" · ");
+  return `<div class="topo ctx">
+    ${o.voltar?`<button class="btn-topo" data-voltar="1">‹</button>`:""}
+    <h1>${esc(mae.nome)} › ${esc(rotuloAtividade(atv))}${area>0?` <span class="ctx-area num">(${fmtHa(area)} ha)</span>`:""}</h1>
+    <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button>
+  </div>${l2?`<div class="ctx-l2 no-print">${esc(l2)}</div>`:""}`;
 }
 
 /* ---------- Seções multicultura do formulário ---------- */
@@ -4336,7 +4377,7 @@ function vDetalhe(id){
   const g = sessao.papel==="gerente";
   const horas48 = (Date.now() - new Date(b.data+"T12:00:00").getTime()) < 48*3600*1000;
   const podeEditar = g && horas48;
-  return topo(fazenda(b.fazendaId).nome+" — "+fmtData(b.data), esc(b.responsavel), true)+`
+  return cabecalhoContexto(b.fazendaId,{sub:[fmtData(b.data),b.responsavel].filter(Boolean).join(" · "), voltar:true})+`
     ${b.editadoEm?`<p class="mut mb">Última alteração: ${esc(b.editadoEm)}</p>`:""}
     <div class="cartao"><h3>🌤️ Clima</h3><dl class="dl mt">
       <dt>Condição</dt><dd>${esc(b.clima.cond)||"—"}</dd>
@@ -4520,7 +4561,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v65";
+const APP_VERSAO="v66";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5616,7 +5657,7 @@ function vCasaPos(){
   const fz=sessao.fazendaId, p=posDoDia(hojeISO(),fz);
   const rec = envioRecentePos && p && p.id===envioRecentePos ? p.id : null;
   const ult=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz).sort((a,b)=>a.data<b.data?1:-1).slice(0,5);
-  return topo(fazenda(fz).nome,"Terreiro · Secador · Benefício")+`
+  return cabecalhoContexto(fz,{sub:"Terreiro · Secador · Benefício"})+`
     ${cartaoCargas(fz)}
     ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>✅ Registro enviado!</h2>
       <p class="mut">Um toque e o resumo vai pro grupo.</p>
@@ -5745,7 +5786,7 @@ function vDetalhePos(id){
   const p=(D.posColheitas||[]).find(x=>x.id===id);
   if(!p) return topo("Registro","não encontrado",true);
   const t=p.terreiro||{}, secs=secsDe(p), tuls=tulhasDe(p), bens=bensDe(p);
-  return topo(fazenda(p.fazendaId).nome+" — "+fmtData(p.data), "Pós-colheita · "+esc(p.responsavel||""), true)+`
+  return cabecalhoContexto(p.fazendaId,{sub:[fmtData(p.data),"Pós-colheita",p.responsavel].filter(Boolean).join(" · "), voltar:true})+`
     ${(t.entradaLatas!==""||t.viradas!==""||t.saiu||t.obs)?`<div class="cartao"><h3>☀️ Terreiro</h3><dl class="dl mt">
       ${n0(t.entradaLatas)?`<dt>Entrou</dt><dd>${n0(t.entradaLatas)} latas</dd>`:""}
       ${n0(t.viradas)?`<dt>Viradas</dt><dd>${n0(t.viradas)}</dd>`:""}

@@ -203,6 +203,44 @@ apontamento em 3 passos não recebe navegação nem métrica; (5) a prova
 de isolamento é a regressão (scripts/regressao_render.cjs): grãos e
 pecuária idênticos quando a tarefa é de café, e o contrário.
 
+### c5) Cabeçalho contextual nas telas de leitura (desde a v66)
+Toda tela de leitura com unidade escolhida mostra onde a pessoa está
+pelo componente ÚNICO `cabecalhoContexto(fazendaId, {sub, voltar})`
+do index.html — nunca uma variante por atividade e nunca `topo()` com
+o nome da fazenda montado à mão. Telas: casa do gerente, boletim
+enviado, casa e registro do pós-colheita, relatório do gerente e
+Diretoria › Faróis › unidade, nas três atividades. Fora, por desenho:
+a home das três abas e a escolha de unidade (contexto ainda não
+escolhido), a tela de apontamento em 3 passos e o formulário do
+pós-colheita (entrada), e as telas de grupo da Diretoria (painel,
+Relatórios, Faróis, Resumo do período) e de Cadastros.
+- **Linha 1 (sempre visível, na barra sticky `.topo.ctx`):**
+  `Fazenda › Unidade (1.234,56 ha)`. Fazenda = fazenda física
+  (`maeDe(f).nome`); unidade = rótulo da atividade pelo catálogo
+  `ATIVIDADES` (unidade operacional = fazenda física + atividade,
+  identificada por id, nunca por pedaço de nome); área = `areaUnidade`
+  (soma dos talhões cadastrados na unidade, sem ESTRUTURA e sem
+  ARRENDADO), formatada por `fmtHa` (duas casas, vírgula, ponto de
+  milhar), em tipografia secundária. Sem área, o parêntese inteiro
+  some — nunca "(— ha)", "(0 ha)" ou "(sem área)".
+- **Linha 2 (só no topo da tela, faixa `.ctx-l2`):** ciclo da
+  atividade pelo catálogo `CTX_ATIVIDADE[atv].ciclo` (grãos: "ciclo:
+  Feijão, Soja" — culturas dos ciclos ativos dos talhões; café e
+  pecuária: `null`, sem safra inventada) + texto próprio da tela
+  (`sub`: papel, data, período). Vocabulário só pelo catálogo, por
+  chave; proibido `if(atividade==="CAFE")` nas telas.
+- **Colapso sem JS e sem salto:** a faixa da linha 2 é estática e rola
+  por baixo da barra sticky; ao voltar ao topo reaparece. Nada muda de
+  altura. Medidas a 390 × 844: barra 64 px + faixa 19 px = 83 px
+  expandido (9,9 % de 844; 11,9 % de 700 px úteis), 64 px colapsado
+  (7,6 %). O piso de 64 px é dos botões "‹" e "⇥" da barra.
+- **Ordem de corte se não couber:** atividade (já é a unidade da linha
+  1), depois ciclo; fazenda, unidade e área ficam. A linha 1 pode
+  ocupar duas linhas visuais dentro dos 40 px dos botões (line-clamp).
+- **Proibido no cabeçalho:** produtor/empresa, ícone de cultura, custo,
+  produto, dose, "não fez"/"pendente", carimbo de origem de dado (esse
+  fica no rodapé do bloco, item c3).
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

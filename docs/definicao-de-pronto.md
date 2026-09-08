@@ -131,3 +131,29 @@ Regras:
 8. **Tentativa ≠ sucesso ≠ dado**: quem mexer na visão ou na tela
    mantém os três horários separados (tabela em docs/relatorios.md).
    Colapsar qualquer um deles faz dado velho parecer novo.
+
+## 8. Cabeçalho contextual nas telas de leitura (desde a v66)
+Toda tela de leitura com unidade escolhida (casa do gerente, boletim
+enviado, casa e registro do pós-colheita, relatório do gerente,
+Diretoria › Faróis › unidade) abre pelo componente único
+`cabecalhoContexto(fazendaId, {sub, voltar})` do `index.html`
+(CLAUDE.md, item c5) — nunca por `topo()` com nome de fazenda montado
+na tela. Antes do PR, conferir:
+1. **Linha 1** `Fazenda › Unidade (1.234,56 ha)`: fazenda física por
+   `maeDe`, unidade = rótulo da atividade por `ATIVIDADES`, área por
+   `areaUnidade`/`fmtHa`. Unidade sem talhão com área (hoje Porto
+   Buriti e Monte Carmelo — Pecuária) omite o parêntese inteiro.
+2. **Linha 2** só do catálogo `CTX_ATIVIDADE` (grãos: "ciclo: …";
+   café e pecuária sem ciclo) + o `sub` da tela. Nenhum rótulo de safra
+   inventado; nenhum condicional por atividade na tela.
+3. **Altura**: expandido ≤ 12 % da altura útil (medido: 83 px a
+   390 × 844; 64 px colapsado); a linha 2 rola por baixo da barra sem
+   JS e sem mudar altura de nada. Tela nova não pode empilhar outra
+   barra sticky em cima — se precisar de régua ou filtro fixo, a soma
+   com o cabeçalho fica abaixo de ~25 % da altura útil.
+4. **Regressão** (`scripts/regressao_render.cjs`): a diferença entre
+   main e branch nas telas de leitura é só o trecho `.topo.ctx` +
+   `.ctx-l2`, igual nas três atividades; tela de apontamento, home das
+   abas, painel e Cadastros byte a byte iguais.
+5. **Sem** produtor, custo, produto, dose ou carimbo de origem de dado
+   no cabeçalho (o carimbo fica no rodapé do bloco, item 7).
