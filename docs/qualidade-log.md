@@ -30,8 +30,12 @@ ESTADO.md.
   ❌ novo), agora com semente de integração também na casa de café e no
   painel (café 1,0 tela; painel 3,2 telas com busca; termos de outra
   atividade zero nas três).
-- `scripts/regressao_render.cjs` main (v63) × branch (v64): resultado
-  detalhado no PR 31 (rodada de 08/09/2026).
+- `scripts/regressao_render.cjs` main (v63) × branch (v64), 53 telas:
+  sem dados simulados, as 6 cenas idênticas (só versão e horários); com
+  dados simulados, pós-colheita, grãos, pecuária e Diretoria idênticos
+  (já tinham a linha), café ganha só a linha no cartão Solinftec da casa
+  (f23 não é fazenda iCrop) e o painel (cena admin) ganha as duas linhas
+  nos cartões de ontem. Nada mais mudou.
 
 **Teste manual (Nilo).** Com o código de uma unidade de café irrigada
 (Rio Preto-Lagamar café ou Vereda café), abrir o boletim › Irrigação
