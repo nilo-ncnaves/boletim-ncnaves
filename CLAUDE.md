@@ -45,8 +45,8 @@ vw_ritmo_operacoes (sql/043; ritmo entre registros, só leitura, só
 grãos e pecuária no app). Desde a v63: integracao_job,
 integracao_execucoes e a visão vw_status_integracoes (sql/045; de
 quando é o dado do iCrop/Solinftec — tentativa, sucesso e dado
-gravado são horários distintos; o app só lê, aparelho só de café não
-baixa).
+gravado são horários distintos; o app só lê). Desde a v64 a linha de
+origem vale também para café e para o painel da Diretoria.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -178,8 +178,10 @@ futura) leva no rodapé UMA linha secundária pela função única
 dado gravado, em Brasília; hoje/ontem/dd/mm) — e, com mais de 26 h sem
 sucesso do robô, "Última atualização do iCrop há 2 dias" em cor de
 atenção, sem ícone, exclamação ou bloqueio. Proibido "agora" / "tempo
-real". Café não mostra; tela compartilhada só com decisão do Nilo.
-Detalhe em docs/definicao-de-pronto.md, item 7.
+real". Vale para as três atividades e para o painel da Diretoria
+(café desde a v64, por decisão do Nilo: dado de irrigação iCrop e de
+máquinas é gestão do cafeicultor). Detalhe em
+docs/definicao-de-pronto.md, item 7.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

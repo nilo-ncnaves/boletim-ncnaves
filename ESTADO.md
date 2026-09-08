@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v63** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v64** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -214,10 +214,14 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   04:20" / "de 05/09, 04:05", convertido para Brasília com
   America/Sao_Paulo explícito; com mais de 26 h sem sucesso do robô vira
   "Última atualização do iCrop há 2 dias" em âmbar, sem ícone ou
-  bloqueio. Onde: cartão iCrop do gerente de grãos, cartão Solinftec do
-  gerente de grãos e pecuária, bloco "Estado dos robôs" em Escritório ›
-  Integrações e robôs. Café e painel da Diretoria (compartilhado) não
-  mudaram. Detalhe em docs/relatorios.md, "Estado das integrações".
+  bloqueio. Onde (v64 — o Nilo decidiu em 08/09/2026 incluir o café,
+  porque data de medição de irrigação e de máquinas é gestão do
+  cafeicultor): cartão iCrop do boletim do gerente (café e grãos),
+  cartão Solinftec da casa do gerente (café, grãos e pecuária), cartões
+  "iCrop — medição de ontem" e "Solinftec — medição de ontem" do painel
+  da Diretoria, bloco "Estado dos robôs" em Escritório › Integrações e
+  robôs. Sem linha: pós-colheita e a dica de chuva na seção Clima.
+  Detalhe em docs/relatorios.md, "Estado das integrações".
 
 ## Plano de safra 2026/27 (v52 — fase A, "Fundação")
 Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
@@ -620,7 +624,10 @@ a v63 acrescentou a linha de origem "Dados do iCrop de hoje, 04:05" nos
 cartões iCrop/Solinftec de grãos e pecuária e o bloco "Estado dos robôs"
 em Integrações e robôs — medidos com dado de integração e status de
 exemplo semeados no script: casa de grãos/pecuária 1,0 tela, Integrações
-1,2 telas, termos de outra atividade zero, ✅). Esta lista é o retrato dos ❌ herdados: cada tarefa
+1,2 telas, termos de outra atividade zero, ✅; a v64 estendeu a linha ao
+café e aos cartões de ontem do painel, com semente também na casa de café
+e no painel — 221 ✅ · 41 ❌ de novo, casa de café 1,0 tela, painel 3,2
+telas com busca). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
 
@@ -720,10 +727,10 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   respostas no diário `integracao_execucoes`, 8 jobs no de-para. Ainda
   manual: sincronizar com código de grãos/pecuária e ver a linha no
   rodapé dos cartões iCrop/Solinftec; com ADMIN, o bloco "Estado dos
-  robôs" em Escritório › Integrações e robôs. Decisões que ficaram para
-  o Nilo: (a) painel da Diretoria é compartilhado e NÃO
-  ganhou a linha; (b) a dica de chuva da estação iCrop na seção Clima
-  também não (o cartão iCrop do mesmo boletim já a carrega); (c)
+  robôs" em Escritório › Integrações e robôs. Decidido pelo Nilo em
+  08/09/2026 (v64): a linha vale para café e para o painel da Diretoria.
+  Ainda com o Nilo: (b) a dica de chuva da estação iCrop na seção Clima
+  segue sem linha (o cartão iCrop do mesmo boletim já a carrega); (c)
   `ultima_execucao_ok_em` da iCrop conta qualquer pedido com HTTP 200
   (manejo ou parcelas) — a coluna `tipo` do diário permite apertar isso.
 - **Intervalo entre operações (v62) — para o Nilo:** rodar

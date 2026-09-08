@@ -6,6 +6,42 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v64 · linha de origem também no café e no painel da Diretoria
+
+**Entrega.** Decisão do Nilo (08/09/2026): "o que for aplicável à
+cafeicultura e fizer sentido em gestão, pode fazer". Aplicado onde há dado
+de integração que é gestão do cafeicultor: cartão iCrop do boletim do
+gerente de café (Irrigação gotejo — Rio Preto-Lagamar e Vereda irrigam
+com iCrop), cartão Solinftec da casa do gerente de café (Monte Carmelo e
+Mata Preta têm máquinas medidas) e os cartões "iCrop — medição de ontem"
+e "Solinftec — medição de ontem" do painel da Diretoria. Aparelho só de
+café passa a baixar o estado das integrações. Sem linha, por não terem
+dado de integração ou por já estarem cobertos: pós-colheita, dica de
+chuva na seção Clima, vigia do painel (texto existente, intocado). No
+`index.html`: quatro chamadas de `linhaOrigemDado` e a remoção do pulo
+do café em `baixarStatusIntegracoes`; nada mais. Versão v64 (rodapé +
+cache do sw.js). Script de poluição semeia café e painel também. Docs:
+CLAUDE.md c3, definicao-de-pronto.md item 7 (regra 7), relatorios.md,
+ESTADO.md.
+
+**Verificado (automático).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: 221 ✅ · 41 ❌, os mesmos da v63 (nenhum
+  ❌ novo), agora com semente de integração também na casa de café e no
+  painel (café 1,0 tela; painel 3,2 telas com busca; termos de outra
+  atividade zero nas três).
+- `scripts/regressao_render.cjs` main (v63) × branch (v64): resultado
+  detalhado no PR 31 (rodada de 08/09/2026).
+
+**Teste manual (Nilo).** Com o código de uma unidade de café irrigada
+(Rio Preto-Lagamar café ou Vereda café), abrir o boletim › Irrigação
+(gotejo) e ver a linha no rodapé do cartão iCrop; na casa de Monte
+Carmelo ou Mata Preta café, ver a linha no cartão Solinftec; com
+DIRETORIA, ver a linha nos cartões de ontem do painel.
+
+**Não tocado.** Pós-colheita, seção Clima, vigia do painel, tabelas e
+SQL (o `sql/045` de 08/09 serve como está), funções do robô iCrop.
+
 ## 07/09/2026 · v63 · de quando é o dado de integração (vw_status_integracoes + linha de origem)
 
 **Entrega.** `sql/045-status-integracoes.sql` (de-para `integracao_job`,
