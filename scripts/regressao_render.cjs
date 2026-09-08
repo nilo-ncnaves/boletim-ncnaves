@@ -145,8 +145,9 @@ async function cenario(browser, nome, acesso, sessao, passos) {
       { id: 'ex-num-3', relatorio: 'farol_30', periodo_ini: '2026-08-09', periodo_fim: '2026-09-07', unidade_id: 'f33', dados: { em_dia: true, enviados: 24, uteis: 26, marcas: '' }, gerado_em: em, texto: null } ];
       ir('relatorios'); }); await pausa(p, 300); }],
     ['26-relatorios-folha', async p => { const b = await p.$('#app .txt-ler'); if (!b) throw new Error('sem "ler texto completo" (versão antiga)'); await b.click(); await pausa(p, 300);
-      await p.evaluate(() => { const f = document.querySelector('#folha-texto'); document.querySelector('#app').setAttribute('data-folha', f ? f.outerHTML : ''); document.querySelector('#app').setAttribute('data-scroll-travado', document.body.classList.contains('folha-aberta') ? '1' : '0'); }); }],
-    ['27-relatorios-fechada', async p => { await p.evaluate(() => { const b = document.querySelector('#bt-folha-fechar'); if (b) b.click(); document.querySelector('#app').removeAttribute('data-folha'); document.querySelector('#app').removeAttribute('data-scroll-travado'); }); await pausa(p, 300); }],
+      /* a folha vive fora do #app: copia o HTML dela para um bloco dentro do #app só para o dump (removido no passo seguinte) */
+      await p.evaluate(() => { const f = document.querySelector('#folha-texto'); const d = document.createElement('div'); d.id = 'dump-folha'; d.hidden = true; d.setAttribute('data-scroll-travado', document.body.classList.contains('folha-aberta') ? '1' : '0'); d.textContent = f ? f.outerHTML : 'SEM FOLHA'; document.querySelector('#app').appendChild(d); }); }],
+    ['27-relatorios-fechada', async p => { await p.evaluate(() => { const d = document.querySelector('#dump-folha'); if (d) d.remove(); const b = document.querySelector('#bt-folha-fechar'); if (b) b.click(); }); await pausa(p, 300); }],
     ['28-relat-texto', async p => { await p.evaluate(() => { relVista = { rel: 'devolutiva_semanal', ini: '2026-09-01', fim: '2026-09-07' }; ir('relat'); }); await pausa(p, 300); }],
     ['30-farois', async p => { await p.evaluate(() => ir('farois')); await pausa(p, 300); }],
     ['40-farol-f26', async p => { await p.evaluate(() => ir('farol', 'f26')); await pausa(p, 300); }],
