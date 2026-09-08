@@ -207,3 +207,39 @@ de 3 linhas que venha a entrar numa lista) usa o componente único
 7. **Medição:** `scripts/checar-poluicao.cjs`, item "8. Texto longo em
    lista" — roda com textos de exemplo semeados na tela Relatórios e
    mede cartão, cabeçalho "Números", prévia, folha e rolagem.
+
+## 11. Seção eventual oferece resposta explícita de ausência (desde a v69)
+Toda seção do boletim classificada como **eventual** em
+docs/catalogos-por-atividade.md ("Seções do boletim: eventual ×
+esperada") — hoje pragas/doenças, ocorrências, movimentação e sanidade
+do rebanho — mostra, quando não há registro, o par de chips
+**"Nada a registrar hoje" · "Registrar…"** pelo componente único
+(`chipsRespostaSecao` / `resumoSecaoHtml` / `pintarSecoesResposta`,
+catálogo `SECOES_BOLETIM`). Seção eventual NOVA entra no catálogo (id
+imutável, `campos`, `resumo`, `botao`, `acao`), na tabela
+`boletim_secao` (sql) e na tabela do docs na mesma tarefa. Antes do PR,
+conferir:
+1. **Texto exato** "Nada a registrar hoje". Proibidos "Nada aconteceu",
+   "Sem problemas", "Tudo certo" ou qualquer frase que afirme sobre a
+   lavoura ou o rebanho — o chip declara que não há o que registrar.
+2. **Um toque grava e recolhe o cartão; o 2º toque desfaz.** Sem modal,
+   sem confirmação, sem ação em massa ("marcar todas").
+3. **Chips só sem registro.** Com registro, o cabeçalho mostra o
+   contador de sempre; adicionar um registro numa seção respondida
+   apaga a resposta sozinho (app e gatilho no banco).
+4. **Três estados distintos no cabeçalho:** "○" (não respondido —
+   neutro, sem vermelho, sem cobrança enquanto o boletim está aberto),
+   "sem ocorrência", "N registros". Proibidos "pendente", "faltando",
+   "obrigatório", "você não respondeu", emoji de alerta, exclamação.
+5. **Seção esperada não recebe os chips** — a ausência ali é do farol
+   de leitura. Aplicar nos dois lugares confunde os conceitos.
+6. **Vocabulário pelo catálogo** (`acao` por chave): nunca
+   `if(atividade==="…")` na tela. Mesmo componente nas três atividades.
+7. **Envio nunca é bloqueado nem condicionado** pela resposta; rascunho
+   automático guarda `rascunho.secoes` como qualquer outro campo.
+8. **Checagem de poluição:** o par de chips faz parte do estado
+   compacto da seção eventual (o script ignora `[data-resp-secao]` no
+   item 3); qualquer outro chip antes do "＋" continua ❌.
+9. **Leitura:** "não respondido" = sem registro E sem linha em
+   `boletim_secao_resposta` — nunca "não fez" (docs/relatorios.md,
+   "Resposta explícita de ausência").

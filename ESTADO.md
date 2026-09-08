@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v68** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v69** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -66,6 +66,14 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   formato novo — esses aparelhos pedem o código novo uma vez.
 
 ## Seções do boletim por atividade
+Desde a v69 cada seção tem uma classificação **eventual × esperada**
+(docs/catalogos-por-atividade.md, "Seções do boletim: eventual ×
+esperada"; catálogo `SECOES_BOLETIM`; confirmada pelo Nilo em
+08/09/2026): as eventuais — café: Pragas, doenças e daninhas e
+Ocorrências gerais; grãos: Pragas, doenças e ocorrências (uma resposta
+por cartão); pecuária: Movimentação do rebanho, Sanidade e Ocorrências
+e sanidade — oferecem o par de chips "Nada a registrar hoje" ·
+"Registrar…" quando não há registro (seção própria abaixo).
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
   irrigação (gotejo), colheita, pós-colheita, fito, ocorrências.
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
@@ -737,6 +745,52 @@ adubo) NÃO foram copiadas.
   diferença main × branch nas telas de leitura é só o
   `<span class="op-cat">`, igual nas três atividades.
 
+## Resposta explícita de ausência por seção (v69) — boletim, três atividades
+Regra permanente em CLAUDE.md, item c8; checagem em
+docs/definicao-de-pronto.md, item 11; classificação das seções em
+docs/catalogos-por-atividade.md; tabela e visão em docs/relatorios.md.
+- **Problema resolvido:** cartão vazio parecia cartão resolvido (não
+  havia diferença entre "olhei e não havia praga" e "nem abri"), e
+  silêncio não é dado — sem registro de broca não se sabe se não havia
+  ou se ninguém verificou. Com pressa, pular custava zero e registrar
+  custava várias decisões.
+- **Solução:** nas seções EVENTUAIS, sem registro, o cartão mostra
+  dois chips (padrão `.chip` de sempre): **"Nada a registrar hoje"**
+  (um toque grava `rascunho.secoes[id] = {resposta:"sem_ocorrencia",
+  por, em}` e recolhe o cartão; o 2º toque desfaz — "toque de novo
+  para desfazer" ao lado; sem modal) e **"Registrar…"** (aciona o "＋"
+  de sempre: ocorrência, movimento, tratamento — rótulo pelo catálogo).
+  Com registro os chips somem. Sem ação em massa. O chip declara que
+  não há o que registrar, nunca que "está tudo bem".
+- **Três estados no cabeçalho** (componente único `resumoSecaoHtml`;
+  repintura por `pintarSecoesResposta`): "○" cinza = não respondido
+  (neutro: sem vermelho, sem "pendente"/"faltando"/"obrigatório", sem
+  emoji de alerta — a janela do dia ainda não fechou); "sem ocorrência"
+  cinza = respondido; "N registros" verde = com registros (Movimentação
+  mantém "2 nascimentos · 1 morte").
+- **Registro e resposta nunca coexistem:** adicionar um registro numa
+  seção respondida apaga a resposta sozinho (`limparRespostasSecao`, em
+  cada "＋"/remover e no envio); no banco o gatilho refaz o cálculo e a
+  trava recusa linha em seção com registro.
+- **Dados:** a resposta sobe DENTRO do payload do boletim (fila offline
+  de sempre; rascunho automático em `bdf:rascunho` a guarda). No
+  Supabase (`sql/047-secao-resposta.sql`): `boletim_secao` (catálogo,
+  id imutável = chave substituta), `boletim_secao_resposta` (uma linha
+  = "sem ocorrência" com autor e hora; ausência de linha = não
+  respondido, sem enum pendente; escrita SÓ pelo gatilho de `boletins`
+  a partir de `payload.secoes`, security definer, sem policy de
+  escrita) e `vw_completude_boletim` (por boletim: seções eventuais,
+  com registro, sem ocorrência, não respondidas + ids). Leitura no app:
+  `baixarCompletudeBoletim({unidade, de, ate})`, sob demanda, sem tela.
+- **Não mudou:** envio (não bloqueado nem condicionado), ordem dos
+  cartões (a ordem é a narrativa do dia e Observações continua por
+  último; reordenar dinamicamente faria a seção pular entre
+  redesenhos — sugestão futura, ver PR), tela de apontamento em 3
+  passos, seções esperadas (Irrigação já tinha "Dia sem irrigação" /
+  "Não rodou"), resumo WhatsApp, boletim enviado, painel, Cadastros.
+  Café, grãos e pecuária recebem o MESMO componente; nenhum
+  `if(atividade==="…")` na tela — vocabulário por chave do catálogo.
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -761,7 +815,11 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v68, 08/09/2026:
-**242 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v68 acrescentou a medição
+**242 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v69 acrescentou o par de
+chips de resposta explícita de ausência nas seis seções eventuais — o
+script passou a tratar `[data-resp-secao]` como parte do estado compacto
+da seção (docs/definicao-de-pronto.md, item 11), e o resultado ficou
+idêntico ao da v68; a v68 acrescentou a medição
 da tela Relatórios com dois textos do robô-redator semeados (um longo,
 um curto) e o grupo "8. Texto longo em lista" com 13 itens, todos ✅,
 mais os itens de renderização/altura da tela semeada (1,6 telas, 390 px
@@ -804,10 +862,12 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
     atividade em seletor, 7 rótulos e calda/máquinas de uma vez).
   - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
     rótulos de uma vez).
-  - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ · "＋" ❌ (tipo
-    em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ → ONDE).
-  - Ocorrências gerais: fechada ✅ · ao abrir ✅ · "＋" ❌ (tipo em
-    seletor + gravidade + texto + foto de uma vez).
+  - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v69: só o par
+    "Nada a registrar hoje" · "Registrar ocorrência" + lista + ＋) · "＋"
+    ❌ (tipo em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ
+    → ONDE).
+  - Ocorrências gerais: fechada ✅ · ao abrir ✅ (v69: idem) · "＋" ❌
+    (tipo em seletor + gravidade + texto + foto de uma vez).
 - 🌾 Grãos (f33) — casa e boletim ✅ (1 tela, tudo fechado); termos de
   café/pecuária ✅ zero.
   - Mão de obra: idem café ❌ ❌.
@@ -817,18 +877,20 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   - Irrigação (pivôs): fechada ✅ · ao abrir ❌ (além do "＋ pivô": botão
     "adicionar todos os pivôs" e link "cadastrar outro pivô") · "＋ pivô"
     ❌ (pivô em seletor; depois vira linha compacta ✓).
-  - Pragas, doenças e ocorrências: fechada ✅ · ao abrir ✅ · "＋" ❌ ❌
-    (mesmos cartões do café).
+  - Pragas, doenças e ocorrências: fechada ✅ · ao abrir ✅ (v69: um par
+    de chips para o cartão inteiro) · "＋" ❌ ❌ (mesmos cartões do café).
 - 🐂 Pecuária (f26) — casa e boletim ✅ (1 tela, tudo fechado); termos
   de café/grãos ✅ zero.
   - Mão de obra: idem café ❌ ❌.
   - Seção 🐂 Pecuária: fechada ✅ · **acordeão dentro de acordeão ❌** (7
     sub-acordeões) · campo "Observações de pecuária" visível ao abrir.
-    - Movimentação do rebanho: ao abrir ✅ · "＋ movimento" ✅ (chips "O
-      que houve" sozinhos; pasto vem depois, em seletor — ordem O QUÊ →
+    - Movimentação do rebanho: ao abrir ✅ (v69: par "Nada a registrar
+      hoje" · "Registrar movimento") · "＋ movimento" ✅ (chips "O que
+      houve" sozinhos; pasto vem depois, em seletor — ordem O QUÊ →
       ONDE, a ajustar quando a seção for tocada).
-    - Sanidade: ao abrir ✅ · "＋ animal tratado" ❌ (21 chips + 4 campos
-      de uma vez) · "＋ manejo em massa" ❌ (11 chips + 2 campos).
+    - Sanidade: ao abrir ✅ (v69: par "Nada a registrar hoje" ·
+      "Registrar tratamento") · "＋ animal tratado" ❌ (21 chips + 4
+      campos de uma vez) · "＋ manejo em massa" ❌ (11 chips + 2 campos).
     - Reprodução · Pasto e estrutura: formulários, fechados ✅.
     - Cocho e nutrição: ao abrir ❌ (resumo rápido OK/Problema visível)
       · "＋ pasto" ❌ (pasto em seletor + 10 chips de uma vez).
@@ -836,7 +898,8 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
       campos).
     - Outros manejos: ao abrir ✅ · "＋ manejo" ❌ (2 seletores + 3
       campos).
-  - Ocorrências e sanidade: ao abrir ✅ · "＋" ❌ (idem café).
+  - Ocorrências e sanidade: ao abrir ✅ (v69: par de chips) · "＋" ❌
+    (idem café).
 - 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
   Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
   "Enviar registro do dia" não é fixo no rodapé ❌; termos de
@@ -889,6 +952,20 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Resposta explícita de ausência (v69) — para o Nilo:** (1) rodar
+  `sql/047-secao-resposta.sql` no SQL Editor (bloco único, passo a
+  passo no cabeçalho; até lá a resposta já sobe dentro do payload e o
+  bloco reprocessa os boletins antigos quando rodar); (2) testar no
+  iPhone, uma unidade de cada atividade: cartão de Pragas/Ocorrências
+  (café), Pragas e ocorrências (grãos), Movimentação/Sanidade/
+  Ocorrências (pecuária) — "○" no cabeçalho, os dois chips ao abrir,
+  toque em "Nada a registrar hoje" recolhe o cartão e o cabeçalho vira
+  "sem ocorrência", 2º toque desfaz, "＋" apaga a resposta, rascunho
+  sobrevive a fechar o app, envio não muda; (3) decidir se "○" é claro
+  o bastante como "não respondido" ou se prefere um texto neutro; (4)
+  futuro: farol de completude por seção no painel (a visão
+  `vw_completude_boletim` já existe; tela fora desta entrega) e ordem
+  dos cartões (sugestão no PR).
 - **Selo "Powered by Netlify" (v68) — decisão do Nilo, sem custo:** o
   selo que flutua sobre o rodapé é injetado pelo Netlify (não está no
   código nem se desliga por netlify.toml). Pela documentação do Netlify

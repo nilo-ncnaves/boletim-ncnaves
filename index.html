@@ -109,6 +109,9 @@ h3{font-size:.95rem;font-weight:700}
 .subsec[open]>summary .seta{transform:rotate(90deg)}
 .subsec .corpo{padding:0 12px 14px;border-top:1px solid var(--linha)}
 .secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
+/* v69: estado da seção eventual no cabeçalho — "○" (não respondido) e "sem ocorrência" são neutros, sem cor de alerta; só o contador fica verde */
+.secao>summary .resumo.neutro,.subsec>summary .resumo.neutro{color:var(--tinta-2);font-weight:600}
+.resp-secao{margin:6px 0 10px}.resp-secao:empty{display:none}
 /* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
 .fase-op{border:1px solid var(--linha);border-radius:10px;margin-top:8px;background:var(--cartao)}
 .fase-op>summary{list-style:none;padding:12px 14px;font-weight:700;cursor:pointer;display:flex;align-items:center}
@@ -1563,6 +1566,77 @@ const LISTA_OCORR_PECUARIA=["Morte de animal","Fuga de animais","Cerca rompida",
 const LISTA_OCORR_GRAOS=["Quebra de máquina","Falta de insumo","Chuva impediu aplicação","Atraso de operação"];
 const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUARIA, ...LISTA_OCORR]
   : atividadeDe(fz)==="GRAOS" ? [...LISTA_OCORR_GRAOS, ...LISTA_OCORR] : LISTA_OCORR;
+/* ---- Resposta explícita de ausência por seção (v69) ----
+   Catálogo das seções do boletim por atividade — espelho de boletim_secao (sql/047); fonte:
+   docs/catalogos-por-atividade.md, "Seções do boletim: eventual × esperada". id = chave
+   substituta imutável (nunca pedaço de nome). tipo "eventual" = a seção pode legitimamente
+   não ter nada no dia, por isso oferece o chip "Nada a registrar hoje"; "esperada" = execução
+   esperada, cuja ausência é assunto do farol de leitura, nunca da tela de entrada.
+   campos = listas do payload que contam como registro (o mesmo cálculo de
+   boletim_secao.campos no Supabase); resumo = id do span do cabeçalho do cartão; botao = "＋"
+   que o chip "Registrar…" aciona; acao = rótulo desse chip (vocabulário por chave, nunca
+   condicional por atividade na tela); texto = contador próprio do cartão, se houver.
+   A resposta vive em rascunho.secoes[id] = {resposta:"sem_ocorrencia", por, em}; ausência da
+   chave é "não respondido" — não existe valor "pendente". Registro e resposta nunca coexistem:
+   limparRespostasSecao apaga a resposta assim que a seção ganha um registro. */
+const SECOES_BOLETIM=[
+  {id:"CAFE-CLIMA",atividade:"CAFE",nome:"Clima do dia",tipo:"esperada"},
+  {id:"CAFE-MO",atividade:"CAFE",nome:"Mão de obra",tipo:"esperada"},
+  {id:"CAFE-IRR",atividade:"CAFE",nome:"Irrigação (gotejo)",tipo:"esperada"},
+  {id:"CAFE-ATIV",atividade:"CAFE",nome:"Atividades por talhão",tipo:"esperada"},
+  {id:"CAFE-COLHEITA",atividade:"CAFE",nome:"Colheita",tipo:"esperada"},
+  {id:"CAFE-FITO",atividade:"CAFE",nome:"Pragas, doenças e daninhas",tipo:"eventual",campos:["fito"],resumo:"res-fito",botao:"bt-add-fito",acao:"Registrar ocorrência"},
+  {id:"CAFE-OCOR",atividade:"CAFE",nome:"Ocorrências gerais",tipo:"eventual",campos:["ocorrencias"],resumo:"res-oc",botao:"bt-add-oc",acao:"Registrar ocorrência"},
+  {id:"CAFE-OBS",atividade:"CAFE",nome:"Observações e pendências",tipo:"esperada"},
+  {id:"GRAOS-CLIMA",atividade:"GRAOS",nome:"Clima do dia",tipo:"esperada"},
+  {id:"GRAOS-MO",atividade:"GRAOS",nome:"Mão de obra",tipo:"esperada"},
+  {id:"GRAOS-OPER",atividade:"GRAOS",nome:"Operações do dia",tipo:"esperada"},
+  {id:"GRAOS-IRG",atividade:"GRAOS",nome:"Irrigação (pivôs)",tipo:"esperada"},
+  {id:"GRAOS-FITO_OCOR",atividade:"GRAOS",nome:"Pragas, doenças e ocorrências",tipo:"eventual",campos:["fito","ocorrencias"],resumo:"res-fito",botao:"bt-add-oc",acao:"Registrar ocorrência"},
+  {id:"GRAOS-OBS",atividade:"GRAOS",nome:"Observações e pendências",tipo:"esperada"},
+  {id:"PEC-CLIMA",atividade:"PECUARIA",nome:"Clima do dia",tipo:"esperada"},
+  {id:"PEC-MO",atividade:"PECUARIA",nome:"Mão de obra",tipo:"esperada"},
+  {id:"PEC-MOV",atividade:"PECUARIA",nome:"Movimentação do rebanho",tipo:"eventual",campos:["pecuaria.mov"],resumo:"res-pec-mov",botao:"bt-add-mov-pec",acao:"Registrar movimento",texto:r=>contadorMovPec(r.pecuaria)},
+  {id:"PEC-SAN",atividade:"PECUARIA",nome:"Sanidade",tipo:"eventual",campos:["pecuaria.san","pecuaria.massa"],resumo:"res-pec-san",botao:"bt-add-san-pec",acao:"Registrar tratamento"},
+  {id:"PEC-REP",atividade:"PECUARIA",nome:"Reprodução",tipo:"esperada"},
+  {id:"PEC-NUT",atividade:"PECUARIA",nome:"Cocho e nutrição",tipo:"esperada"},
+  {id:"PEC-CONT",atividade:"PECUARIA",nome:"Contagem por lote / pasto",tipo:"esperada"},
+  {id:"PEC-PASTO",atividade:"PECUARIA",nome:"Pasto e estrutura",tipo:"esperada"},
+  {id:"PEC-MANEJO",atividade:"PECUARIA",nome:"Outros manejos",tipo:"esperada"},
+  {id:"PEC-OBSPEC",atividade:"PECUARIA",nome:"Observações de pecuária",tipo:"esperada"},
+  {id:"PEC-OCOR",atividade:"PECUARIA",nome:"Ocorrências e sanidade",tipo:"eventual",campos:["ocorrencias"],resumo:"res-oc",botao:"bt-add-oc",acao:"Registrar ocorrência"},
+  {id:"PEC-OBS",atividade:"PECUARIA",nome:"Observações e pendências",tipo:"esperada"}
+];
+const secoesEventuaisDa = atv => SECOES_BOLETIM.filter(s=>s.atividade===atv && s.tipo==="eventual");
+/* a seção eventual de um cartão, pela chave do cartão (id do span de resumo) na atividade da unidade */
+const secaoDoCard = (fz, resumoId) => secoesEventuaisDa(atividadeDe(fz)).find(s=>s.resumo===resumoId) || null;
+const secaoRegistros = (r, s) => (s.campos||[]).reduce((n,c)=>n+((c.split(".").reduce((o,k)=>(o&&o[k])||null, r))||[]).length, 0);
+function respostaSecao(r, id){ const x=r&&r.secoes&&r.secoes[id]; return (x&&x.resposta==="sem_ocorrencia")?x:null; }
+function estadoSecao(r, s){ const n=secaoRegistros(r,s); if(n>0) return {k:"registros",n}; return respostaSecao(r,s.id)?{k:"sem_ocorrencia"}:{k:"nao_respondido"}; }
+/* registro e "sem ocorrência" nunca coexistem: a seção que ganha registro perde a resposta sozinha */
+function limparRespostasSecao(r){ if(!r||!r.secoes) return; secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s=>{ if(r.secoes[s.id] && secaoRegistros(r,s)>0) delete r.secoes[s.id]; }); }
+function textoEstadoSecao(r, s){ const e=estadoSecao(r,s);
+  if(e.k==="registros") return (s.texto&&s.texto(r)) || (e.n+" registro"+(e.n>1?"s":""));
+  return e.k==="sem_ocorrencia" ? "sem ocorrência" : "○"; }
+/* cabeçalho do cartão eventual: contador (verde, como sempre) · "sem ocorrência" · "○" = não respondido (neutro, sem cor nem cobrança) */
+function resumoSecaoHtml(r, resumoId){ const s=secaoDoCard(r.fazendaId,resumoId);
+  if(!s) return `<span class="resumo" id="${resumoId}"></span>`;
+  const e=estadoSecao(r,s);
+  return `<span class="resumo${e.k==="registros"?"":" neutro"}" id="${resumoId}"${e.k==="nao_respondido"?' aria-label="sem resposta"':""}>${esc(textoEstadoSecao(r,s))}</span>`; }
+/* os dois chips (só sem registro): "Nada a registrar hoje" grava com um toque e recolhe o cartão; o 2º toque desfaz. Sem modal, sem ação em massa. */
+function chipsRespostaInner(r, s){ const e=estadoSecao(r,s);
+  if(e.k==="registros") return "";
+  if(e.k==="sem_ocorrencia") return `<button class="chip on" data-resp-nada="${s.id}">Nada a registrar hoje</button><span class="mut" style="align-self:center;font-size:.78rem">toque de novo para desfazer</span>`;
+  return `<button class="chip" data-resp-nada="${s.id}">Nada a registrar hoje</button><button class="chip" data-resp-abrir="${s.id}">${esc(s.acao||"Registrar ocorrência")}</button>`; }
+function chipsRespostaSecao(r, resumoId){ const s=secaoDoCard(r.fazendaId,resumoId); if(!s) return "";
+  return `<div class="chips resp-secao" data-resp-secao="${s.id}">${chipsRespostaInner(r,s)}</div>`; }
+/* repinta chips e cabeçalho de todas as seções eventuais da unidade (depois de adicionar/remover registro ou responder) */
+function pintarSecoesResposta(r){ limparRespostasSecao(r);
+  secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s=>{
+    const cx=document.querySelector(`[data-resp-secao="${s.id}"]`); if(cx) cx.innerHTML=chipsRespostaInner(r,s);
+    const sp=document.getElementById(s.resumo); if(!sp) return;
+    const e=estadoSecao(r,s); sp.textContent=textoEstadoSecao(r,s); sp.classList.toggle("neutro", e.k!=="registros");
+    if(e.k==="nao_respondido") sp.setAttribute("aria-label","sem resposta"); else sp.removeAttribute("aria-label"); }); }
 /* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
 function opcoesAtiv(fz, sel){
   if(atividadeDe(fz)!=="GRAOS"){ const lst=[...LISTA_ATIV,...catExtra("operacoes:CAFE")];
@@ -1979,6 +2053,29 @@ function textoDiasSemRegistro(l){
   if(!l || l.nunca_registrado || l.dias_sem_registro===null || l.dias_sem_registro===undefined) return "sem registro";
   const n=Math.max(0,Math.round(Number(l.dias_sem_registro)||0));
   return n===0?"hoje":"há "+n+(n===1?" dia":" dias");
+}
+/* ---- Completude do boletim (v69): leitura da visão vw_completude_boletim (sql/047), sob demanda e sem tela.
+   Por boletim: seções eventuais da atividade, com registro, com "sem ocorrência" e não respondidas (ids em
+   arrays). "Não respondida" = sem registro E sem linha em boletim_secao_resposta — nunca "não fez".
+   Filtros opcionais {unidade:"f33", de:"2026-09-01", ate:"2026-09-07"}; mesma trava de escopo das outras visões. */
+async function baixarCompletudeBoletim(filtro){
+  if(!syncAtivo()) return [];
+  filtro=filtro||{};
+  try{
+    const esc0=escopoAtual(); if(!esc0) return [];
+    const tudo=!!esc0.tudo, ids=tudo?[]:unidadesPermitidas().map(f=>f.id);
+    if(!tudo && !ids.length) return [];
+    if(filtro.unidade && !tudo && !ids.includes(filtro.unidade)) return [];
+    const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
+    let url=syncCfg.url+"/rest/v1/vw_completude_boletim?select=boletim_id,unidade_id,atividade,data,secoes_eventuais,com_registro,sem_ocorrencia,nao_respondidas,ids_com_registro,ids_sem_ocorrencia,ids_nao_respondidas&order=data.desc,unidade_id&limit=5000";
+    if(filtro.unidade) url+="&unidade_id=eq."+encodeURIComponent(filtro.unidade);
+    else if(!tudo) url+="&unidade_id=in.("+ids.join(",")+")";
+    if(filtro.de) url+="&data=gte."+encodeURIComponent(filtro.de);
+    if(filtro.ate) url+="&data=lte."+encodeURIComponent(filtro.ate);
+    const r=await fetch(url,cab); if(!r.ok) return [];
+    const linhas=await r.json(); if(!Array.isArray(linhas)) return [];
+    return linhas.filter(l=>l && l.boletim_id && l.unidade_id && (tudo || ids.includes(l.unidade_id)));
+  }catch(e){ return []; }
 }
 /* ---- Intervalo entre operações (v62): leitura das visões vw_intervalo_operacoes e vw_ritmo_operacoes
    (sql/043). Ritmo = mediana dos dias entre um registro e o anterior da mesma operação na mesma
@@ -2941,6 +3038,7 @@ function novoRascunho(dataBase){
     atividades:[], colheita:[],
     pos:{terreiro:"", secLote:"", secTemp:"", secHoras:"", sacasBenef:""},
     fito:[], ocorrencias:[], obsGeral:"", pendencias:"",
+    secoes:{},   /* v69: respostas explícitas de ausência por seção eventual (id do catálogo → {resposta, por, em}) */
     ...(temCultura(fz,"GRAOS")?{irg:[]}:{}),
     ...(temCultura(fz,"PECUARIA")?{pecuaria:pecVazia()}:{})
   };
@@ -3617,10 +3715,9 @@ function secaoIrrigacaoGraos(r){
 }
 /* ===== GRÃOS — Pragas, doenças e ocorrências numa seção só ===== */
 function secaoFitoOcorrGraos(r){
-  const n=r.fito.length+r.ocorrencias.length;
   return `<details class="secao"><summary><span class="ico">🐛</span>Pragas, doenças e ocorrências
-    <span class="resumo" id="res-fito">${n?n+" registro"+(n>1?"s":""):""}</span><span class="seta">›</span></summary>
-    <div class="corpo">
+    ${resumoSecaoHtml(r,"res-fito")}<span class="seta">›</span></summary>
+    <div class="corpo">${chipsRespostaSecao(r,"res-fito")}
       <label class="mt">Pragas, doenças e daninhas <span class="mut">(lista da cultura do talhão)</span></label>
       <div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mini mt" id="bt-add-fito">＋ praga / doença / daninha</button>
@@ -3794,7 +3891,7 @@ function blocoPastoPec(p){
     ${ps.visita?`<input data-pst="visitaObs" value="${esc(ps.visitaObs||"")}" placeholder="Quem veio / o que resolveu" style="margin-top:8px">`:""}
     <p class="mut mt" style="font-size:.78rem">Chuva vai na seção Clima e a equipe na Mão de obra — não precisa repetir aqui.</p>`;
 }
-function pecPintarMov(r){ const s=$("#res-pec-mov"); if(s) s.textContent=contadorMovPec(r.pecuaria)||""; }
+function pecPintarMov(r){ pintarSecoesResposta(r); } /* v69: contador próprio (contadorMovPec) + estado da seção eventual */
 function secaoPecuaria(r){
   if(!temCultura(r.fazendaId,"PECUARIA")) return "";
   if(!r.pecuaria) r.pecuaria=pecVazia();
@@ -3807,8 +3904,8 @@ function secaoPecuaria(r){
   const nNut=(p.nut||[]).length;
   const nEv=(p.eventos||[]).filter(e2=>e2.tipo).length;
   const temNutRapida=!!(p.cocho||p.sal||p.agua);
-  const sub=(titulo,resumoId,resumoTxt,aberto,corpo)=>`<details class="subsec" ${aberto?"open":""}><summary>${titulo}
-    <span class="resumo" id="${resumoId}">${resumoTxt||""}</span><span class="seta">›</span></summary>
+  const sub=(titulo,resumoId,resumoTxt,aberto,corpo,resumoHtml)=>`<details class="subsec" ${aberto?"open":""}><summary>${titulo}
+    ${resumoHtml||`<span class="resumo" id="${resumoId}">${resumoTxt||""}</span>`}<span class="seta">›</span></summary>
     <div class="corpo">${corpo}</div></details>`;
   return `<details class="secao" ${temPecuaria(r)?"open":""}><summary><span class="ico">🐂</span>Pecuária
     <span class="resumo" id="res-pec">${tot?tot+" cabeças":""}</span><span class="seta">›</span></summary>
@@ -3816,16 +3913,16 @@ function secaoPecuaria(r){
       <p class="mut mt" style="font-size:.8rem">Abra só o que teve movimento hoje — dia parado fica tudo fechado e fora do resumo.</p>
 
       ${sub("📋 Movimentação do rebanho","res-pec-mov",contMov,(p.mov||[]).some(m=>m.tipo),`
-        <div id="lista-pec-mov">${(p.mov||[]).map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("")}</div>
-        <button class="btn suave mini mt" id="bt-add-mov-pec">＋ movimento (nascimento, morte, mudança…)</button>`)}
+        ${chipsRespostaSecao(r,"res-pec-mov")}<div id="lista-pec-mov">${(p.mov||[]).map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("")}</div>
+        <button class="btn suave mini mt" id="bt-add-mov-pec">＋ movimento (nascimento, morte, mudança…)</button>`,resumoSecaoHtml(r,"res-pec-mov"))}
 
       ${sub("💉 Sanidade","res-pec-san",nSan?nSan+" registro"+(nSan>1?"s":""):"",nSan>0,`
-        <label class="mt">Animal doente / tratado</label>
+        ${chipsRespostaSecao(r,"res-pec-san")}<label class="mt">Animal doente / tratado</label>
         <div id="lista-pec-san">${(p.san||[]).map((s,i)=>cardSanPec(s,i)).join("")}</div>
         <button class="btn suave mini mt" id="bt-add-san-pec">＋ animal ou lote tratado</button>
         <label class="mt">Vacinação / vermifugação em massa</label>
         <div id="lista-pec-massa">${(p.massa||[]).map((v,i)=>cardMassaPec(v,i)).join("")}</div>
-        <button class="btn suave mini mt" id="bt-add-massa-pec">＋ manejo em massa</button>`)}
+        <button class="btn suave mini mt" id="bt-add-massa-pec">＋ manejo em massa</button>`,resumoSecaoHtml(r,"res-pec-san"))}
 
       ${sub("🐄 Reprodução","res-pec-rep",algo(p.rep)?"✓":"",algo(p.rep),`<div id="bloco-pec-rep">${blocoRepPec(p)}</div>`)}
 
@@ -3982,13 +4079,13 @@ function vForm(){
   ${secaoPecuaria(r)}
 
   ${soGraos?secaoFitoOcorrGraos(r):!(temCafe||temGraos)?"":`<details class="secao" ${r.fito.length?"open":""}><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
-    <span class="resumo" id="res-fito">${r.fito.length?r.fito.length+" registro"+(r.fito.length>1?"s":""):""}</span><span class="seta">›</span></summary>
-    <div class="corpo"><div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
+    ${resumoSecaoHtml(r,"res-fito")}<span class="seta">›</span></summary>
+    <div class="corpo">${chipsRespostaSecao(r,"res-fito")}<div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mt" id="bt-add-fito">＋ Registrar ocorrência fitossanitária</button></div></details>`}
 
   ${soGraos?"":`<details class="secao" ${r.ocorrencias.length?"open":""}><summary><span class="ico">⚠️</span>${temPec?"Ocorrências e sanidade":"Ocorrências gerais"}
-    <span class="resumo" id="res-oc">${r.ocorrencias.length?r.ocorrencias.length+" registro"+(r.ocorrencias.length>1?"s":""):""}</span><span class="seta">›</span></summary>
-    <div class="corpo"><div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
+    ${resumoSecaoHtml(r,"res-oc")}<span class="seta">›</span></summary>
+    <div class="corpo">${chipsRespostaSecao(r,"res-oc")}<div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
       <button class="btn suave mt" id="bt-add-oc">＋ Adicionar ocorrência</button></div></details>`}
 
   <details class="secao"><summary><span class="ico">📝</span>Observações e pendências<span class="seta">›</span></summary>
@@ -4718,7 +4815,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v68";
+const APP_VERSAO="v69";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6069,6 +6166,9 @@ function validarEnviar(){
 }
 function concluirEnvio(){
   const r=rascunho;
+  /* v69: "sem ocorrência" nunca sobe junto com registro; quem respondeu = quem assina o boletim, se o chip veio antes do nome */
+  limparRespostasSecao(r);
+  Object.values(r.secoes||{}).forEach(x=>{ if(x && !x.por) x.por=r.responsavel||""; });
   D.ultimasDoses = D.ultimasDoses||{};
   D.insumosAprendidos = D.insumosAprendidos||[];
   D.ultimasReceitas = D.ultimasReceitas||{};
@@ -6465,7 +6565,7 @@ function ligarEventos(tela){
     if(t.id==="bt-add-mov-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
       p.mov.push({tipo:"",categoria:"",qtd:""});
       $("#lista-pec-mov").innerHTML=p.mov.map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("");
-      salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.rmPecmov!==undefined){ r.pecuaria.mov.splice(parseInt(d.rmPecmov),1);
       $("#lista-pec-mov").innerHTML=r.pecuaria.mov.map((m,i)=>cardMovPec(m,i,r.fazendaId)).join("");
       pecPintarMov(r); salvarRascunho(); return; }
@@ -6476,10 +6576,10 @@ function ligarEventos(tela){
     if(t.id==="bt-add-san-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
       p.san.push({categoria:"",qtd:"",brinco:"",problema:"",acao:"",produto:"",obs:""});
       $("#lista-pec-san").innerHTML=p.san.map((s,i)=>cardSanPec(s,i)).join("");
-      salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.rmPecsan!==undefined){ r.pecuaria.san.splice(parseInt(d.rmPecsan),1);
       $("#lista-pec-san").innerHTML=r.pecuaria.san.map((s,i)=>cardSanPec(s,i)).join("");
-      salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.snc){ const pt=d.snc.split("|"); const s=r.pecuaria.san[parseInt(pt[0])];
       if(s){ const v=pt.slice(2).join("|"); s[pt[1]]=(s[pt[1]]===v)?"":v;
         const card=app.querySelector(`[data-pecsan="${pt[0]}"]`); if(card) card.outerHTML=cardSanPec(s,parseInt(pt[0]));
@@ -6487,9 +6587,10 @@ function ligarEventos(tela){
     if(t.id==="bt-add-massa-pec"){ const p=pecMigrar(r.pecuaria=r.pecuaria||pecVazia());
       p.massa.push({tipo:"",categoria:"",qtd:"",produto:""});
       $("#lista-pec-massa").innerHTML=p.massa.map((v,i)=>cardMassaPec(v,i)).join("");
-      salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.rmPecmassa!==undefined){ r.pecuaria.massa.splice(parseInt(d.rmPecmassa),1);
       $("#lista-pec-massa").innerHTML=r.pecuaria.massa.map((v,i)=>cardMassaPec(v,i)).join("");
+      pintarSecoesResposta(r);
       salvarRascunho(); return; }
     if(d.msc){ const pt=d.msc.split("|"); const v2=r.pecuaria.massa[parseInt(pt[0])];
       if(v2){ const v=pt.slice(2).join("|"); v2[pt[1]]=(v2[pt[1]]===v)?"":v;
@@ -6633,11 +6734,19 @@ function ligarEventos(tela){
       const rb=card.querySelector("[data-remessabox]"); if(rb) rb.style.display=(c.destino==="Outra fazenda 🚚")?"":"none";
       salvarRascunho(); return; }
 
+    /* v69: resposta explícita de ausência — um toque grava e recolhe o cartão; o 2º toque desfaz; sem modal */
+    if(d.respNada){ r.secoes=r.secoes||{};
+      if(r.secoes[d.respNada]) delete r.secoes[d.respNada];
+      else r.secoes[d.respNada]={resposta:"sem_ocorrencia",por:r.responsavel||"",em:new Date().toISOString()};
+      const det=t.closest("details"); pintarSecoesResposta(r);
+      if(det&&r.secoes[d.respNada]) det.open=false;
+      salvarRascunho(); return; }
+    if(d.respAbrir){ const s=SECOES_BOLETIM.find(x=>x.id===d.respAbrir); const b=(s&&s.botao)?$("#"+s.botao):null; if(b) b.click(); return; }
     if(t.id==="bt-add-fito"){ const f={id:uid(),tipo:"",nome:"",talhaoId:"",nivel:"",obs:""};
       r.fito.push(f); $("#lista-fito").insertAdjacentHTML("beforeend",cardFito(f));
-      resumoContagem("res-fito",r.fito.length); salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.rmFito){ r.fito=r.fito.filter(f=>f.id!==d.rmFito);
-      t.closest("[data-fito]").remove(); resumoContagem("res-fito",r.fito.length); salvarRascunho(); return; }
+      t.closest("[data-fito]").remove(); pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.ftipo){ const card=t.closest("[data-fito]"); const f=r.fito.find(x=>x.id===card.dataset.fito);
       f.tipo=d.ftipo; marcarChips(card,"ftipo",f.tipo);
       if(f.nome && !((sugestaoFitoDa(rascunho.fazendaId))[f.tipo]||[]).includes(f.nome)) f.nome="";
@@ -6710,9 +6819,9 @@ function ligarEventos(tela){
 
     if(t.id==="bt-add-oc"){ const o={id:uid(),tipo:"",grav:"",texto:"",foto:null};
       r.ocorrencias.push(o); $("#lista-oc").insertAdjacentHTML("beforeend",cardOcorr(o));
-      resumoContagem("res-oc",r.ocorrencias.length); salvarRascunho(); return; }
+      pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.rmOc){ r.ocorrencias=r.ocorrencias.filter(o=>o.id!==d.rmOc);
-      t.closest("[data-oc]").remove(); resumoContagem("res-oc",r.ocorrencias.length); salvarRascunho(); return; }
+      t.closest("[data-oc]").remove(); pintarSecoesResposta(r); salvarRascunho(); return; }
     if(d.ograv){ const card=t.closest("[data-oc]"); const o=r.ocorrencias.find(x=>x.id===card.dataset.oc);
       o.grav=d.ograv; marcarChips(card,"ograv",o.grav); salvarRascunho(); return; }
     if(d.foto){ app.querySelector(`input[data-foto-input="${d.foto}"]`).click(); return; }

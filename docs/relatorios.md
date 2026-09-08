@@ -35,7 +35,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | nº | Nome | O que responde | Fonte | Cadência | Dono/produtor | Status |
 |---:|---|---|---|---|---|---|
 | **NÍVEL 1 — SUSTENTAÇÃO** | | | | | | |
-| 1 | Farol de completude | quem enviou/não enviou boletim | app | diário | painel + motor (`farol_7`, `farol_30`) | EXISTE |
+| 1 | Farol de completude | quem enviou/não enviou boletim; desde a v69, por seção eventual: com registro · sem ocorrência · não respondida (`vw_completude_boletim`, sem tela ainda) | app | diário | painel + motor (`farol_7`, `farol_30`) | EXISTE (por seção: visão pronta, tela futura) |
 | 2 | Devolutiva semanal por unidade | adesão, dito × medido, elogio | app + iCrop + Solinftec | sexta | robô-redator (`devolutiva_semanal`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase) — prompt `docs/relatorios/02-devolutiva-semanal.md` |
 | 3 | Vistoria do sistema | site × código, robôs, segurança | repo + REST | segunda | Code | EXISTE — roteiro em `docs/vistoria-semanal.md` |
 | **NÍVEL 2 — CONTROLE OPERACIONAL** | | | | | | |
@@ -490,6 +490,46 @@ gerente (café, grãos e pecuária), cartões "iCrop — medição de ontem" e
 dos robôs" em Escritório › Integrações e robôs. Sem linha: pós-colheita
 (não tem dado de integração) e a dica de chuva na seção Clima (o cartão
 iCrop do mesmo boletim já a carrega).
+
+## Resposta explícita de ausência — `boletim_secao`, `boletim_secao_resposta` + `vw_completude_boletim` (v69)
+
+Núcleo conceitual: **"não respondido" e "sem ocorrência" são coisas
+diferentes** — é o mesmo problema de "sem registro × não fez", aplicado
+à ENTRADA em vez da leitura. Até a v68, um cartão vazio de Pragas ou de
+Ocorrências podia significar "olhei e não havia" ou "ninguém abriu";
+qualquer relatório de sanidade herdava essa ambiguidade. Desde a v69 o
+gerente toca em **"Nada a registrar hoje"** e a ausência vira um
+REGISTRO, com autor e hora. Arquivo: `sql/047-secao-resposta.sql`
+(bloco único, passo a passo no cabeçalho; pré-requisito: `sql/020`).
+
+| estado da seção eventual | como se reconhece | significa |
+|---|---|---|
+| **com registro** | `boletim_secao_registros(payload, campos) > 0` | há lançamento (praga, ocorrência, movimento, tratamento) |
+| **sem ocorrência** | linha em `boletim_secao_resposta` (`resposta = 'sem_ocorrencia'`) | alguém olhou e declarou que não há o que registrar; sabe-se quem e quando |
+| **não respondido** | nem registro nem linha | a seção não foi respondida — ausência de resposta, NUNCA "não fez" nem "não havia" |
+
+Não existe valor "pendente" nem "não respondido" gravado: a ausência de
+linha É o não respondido (gravar um enum duplicaria o estado e criaria
+divergência). "Sem ocorrência" e registro nunca coexistem: o app apaga
+a resposta ao adicionar um registro, e o banco confere de novo (gatilho
+`boletim_secao_resposta_trava`).
+
+| objeto | o que é |
+|---|---|
+| `boletim_secao` | catálogo das seções do boletim por atividade: `id` (chave substituta imutável: CAFE-FITO, GRAOS-FITO_OCOR, PEC-MOV…), `atividade`, `nome` (só rótulo), `tipo` (eventual / esperada), `campos` (caminhos das listas do payload que contam como registro), `ordem`, `ativo`. Espelho de `SECOES_BOLETIM` do index.html e da tabela em docs/catalogos-por-atividade.md. Só o SQL Editor escreve. |
+| `boletim_secao_resposta` | a resposta: `id` (uuid), `boletim_id`, `secao_id` → `boletim_secao`, `atividade`, `resposta` (check: só `sem_ocorrencia` por ora), `respondido_por` (nome de quem preenche; `payload.secoes[].por`, senão `payload.responsavel`), `respondido_em` (hora do toque no chip, `payload.secoes[].em`), `fazenda_id`, `data` (cópias de boletins), `atualizado_em`; `unique (boletim_id, secao_id)`. |
+| `boletim_secao_registros(payload, campos)` | soma `jsonb_array_length` dos caminhos em `campos` — o mesmo cálculo de `secaoRegistros` no app. |
+| gatilho `boletins_secao_resposta` | em insert/update/delete de `boletins`: reescreve as linhas de `boletim_secao_resposta` daquele boletim a partir de `payload.secoes` (só seções eventuais ativas da atividade da unidade e só com 0 registros). É por isso que o app NÃO escreve na tabela: grava a resposta dentro do payload, na fila offline de sempre, sem policy de escrita, sem delete pela REST e sem depender de ordem de sincronização. Protegido por exception: nunca derruba o envio do boletim. Correção do boletim (mesmo id) e troca de id no upsert (merge) limpam as linhas antigas. |
+| `vw_completude_boletim` | por boletim (sem "exemplo"): `boletim_id`, `unidade_id` (ids antigos por `rel_fz_atual`), `atividade`, `data`, `secoes_eventuais` (quantas a atividade tem), `com_registro`, `sem_ocorrencia`, `nao_respondidas` e os arrays `ids_com_registro`, `ids_sem_ocorrencia`, `ids_nao_respondidas`. Alimenta o farol de completude por seção (relatório nº 1, evolução prevista). |
+
+Como o dado chega (app, v69): `rascunho.secoes = { "CAFE-FITO":
+{resposta:"sem_ocorrencia", por:"João", em:"2026-09-08T14:03:00Z"} }`
+sobe dentro do payload do boletim, como sempre. Leitura no app:
+`baixarCompletudeBoletim({unidade, de, ate})` (sob demanda, sem tela;
+mesma trava de escopo das outras visões). Segurança: leitura anon por
+policy select nas duas tabelas; escrita só pelas funções (security
+definer); visão com security_invoker. Boletins gravados antes de o SQL
+rodar são reprocessados pelo próprio bloco (passo 6).
 
 ## Como rodar um relatório PRONTO no Cowork
 

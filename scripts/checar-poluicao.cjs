@@ -18,7 +18,10 @@
       sem campo de busca.
    3. Abre cada seção de lançamento (as que têm botão "＋") e conta o que
       fica visível: só a lista compacta e o "＋" — nenhum campo, chip ou
-      seletor antes do toque em "＋".
+      seletor antes do toque em "＋". Exceção definida na v69: o par de
+      chips de resposta explícita de ausência ("Nada a registrar hoje" ·
+      "Registrar…", container [data-resp-secao]) faz parte do estado
+      compacto das seções EVENTUAIS (docs/definicao-de-pronto.md, item 11).
    4. Toca em "＋" e confere o padrão de 3 passos: primeiro só o ONDE
       (chips de talhão/pivô/pasto), nada de campo ou seletor junto.
    5. Procura termos de café nas telas de grãos/pecuária e vice-versa.
@@ -149,8 +152,10 @@ const NA_PAGINA = {
     const txt = el => el.textContent.trim().replace(/\s+/g, ' ');
     const inspecionar = (det, nivel) => {
       const corpo = det.querySelector(':scope > .corpo') || det;
-      const campos = [...corpo.querySelectorAll('input, select, textarea, .chip')].filter(vis).filter(el => !el.closest('details.subsec, details.fase-op') || el.closest('details.subsec, details.fase-op') === det);
-      const botoes = [...corpo.querySelectorAll('button')].filter(vis).filter(b => !b.classList.contains('chip') && !b.closest('details.subsec') || b.closest('details.subsec') === det);
+      /* v69: o par de chips de resposta explícita de ausência ("Nada a registrar hoje" · "Registrar…", [data-resp-secao])
+         faz parte do estado compacto da seção eventual — não é campo de lançamento antes do ＋ */
+      const campos = [...corpo.querySelectorAll('input, select, textarea, .chip')].filter(vis).filter(el => !el.closest('[data-resp-secao]')).filter(el => !el.closest('details.subsec, details.fase-op') || el.closest('details.subsec, details.fase-op') === det);
+      const botoes = [...corpo.querySelectorAll('button')].filter(vis).filter(b => !b.closest('[data-resp-secao]')).filter(b => !b.classList.contains('chip') && !b.closest('details.subsec') || b.closest('details.subsec') === det);
       const mais = botoes.filter(b => txt(b).startsWith('＋'));
       const outros = botoes.filter(b => !txt(b).startsWith('＋'));
       const camposFora = campos.filter(el => !el.closest('details.subsec') || el.closest('details.subsec') === det);
