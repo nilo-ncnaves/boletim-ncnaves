@@ -145,6 +145,37 @@ de enviar", com o botão "copiar para WhatsApp". A chave da API vive só em
 | `painel_executivo` | mês anterior fechado | linha do grupo | `farol_30`, `custo_fisico_talhao_mes`, `rebanho_mes`, `plano_executado_mes`, semanas de `irrigacao_rec_exec_semana` e dito × medido, resumos do mês anterior | dia 8 08:20 / 08:35 |
 | `alerta_divergencia` | manual (sql/032) | por unidade e dia | `dito_medido_icrop_dia`, `dito_medido_solinftec_dia` | — |
 
+### Tela "Textos para revisar" (v68): cartão colapsado + folha de leitura
+
+Desde a v68 cada texto do redator entra na tela (Diretoria › 📊
+Relatórios, seção "Textos para revisar", e a tela do relatório narrativo
+aberta por "ver com os números ›") pelo componente único
+`cartaoTextoLongo` do `index.html` (CLAUDE.md, item c7). O cartão nasce
+**colapsado**: tag "gerado automaticamente — revisar antes de enviar",
+título (unidade destinatária), prévia de 3 linhas cortada por linha
+inteira com reticências, linha compacta de origem e dois botões lado a
+lado — "ler texto completo ›" e "📲 copiar para WhatsApp". Copiar
+funciona sem expandir e copia o texto integral de
+`relatorios_gerados.texto` (nunca a prévia). Texto curto (cabe nas 3
+linhas) não mostra reticências nem "ler texto completo".
+
+"ler texto completo ›" abre uma folha de tela cheia (não expande na
+lista): cabeçalho fixo com "‹ Fechar", a tag, o texto completo rolável,
+a origem completa e um rodapé fixo com Fechar e copiar. Ao fechar, a
+lista volta à posição de rolagem de antes.
+
+Regra da origem: no cartão só a versão compacta, `robô-redator ·
+dd/mm hh:mm` (de `texto_em`); a completa — "Redigido no Supabase por
+<texto_modelo> em dd/mm, hh:mm a partir dos números do relatório" — só
+na folha. O aviso "Confira e ajuste antes de mandar" saiu do rodapé: a
+tag já diz isso. O texto continua SÓ leitura no app: o ajuste é feito
+no WhatsApp, depois de colar; nada é editado nem gravado.
+
+Na lista "Números": quando o total de unidades e o número "para
+conferir" coincidem, a linha diz "N unidades · todas para conferir"
+("1 unidade · para conferir" no singular); diferentes, os dois números
+continuam.
+
 Pedido: modelo `claude-sonnet-4-6`, `max_tokens` 1500 (300 no alerta),
 system = instruções do modelo, uma mensagem de usuário com data, unidade,
 período e o JSON das fontes. Custo típico: devolutiva ≈ 2,5 mil tokens de

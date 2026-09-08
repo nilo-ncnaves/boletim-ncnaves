@@ -141,6 +141,25 @@ h3{font-size:.95rem;font-weight:700}
 .rel-tab tr.conferir td{background:var(--amarelo-claro)}
 .rel-tab tr.critico td{background:var(--cereja-claro)}
 .rel-conf{color:#8a5f10;font-weight:600}
+/* Texto longo em lista (v68): o cartão nasce COLAPSADO — prévia de 3 linhas cortada por linha inteira (max-height
+   em múltiplo do line-height: nunca no meio da palavra) com reticências reais no canto reservado pelo padding
+   (fade seria gradiente, proibido); ações lado a lado, copiar sem expandir; leitura completa na folha .folha
+   (tela cheia, própria rolagem, corpo da página travado por body.folha-aberta para devolver a posição ao fechar). */
+.txt-cartao{border-color:var(--amarelo)}   /* mesma borda âmbar "para revisar" do cartão antigo */
+.txt-cartao .tag,.folha .tag{display:inline-block;margin-bottom:6px;border-radius:0;font-size:.68rem;padding:3px 5px}
+.txt-previa{position:relative;white-space:pre-wrap;font-size:.95rem;line-height:1.45;max-height:calc(3 * 1.45em);overflow:hidden;padding-right:1.1em;margin-top:4px}
+.txt-previa.cortado::after{content:"…";position:absolute;right:0;bottom:0;line-height:inherit;background:var(--cartao);padding-left:2px}
+.txt-origem{font-size:.72rem;margin-top:6px}
+.txt-acoes{display:flex;gap:8px;margin-top:10px}
+.txt-acoes .btn{flex:1 1 auto;min-width:0;min-height:44px;padding:4px 4px;border-radius:0;box-shadow:none;font-size:.8rem;line-height:1.2;text-align:center}
+.txt-acoes .txt-ler.oculto{display:none}
+.folha{position:fixed;inset:0;z-index:60;background:var(--papel);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 14px calc(96px + env(safe-area-inset-bottom))}
+.folha .miolo{max-width:640px;margin:0 auto}
+.folha .btn-topo{min-height:44px;border-radius:0}
+.folha .txt-completo{white-space:pre-wrap;font-size:.98rem;line-height:1.5;margin-top:10px}
+.folha .rodape .btn{border-radius:0;box-shadow:none;font-size:.95rem}
+.folha .rodape .btn.sec{flex:0 0 auto;width:auto;padding:0 22px}
+body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .foto-mini{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--linha)}
 .foto-grande{width:100%;border-radius:10px;border:1px solid var(--linha);margin-top:8px}
 .lista-limpa{list-style:none}
@@ -2130,9 +2149,11 @@ function relItensNumeros(per){
     const ps=relPeriodos(k); if(!ps.length) return "";
     const [ini,fim]=ps[0].split("|"), ls=relLinhas(k,ini,fim), uni=ls.filter(l=>l.unidade_id);
     const conf=uni.filter(relAlerta).length;
+    /* v68: total e "para conferir" iguais viram "todas para conferir" (o número repetido não diz nada); diferentes ficam os dois */
+    const confTxt=!conf?"":conf===uni.length?(uni.length===1?" · para conferir":" · todas para conferir"):" · "+conf+" para conferir";
     return `<li><button class="linha-flex" style="width:100%;text-align:left" data-relab="${k}|${ini}|${fim}">
       <span class="farol ${conf?"espera":"ok"}"></span>
-      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${uni.length} unidade${uni.length===1?"":"s"}${conf?" · "+conf+" para conferir":""} · ${ps.length} período${ps.length>1?"s":""}</span></span>
+      <span class="cresce"><b>${esc(REL_CATALOGO[k].nome)}</b><br><span class="mut">${relRotuloPer(k,ini,fim)} · ${uni.length} unidade${uni.length===1?"":"s"}${confTxt} · ${ps.length} período${ps.length>1?"s":""}</span></span>
       <span class="mut">›</span></button></li>`;
   }).join("");
 }
@@ -2159,7 +2180,7 @@ function vRelatorios(){
   if(!relCache.length && relEstado.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"os relatórios"},{acao:true})}</div>`+voltar;
   return cab+`
     <h2 style="margin-bottom:6px">📝 Textos para revisar</h2>
-    <p class="mut" style="font-size:.8rem">Escritos pelo robô-redator a partir dos números. Leia, ajuste se quiser e toque em copiar para mandar no WhatsApp.</p>
+    <p class="mut" style="font-size:.8rem">Escritos pelo robô-redator a partir dos números. Toque em copiar para mandar no WhatsApp.</p>
     ${textos||`<div class="cartao">${htmlEstado("vazio",{que:"texto do redator para revisar",dica:"Os textos aparecem aqui depois de sincronizar."})}</div>`}
     <h2 style="margin:18px 0 6px">📊 Números</h2>
     ${relCache.length?`<div class="chips mb no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
@@ -2223,14 +2244,85 @@ function relNavegar(sentido){
   const j=sentido==="ant"?i+1:i-1; if(j<0||j>=ps.length) return;
   const [ini,fim]=ps[j].split("|"); relVista={...relVista,ini,fim}; ir("relat");
 }
-/* texto redigido pelo robô-redator (fase 2): acima dos números, sempre com o marcador de revisão */
-function relTextos(ls){
-  return ls.filter(l=>l.texto).map(l=>`<div class="cartao" style="border-color:var(--amarelo)">
-    <div class="linha-flex" style="align-items:flex-start;gap:8px"><h3 class="cresce">📝 ${esc(relUni(l.unidade_id))}</h3>
-      <span class="tag amarelo" style="flex:none">gerado automaticamente — revisar antes de enviar</span></div>
-    <p style="white-space:pre-wrap;font-size:.95rem;margin-top:8px">${esc(l.texto)}</p>
-    <p class="mut" style="font-size:.72rem;margin-top:6px">Redigido no Supabase${l.texto_modelo?" por "+esc(l.texto_modelo):""}${l.texto_em?" em "+new Date(l.texto_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):""} a partir dos números abaixo. Confira e ajuste antes de mandar.</p>
-    <button class="btn sec mini mt no-print" data-relcopiar="${esc(String(l.id))}">📲 copiar para WhatsApp</button></div>`).join("");
+/* ---------- Texto longo em lista (v68) — componente ÚNICO ----------
+   cartaoTextoLongo(o) monta o cartão COLAPSADO de um texto longo numa lista de leitura: tag de aviso, título,
+   prévia de 3 linhas cortada por linha inteira (nunca no meio da palavra; reticências reais — fade seria
+   gradiente, proibido), linha curta de origem e duas ações lado a lado: "ler texto completo ›" (abre a folha
+   de tela cheia, abrirFolhaTexto) e a ação principal (copiar), que funciona SEM expandir e sempre sobre o
+   texto integral. Texto que cabe nas 3 linhas não mostra "ler texto completo" nem reticências
+   (ajustarTextosLongos mede depois de desenhar, chamada por ir()). A prévia junta as linhas em branco para
+   as 3 linhas terem conteúdo; o texto integral fica intacto. A folha guarda a posição de rolagem ao
+   abrir e devolve ao fechar; o corpo da página fica travado (body.folha-aberta) para o iPhone não rolar a
+   lista por baixo. Nenhum campo de digitação; nunca uma variante por atividade ou por perfil.
+   o = { chave, titulo, tag, texto, origemCurta, origemLonga, copiar (rótulo), aoCopiar(botao) }. */
+const textosLongos=new Map();   /* chave → o: os botões do cartão e da folha acham o texto por aqui */
+let folhaScrollY=0;
+function cartaoTextoLongo(o){
+  textosLongos.set(o.chave,o);
+  return `<div class="cartao txt-cartao">
+    ${o.tag?`<span class="tag amarelo">${esc(o.tag)}</span>`:""}
+    <h3>${esc(o.titulo)}</h3>
+    <div class="txt-previa">${esc(String(o.texto||"").replace(/\n\s*\n+/g,"\n"))}</div>
+    ${o.origemCurta?`<p class="mut txt-origem">${esc(o.origemCurta)}</p>`:""}
+    <div class="txt-acoes no-print">
+      <button class="btn sec mini txt-ler" data-txtler="${esc(o.chave)}">ler texto completo ›</button>
+      <button class="btn mini" data-txtcopiar="${esc(o.chave)}">${esc(o.copiar||"copiar")}</button>
+    </div></div>`;
+}
+/* depois de desenhar: prévia que não transborda perde as reticências e o "ler texto completo" */
+function ajustarTextosLongos(){
+  document.querySelectorAll(".txt-cartao").forEach(c=>{
+    const p=c.querySelector(".txt-previa"), bt=c.querySelector(".txt-ler"); if(!p) return;
+    p.classList.remove("cortado");
+    const corta=p.scrollHeight-p.clientHeight>2;
+    p.classList.toggle("cortado",corta); if(bt) bt.classList.toggle("oculto",!corta);
+  });
+}
+function abrirFolhaTexto(o){
+  fecharFolhaTexto();
+  folhaScrollY=window.scrollY||window.pageYOffset||0;
+  const f=document.createElement("div"); f.className="folha"; f.id="folha-texto";
+  f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label",o.titulo);
+  f.innerHTML=`<div class="miolo">
+    <div class="topo"><button class="btn-topo" id="bt-folha-voltar">‹ Fechar</button><h1>${esc(o.titulo)}</h1></div>
+    ${o.tag?`<span class="tag amarelo">${esc(o.tag)}</span>`:""}
+    <p class="txt-completo">${esc(o.texto)}</p>
+    ${o.origemLonga?`<p class="mut txt-origem">${esc(o.origemLonga)}</p>`:""}
+  </div>
+  <div class="rodape no-print"><div class="linha-flex" style="gap:8px;max-width:640px;margin:0 auto">
+    <button class="btn sec" id="bt-folha-fechar">Fechar</button>
+    <button class="btn" id="bt-folha-copiar">${esc(o.copiar||"copiar")}</button></div></div>`;
+  document.body.appendChild(f);
+  document.body.style.top=(-folhaScrollY)+"px"; document.body.classList.add("folha-aberta");
+  f.onclick=ev=>{ const t=ev.target.closest("button"); if(!t) return;
+    if(t.id==="bt-folha-copiar"){ if(o.aoCopiar) o.aoCopiar(t); return; }
+    if(t.id==="bt-folha-fechar"||t.id==="bt-folha-voltar") fecharFolhaTexto(); };
+}
+function fecharFolhaTexto(){
+  const f=document.getElementById("folha-texto"); if(!f) return;
+  f.remove(); document.body.classList.remove("folha-aberta"); document.body.style.top="";
+  window.scrollTo(0,folhaScrollY);
+}
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape") fecharFolhaTexto(); });
+
+/* texto redigido pelo robô-redator (fase 2): sempre com o marcador de revisão. v68: cartão colapsado pelo
+   componente único cartaoTextoLongo (prévia + copiar sem expandir; leitura completa na folha). Origem curta
+   "robô-redator · dd/mm hh:mm" no cartão; a completa (modelo, Supabase) só na folha. Texto SÓ leitura: o
+   ajuste é feito no WhatsApp, depois de colar — nada é editado nem gravado pelo app. */
+const fmtDataHora=iso=>new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+function relTextoLongo(l){
+  const quando=l.texto_em?fmtDataHora(l.texto_em):"";
+  return { chave:"rel:"+l.id, titulo:"📝 "+relUni(l.unidade_id), tag:"gerado automaticamente — revisar antes de enviar", texto:l.texto,
+    origemCurta:"robô-redator"+(quando?" · "+quando.replace(", "," "):""),
+    origemLonga:"Redigido no Supabase"+(l.texto_modelo?" por "+l.texto_modelo:"")+(quando?" em "+quando:"")+" a partir dos números do relatório.",
+    copiar:"copiar para WhatsApp", aoCopiar:bt=>relCopiar(l,bt) };
+}
+function relTextos(ls){ return ls.filter(l=>l.texto).map(l=>cartaoTextoLongo(relTextoLongo(l))).join(""); }
+/* copia o texto INTEGRAL (nunca a prévia), marca "✔ copiado" e abre o compartilhar */
+function relCopiar(l,bt){
+  if(!l||!l.texto) return;
+  const txt=l.texto; const fim=()=>{ if(bt) bt.textContent="✔ copiado"; abrirTextoZap(txt); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(fim,fim); else fim();
 }
 /* renderização por relatório: tabelas compactas, âmbar onde há divergência/atraso */
 function relRender(rel,ls){
@@ -2884,6 +2976,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="farol") app.innerHTML = vFarol(arg);
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
+  ajustarTextosLongos();   /* v68: prévia dos textos longos (reticências e "ler texto completo" só se transbordar) */
 }
 
 /* ---------- Tela: código de acesso ---------- */
@@ -4625,7 +4718,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v67";
+const APP_VERSAO="v68";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6261,10 +6354,9 @@ function ligarEventos(tela){
     if(d.relper!==undefined){ relFiltro.per=d.relper; ir(telaAtual,null,true); return; }
     if(d.relnav){ relNavegar(d.relnav); return; }
     if(t.id==="bt-rel-zap"){ abrirTextoZap(relTexto()); return; }
-    if(d.relcopiar){ const l=relCache.find(x=>String(x.id)===d.relcopiar); if(!l||!l.texto) return;
-      const txt=l.texto; const fim=()=>{ t.textContent="✔ copiado"; abrirTextoZap(txt); };
-      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(fim,fim); else fim();
-      return; }
+    /* v68: texto longo em lista — ler na folha de tela cheia / copiar o texto integral sem expandir */
+    if(d.txtler){ const o=textosLongos.get(d.txtler); if(o) abrirFolhaTexto(o); return; }
+    if(d.txtcopiar){ const o=textosLongos.get(d.txtcopiar); if(o&&o.aoCopiar) o.aoCopiar(t); return; }
     if(t.id==="bt-rel-pdf"){ window.print(); return; }
     if(t.id==="bt-preencher"){
       const b=boletimDoDia(hojeISO(), sessao.fazendaId);

@@ -6,6 +6,69 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v68 · Textos do robô-redator nascem colapsados (Relatórios da Diretoria)
+
+**Entrega.** Componente único `cartaoTextoLongo(o)` + folha de leitura
+em tela cheia (`abrirFolhaTexto` / `fecharFolhaTexto`) +
+`ajustarTextosLongos()` no `index.html` (CSS `.txt-cartao`,
+`.txt-previa`, `.txt-acoes`, `.folha`, `body.folha-aberta`). Em
+Diretoria › 📊 Relatórios › "Textos para revisar" (e na tela do relatório
+narrativo, "ver com os números ›") cada texto do redator passa a nascer
+colapsado: tag "gerado automaticamente — revisar antes de enviar",
+título, prévia de 3 linhas (corte por linha inteira, reticências reais,
+sem fade), origem compacta "robô-redator · dd/mm hh:mm" e os botões "ler
+texto completo ›" + "copiar para WhatsApp" lado a lado. Copiar funciona
+sem expandir e copia o texto integral. "ler texto completo" abre a folha
+(cabeçalho fixo "‹ Fechar", tag, texto completo, origem completa, rodapé
+fixo com Fechar + copiar) e, ao fechar, devolve a posição de rolagem.
+"Confira e ajuste antes de mandar" saiu do rodapé do cartão; a lista
+"Números" diz "N unidades · todas para conferir" quando os números
+coincidem. Texto continua só leitura (o app nunca editou nem gravou
+ajuste). Sem campo novo, sem SQL, sem texto prescritivo. Regra
+permanente: CLAUDE.md c7; checagem: definicao-de-pronto.md item 10.
+
+**Verificado (automático, sem rede, 390 × 844).**
+- `scripts/checar-poluicao.cjs` (cenário novo: tela Relatórios com dois
+  textos de exemplo, um longo e um curto, e números): **242 ✅ · 41 ❌**
+  — os mesmos 41 ❌ herdados (nenhum novo). Grupo "8. Texto longo em
+  lista", 13 itens ✅: prévia de 3 linhas com reticências; cartão de
+  230 px (cabe em menos de uma tela); cabeçalho "Números" a 809 px com
+  DOIS textos na lista (critério pedia um); copiar visível no cartão e
+  igual ao texto da linha de `relatorios_gerados`; corte da prévia em
+  palavra inteira ("…registrou boletim em"), sem gradiente; texto curto
+  (2 linhas) sem "ler texto completo" e sem reticências; origem
+  "robô-redator · 08/09 05:35" e nenhum "Confira e ajuste"; "todas para
+  conferir"; folha aberta com corpo travado; cabeçalho fixo e "copiar
+  para WhatsApp" no rodapé sem rolar; 998 caracteres na folha, tag e
+  "Redigido no Supabase por claude-sonnet-4-6 em 08/09, 05:35 a partir
+  dos números do relatório."; folha sem gradiente/sombra/canto e toque
+  ≥ 44 px; rolagem 120 px antes e 120 px depois de fechar. Tela semeada:
+  390 px de largura (sem rolagem lateral), 1,6 telas.
+- Capturas de tela (Playwright, script de apoio fora do repositório):
+  cartão colapsado com os dois botões numa linha só; folha com
+  "‹ Fechar", texto e rodapé fixo.
+- `scripts/regressao_render.cjs` main × branch (passos novos
+  `25-relatorios-textos`, `26-relatorios-folha`, `27-relatorios-fechada`,
+  `28-relat-texto` na Diretoria): diferença só na tela Relatórios com
+  textos semeados, na tela do relatório narrativo (mesmo componente) e
+  no rodapé de versão; café, grãos, pecuária, pós-colheita, painel,
+  Resumo do período, Faróis e Cadastros idênticos (ver resumo no PR).
+- `node --check` no JavaScript extraído e no `sw.js`. Versão v68 no
+  rodapé e no cache.
+- `git grep` por "não fez", "pendente", "atrasad" no código novo: nada.
+
+**Teste manual (Nilo, no iPhone).** Diretoria › 📊 Relatórios: cada
+texto aparece com 3 linhas e os dois botões; "Números" visível sem rolar;
+"copiar para WhatsApp" sem abrir cola o texto inteiro no WhatsApp; "ler
+texto completo ›" abre a folha, rola, "Fechar" volta ao mesmo ponto da
+lista. Conferir o mesmo em "ver com os números ›". Decidir sobre o selo
+"Powered by Netlify" (PENDÊNCIAS do ESTADO.md: desliga-se sem custo em
+Project configuration › General).
+
+**Não tocado.** Boletim do gerente nas três atividades, pós-colheita,
+painel, Faróis, Cadastros, motor e redator no Supabase (nenhum SQL),
+`relatorios.html`. O gerente continua sem receber texto do redator.
+
 ## 08/09/2026 · v67 · Badge de categoria da operação (uma letra) nas listas de leitura
 
 **Entrega.** Componente único `badgeCategoria(atividade, {id | nome})`
