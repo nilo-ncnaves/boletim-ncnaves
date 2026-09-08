@@ -18,10 +18,10 @@
       sem campo de busca.
    3. Abre cada seção de lançamento (as que têm botão "＋") e conta o que
       fica visível: só a lista compacta e o "＋" — nenhum campo, chip ou
-      seletor antes do toque em "＋". Exceção definida na v68: o par de
+      seletor antes do toque em "＋". Exceção definida na v69: o par de
       chips de resposta explícita de ausência ("Nada a registrar hoje" ·
       "Registrar…", container [data-resp-secao]) faz parte do estado
-      compacto das seções EVENTUAIS (docs/definicao-de-pronto.md, item 10).
+      compacto das seções EVENTUAIS (docs/definicao-de-pronto.md, item 11).
    4. Toca em "＋" e confere o padrão de 3 passos: primeiro só o ONDE
       (chips de talhão/pivô/pasto), nada de campo ou seletor junto.
    5. Procura termos de café nas telas de grãos/pecuária e vice-versa.
@@ -31,6 +31,12 @@
       detalhe tem a ação principal visível sem rolar.
    7. Padrão visual da casa: sem gradiente, sem sombra, sem canto
       arredondado, toque ≥ 44 px — medido no CSS calculado de cada tela.
+   8. Texto longo em lista (v68): na tela Relatórios com textos do
+      robô-redator semeados, o cartão nasce colapsado (3 linhas, corte
+      por linha inteira), cabe em menos de uma tela, deixa o cabeçalho
+      "Números" visível sem rolar, copia o texto integral sem expandir,
+      e "ler texto completo" abre a folha de tela cheia (cabeçalho fixo,
+      ação principal visível, origem completa) e devolve a rolagem.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -146,7 +152,7 @@ const NA_PAGINA = {
     const txt = el => el.textContent.trim().replace(/\s+/g, ' ');
     const inspecionar = (det, nivel) => {
       const corpo = det.querySelector(':scope > .corpo') || det;
-      /* v68: o par de chips de resposta explícita de ausência ("Nada a registrar hoje" · "Registrar…", [data-resp-secao])
+      /* v69: o par de chips de resposta explícita de ausência ("Nada a registrar hoje" · "Registrar…", [data-resp-secao])
          faz parte do estado compacto da seção eventual — não é campo de lançamento antes do ＋ */
       const campos = [...corpo.querySelectorAll('input, select, textarea, .chip')].filter(vis).filter(el => !el.closest('[data-resp-secao]')).filter(el => !el.closest('details.subsec, details.fase-op') || el.closest('details.subsec, details.fase-op') === det);
       const botoes = [...corpo.querySelectorAll('button')].filter(vis).filter(b => !b.closest('[data-resp-secao]')).filter(b => !b.classList.contains('chip') && !b.closest('details.subsec') || b.closest('details.subsec') === det);
@@ -187,6 +193,59 @@ const NA_PAGINA = {
       primeiroRotulo: labels[0] || '',
       primeiroControle: (() => { const c = [...cartao.querySelectorAll('select, input:not([type=file]), textarea, .chip')].filter(vis)[0]; return c ? (c.classList.contains('chip') ? 'chip' : c.tagName.toLowerCase()) : ''; })(),
       apareceu: app.querySelectorAll('input, select, textarea, .chip').length - antes,
+    };
+  },
+  /* v68: cartão colapsado do texto longo (tela Relatórios com semente) — mede o 1º cartão (texto longo) e o 2º (texto curto) */
+  textoLongo: () => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const app = document.querySelector('#app');
+    const cartoes = [...app.querySelectorAll('.txt-cartao')];
+    const h2 = [...app.querySelectorAll('h2')].find(h => /Números/.test(h.textContent));
+    const olhar = c => {
+      if (!c) return null;
+      const r = c.getBoundingClientRect(), previa = c.querySelector('.txt-previa'), ler = c.querySelector('.txt-ler'), cop = c.querySelector('[data-txtcopiar]');
+      const lh = previa ? parseFloat(getComputedStyle(previa).lineHeight) : 0;
+      /* último caractere visível da prévia: o corte é por linha inteira se o que vem depois dele é espaço/quebra (ou fim) */
+      let corteInteiro = null, ultimo = '';
+      if (previa && previa.firstChild && previa.firstChild.nodeType === 3) {
+        const tn = previa.firstChild, lim = previa.getBoundingClientRect().top + previa.clientHeight + 0.5, rg = document.createRange(); let ult = -1;
+        for (let i = 0; i < tn.length; i++) { rg.setStart(tn, i); rg.setEnd(tn, i + 1); const rr = rg.getBoundingClientRect(); if (rr.height && rr.bottom <= lim) ult = i; }
+        ultimo = tn.data.slice(Math.max(0, ult - 20), ult + 1);
+        corteInteiro = ult < 0 || ult >= tn.length - 1 || /\s/.test(tn.data[ult + 1]) || /\s/.test(tn.data[ult]);
+      }
+      const chave = cop && cop.dataset.txtcopiar, o = chave && textosLongos.get(chave);
+      return {
+        altura: Math.round(r.height), cabe: r.height < innerHeight,
+        linhas: previa && lh ? Math.round(previa.clientHeight / lh) : 0, cortado: !!(previa && previa.classList.contains('cortado')),
+        lerVisivel: !!(ler && vis(ler)), copiarVisivel: !!(cop && vis(cop)), copiarNaTela: !!(cop && cop.getBoundingClientRect().bottom <= innerHeight),
+        copiaIntegral: !!(o && o.texto && (relCache.find(l => 'rel:' + l.id === chave) || {}).texto === o.texto && o.texto.length >= previa.textContent.length), origem: (c.querySelector('.txt-origem') || {}).textContent || '',
+        tag: (c.querySelector('.tag') || {}).textContent || '', corteInteiro, ultimo,
+        gradiente: !!(previa && (getComputedStyle(previa, '::after').backgroundImage || '').includes('gradient')),
+      };
+    };
+    return { cartoes: cartoes.length, numerosVisivel: !!(h2 && h2.getBoundingClientRect().top < innerHeight), numerosTopo: h2 ? Math.round(h2.getBoundingClientRect().top) : null,
+      longo: olhar(cartoes[0]), curto: olhar(cartoes[1]), rodape: /Confira e ajuste antes de mandar/.test(app.innerText), todas: /todas para conferir/.test(app.innerText) };
+  },
+  /* v68: folha de leitura em tela cheia (fora do #app) */
+  folha: () => {
+    const f = document.querySelector('#folha-texto'); if (!f) return null;
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const rot = el => (el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') + ' "' + (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24) + '"');
+    const out = { raio: [], sombra: [], gradiente: [], toque: [] };
+    const junta = (arr, el) => { const r = rot(el); if (!arr.includes(r)) arr.push(r); };
+    [...f.querySelectorAll('*')].filter(vis).forEach(el => {
+      const cs = getComputedStyle(el);
+      if (cs.backgroundImage && cs.backgroundImage.includes('gradient')) junta(out.gradiente, el);
+      if (cs.boxShadow && cs.boxShadow !== 'none') junta(out.sombra, el);
+      if (el.matches('button, .cartao, .tag') && parseFloat(cs.borderTopLeftRadius) > 0 && el.offsetWidth > 20) junta(out.raio, el);
+      if (el.matches('button')) { const b = el.getBoundingClientRect(); if (b.height > 0 && b.height < 44) junta(out.toque, el); }
+    });
+    const topo = f.querySelector('.topo'), acao = f.querySelector('.rodape .btn:not(.sec)'), r = acao && acao.getBoundingClientRect();
+    return {
+      topoFixo: !!topo && ['sticky', 'fixed'].includes(getComputedStyle(topo).position), temVoltar: !!(topo && [...topo.querySelectorAll('button')].some(b => /‹|Fechar/.test(b.textContent))),
+      acaoVisivel: !!(r && r.top >= 0 && r.bottom <= innerHeight), acao: acao ? acao.textContent.trim() : '',
+      texto: (f.querySelector('.txt-completo') || {}).textContent || '', origem: (f.querySelector('.txt-origem') || {}).textContent || '', tag: (f.querySelector('.tag') || {}).textContent || '',
+      bodyTravado: document.body.classList.contains('folha-aberta'), rola: f.scrollHeight > f.clientHeight, visual: out,
     };
   },
   /* todo o texto que o gerente pode ver na tela (tudo aberto), com placeholders e opções */
@@ -230,6 +289,34 @@ const statusIntegracoesExemplo = () => {
   return [
     { fonte: 'icrop', ultima_execucao_em: t(2 * 36e5), ultima_execucao_ok_em: t(2 * 36e5), ultimo_dado_em: t(2 * 36e5), ultimo_dado_origem: dia(0), horas_desde_ultimo_sucesso: 2 },
     { fonte: 'solinftec', ultima_execucao_em: t(1 * 36e5), ultima_execucao_ok_em: t(30 * 36e5), ultimo_dado_em: t(30 * 36e5), ultimo_dado_origem: dia(864e5), horas_desde_ultimo_sucesso: 30 },
+  ];
+};
+
+/* v68: linhas de exemplo de relatorios_gerados — um texto LONGO (devolutiva, f33) e um CURTO (alerta, f26) do
+   robô-redator, mais números (farol_7 nas duas unidades "para conferir" → "todas para conferir"; farol_30 em dia).
+   Datas relativas a hoje para caírem no recorte da tela. */
+const relatoriosExemplo = () => {
+  const d = n => { const x = new Date(); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+  const em = new Date(d(0) + 'T05:35:00-03:00');   /* 05:35 de Brasília, como o robô grava */
+  const longo = ['Floramill — devolutiva da semana de ' + d(7).slice(8) + '/' + d(7).slice(5, 7) + ' a ' + d(1).slice(8) + '/' + d(1).slice(5, 7),
+    '',
+    'Boletins: a unidade registrou boletim em 5 dos 6 dias úteis da semana. O dia sem registro foi a quarta-feira; o boletim de quinta trouxe as operações dos dois dias, o que mantém o histórico completo para a Diretoria.',
+    '',
+    'Irrigação: os pivôs 01, 02 e 03 informaram lâmina nos quatro dias em que o iCrop mediu irrigação. No pivô 04 o boletim marcou "Rodou" na terça-feira e o iCrop não registrou lâmina naquele dia — ponto para conferir com o gerente, sem conclusão sobre o que aconteceu no campo.',
+    '',
+    'Máquinas: a Solinftec mediu 41 horas de motor na semana e o boletim apontou 38 horas nas operações de plantio e pulverização. A diferença de 3 horas está dentro do esperado para deslocamento e abastecimento.',
+    '',
+    'Clima: 12 mm de chuva acumulados, coerentes com o pluviômetro do iCrop (11 mm).',
+    '',
+    'Pontos para a conversa da semana: confirmar a irrigação do pivô 04 na terça-feira e lembrar que o boletim de quarta pode ser enviado no dia seguinte, sem prejuízo.'].join('\n');
+  const curto = 'Água Santa — ' + d(1).slice(8) + '/' + d(1).slice(5, 7) + ': boletim e medição batem; sem ponto para conferir hoje.';
+  const base = { gerado_em: em.toISOString(), texto_em: em.toISOString(), texto_modelo: 'claude-sonnet-4-6' };
+  return [
+    { id: 'ex-txt-1', relatorio: 'devolutiva_semanal', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { composto: true, fontes: [] }, texto: longo, ...base },
+    { id: 'ex-txt-2', relatorio: 'alerta_divergencia', periodo_ini: d(1), periodo_fim: d(1), unidade_id: 'f26', dados: { composto: true, fontes: [] }, texto: curto, ...base },
+    { id: 'ex-num-1', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { em_dia: false, enviados: 5, uteis: 6, marcas: '●●○●●●' }, gerado_em: em.toISOString(), texto: null },
+    { id: 'ex-num-2', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f26', dados: { em_dia: false, enviados: 4, uteis: 6, marcas: '●○○●●●' }, gerado_em: em.toISOString(), texto: null },
+    { id: 'ex-num-3', relatorio: 'farol_30', periodo_ini: d(30), periodo_fim: d(1), unidade_id: 'f33', dados: { em_dia: true, enviados: 24, uteis: 26, marcas: '' }, gerado_em: em.toISOString(), texto: null },
   ];
 };
 
@@ -298,6 +385,18 @@ async function cenarioDiretoria(browser, base, R) {
   R.telas.push(await medirTela(page, 'Diretoria — painel', 'diretoria'));
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
+  /* v68: textos do robô-redator semeados — cartão colapsado, "Números" sem rolar, folha de leitura, rolagem devolvida */
+  await page.evaluate(ex => { relCache = ex; ir('relatorios'); }, relatoriosExemplo()); await page.waitForTimeout(300);
+  const relTx = await medirTela(page, 'Diretoria — Relatórios (com textos do redator)', 'diretoria');
+  relTx.textoLongo = await page.evaluate(NA_PAGINA.textoLongo);
+  relTx.antesY = await page.evaluate(() => { window.scrollTo(0, 120); return window.scrollY; });
+  await page.click('#app .txt-ler >> nth=0').catch(() => {}); await page.waitForTimeout(250);
+  relTx.folha = await page.evaluate(NA_PAGINA.folha);
+  relTx.folhaVisual = relTx.folha ? relTx.folha.visual : null;
+  await page.click('#bt-folha-fechar').catch(() => {}); await page.waitForTimeout(250);
+  relTx.depois = await page.evaluate(() => ({ y: window.scrollY, folha: !!document.querySelector('#folha-texto'), travado: document.body.classList.contains('folha-aberta') }));
+  R.telas.push(relTx);
+  await page.evaluate(() => { relCache = []; window.scrollTo(0, 0); });
   await page.evaluate(() => ir('relatorio')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Resumo do período', 'diretoria'));
   /* Faróis de registro (v60): tela nova da Diretoria, medida com os padrões de Cadastros (P1–P10).
@@ -450,6 +549,23 @@ function avaliar(R) {
     add('7. Padrão visual — sem sombra', rotG[g], !v.sombra.size, v.sombra.size ? ex(v.sombra) : '');
     add('7. Padrão visual — sem canto arredondado', rotG[g], !v.raio.size, v.raio.size ? ex(v.raio) : '');
     add('7. Padrão visual — toque ≥ 44 px', rotG[g], !v.toque.size, v.toque.size ? ex(v.toque) : '');
+  });
+  /* 8. texto longo em lista (v68) */
+  R.telas.filter(t => t.textoLongo).forEach(t => {
+    const g = '8. Texto longo em lista: colapsado, copiar sem expandir, folha de leitura', x = t.textoLongo, L = x.longo || {}, C = x.curto || {}, F = t.folha, nome = t.nome.split(' — ')[0] + ' › Relatórios';
+    add(g, `${nome} — cartão nasce colapsado (prévia de 3 linhas)`, x.cartoes >= 2 && L.linhas === 3 && L.cortado, `${x.cartoes} cartões; prévia com ${L.linhas} linhas${L.cortado ? ', com reticências' : ', sem reticências'}`);
+    add(g, `${nome} — cartão colapsado cabe em menos de uma tela`, L.cabe, `${L.altura} px de ${VP.height}`);
+    add(g, `${nome} — cabeçalho "Números" visível sem rolar (2 textos na lista)`, x.numerosVisivel, x.numerosTopo === null ? 'sem cabeçalho Números' : `topo a ${x.numerosTopo} px`);
+    add(g, `${nome} — copiar visível no cartão colapsado e copia o texto integral`, L.copiarVisivel && L.copiaIntegral, `${L.copiarVisivel ? 'botão visível' : 'botão ausente'}; ${L.copiaIntegral ? 'texto integral' : 'texto diferente da linha'}`);
+    add(g, `${nome} — prévia corta por linha inteira, nunca no meio da palavra`, L.corteInteiro === true && !L.gradiente, `…${(L.ultimo || '').trim()}${L.gradiente ? ' (fade em gradiente)' : ''}`);
+    add(g, `${nome} — texto curto sem "ler texto completo" e sem reticências`, C.altura > 0 && !C.lerVisivel && !C.cortado, `${C.linhas} linha(s); ler ${C.lerVisivel ? 'visível' : 'oculto'}; ${C.cortado ? 'com' : 'sem'} reticências`);
+    add(g, `${nome} — origem compacta "robô-redator · dd/mm hh:mm" no cartão; aviso só no badge`, /^robô-redator · \d\d\/\d\d \d\d:\d\d$/.test(L.origem) && !x.rodape && /revisar antes de enviar/.test(L.tag), `"${L.origem}"${x.rodape ? '; ainda há "Confira e ajuste antes de mandar"' : ''}`);
+    add(g, `${nome} — "N unidades · todas para conferir" quando os números coincidem`, x.todas, x.todas ? '' : 'texto não encontrado');
+    add(g, `${nome} — "ler texto completo" abre folha de tela cheia (não expande na lista)`, !!F && F.bodyTravado, F ? (F.bodyTravado ? 'folha aberta, lista travada por baixo' : 'folha aberta sem travar a lista') : 'folha não abriu');
+    add(g, `${nome} — folha: cabeçalho fixo com Fechar e ação principal visível sem rolar`, !!F && F.topoFixo && F.temVoltar && F.acaoVisivel, F ? `${F.topoFixo ? 'cabeçalho fixo' : 'cabeçalho solto'}; "${F.acao}" ${F.acaoVisivel ? 'no rodapé' : 'fora da tela'}` : '');
+    add(g, `${nome} — folha: texto completo, badge e origem completa`, !!F && F.texto.length > 400 && /revisar antes de enviar/.test(F.tag) && /^Redigido no Supabase por .+ em \d\d\/\d\d, \d\d:\d\d/.test(F.origem), F ? `${F.texto.length} caracteres; "${F.origem}"` : '');
+    add(g, `${nome} — folha: padrão visual (sem gradiente, sem sombra, sem canto, toque ≥ 44 px)`, !!F && !F.visual.gradiente.length && !F.visual.sombra.length && !F.visual.raio.length && !F.visual.toque.length, F ? ['gradiente', 'sombra', 'raio', 'toque'].filter(k => F.visual[k].length).map(k => k + ': ' + F.visual[k].slice(0, 3).join('; ')).join(' | ') : '');
+    add(g, `${nome} — ao fechar a folha volta à posição de rolagem anterior`, !!t.depois && !t.depois.folha && !t.depois.travado && t.depois.y === t.antesY, t.depois ? `antes ${t.antesY} px, depois ${t.depois.y} px${t.depois.travado ? '; corpo continua travado' : ''}` : '');
   });
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);

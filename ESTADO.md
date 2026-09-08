@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v68** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v69** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -66,7 +66,7 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   formato novo — esses aparelhos pedem o código novo uma vez.
 
 ## Seções do boletim por atividade
-Desde a v68 cada seção tem uma classificação **eventual × esperada**
+Desde a v69 cada seção tem uma classificação **eventual × esperada**
 (docs/catalogos-por-atividade.md, "Seções do boletim: eventual ×
 esperada"; catálogo `SECOES_BOLETIM`; confirmada pelo Nilo em
 08/09/2026): as eventuais — café: Pragas, doenças e daninhas e
@@ -663,6 +663,42 @@ espaço.
   (`unidade_manejo`) não é usada. Regressão: diferença main × branch só
   no trecho do cabeçalho, igual nas três atividades.
 
+## Texto longo em lista nasce colapsado (v68) — Relatórios da Diretoria
+Regra permanente em CLAUDE.md, item c7; checagem em
+docs/definicao-de-pronto.md, item 10; comportamento da tela em
+docs/relatorios.md, "Tela Textos para revisar (v68)".
+- **Problema resolvido:** em Diretoria › 📊 Relatórios cada texto do
+  robô-redator nascia inteiro (mais de uma tela do iPhone), escondia a
+  seção "Números" e deixava o "copiar para WhatsApp" no fim de uma
+  tela e meia de leitura.
+- **Componente único** `cartaoTextoLongo(o)` + `abrirFolhaTexto(o)` /
+  `fecharFolhaTexto()` + `ajustarTextosLongos()` (CSS `.txt-cartao`,
+  `.txt-previa`, `.txt-acoes`, `.folha`, `body.folha-aberta`). O cartão
+  nasce colapsado: tag de aviso, título, prévia de 3 linhas (corte por
+  linha inteira, reticências reais, sem fade/gradiente), origem
+  compacta "robô-redator · dd/mm hh:mm", e "ler texto completo ›" +
+  "📲 copiar para WhatsApp" lado a lado. Copiar funciona sem expandir e
+  copia o texto integral (`relCopiar`). Texto que cabe nas 3 linhas
+  não mostra reticências nem "ler texto completo".
+- **Folha de leitura** em tela cheia (`.folha`, fora do `#app`):
+  cabeçalho fixo "‹ Fechar", tag, texto completo, origem completa
+  ("Redigido no Supabase por <modelo> em dd/mm, hh:mm a partir dos
+  números do relatório"), rodapé fixo com Fechar + copiar. Corpo da
+  página travado enquanto aberta; ao fechar volta à posição de rolagem
+  anterior (Escape também fecha).
+- **Textos:** "Confira e ajuste antes de mandar" saiu do rodapé do
+  cartão (a tag já avisa). Lista "Números": "N unidades · todas para
+  conferir" quando total e "para conferir" coincidem ("1 unidade · para
+  conferir" no singular); diferentes, os dois números ficam.
+- **Onde entra:** seção "Textos para revisar" e a tela do relatório
+  narrativo ("ver com os números ›"), mesmo componente. Só
+  Diretoria/ADMIN veem textos (o gerente nunca baixa rascunho — igual à
+  v57). Sem variação por atividade. **Não editável, como antes:** o app
+  nunca gravou ajuste de texto; nada foi acrescentado.
+- Sem campo novo, sem SQL, sem texto prescritivo. Medição nova em
+  `scripts/checar-poluicao.cjs` (item 8, com textos de exemplo) e
+  passos `25–28` da Diretoria em `scripts/regressao_render.cjs`.
+
 ## Badge de categoria da operação (v67) — listas de leitura, três atividades
 Regra permanente em CLAUDE.md, item c6; checagem em
 docs/definicao-de-pronto.md, item 9; categorias e letras em
@@ -709,9 +745,9 @@ adubo) NÃO foram copiadas.
   diferença main × branch nas telas de leitura é só o
   `<span class="op-cat">`, igual nas três atividades.
 
-## Resposta explícita de ausência por seção (v68) — boletim, três atividades
-Regra permanente em CLAUDE.md, item c7; checagem em
-docs/definicao-de-pronto.md, item 10; classificação das seções em
+## Resposta explícita de ausência por seção (v69) — boletim, três atividades
+Regra permanente em CLAUDE.md, item c8; checagem em
+docs/definicao-de-pronto.md, item 11; classificação das seções em
 docs/catalogos-por-atividade.md; tabela e visão em docs/relatorios.md.
 - **Problema resolvido:** cartão vazio parecia cartão resolvido (não
   havia diferença entre "olhei e não havia praga" e "nem abri"), e
@@ -779,11 +815,15 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v68, 08/09/2026:
-**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v68 acrescentou o par de
+**242 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v69 acrescentou o par de
 chips de resposta explícita de ausência nas seis seções eventuais — o
 script passou a tratar `[data-resp-secao]` como parte do estado compacto
-da seção (docs/definicao-de-pronto.md, item 10), e o resultado ficou
-idêntico ao da v67; a v67 acrescentou o badge de
+da seção (docs/definicao-de-pronto.md, item 11), e o resultado ficou
+idêntico ao da v68; a v68 acrescentou a medição
+da tela Relatórios com dois textos do robô-redator semeados (um longo,
+um curto) e o grupo "8. Texto longo em lista" com 13 itens, todos ✅,
+mais os itens de renderização/altura da tela semeada (1,6 telas, 390 px
+de largura); a v67 acrescentou o badge de
 categoria (span de 20 px, sem raio, sem sombra, fora da lista de alvos de
 toque medidos; área de toque de 44 px por pseudo-elemento) nas linhas de
 Faróis › unidade — medido com as linhas de exemplo das três atividades,
@@ -822,11 +862,11 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
     atividade em seletor, 7 rótulos e calda/máquinas de uma vez).
   - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
     rótulos de uma vez).
-  - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v68: só o par
+  - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v69: só o par
     "Nada a registrar hoje" · "Registrar ocorrência" + lista + ＋) · "＋"
     ❌ (tipo em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ
     → ONDE).
-  - Ocorrências gerais: fechada ✅ · ao abrir ✅ (v68: idem) · "＋" ❌
+  - Ocorrências gerais: fechada ✅ · ao abrir ✅ (v69: idem) · "＋" ❌
     (tipo em seletor + gravidade + texto + foto de uma vez).
 - 🌾 Grãos (f33) — casa e boletim ✅ (1 tela, tudo fechado); termos de
   café/pecuária ✅ zero.
@@ -837,18 +877,18 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   - Irrigação (pivôs): fechada ✅ · ao abrir ❌ (além do "＋ pivô": botão
     "adicionar todos os pivôs" e link "cadastrar outro pivô") · "＋ pivô"
     ❌ (pivô em seletor; depois vira linha compacta ✓).
-  - Pragas, doenças e ocorrências: fechada ✅ · ao abrir ✅ (v68: um par
+  - Pragas, doenças e ocorrências: fechada ✅ · ao abrir ✅ (v69: um par
     de chips para o cartão inteiro) · "＋" ❌ ❌ (mesmos cartões do café).
 - 🐂 Pecuária (f26) — casa e boletim ✅ (1 tela, tudo fechado); termos
   de café/grãos ✅ zero.
   - Mão de obra: idem café ❌ ❌.
   - Seção 🐂 Pecuária: fechada ✅ · **acordeão dentro de acordeão ❌** (7
     sub-acordeões) · campo "Observações de pecuária" visível ao abrir.
-    - Movimentação do rebanho: ao abrir ✅ (v68: par "Nada a registrar
+    - Movimentação do rebanho: ao abrir ✅ (v69: par "Nada a registrar
       hoje" · "Registrar movimento") · "＋ movimento" ✅ (chips "O que
       houve" sozinhos; pasto vem depois, em seletor — ordem O QUÊ →
       ONDE, a ajustar quando a seção for tocada).
-    - Sanidade: ao abrir ✅ (v68: par "Nada a registrar hoje" ·
+    - Sanidade: ao abrir ✅ (v69: par "Nada a registrar hoje" ·
       "Registrar tratamento") · "＋ animal tratado" ❌ (21 chips + 4
       campos de uma vez) · "＋ manejo em massa" ❌ (11 chips + 2 campos).
     - Reprodução · Pasto e estrutura: formulários, fechados ✅.
@@ -858,7 +898,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
       campos).
     - Outros manejos: ao abrir ✅ · "＋ manejo" ❌ (2 seletores + 3
       campos).
-  - Ocorrências e sanidade: ao abrir ✅ (v68: par de chips) · "＋" ❌
+  - Ocorrências e sanidade: ao abrir ✅ (v69: par de chips) · "＋" ❌
     (idem café).
 - 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
   Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
@@ -871,6 +911,13 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 - Painel da Diretoria: renderiza ✅ · 3,0 telas de altura com a busca
   de boletins ✅ (referência) · Relatórios 1 tela ✅ · Resumo do período
   1,2 telas ✅.
+- Diretoria › Relatórios com textos do redator (v68, medida com dois
+  textos de exemplo, um longo e um curto): 13 itens do grupo "8. Texto
+  longo em lista" ✅ — cartão colapsado de 3 linhas, cabe em menos de
+  uma tela, "Números" visível sem rolar, copiar sem expandir e integral,
+  corte por linha inteira, texto curto sem reticências, origem compacta,
+  "todas para conferir", folha em tela cheia com cabeçalho e ação
+  fixos, origem completa, padrão visual da folha, rolagem devolvida.
 - Diretoria › Faróis de registro (v60, medida como Cadastros): lista 1,5
   telas com busca ✅ (14 unidades > 12 → busca) · nível 2 ✅ · cabeçalho
   fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
@@ -905,7 +952,7 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Resposta explícita de ausência (v68) — para o Nilo:** (1) rodar
+- **Resposta explícita de ausência (v69) — para o Nilo:** (1) rodar
   `sql/047-secao-resposta.sql` no SQL Editor (bloco único, passo a
   passo no cabeçalho; até lá a resposta já sobe dentro do payload e o
   bloco reprocessa os boletins antigos quando rodar); (2) testar no
@@ -919,6 +966,20 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   futuro: farol de completude por seção no painel (a visão
   `vw_completude_boletim` já existe; tela fora desta entrega) e ordem
   dos cartões (sugestão no PR).
+- **Selo "Powered by Netlify" (v68) — decisão do Nilo, sem custo:** o
+  selo que flutua sobre o rodapé é injetado pelo Netlify (não está no
+  código nem se desliga por netlify.toml). Pela documentação do Netlify
+  (changelog de 19/08/2026), ele aparece por padrão em projetos do
+  plano Free criados a partir dessa data e pode ser desligado em
+  qualquer plano, sem custo, em Netlify › projeto boletim-ncnaves ›
+  Project configuration › General › "Powered by Netlify badge" (vale
+  no próximo acesso, sem novo deploy). Cada visitante também pode
+  escondê-lo só no próprio aparelho. Não mexer em plano.
+- **Textos colapsados (v68) — para o Nilo testar no iPhone:** Diretoria
+  › 📊 Relatórios: cada texto aparece com 3 linhas, "ler texto completo
+  ›" e "copiar para WhatsApp" lado a lado; "Números" visível sem rolar;
+  copiar sem abrir cola o texto inteiro; "ler" abre a folha, Fechar
+  volta ao mesmo ponto da lista.
 - **Badge de categoria (v67) — decisão do Nilo antes do merge:** aprovar
   (ou trocar) as 5 categorias e letras do café propostas em
   docs/catalogos-por-atividade.md (C Colheita · A Aplicação · T Trato

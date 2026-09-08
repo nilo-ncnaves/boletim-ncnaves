@@ -1,4 +1,4 @@
--- Resposta explícita de ausência por seção do boletim (v68)
+-- Resposta explícita de ausência por seção do boletim (v69)
 -- Objetos: boletim_secao (catálogo), boletim_secao_resposta (a resposta),
 -- vw_completude_boletim (leitura). Rodar no SQL Editor do Supabase
 -- (projeto syvehtgrbqteyuqhoban).
@@ -17,8 +17,8 @@
 --
 -- O QUE É: no boletim diário há seções que legitimamente podem não ter
 -- nada num dia (pragas/doenças, ocorrências, movimentação e sanidade do
--- rebanho). Até a v67, cartão vazio e cartão pulado eram a mesma coisa.
--- Desde a v68 o gerente toca em "Nada a registrar hoje" e isso vira um
+-- rebanho). Até a v68, cartão vazio e cartão pulado eram a mesma coisa.
+-- Desde a v69 o gerente toca em "Nada a registrar hoje" e isso vira um
 -- REGISTRO, com autor e hora — a resposta explícita de ausência.
 --   • Linha em boletim_secao_resposta  = "sem ocorrência" (respondido).
 --   • Seção com registro no payload    = "com registro".
@@ -71,7 +71,7 @@ create table if not exists public.boletim_secao (
   ativo     boolean not null default true
 );
 comment on table public.boletim_secao is
-  'Catálogo das seções do boletim diário por atividade (Boletim NCNaves v68). tipo eventual = pode não ter nada no dia e oferece "Nada a registrar hoje"; esperada = execução esperada, tratada pelo farol de leitura. campos = caminhos (a.b) de listas do payload que contam como registro. Espelho de SECOES_BOLETIM do index.html.';
+  'Catálogo das seções do boletim diário por atividade (Boletim NCNaves v69). tipo eventual = pode não ter nada no dia e oferece "Nada a registrar hoje"; esperada = execução esperada, tratada pelo farol de leitura. campos = caminhos (a.b) de listas do payload que contam como registro. Espelho de SECOES_BOLETIM do index.html.';
 
 insert into public.boletim_secao (id, atividade, nome, tipo, campos, ordem) values
   ('CAFE-CLIMA',      'CAFE',     'Clima do dia',                  'esperada', '{}',                              1),
@@ -137,7 +137,7 @@ create table if not exists public.boletim_secao_resposta (
   unique (boletim_id, secao_id)
 );
 comment on table public.boletim_secao_resposta is
-  'Resposta explícita de ausência por seção eventual do boletim (v68): "Nada a registrar hoje" gravado com autor e hora. Ausência de linha = não respondido (não existe enum pendente). Escrita só pelo gatilho de boletins (boletim_secao_resposta_sync); leitura pela visão vw_completude_boletim.';
+  'Resposta explícita de ausência por seção eventual do boletim (v69): "Nada a registrar hoje" gravado com autor e hora. Ausência de linha = não respondido (não existe enum pendente). Escrita só pelo gatilho de boletins (boletim_secao_resposta_sync); leitura pela visão vw_completude_boletim.';
 create index if not exists boletim_secao_resposta_boletim on public.boletim_secao_resposta (boletim_id);
 create index if not exists boletim_secao_resposta_fazenda_data on public.boletim_secao_resposta (fazenda_id, data);
 
@@ -217,7 +217,7 @@ create trigger boletins_secao_resposta
   after insert or update or delete on public.boletins
   for each row execute function public.boletins_secao_resposta_tg();
 
--- 6. Boletins já gravados antes deste SQL (aparelhos na v68 antes de o SQL rodar)
+-- 6. Boletins já gravados antes deste SQL (aparelhos na v69 antes de o SQL rodar)
 do $$
 declare r record;
 begin

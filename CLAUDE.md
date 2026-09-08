@@ -52,7 +52,7 @@ v65 as unidades de café aparecem em Diretoria › Faróis de registro
 Desde a v67 (opcional, o app não lê): operacao_categoria e a coluna
 operacao_catalogo.categoria_id (sql/046; espelho do catálogo de
 categorias OP_CATEGORIAS do index.html).
-Desde a v68: boletim_secao (catálogo das seções do boletim, eventual ×
+Desde a v69: boletim_secao (catálogo das seções do boletim, eventual ×
 esperada), boletim_secao_resposta (resposta explícita de ausência —
 "Nada a registrar hoje", com autor e hora; escrita SÓ por gatilho a
 partir de boletins.payload.secoes) e a visão vw_completude_boletim
@@ -283,7 +283,39 @@ app Sigma (Fundação ABC): só o mecanismo visual, nunca as categorias.
   letras únicas, toda operação em uma categoria). Espelho opcional no
   Supabase: sql/046 (o app não lê).
 
-### c7) Resposta explícita de ausência nas seções eventuais (desde a v68)
+### c7) Texto longo em lista nasce colapsado (desde a v68)
+Todo texto longo numa lista de leitura (hoje: os textos do robô-redator
+em Diretoria › Relatórios › "Textos para revisar" e na tela do relatório
+narrativo) entra pelo componente ÚNICO `cartaoTextoLongo(o)` do
+index.html — nunca uma variante por atividade ou por perfil. O cartão
+nasce COLAPSADO, nesta ordem: tag de aviso ("gerado automaticamente —
+revisar antes de enviar"), título (destinatário), prévia de 3 linhas,
+linha compacta de origem e duas ações lado a lado: "ler texto completo
+›" e a ação principal ("📲 copiar para WhatsApp").
+- **A ação principal funciona sem expandir** e age sempre sobre o texto
+  integral (nunca sobre a prévia). Um cartão colapsado cabe em menos de
+  uma tela do iPhone; com um ou dois textos, o cabeçalho da seção
+  seguinte ("Números") fica visível sem rolar.
+- **Prévia corta por linha inteira** (`max-height` em múltiplo do
+  `line-height`), nunca no meio da palavra, com reticências reais no
+  canto reservado. Fade é gradiente, e gradiente é proibido. Texto que
+  cabe nas 3 linhas não mostra reticências nem "ler texto completo"
+  (`ajustarTextosLongos` mede depois de desenhar).
+- **Ler é em tela cheia** (`abrirFolhaTexto`, classe `.folha`), nunca
+  expansão na lista: cabeçalho fixo com "‹ Fechar", tag, texto completo
+  rolável, origem completa e rodapé fixo com Fechar + ação principal.
+  Ao fechar, a lista volta exatamente à posição de rolagem de antes
+  (corpo travado por `body.folha-aberta` enquanto a folha está aberta).
+- **Origem em duas versões:** compacta no cartão ("robô-redator ·
+  dd/mm hh:mm") e completa só na folha ("Redigido no Supabase por
+  <modelo> em dd/mm, hh:mm a partir dos números do relatório"). Um
+  aviso só: a tag; nenhum "confira antes de mandar" repetido no rodapé.
+- **Nenhum campo de digitação:** o texto é só leitura; o ajuste é feito
+  no WhatsApp depois de colar. Nada é editado nem gravado pelo app.
+- Conferência: `scripts/checar-poluicao.cjs`, item 8 (semente de
+  textos em Relatórios); detalhe em docs/definicao-de-pronto.md, item 10.
+
+### c8) Resposta explícita de ausência nas seções eventuais (desde a v69)
 Seção do boletim classificada como EVENTUAL (docs/catalogos-por-
 atividade.md, "Seções do boletim: eventual × esperada"; catálogo
 `SECOES_BOLETIM` do index.html, espelho em `boletim_secao`) mostra, sem
@@ -299,7 +331,7 @@ e resposta nunca coexistem (app e gatilho no banco). Ausência de linha
 recebe os chips (a ausência ali é do farol de leitura). Texto exato
 "Nada a registrar hoje": proibido "Nada aconteceu", "Tudo certo",
 "Sem problemas". O envio do boletim não é bloqueado nem condicionado.
-Checagem em docs/definicao-de-pronto.md, item 10.
+Checagem em docs/definicao-de-pronto.md, item 11.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

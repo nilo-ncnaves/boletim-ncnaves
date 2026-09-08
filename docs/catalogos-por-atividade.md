@@ -339,7 +339,7 @@ movimentação, sanidade e manejo em massa da pecuária (blocos próprios,
 cada um de uma natureza só); Cadastros › Catálogos (grãos e pecuária já
 listam por fase — uma categoria por bloco; café mantido igual).
 
-## Seções do boletim: eventual × esperada (v68)
+## Seções do boletim: eventual × esperada (v69)
 
 Fonte oficial da classificação das seções do boletim diário, por
 atividade, que alimenta o catálogo `SECOES_BOLETIM` do index.html e a

@@ -35,7 +35,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | nº | Nome | O que responde | Fonte | Cadência | Dono/produtor | Status |
 |---:|---|---|---|---|---|---|
 | **NÍVEL 1 — SUSTENTAÇÃO** | | | | | | |
-| 1 | Farol de completude | quem enviou/não enviou boletim; desde a v68, por seção eventual: com registro · sem ocorrência · não respondida (`vw_completude_boletim`, sem tela ainda) | app | diário | painel + motor (`farol_7`, `farol_30`) | EXISTE (por seção: visão pronta, tela futura) |
+| 1 | Farol de completude | quem enviou/não enviou boletim; desde a v69, por seção eventual: com registro · sem ocorrência · não respondida (`vw_completude_boletim`, sem tela ainda) | app | diário | painel + motor (`farol_7`, `farol_30`) | EXISTE (por seção: visão pronta, tela futura) |
 | 2 | Devolutiva semanal por unidade | adesão, dito × medido, elogio | app + iCrop + Solinftec | sexta | robô-redator (`devolutiva_semanal`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase) — prompt `docs/relatorios/02-devolutiva-semanal.md` |
 | 3 | Vistoria do sistema | site × código, robôs, segurança | repo + REST | segunda | Code | EXISTE — roteiro em `docs/vistoria-semanal.md` |
 | **NÍVEL 2 — CONTROLE OPERACIONAL** | | | | | | |
@@ -144,6 +144,37 @@ de enviar", com o botão "copiar para WhatsApp". A chave da API vive só em
 | `devolutiva_semanal` | semana (últimos 7 dias até quinta) | uma por unidade ativa | `farol_7`, `dito_medido_icrop_semana`, `dito_medido_solinftec_semana` | sexta 08:20 dispara / 08:35 colhe |
 | `painel_executivo` | mês anterior fechado | linha do grupo | `farol_30`, `custo_fisico_talhao_mes`, `rebanho_mes`, `plano_executado_mes`, semanas de `irrigacao_rec_exec_semana` e dito × medido, resumos do mês anterior | dia 8 08:20 / 08:35 |
 | `alerta_divergencia` | manual (sql/032) | por unidade e dia | `dito_medido_icrop_dia`, `dito_medido_solinftec_dia` | — |
+
+### Tela "Textos para revisar" (v68): cartão colapsado + folha de leitura
+
+Desde a v68 cada texto do redator entra na tela (Diretoria › 📊
+Relatórios, seção "Textos para revisar", e a tela do relatório narrativo
+aberta por "ver com os números ›") pelo componente único
+`cartaoTextoLongo` do `index.html` (CLAUDE.md, item c7). O cartão nasce
+**colapsado**: tag "gerado automaticamente — revisar antes de enviar",
+título (unidade destinatária), prévia de 3 linhas cortada por linha
+inteira com reticências, linha compacta de origem e dois botões lado a
+lado — "ler texto completo ›" e "📲 copiar para WhatsApp". Copiar
+funciona sem expandir e copia o texto integral de
+`relatorios_gerados.texto` (nunca a prévia). Texto curto (cabe nas 3
+linhas) não mostra reticências nem "ler texto completo".
+
+"ler texto completo ›" abre uma folha de tela cheia (não expande na
+lista): cabeçalho fixo com "‹ Fechar", a tag, o texto completo rolável,
+a origem completa e um rodapé fixo com Fechar e copiar. Ao fechar, a
+lista volta à posição de rolagem de antes.
+
+Regra da origem: no cartão só a versão compacta, `robô-redator ·
+dd/mm hh:mm` (de `texto_em`); a completa — "Redigido no Supabase por
+<texto_modelo> em dd/mm, hh:mm a partir dos números do relatório" — só
+na folha. O aviso "Confira e ajuste antes de mandar" saiu do rodapé: a
+tag já diz isso. O texto continua SÓ leitura no app: o ajuste é feito
+no WhatsApp, depois de colar; nada é editado nem gravado.
+
+Na lista "Números": quando o total de unidades e o número "para
+conferir" coincidem, a linha diz "N unidades · todas para conferir"
+("1 unidade · para conferir" no singular); diferentes, os dois números
+continuam.
 
 Pedido: modelo `claude-sonnet-4-6`, `max_tokens` 1500 (300 no alerta),
 system = instruções do modelo, uma mensagem de usuário com data, unidade,
@@ -460,13 +491,13 @@ dos robôs" em Escritório › Integrações e robôs. Sem linha: pós-colheita
 (não tem dado de integração) e a dica de chuva na seção Clima (o cartão
 iCrop do mesmo boletim já a carrega).
 
-## Resposta explícita de ausência — `boletim_secao`, `boletim_secao_resposta` + `vw_completude_boletim` (v68)
+## Resposta explícita de ausência — `boletim_secao`, `boletim_secao_resposta` + `vw_completude_boletim` (v69)
 
 Núcleo conceitual: **"não respondido" e "sem ocorrência" são coisas
 diferentes** — é o mesmo problema de "sem registro × não fez", aplicado
-à ENTRADA em vez da leitura. Até a v67, um cartão vazio de Pragas ou de
+à ENTRADA em vez da leitura. Até a v68, um cartão vazio de Pragas ou de
 Ocorrências podia significar "olhei e não havia" ou "ninguém abriu";
-qualquer relatório de sanidade herdava essa ambiguidade. Desde a v68 o
+qualquer relatório de sanidade herdava essa ambiguidade. Desde a v69 o
 gerente toca em **"Nada a registrar hoje"** e a ausência vira um
 REGISTRO, com autor e hora. Arquivo: `sql/047-secao-resposta.sql`
 (bloco único, passo a passo no cabeçalho; pré-requisito: `sql/020`).
@@ -491,7 +522,7 @@ a resposta ao adicionar um registro, e o banco confere de novo (gatilho
 | gatilho `boletins_secao_resposta` | em insert/update/delete de `boletins`: reescreve as linhas de `boletim_secao_resposta` daquele boletim a partir de `payload.secoes` (só seções eventuais ativas da atividade da unidade e só com 0 registros). É por isso que o app NÃO escreve na tabela: grava a resposta dentro do payload, na fila offline de sempre, sem policy de escrita, sem delete pela REST e sem depender de ordem de sincronização. Protegido por exception: nunca derruba o envio do boletim. Correção do boletim (mesmo id) e troca de id no upsert (merge) limpam as linhas antigas. |
 | `vw_completude_boletim` | por boletim (sem "exemplo"): `boletim_id`, `unidade_id` (ids antigos por `rel_fz_atual`), `atividade`, `data`, `secoes_eventuais` (quantas a atividade tem), `com_registro`, `sem_ocorrencia`, `nao_respondidas` e os arrays `ids_com_registro`, `ids_sem_ocorrencia`, `ids_nao_respondidas`. Alimenta o farol de completude por seção (relatório nº 1, evolução prevista). |
 
-Como o dado chega (app, v68): `rascunho.secoes = { "CAFE-FITO":
+Como o dado chega (app, v69): `rascunho.secoes = { "CAFE-FITO":
 {resposta:"sem_ocorrencia", por:"João", em:"2026-09-08T14:03:00Z"} }`
 sobe dentro do payload do boletim, como sempre. Leitura no app:
 `baixarCompletudeBoletim({unidade, de, ate})` (sob demanda, sem tela;
