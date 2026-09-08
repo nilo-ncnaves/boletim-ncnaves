@@ -508,6 +508,9 @@ REGISTRO, com autor e hora. Arquivo: `sql/047-secao-resposta.sql`
 | **sem ocorrência** | linha em `boletim_secao_resposta` (`resposta = 'sem_ocorrencia'`) | alguém olhou e declarou que não há o que registrar; sabe-se quem e quando |
 | **não respondido** | nem registro nem linha | a seção não foi respondida — ausência de resposta, NUNCA "não fez" nem "não havia" |
 
+Desde a v70 o app não envia boletim com seção eventual sem resposta, então
+"não respondido" só aparece no histórico anterior e em aparelhos ainda
+não atualizados (a visão continua calculando).
 Não existe valor "pendente" nem "não respondido" gravado: a ausência de
 linha É o não respondido (gravar um enum duplicaria o estado e criaria
 divergência). "Sem ocorrência" e registro nunca coexistem: o app apaga

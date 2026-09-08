@@ -397,12 +397,15 @@ atividade na tela.
 
 Estados do cabeçalho do cartão eventual (componente único
 `resumoSecaoHtml` / `chipsRespostaSecao` / `pintarSecoesResposta`):
-"○" (não respondido — neutro, cinza `--tinta-2`, sem cobrança),
+"sem resposta" (não respondido — texto neutro desde a v70, cinza
+`--tinta-2`, sem cobrança),
 "sem ocorrência" (respondido — cinza) e "N registros" (verde, como
 sempre; Movimentação mantém o contador próprio "2 nascimentos · 1
 morte"). Registro e "sem ocorrência" nunca coexistem: adicionar um
 registro apaga a resposta (`limparRespostasSecao`), no app e no banco.
-Sem ação em massa, sem modal, sem campo novo de digitação.
+Sem ação em massa, sem modal, sem campo novo de digitação. Desde a v70
+(decisão do Nilo) o envio exige resposta em toda seção eventual:
+registro ou "Nada a registrar hoje"; seção esperada fica fora.
 
 ## Termos exclusivos por atividade (checagem de poluição)
 

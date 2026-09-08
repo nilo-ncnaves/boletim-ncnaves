@@ -227,15 +227,21 @@ conferir:
 3. **Chips só sem registro.** Com registro, o cabeçalho mostra o
    contador de sempre; adicionar um registro numa seção respondida
    apaga a resposta sozinho (app e gatilho no banco).
-4. **Três estados distintos no cabeçalho:** "○" (não respondido —
-   neutro, sem vermelho, sem cobrança enquanto o boletim está aberto),
+4. **Três estados distintos no cabeçalho:** "sem resposta" (não
+   respondido — texto neutro desde a v70, decisão do Nilo; sem vermelho,
+   sem cobrança enquanto o boletim está aberto),
    "sem ocorrência", "N registros". Proibidos "pendente", "faltando",
    "obrigatório", "você não respondeu", emoji de alerta, exclamação.
 5. **Seção esperada não recebe os chips** — a ausência ali é do farol
    de leitura. Aplicar nos dois lugares confunde os conceitos.
 6. **Vocabulário pelo catálogo** (`acao` por chave): nunca
    `if(atividade==="…")` na tela. Mesmo componente nas três atividades.
-7. **Envio nunca é bloqueado nem condicionado** pela resposta; rascunho
+7. **Envio exige resposta nas eventuais (desde a v70):** Enviar com
+   seção eventual sem resposta abre as seções, mostra UM aviso âmbar
+   inline ("Antes de enviar, responda: A · B. Registre o que houve ou
+   toque em Nada a registrar hoje") acima da primeira e rola até ela —
+   sem `alert`, sem modal, sem "pendente"/"faltou". O aviso some ao
+   responder. Seções esperadas ficam fora da exigência. Rascunho
    automático guarda `rascunho.secoes` como qualquer outro campo.
 8. **Checagem de poluição:** o par de chips faz parte do estado
    compacto da seção eventual (o script ignora `[data-resp-secao]` no

@@ -109,7 +109,7 @@ h3{font-size:.95rem;font-weight:700}
 .subsec[open]>summary .seta{transform:rotate(90deg)}
 .subsec .corpo{padding:0 12px 14px;border-top:1px solid var(--linha)}
 .secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
-/* v69: estado da seção eventual no cabeçalho — "○" (não respondido) e "sem ocorrência" são neutros, sem cor de alerta; só o contador fica verde */
+/* v69: estado da seção eventual no cabeçalho — "sem resposta" (não respondido, texto desde a v70) e "sem ocorrência" são neutros, sem cor de alerta; só o contador fica verde */
 .secao>summary .resumo.neutro,.subsec>summary .resumo.neutro{color:var(--tinta-2);font-weight:600}
 .resp-secao{margin:6px 0 10px}.resp-secao:empty{display:none}
 /* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
@@ -1617,12 +1617,12 @@ function estadoSecao(r, s){ const n=secaoRegistros(r,s); if(n>0) return {k:"regi
 function limparRespostasSecao(r){ if(!r||!r.secoes) return; secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s=>{ if(r.secoes[s.id] && secaoRegistros(r,s)>0) delete r.secoes[s.id]; }); }
 function textoEstadoSecao(r, s){ const e=estadoSecao(r,s);
   if(e.k==="registros") return (s.texto&&s.texto(r)) || (e.n+" registro"+(e.n>1?"s":""));
-  return e.k==="sem_ocorrencia" ? "sem ocorrência" : "○"; }
-/* cabeçalho do cartão eventual: contador (verde, como sempre) · "sem ocorrência" · "○" = não respondido (neutro, sem cor nem cobrança) */
+  return e.k==="sem_ocorrencia" ? "sem ocorrência" : "sem resposta"; }   /* v70: texto neutro no lugar do "○" (decisão do Nilo) */
+/* cabeçalho do cartão eventual: contador (verde, como sempre) · "sem ocorrência" · "sem resposta" = não respondido (neutro, sem cor nem cobrança) */
 function resumoSecaoHtml(r, resumoId){ const s=secaoDoCard(r.fazendaId,resumoId);
   if(!s) return `<span class="resumo" id="${resumoId}"></span>`;
   const e=estadoSecao(r,s);
-  return `<span class="resumo${e.k==="registros"?"":" neutro"}" id="${resumoId}"${e.k==="nao_respondido"?' aria-label="sem resposta"':""}>${esc(textoEstadoSecao(r,s))}</span>`; }
+  return `<span class="resumo${e.k==="registros"?"":" neutro"}" id="${resumoId}">${esc(textoEstadoSecao(r,s))}</span>`; }
 /* os dois chips (só sem registro): "Nada a registrar hoje" grava com um toque e recolhe o cartão; o 2º toque desfaz. Sem modal, sem ação em massa. */
 function chipsRespostaInner(r, s){ const e=estadoSecao(r,s);
   if(e.k==="registros") return "";
@@ -1632,11 +1632,11 @@ function chipsRespostaSecao(r, resumoId){ const s=secaoDoCard(r.fazendaId,resumo
   return `<div class="chips resp-secao" data-resp-secao="${s.id}">${chipsRespostaInner(r,s)}</div>`; }
 /* repinta chips e cabeçalho de todas as seções eventuais da unidade (depois de adicionar/remover registro ou responder) */
 function pintarSecoesResposta(r){ limparRespostasSecao(r);
+  const av=document.getElementById("aviso-sem-resposta"); if(av) av.remove();
   secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s=>{
     const cx=document.querySelector(`[data-resp-secao="${s.id}"]`); if(cx) cx.innerHTML=chipsRespostaInner(r,s);
     const sp=document.getElementById(s.resumo); if(!sp) return;
-    const e=estadoSecao(r,s); sp.textContent=textoEstadoSecao(r,s); sp.classList.toggle("neutro", e.k!=="registros");
-    if(e.k==="nao_respondido") sp.setAttribute("aria-label","sem resposta"); else sp.removeAttribute("aria-label"); }); }
+    const e=estadoSecao(r,s); sp.textContent=textoEstadoSecao(r,s); sp.classList.toggle("neutro", e.k!=="registros"); }); }
 /* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
 function opcoesAtiv(fz, sel){
   if(atividadeDe(fz)!=="GRAOS"){ const lst=[...LISTA_ATIV,...catExtra("operacoes:CAFE")];
@@ -4815,7 +4815,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v69";
+const APP_VERSAO="v70";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6133,6 +6133,20 @@ function avisosEnvio(r){
   }
   return avisos;
 }
+/* v70: envio com seção eventual sem resposta — abre as seções, mostra UM aviso âmbar acima da primeira e rola até ela.
+   Texto relata ausência de resposta (nunca "pendente"/"faltou"); o aviso some sozinho quando a seção é respondida. */
+function mostrarSecoesSemResposta(lista){
+  const antiga=document.getElementById("aviso-sem-resposta"); if(antiga) antiga.remove();
+  let primeira=null;
+  lista.forEach(s=>{ const sp=document.getElementById(s.resumo); if(!sp) return;
+    let det=sp.closest("details"); while(det){ det.open=true; det=det.parentElement&&det.parentElement.closest("details"); }
+    if(!primeira) primeira=sp.closest("details"); });
+  if(!primeira) return;
+  const av=document.createElement("div"); av.id="aviso-sem-resposta"; av.className="aviso";
+  av.innerHTML=`<b>Antes de enviar, responda:</b> ${lista.map(s=>esc(s.nome)).join(" · ")}. Registre o que houve ou toque em <b>Nada a registrar hoje</b>.`;
+  primeira.parentNode.insertBefore(av, primeira);
+  av.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function caixaAvisosEnvio(avisos){
   const antiga=document.getElementById("caixa-avisos"); if(antiga) antiga.remove();
   const fundo=document.createElement("div");
@@ -6159,6 +6173,10 @@ function validarEnviar(){
   }
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   if(jaExiste){ alert("Já existe boletim para "+fmtData(r.data)+". Abra-o pela lista para corrigir."); return; }
+  /* v70 (decisão do Nilo): toda seção eventual precisa de resposta antes do envio — registro ou "Nada a registrar hoje".
+     Só as eventuais (as que têm o chip); as esperadas seguem a regra de sempre. Sem ação em massa: um toque por seção. */
+  const semResposta=secoesEventuaisDa(atividadeDe(r.fazendaId)).filter(s=>estadoSecao(r,s).k==="nao_respondido");
+  if(semResposta.length){ mostrarSecoesSemResposta(semResposta); return; }
   const avisos=avisosEnvio(r);
   if(avisos.length){ caixaAvisosEnvio(avisos); return; }
   delete r.avisosConfirmados;
