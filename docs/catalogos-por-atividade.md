@@ -339,6 +339,71 @@ movimentação, sanidade e manejo em massa da pecuária (blocos próprios,
 cada um de uma natureza só); Cadastros › Catálogos (grãos e pecuária já
 listam por fase — uma categoria por bloco; café mantido igual).
 
+## Seções do boletim: eventual × esperada (v68)
+
+Fonte oficial da classificação das seções do boletim diário, por
+atividade, que alimenta o catálogo `SECOES_BOLETIM` do index.html e a
+tabela `boletim_secao` do Supabase (`sql/047-secao-resposta.sql`). Os
+três nunca divergem: mudou aqui, muda nos dois no mesmo pull request.
+Classificação confirmada pelo Nilo em 08/09/2026 (decisão de negócio,
+não técnica).
+
+- **Eventual** — a seção registra eventos que legitimamente podem não
+  acontecer num dia. Sem registro, o cartão oferece os dois chips
+  **"Nada a registrar hoje" · "Registrar…"**: um toque grava a resposta
+  explícita de ausência (`rascunho.secoes[id]`, com autor e hora) e
+  recolhe o cartão; o 2º toque desfaz. A resposta declara que não há o
+  que registrar — nunca que "está tudo bem" (regra 5 dos faróis).
+- **Esperada** — execução esperada no dia (clima, equipe, operações,
+  irrigação, cocho…). Não recebe os chips: a ausência ali é assunto do
+  farol de leitura (dias sem registro, janela), nunca da tela de
+  entrada. Aplicar nos dois lugares confundiria os conceitos.
+
+A identidade é o `id` (chave substituta imutável, mesmo padrão de
+`operacao_catalogo`); o nome é só rótulo. `campos` = listas do payload
+cujo tamanho conta como registro (o mesmo cálculo no app,
+`secaoRegistros`, e no banco, `boletim_secao_registros`). O rótulo do
+2º chip (`acao`) é vocabulário por chave — nunca condicional por
+atividade na tela.
+
+| id | Atividade | Seção (cartão do boletim) | Tipo | campos (registro) | 2º chip |
+|---|---|---|---|---|---|
+| CAFE-CLIMA | ☕ Café | Clima do dia | esperada | — | — |
+| CAFE-MO | ☕ Café | Mão de obra | esperada | — | — |
+| CAFE-IRR | ☕ Café | Irrigação (gotejo) | esperada (já tem "Dia sem irrigação") | — | — |
+| CAFE-ATIV | ☕ Café | Atividades por talhão | esperada | — | — |
+| CAFE-COLHEITA | ☕ Café | Colheita | esperada (sazonal: fora da safra não há o que responder) | — | — |
+| **CAFE-FITO** | ☕ Café | Pragas, doenças e daninhas | **eventual** | fito | Registrar ocorrência |
+| **CAFE-OCOR** | ☕ Café | Ocorrências gerais | **eventual** | ocorrencias | Registrar ocorrência |
+| CAFE-OBS | ☕ Café | Observações e pendências | esperada (texto livre) | — | — |
+| GRAOS-CLIMA | 🌾 Grãos | Clima do dia | esperada | — | — |
+| GRAOS-MO | 🌾 Grãos | Mão de obra | esperada | — | — |
+| GRAOS-OPER | 🌾 Grãos | Operações do dia | esperada | — | — |
+| GRAOS-IRG | 🌾 Grãos | Irrigação (pivôs) | esperada (já tem "Não rodou" por pivô) | — | — |
+| **GRAOS-FITO_OCOR** | 🌾 Grãos | Pragas, doenças e ocorrências (um cartão, duas listas; UMA resposta por cartão — decisão do Nilo) | **eventual** | fito + ocorrencias | Registrar ocorrência (aciona "＋ ocorrência") |
+| GRAOS-OBS | 🌾 Grãos | Observações e pendências | esperada | — | — |
+| PEC-CLIMA | 🐂 Pecuária | Clima do dia | esperada | — | — |
+| PEC-MO | 🐂 Pecuária | Mão de obra | esperada | — | — |
+| **PEC-MOV** | 🐂 Pecuária | Pecuária › Movimentação do rebanho | **eventual** | pecuaria.mov | Registrar movimento |
+| **PEC-SAN** | 🐂 Pecuária | Pecuária › Sanidade | **eventual** | pecuaria.san + pecuaria.massa | Registrar tratamento |
+| PEC-REP | 🐂 Pecuária | Pecuária › Reprodução | esperada (formulário de estado) | — | — |
+| PEC-NUT | 🐂 Pecuária | Pecuária › Cocho e nutrição | esperada (trato diário) | — | — |
+| PEC-CONT | 🐂 Pecuária | Pecuária › Contagem por lote / pasto | esperada | — | — |
+| PEC-PASTO | 🐂 Pecuária | Pecuária › Pasto e estrutura | esperada (formulário de estado) | — | — |
+| PEC-MANEJO | 🐂 Pecuária | Pecuária › Outros manejos | esperada (pelo farol de leitura; opção "Outros manejos eventual" não escolhida) | — | — |
+| PEC-OBSPEC | 🐂 Pecuária | Pecuária › Observações de pecuária | esperada (texto livre) | — | — |
+| **PEC-OCOR** | 🐂 Pecuária | Ocorrências e sanidade | **eventual** | ocorrencias | Registrar ocorrência |
+| PEC-OBS | 🐂 Pecuária | Observações e pendências | esperada | — | — |
+
+Estados do cabeçalho do cartão eventual (componente único
+`resumoSecaoHtml` / `chipsRespostaSecao` / `pintarSecoesResposta`):
+"○" (não respondido — neutro, cinza `--tinta-2`, sem cobrança),
+"sem ocorrência" (respondido — cinza) e "N registros" (verde, como
+sempre; Movimentação mantém o contador próprio "2 nascimentos · 1
+morte"). Registro e "sem ocorrência" nunca coexistem: adicionar um
+registro apaga a resposta (`limparRespostasSecao`), no app e no banco.
+Sem ação em massa, sem modal, sem campo novo de digitação.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar

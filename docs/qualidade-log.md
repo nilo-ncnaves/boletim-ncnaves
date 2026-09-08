@@ -6,6 +6,78 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v68 · Resposta explícita de ausência por seção ("Nada a registrar hoje")
+
+**Entrega.** Catálogo `SECOES_BOLETIM` (26 seções, eventual × esperada,
+classificação confirmada pelo Nilo antes de implementar) + componente
+único `chipsRespostaSecao` / `resumoSecaoHtml` / `pintarSecoesResposta`
+/ `limparRespostasSecao` no `index.html`, aplicado nas seis seções
+eventuais das três atividades (café: Pragas e Ocorrências; grãos: Pragas
+e ocorrências; pecuária: Movimentação, Sanidade e Ocorrências e
+sanidade). Resposta em `rascunho.secoes[id] = {resposta, por, em}`
+(payload do boletim, fila offline de sempre). `sql/047-secao-resposta.sql`
+(`boletim_secao`, `boletim_secao_resposta`, gatilho em `boletins`,
+`vw_completude_boletim`), `baixarCompletudeBoletim` (leitura sob
+demanda, sem tela), CSS `.resumo.neutro` e `.resp-secao`. Scripts:
+`checar-poluicao.cjs` trata `[data-resp-secao]` como estado compacto;
+`regressao_render.cjs` ganhou 4 passos (grava, desfaz, cai ao ganhar
+registro, fica gravado até o envio). Docs: CLAUDE.md (c7),
+catalogos-por-atividade, definicao-de-pronto (item 10), relatorios,
+ESTADO. Versão v68 no rodapé e no cache.
+
+**Verificado (automático, sem rede, 390 × 844).**
+- SQL 047 rodado 2× num PostgreSQL 16 local (idempotente) com
+  `boletins`, `rel_unidades` e `rel_fz_atual` de apoio, papel `anon`
+  inserindo boletins como o app: resposta vira linha com autor (fallback
+  `payload.responsavel`) e hora (ISO do app; texto inválido → agora);
+  seção com registro não gera linha; correção do boletim que ganha
+  ocorrência apaga a linha; seção de outra atividade é ignorada;
+  boletim "exemplo" ignorado; `resposta` fora do enum e objeto
+  malformado ignorados; trava recusa insert direto em seção com
+  registro, em seção esperada e valor "pendente" (check); `anon` não
+  insere nem apaga (permission denied) e lê a visão; troca de id no
+  upsert e delete do boletim limpam as linhas; reprocessamento
+  (backfill) recria; id antigo f19 → f03c; visão com as 11 colunas
+  esperadas; definição sem termos proibidos; policies só de select —
+  20 checagens ✅.
+- Playwright (`scripts/regressao_render.cjs`, main × branch, 62
+  telas): café, grãos e pecuária diferem SÓ no container
+  `[data-resp-secao]` (os dois chips / chip ativo + "toque de novo para
+  desfazer" / vazio com registro), na classe `neutro`, no `aria-label`
+  e no "○" do cabeçalho — igual nas três atividades —, mais o relógio
+  do "Enviado às" (dois passos a mais no cenário); telas de entrada,
+  casa, boletim enviado, resumo WhatsApp, pós-colheita, Diretoria e
+  Cadastros idênticas. Payload enviado: café e grãos com `secoes: {}`
+  (a resposta caiu ao ganhar registro); pecuária com
+  `PEC-OCOR: sem_ocorrencia` gravado; rascunho automático guarda a
+  resposta entre passos.
+- `scripts/checar-poluicao.cjs`: **227 ✅ · 41 ❌** — os mesmos 41 ❌
+  da v67 (nenhum novo); as seis seções eventuais continuam "ao abrir:
+  só lista + ＋" com o par de chips; termos de outra atividade zero;
+  "Registrar movimento" / "Registrar tratamento" não são termos
+  exclusivos.
+- `node --check` no JavaScript extraído, no `sw.js` e nos dois scripts.
+- `git grep` por "pendente", "faltando", "obrigatório", "não fez",
+  "não respondeu" no código e nos textos novos: nada na tela; nenhum
+  emoji de alerta ou exclamação nos chips e estados.
+
+**Teste manual (Nilo, no iPhone).** Rodar `sql/047`. Em uma unidade de
+cada atividade: abrir o boletim, ver "○" nos cartões eventuais, abrir
+um, tocar "Nada a registrar hoje" (cartão recolhe, cabeçalho "sem
+ocorrência"), tocar de novo (desfaz), tocar "Registrar…" (abre o "＋"
+de sempre), adicionar um registro num cartão respondido (resposta some,
+contador aparece), fechar e reabrir o app (rascunho mantém), enviar
+(não muda nada no envio). Conferir depois no Supabase:
+`vw_completude_boletim`. Decidir se "○" basta como "não respondido".
+
+**Não tocado.** Tela de apontamento em 3 passos (os "＋" e os cartões
+são os mesmos), validação e envio do boletim, resumo WhatsApp, boletim
+enviado, painel, Relatórios, Cadastros, pós-colheita, seções esperadas
+(Clima, Mão de obra, Irrigação, Operações, Atividades, Colheita, Cocho,
+Reprodução, Pasto, Contagem, Outros manejos, Observações), tabelas
+existentes do Supabase (o gatilho novo em `boletins` só escreve na
+tabela nova e nunca derruba o envio). Ordem dos cartões mantida.
+
 ## 08/09/2026 · v67 · Badge de categoria da operação (uma letra) nas listas de leitura
 
 **Entrega.** Componente único `badgeCategoria(atividade, {id | nome})`

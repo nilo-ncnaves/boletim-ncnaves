@@ -52,6 +52,11 @@ v65 as unidades de café aparecem em Diretoria › Faróis de registro
 Desde a v67 (opcional, o app não lê): operacao_categoria e a coluna
 operacao_catalogo.categoria_id (sql/046; espelho do catálogo de
 categorias OP_CATEGORIAS do index.html).
+Desde a v68: boletim_secao (catálogo das seções do boletim, eventual ×
+esperada), boletim_secao_resposta (resposta explícita de ausência —
+"Nada a registrar hoje", com autor e hora; escrita SÓ por gatilho a
+partir de boletins.payload.secoes) e a visão vw_completude_boletim
+(sql/047; o app só lê, sob demanda).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -277,6 +282,24 @@ app Sigma (Fundação ABC): só o mecanismo visual, nunca as categorias.
 - Conferência: `node scripts/gerar_categorias_operacoes.cjs` (≤ 5,
   letras únicas, toda operação em uma categoria). Espelho opcional no
   Supabase: sql/046 (o app não lê).
+
+### c7) Resposta explícita de ausência nas seções eventuais (desde a v68)
+Seção do boletim classificada como EVENTUAL (docs/catalogos-por-
+atividade.md, "Seções do boletim: eventual × esperada"; catálogo
+`SECOES_BOLETIM` do index.html, espelho em `boletim_secao`) mostra, sem
+registro, o par de chips **"Nada a registrar hoje" · "Registrar…"** pelo
+componente ÚNICO (`chipsRespostaSecao` / `resumoSecaoHtml` /
+`pintarSecoesResposta`) nas três atividades. Um toque grava
+(`rascunho.secoes[id] = {resposta:"sem_ocorrencia", por, em}`) e
+recolhe o cartão; o 2º toque desfaz; sem modal, sem ação em massa, sem
+campo novo. Cabeçalho com três estados: "○" (não respondido — neutro,
+nunca vermelho nem cobrança), "sem ocorrência", "N registros". Registro
+e resposta nunca coexistem (app e gatilho no banco). Ausência de linha
+é o "não respondido" — não existe enum pendente. Seção ESPERADA nunca
+recebe os chips (a ausência ali é do farol de leitura). Texto exato
+"Nada a registrar hoje": proibido "Nada aconteceu", "Tudo certo",
+"Sem problemas". O envio do boletim não é bloqueado nem condicionado.
+Checagem em docs/definicao-de-pronto.md, item 10.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
