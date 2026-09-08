@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v64** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v65** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -450,7 +450,9 @@ seção "Visão vw_dias_sem_registro".
   nunca_registrado). **Nunca registrado = dias NULL + nunca_registrado
   true**, nunca 0. Sem coluna de status/farol/atraso: a janela é de outra
   camada (backlog). Leitura anon, escrita só pelo SQL Editor; visões com
-  security_invoker. Café entra só como dado; nenhuma tela de café lê.
+  security_invoker. As três atividades entram pela mesma regra (até a
+  v64 nenhuma tela de café lia; desde a v65 a unidade de café aparece em
+  Faróis de registro, ver v60).
 - **App**: `baixarDiasSemRegistro({atividade, unidade})` (junto de
   `baixarRelatorios`) lê a visão pela REST só para as unidades do escopo,
   guarda em `dsrCache` / `bdf:diasSemRegistro`; `diasSemRegistroDe` e
@@ -491,6 +493,16 @@ e farol de registro".
   quadrado (`.farol.reto`) e botões sem sombra/raio nas telas novas (P10).
   Vocabulário: "sem registro", "janela aberta/fechada", "em dia", "sem
   histórico" — nunca "não fez", "atrasado", "pendente".
+- **v65 — café na lista:** unidade cujas operações não têm janela
+  nenhuma (hoje, as 10 de café — decisão da v60 de não dar janela ao
+  café continua) entra no fim da lista, sem cor, com "sem janela · N de
+  M operações com registro" na linha (P7); a tela da unidade mostra o
+  vazio "Sem operação com janela em Água Limpa." e o bloco "Operações
+  sem janela" (fechado, como nas outras) com "há N dias" / "sem
+  registro" e o ritmo. Unidade com pelo menos uma janela é mostrada
+  exatamente como antes (regressão byte a byte em grãos e pecuária).
+  Regra neutra quanto à atividade: uma unidade de grãos com todas as
+  janelas desligadas por unidade passaria a aparecer do mesmo jeito.
 - Telas do gerente e da pós-colheita idênticas à v59 (regressão em
   scripts/regressao_render.cjs, que agora também abre as duas telas novas);
   `scripts/checar-poluicao.cjs` mede as telas novas com os padrões de
@@ -538,12 +550,22 @@ filtro, sem imputar omissão.
   "o motor não gerou nada" (vazio). Com cache no aparelho, o cache é
   mostrado e nenhum desses aparece. Unidades e Plano (v52) já tinha os
   três estados e é a referência.
-- **Café intocado** (regra 1): casa do gerente de café e pós-colheita
-  mantêm "Nenhum boletim ainda." / "Nenhum registro ainda." (decisão por
-  `atividadeDe(fz)`), tela do relatório para gerente de café mantém
-  "Nada calculado para este período na sua unidade.", cartão de cargas
-  de café intocado. Legenda do farol do painel passou de "○ faltou"
-  para "○ sem registro" (Diretoria, compartilhada).
+- **Café (v65):** as telas de café passaram a usar a mesma função
+  (até a v64 mantinham os textos antigos): casa do gerente de café
+  ("Sem boletim registrado em Vereda Romaria. Os boletins aparecem aqui
+  depois do primeiro envio."), casa da pós-colheita ("Sem registro de
+  pós-colheita em Vereda Romaria. …"), tela do relatório para o gerente
+  de café ("Sem relatório calculado em Vereda Romaria para
+  05/09/2026."), cartão "Café em trânsito" do painel ("Sem carga de café
+  aguardando confirmação do destino.") e Escritório › Unidades e Plano
+  (carregando "Carregando o plano de safra…", erro "Não foi possível
+  carregar o plano de safra." + motivo + Tentar de novo próprio, vazios
+  "Sem fazenda com plano de safra cadastrada." / "Sem versão do plano
+  para Água Limpa." / "Sem unidade do plano em Água Limpa."). Nenhuma
+  tela decide texto por `atividadeDe(fz)`. Fora por desenho: o marcador
+  inline "sem apelidos" (rótulo por item, como "sem área"), o cartão de
+  cargas a receber (some sem dado) e os avisos dos robôs. Legenda do
+  farol do painel passou de "○ faltou" para "○ sem registro" na v61.
 - **Fica de fora, por desenho:** listas de lançamento do boletim (só o
   "＋", padrão a), cartões que somem sem dado (Solinftec, iCrop, Meus
   relatórios), avisos dos robôs. Para decisão do Nilo: os títulos
@@ -583,12 +605,15 @@ dias sem registro é normal; com 60, vale olhar.
   demanda), `ritmoDe`, `textoRitmo` ("a cada 18 dias"; vazio sem
   intervalo). Única tela: **Diretoria › Faróis de registro › unidade**
   ganha o texto secundário "ritmo: a cada N dias" na linha da operação
-  (com janela: depois da janela; sem janela: abaixo do nome), só em
-  unidades de grãos e pecuária e só com dois registros ou mais — sem
-  intervalo a linha é omitida (nada de "sem ritmo" nem traço); o rodapé
-  explica o ritmo só nessas unidades. Tela de unidade de café e lista de
-  Faróis idênticas à v61 (prova com linhas de ritmo de café no cache:
-  nada aparece). Gerente não baixa nem vê. Nenhum campo novo.
+  (com janela: depois da janela; sem janela: abaixo do nome), só com
+  dois registros ou mais — sem intervalo a linha é omitida (nada de
+  "sem ritmo" nem traço); o rodapé explica o ritmo. Até a v64 só em
+  unidades de grãos e pecuária (o app só baixava GRAOS e PECUARIA e a
+  tela recusava CAFE); **desde a v65 nas três atividades**: `syncTudo`
+  baixa o ritmo sem filtro de atividade e a tela da unidade de café
+  mostra "ritmo: a cada N dias" pelo mesmo `textoRitmo`. Não há eixo de
+  florada/poda aqui (Onda 2): a métrica mede intervalo entre registros
+  consecutivos, sem marco. Gerente não baixa nem vê. Nenhum campo novo.
 - Versão v62 (rodapé + cache do sw.js).
 
 ## Carteira de relatórios: ver docs/relatorios.md
@@ -614,8 +639,8 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v63, 07/09/2026:
-**221 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v65, 08/09/2026:
+**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
 telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
 os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
 seção nova; a v62 acrescentou um texto secundário "ritmo: a cada N dias"
@@ -627,6 +652,9 @@ exemplo semeados no script: casa de grãos/pecuária 1,0 tela, Integrações
 1,2 telas, termos de outra atividade zero, ✅; a v64 estendeu a linha ao
 café e aos cartões de ontem do painel, com semente também na casa de café
 e no painel — 221 ✅ · 41 ❌ de novo, casa de café 1,0 tela, painel 3,2
+telas com busca; a v65 pôs as unidades de café nos Faróis e mede a tela
+de uma unidade de café com linhas de exemplo: 6 itens novos, todos ✅ —
+227 ✅ · 41 ❌; a lista de Faróis passou de 14 para 24 unidades, 2,2
 telas com busca). Esta lista é o retrato dos ❌ herdados: cada tarefa
 que tocar numa tela ❌ deve zerá-la; **nenhum ❌ novo entra**. Quem
 mudar o resultado atualiza esta seção no mesmo PR.
@@ -693,7 +721,10 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
   só leitura ✅ · nível 3 ✅ · "Operações sem janela" fechado ✅ · v62:
   "ritmo: a cada N dias" como texto secundário, sem campo, chip ou seção
-  nova, omitido sem intervalo ✅.
+  nova, omitido sem intervalo ✅. v65: lista com 24 unidades (café no
+  fim, "sem janela · N de M operações com registro"), 2,2 telas com
+  busca ✅; Faróis › unidade (café): 1 tela ✅ · só leitura ✅ · nível 3 ✅
+  · cabeçalho fixo ✅ · "Operações sem janela" fechado ✅.
 - Cadastros (25 telas medidas: menu, 11 assuntos, detalhes e "novo"):
   P2 níveis ≤ 3 ✅ em todas · P3 altura ≤ 2 telas ou busca ✅ em todas
   (Talhões 2,0 telas com busca) · P3 lista > 12 com busca ✅ (Fazendas
@@ -719,6 +750,18 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Onda 1 estendida ao café (v65) — para o Nilo testar:** com código
+  DIRETORIA/ADMIN, sincronizar e abrir painel › Faróis de registro: as
+  10 unidades de café aparecem no fim da lista ("sem janela · N de M
+  operações com registro"); tocar numa delas mostra "Operações sem
+  janela" com "há N dias" / "sem registro" e, onde já há dois registros,
+  "ritmo: a cada N dias". Com código de gerente de café numa unidade sem
+  boletim no aparelho, ver "Sem boletim registrado em …" na casa; com
+  pós-colheita, "Sem registro de pós-colheita em …". Nenhum SQL novo.
+  **Régua de 7 dias (#19):** não existe no repositório (nenhum PR,
+  branch ou código) — não havia o que estender; se o item ainda for
+  desejado, é tarefa nova com a especificação original. Decisão da v60
+  mantida: café continua sem janela (sem farol colorido).
 - **Estado das integrações (v63):** `sql/045-status-integracoes.sql`
   RODADO pelo Nilo em 08/09/2026 e conferido pela REST pública logo
   depois: as duas linhas da visão (iCrop: tentativa 07:20 UTC, sucesso

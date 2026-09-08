@@ -6,6 +6,73 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v65 · Onda 1 estendida ao café (#17, #37, #13; #3 via v64; #19 inexistente)
+
+**Entrega.** Correção de escopo do Nilo (08/09/2026): a regra 1 isola
+comportamento, não arquivo — melhoria aplicável à cafeicultura entra no
+café pelo mesmo componente (CLAUDE.md, c4 nova). Revisitadas todas as
+telas reportadas como "não alteradas por serem de café ou compartilhadas"
+nos PRs #24, #28, #29 e #30. **#17 e #13:** unidades cujas operações não
+têm janela nenhuma (as 10 de café; o café segue sem janela, decisão da
+v60) entram no fim de Diretoria › Faróis de registro, sem cor, com "sem
+janela · N de M operações com registro" na linha; a tela da unidade
+mostra o vazio pela função única e o bloco "Operações sem janela"
+(fechado) com "há N dias" / "sem registro" e "ritmo: a cada N dias"
+(`syncTudo` baixa `vw_ritmo_operacoes` sem filtro de atividade; a
+condição `=== "CAFE"` de `vFarol` foi removida). **#37:** casa do gerente
+de café, casa da pós-colheita, tela do relatório do gerente de café,
+cartão "Café em trânsito" do painel e Escritório › Unidades e Plano
+(carregando · erro · 3 vazios) passam por `htmlEstado`/`fraseVazio`;
+removidas as duas decisões por `atividadeDe(fz)` que mantinham texto
+antigo. **#3:** já estendido na v64 (PR #31, commits trazidos para este
+branch): as telas de café consomem iCrop (Rio Preto-Lagamar e Vereda
+café, cartão do boletim) e Solinftec (Monte Carmelo e Mata Preta café,
+cartão da casa). **#19:** não existe no repositório (nenhum PR, branch
+ou código com régua) — nada a estender; registrado como tarefa nova.
+Nenhum SQL novo, nenhum campo novo, nenhuma variante por atividade.
+Versão v65 (rodapé + cache do sw.js).
+
+**Verificado (automático, sem rede).**
+- `node --check` no JavaScript extraído do `index.html`, `sw.js`,
+  `scripts/checar-poluicao.cjs` e `scripts/regressao_render.cjs`.
+- `scripts/checar-poluicao.cjs` v65: **227 ✅ · 41 ❌**; rodado também
+  contra a v64 exportada (221 ✅ · 41 ❌) e comparado linha a linha: o
+  conjunto de ❌ é idêntico; os 6 ✅ novos são a tela "Diretoria › Faróis
+  › unidade (café)" (renderiza, 1 tela, só leitura, nível 3, cabeçalho
+  fixo, blocos fechados). Lista de Faróis: 24 unidades, 2,2 telas com
+  busca (era 14 / 1,5); casa de café 1,01 tela (frase de vazio em duas
+  linhas); painel 3,2 telas, igual; termos de outra atividade zero.
+- `scripts/regressao_render.cjs` v64 × v65 **sem dados simulados** (6
+  cenas, 55 telas, versão/horários/ids normalizados): grãos, pecuária e
+  Cadastros byte a byte iguais; café muda só o vazio "Últimos boletins"
+  da casa; pós-colheita só o vazio "Últimos registros"; Diretoria só pela
+  cena nova `41-farol-f01` (unidade de café nos Faróis).
+- Regressão **com dados simulados** (`vw_farol_registro` e
+  `vw_ritmo_operacoes` com 2 unidades de café, 1 de grãos e 1 de
+  pecuária) v63 × v64 × v65: v63 = v64 fora pedidos de rede; v64 × v65:
+  unidade de pecuária (f26) nos Faróis idêntica; linhas de grãos e
+  pecuária da lista idênticas (a diferença começa no grupo "☕ Café · 2"
+  acrescentado no fim); unidade de café ganha "ritmo: a cada 21 dias" na
+  operação com 4 intervalos e nada nas demais; pedido do ritmo perde o
+  filtro `atividade=in.(GRAOS,PECUARIA)`; cache `bdf:ritmoOperacoes`
+  passa a ter as linhas de café. Gerente (café, grãos, pecuária) não faz
+  pedido novo.
+- Vocabulário: `git grep` no diff por "não fez / não realizou / pendente /
+  atrasad / faltou / esqueceu / agora / tempo real": nada.
+
+**Teste manual (Nilo).** DIRETORIA/ADMIN: painel › Faróis de registro —
+unidades de café no fim da lista, tela da unidade com "Operações sem
+janela" (dias sem registro e ritmo). Gerente de café sem boletim no
+aparelho: "Sem boletim registrado em …"; pós-colheita: "Sem registro de
+pós-colheita em …". Escritório › Unidades e Plano em modo avião: "Não foi
+possível carregar o plano de safra." + Tentar de novo.
+
+**Não tocado.** Tela de apontamento em 3 passos (as três atividades e
+pós-colheita), SQL (visões já devolviam café), catálogos, janelas
+(`operacao_janela` — café continua sem janela), títulos "Boletim de hoje
+pendente" (pendência antiga, decisão do Nilo), vigia do painel, marcador
+inline "sem apelidos".
+
 ## 08/09/2026 · v64 · linha de origem também no café e no painel da Diretoria
 
 **Entrega.** Decisão do Nilo (08/09/2026): "o que for aplicável à
