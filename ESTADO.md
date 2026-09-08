@@ -783,7 +783,16 @@ docs/catalogos-por-atividade.md; tabela e visão em docs/relatorios.md.
   escrita) e `vw_completude_boletim` (por boletim: seções eventuais,
   com registro, sem ocorrência, não respondidas + ids). Leitura no app:
   `baixarCompletudeBoletim({unidade, de, ate})`, sob demanda, sem tela.
-- **Não mudou:** envio (não bloqueado nem condicionado), ordem dos
+- **Envio (v70, decisão do Nilo):** Enviar com seção eventual sem
+  resposta não envia: o app abre as seções, mostra um aviso âmbar
+  acima da primeira ("Antes de enviar, responda: … Registre o que houve
+  ou toque em Nada a registrar hoje") e rola até ela; o aviso some ao
+  responder. Um toque por seção, sem ação em massa. Só as eventuais;
+  as esperadas seguem a regra de sempre (clima ou observação). Com
+  isso, boletim enviado a partir da v70 não tem "não respondido" —
+  a visão `vw_completude_boletim` continua valendo para o histórico e
+  para aparelhos que ainda não atualizaram.
+- **Não mudou:** ordem dos
   cartões (a ordem é a narrativa do dia e Observações continua por
   último; reordenar dinamicamente faria a seção pular entre
   redesenhos — sugestão futura, ver PR), tela de apontamento em 3
@@ -962,8 +971,10 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   Ocorrências (pecuária) — "sem resposta" no cabeçalho, os dois chips ao abrir,
   toque em "Nada a registrar hoje" recolhe o cartão e o cabeçalho vira
   "sem ocorrência", 2º toque desfaz, "＋" apaga a resposta, rascunho
-  sobrevive a fechar o app, envio não muda; (3) [decidido em 08/09/2026:
-  texto neutro "sem resposta" no lugar do "○", v70]; (4) futuro: farol de completude por seção no painel (a visão
+  sobrevive a fechar o app, Enviar com seção sem resposta abre a seção
+  com o aviso âmbar e não envia; (3) [decidido em 08/09/2026: texto
+  neutro "sem resposta" no lugar do "○" e envio exigindo resposta nas
+  eventuais, v70]; (4) futuro: farol de completude por seção no painel (a visão
   `vw_completude_boletim` já existe; tela fora desta entrega) e ordem
   dos cartões (sugestão no PR).
 - **Selo "Powered by Netlify" (v68) — decisão do Nilo, sem custo:** o

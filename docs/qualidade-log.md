@@ -6,22 +6,29 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
-## 08/09/2026 · v70 · "sem resposta" no lugar do "○" (decisão do Nilo)
+## 08/09/2026 · v70 · "sem resposta" no lugar do "○" e envio exigindo resposta (decisões do Nilo)
 
-**Entrega.** Só o texto do estado "não respondido" no cabeçalho das
+**Entrega.** (1) Texto do estado "não respondido" no cabeçalho das
 seções eventuais: `textoEstadoSecao` devolve "sem resposta" em vez de
-"○" (o rótulo acessível ficou desnecessário e saiu). Mesmo componente,
-mesma classe `.resumo.neutro` (cinza), mesmo comportamento. Docs:
-CLAUDE.md c8, definição de pronto item 11, catálogos, ESTADO. Versão
-v70 no rodapé e no cache.
+"○" (o rótulo acessível ficou desnecessário e saiu). (2) `validarEnviar`
+exige resposta em toda seção eventual: sem ela, `mostrarSecoesSemResposta`
+abre as seções, põe UM aviso âmbar inline acima da primeira ("Antes de
+enviar, responda: … Registre o que houve ou toque em Nada a registrar
+hoje") e rola até ela; `pintarSecoesResposta` remove o aviso ao
+responder. Sem alert, sem modal, sem ação em massa; seções esperadas
+fora. Mesmo componente nas três atividades. Docs: CLAUDE.md c8,
+definição de pronto item 11, catálogos, relatórios, ESTADO. Versão v70
+no rodapé e no cache.
 
 **Verificado (automático).** `node --check` no JavaScript extraído e no
 `sw.js`; `scripts/checar-poluicao.cjs` e `scripts/regressao_render.cjs`
-main × branch (resultado no PR: diferença só no texto do span de
-resumo das seis seções eventuais, igual nas três atividades).
+main × branch com passos novos `*-enviar-sem-resposta` nas três
+atividades (Enviar com seção sem resposta → aviso âmbar, boletim não
+enviado; resultado no PR).
 
-**Teste manual (Nilo, no iPhone).** Abrir o boletim e ver "sem resposta"
-em cinza nos cartões eventuais; o resto como na v69.
+**Teste manual (Nilo, no iPhone).** Abrir o boletim, ver "sem resposta"
+em cinza nos cartões eventuais, tocar Enviar sem responder: a seção
+abre com o aviso âmbar e nada é enviado; responder e enviar normalmente.
 
 **Não tocado.** Chips, gravação, SQL, sincronização, demais telas.
 

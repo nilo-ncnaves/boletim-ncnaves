@@ -330,7 +330,12 @@ e resposta nunca coexistem (app e gatilho no banco). Ausência de linha
 é o "não respondido" — não existe enum pendente. Seção ESPERADA nunca
 recebe os chips (a ausência ali é do farol de leitura). Texto exato
 "Nada a registrar hoje": proibido "Nada aconteceu", "Tudo certo",
-"Sem problemas". O envio do boletim não é bloqueado nem condicionado.
+"Sem problemas". Desde a v70 (decisão do Nilo) o envio EXIGE resposta em
+toda seção eventual — registro ou "Nada a registrar hoje": ao tocar em
+Enviar com seção sem resposta, o app abre as seções, mostra um aviso
+âmbar ("Antes de enviar, responda: …") e não envia; nunca alert, nunca
+"pendente"/"faltou". Seção esperada continua fora da exigência (não
+existe "nada a registrar" legítimo nela; forçar criaria dado inventado).
 Checagem em docs/definicao-de-pronto.md, item 11.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)

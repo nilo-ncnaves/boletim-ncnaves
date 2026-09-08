@@ -1632,6 +1632,7 @@ function chipsRespostaSecao(r, resumoId){ const s=secaoDoCard(r.fazendaId,resumo
   return `<div class="chips resp-secao" data-resp-secao="${s.id}">${chipsRespostaInner(r,s)}</div>`; }
 /* repinta chips e cabeçalho de todas as seções eventuais da unidade (depois de adicionar/remover registro ou responder) */
 function pintarSecoesResposta(r){ limparRespostasSecao(r);
+  const av=document.getElementById("aviso-sem-resposta"); if(av) av.remove();
   secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s=>{
     const cx=document.querySelector(`[data-resp-secao="${s.id}"]`); if(cx) cx.innerHTML=chipsRespostaInner(r,s);
     const sp=document.getElementById(s.resumo); if(!sp) return;
@@ -6132,6 +6133,20 @@ function avisosEnvio(r){
   }
   return avisos;
 }
+/* v70: envio com seção eventual sem resposta — abre as seções, mostra UM aviso âmbar acima da primeira e rola até ela.
+   Texto relata ausência de resposta (nunca "pendente"/"faltou"); o aviso some sozinho quando a seção é respondida. */
+function mostrarSecoesSemResposta(lista){
+  const antiga=document.getElementById("aviso-sem-resposta"); if(antiga) antiga.remove();
+  let primeira=null;
+  lista.forEach(s=>{ const sp=document.getElementById(s.resumo); if(!sp) return;
+    let det=sp.closest("details"); while(det){ det.open=true; det=det.parentElement&&det.parentElement.closest("details"); }
+    if(!primeira) primeira=sp.closest("details"); });
+  if(!primeira) return;
+  const av=document.createElement("div"); av.id="aviso-sem-resposta"; av.className="aviso";
+  av.innerHTML=`<b>Antes de enviar, responda:</b> ${lista.map(s=>esc(s.nome)).join(" · ")}. Registre o que houve ou toque em <b>Nada a registrar hoje</b>.`;
+  primeira.parentNode.insertBefore(av, primeira);
+  av.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function caixaAvisosEnvio(avisos){
   const antiga=document.getElementById("caixa-avisos"); if(antiga) antiga.remove();
   const fundo=document.createElement("div");
@@ -6158,6 +6173,10 @@ function validarEnviar(){
   }
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
   if(jaExiste){ alert("Já existe boletim para "+fmtData(r.data)+". Abra-o pela lista para corrigir."); return; }
+  /* v70 (decisão do Nilo): toda seção eventual precisa de resposta antes do envio — registro ou "Nada a registrar hoje".
+     Só as eventuais (as que têm o chip); as esperadas seguem a regra de sempre. Sem ação em massa: um toque por seção. */
+  const semResposta=secoesEventuaisDa(atividadeDe(r.fazendaId)).filter(s=>estadoSecao(r,s).k==="nao_respondido");
+  if(semResposta.length){ mostrarSecoesSemResposta(semResposta); return; }
   const avisos=avisosEnvio(r);
   if(avisos.length){ caixaAvisosEnvio(avisos); return; }
   delete r.avisosConfirmados;
