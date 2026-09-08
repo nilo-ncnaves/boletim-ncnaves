@@ -712,16 +712,16 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Estado das integrações (v63) — para o Nilo:** rodar
-  `sql/045-status-integracoes.sql` no SQL Editor (bloco único; passo a
-  passo no cabeçalho). Cria `integracao_job`, `integracao_execucoes`, a
-  função de colheita e a visão `vw_status_integracoes`, agenda a
-  colheita (07:35 e 13:30 UTC) e mostra as duas linhas no fim. Sem o SQL
-  o app segue igual (a leitura falha em silêncio e nenhuma linha de
-  origem aparece). Depois: sincronizar com código de grãos/pecuária e
-  ver a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, o bloco
-  "Estado dos robôs" em Escritório › Integrações e robôs. Decisões que
-  ficaram para o Nilo: (a) painel da Diretoria é compartilhado e NÃO
+- **Estado das integrações (v63):** `sql/045-status-integracoes.sql`
+  RODADO pelo Nilo em 08/09/2026 e conferido pela REST pública logo
+  depois: as duas linhas da visão (iCrop: tentativa 07:20 UTC, sucesso
+  07:05 UTC — resposta 200 do manejo — dado gravado 02/09, origem
+  30/08; Solinftec: tentativa e sucesso 06:05 UTC, dado de 07/09), 44
+  respostas no diário `integracao_execucoes`, 8 jobs no de-para. Ainda
+  manual: sincronizar com código de grãos/pecuária e ver a linha no
+  rodapé dos cartões iCrop/Solinftec; com ADMIN, o bloco "Estado dos
+  robôs" em Escritório › Integrações e robôs. Decisões que ficaram para
+  o Nilo: (a) painel da Diretoria é compartilhado e NÃO
   ganhou a linha; (b) a dica de chuva da estação iCrop na seção Clima
   também não (o cartão iCrop do mesmo boletim já a carrega); (c)
   `ultima_execucao_ok_em` da iCrop conta qualquer pedido com HTTP 200

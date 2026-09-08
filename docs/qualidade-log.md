@@ -68,11 +68,19 @@ até a primeira colheita.
 - `git grep` por "não fez", "atrasad", "pendente", "tempo real", "agora"
   no que foi tocado — nada fora do botão "Baixar agora" já existente.
 
-**Teste manual (Nilo).** Rodar `sql/045` no SQL Editor (a tabelinha final
-mostra as duas linhas); sincronizar com código de grãos ou pecuária e ver
-a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, abrir Escritório
-› Integrações e robôs › "Estado dos robôs". Decidir: painel da Diretoria
-(compartilhado) e dica de chuva na seção Clima ficaram sem a linha.
+**Teste manual (Nilo) — `sql/045` FEITO em 08/09/2026.** Conferência pela
+REST pública logo depois (11:48 UTC): iCrop com tentativa 07:20 UTC,
+sucesso 07:05 UTC (pedido `manejo_rot` respondido 200), último dado
+gravado 02/09 13:15 UTC, origem 30/08, 4 h desde o sucesso — os quatro
+horários distintos, exatamente o retrato "robô e token bons, iCrop sem
+medição nova"; Solinftec com tentativa 06:05, sucesso 06:05:03, dado de
+07/09 gravado 06:05, 5 h. Diário `integracao_execucoes` com 44 respostas
+(a colheita imediata e a das 07:35 UTC já rodaram); `integracao_job` com
+os 8 jobs. Ainda manual: sincronizar com código de grãos ou pecuária e
+ver a linha no rodapé dos cartões iCrop/Solinftec; com ADMIN, abrir
+Escritório › Integrações e robôs › "Estado dos robôs". Decidir: painel da
+Diretoria (compartilhado) e dica de chuva na seção Clima ficaram sem a
+linha.
 
 **Não tocado.** Telas do gerente de café e pós-colheita (idênticas ao
 main, com e sem dados simulados), painel da Diretoria, funções do robô
