@@ -182,3 +182,28 @@ Antes do PR, conferir:
    o motivo.
 7. **Regressão:** a diferença main × branch nas telas de leitura é só o
    `<span class="op-cat">`, igual nas três atividades (mesmo componente).
+
+## 10. Texto longo em lista nasce colapsado (desde a v68)
+Texto longo numa lista de leitura (textos do robô-redator em Diretoria
+› Relatórios e na tela do relatório narrativo; qualquer texto de mais
+de 3 linhas que venha a entrar numa lista) usa o componente único
+`cartaoTextoLongo(o)` (CLAUDE.md, item c7). Antes do PR, conferir:
+1. **Nasce colapsado:** tag de aviso, título, prévia de 3 linhas,
+   origem compacta e duas ações lado a lado. Nunca o texto inteiro
+   aberto numa lista.
+2. **Ação principal sem expandir:** "copiar" (ou a ação da tela) está
+   no cartão colapsado e age sobre o texto integral, nunca sobre a
+   prévia. Um cartão cabe em menos de uma tela; o cabeçalho da seção
+   seguinte fica visível sem rolar com um ou dois textos na lista.
+3. **Corte por linha inteira:** a prévia termina em palavra inteira,
+   com reticências reais; sem fade (gradiente é proibido). Texto que
+   cabe em 3 linhas não mostra reticências nem "ler texto completo".
+4. **Ler é em tela cheia** (`abrirFolhaTexto`), nunca expansão na
+   lista: cabeçalho fixo com Fechar, ação principal fixa no rodapé,
+   origem completa. Fechar devolve a posição de rolagem anterior.
+5. **Origem em duas versões:** compacta no cartão ("robô-redator ·
+   dd/mm hh:mm"); completa só na folha. Um aviso só (a tag).
+6. **Sem campo novo:** o componente não edita nem grava texto.
+7. **Medição:** `scripts/checar-poluicao.cjs`, item "8. Texto longo em
+   lista" — roda com textos de exemplo semeados na tela Relatórios e
+   mede cartão, cabeçalho "Números", prévia, folha e rolagem.
