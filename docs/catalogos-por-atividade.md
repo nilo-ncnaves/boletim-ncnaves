@@ -397,7 +397,8 @@ atividade na tela.
 
 Estados do cabeçalho do cartão eventual (componente único
 `resumoSecaoHtml` / `chipsRespostaSecao` / `pintarSecoesResposta`):
-"○" (não respondido — neutro, cinza `--tinta-2`, sem cobrança),
+"sem resposta" (não respondido — texto neutro desde a v70, cinza
+`--tinta-2`, sem cobrança),
 "sem ocorrência" (respondido — cinza) e "N registros" (verde, como
 sempre; Movimentação mantém o contador próprio "2 nascimentos · 1
 morte"). Registro e "sem ocorrência" nunca coexistem: adicionar um

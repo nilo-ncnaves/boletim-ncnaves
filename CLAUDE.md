@@ -324,8 +324,8 @@ componente ÚNICO (`chipsRespostaSecao` / `resumoSecaoHtml` /
 `pintarSecoesResposta`) nas três atividades. Um toque grava
 (`rascunho.secoes[id] = {resposta:"sem_ocorrencia", por, em}`) e
 recolhe o cartão; o 2º toque desfaz; sem modal, sem ação em massa, sem
-campo novo. Cabeçalho com três estados: "○" (não respondido — neutro,
-nunca vermelho nem cobrança), "sem ocorrência", "N registros". Registro
+campo novo. Cabeçalho com três estados: "sem resposta" (não respondido
+— texto neutro desde a v70, nunca vermelho nem cobrança), "sem ocorrência", "N registros". Registro
 e resposta nunca coexistem (app e gatilho no banco). Ausência de linha
 é o "não respondido" — não existe enum pendente. Seção ESPERADA nunca
 recebe os chips (a ausência ali é do farol de leitura). Texto exato

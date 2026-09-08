@@ -6,6 +6,25 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v70 · "sem resposta" no lugar do "○" (decisão do Nilo)
+
+**Entrega.** Só o texto do estado "não respondido" no cabeçalho das
+seções eventuais: `textoEstadoSecao` devolve "sem resposta" em vez de
+"○" (o rótulo acessível ficou desnecessário e saiu). Mesmo componente,
+mesma classe `.resumo.neutro` (cinza), mesmo comportamento. Docs:
+CLAUDE.md c8, definição de pronto item 11, catálogos, ESTADO. Versão
+v70 no rodapé e no cache.
+
+**Verificado (automático).** `node --check` no JavaScript extraído e no
+`sw.js`; `scripts/checar-poluicao.cjs` e `scripts/regressao_render.cjs`
+main × branch (resultado no PR: diferença só no texto do span de
+resumo das seis seções eventuais, igual nas três atividades).
+
+**Teste manual (Nilo, no iPhone).** Abrir o boletim e ver "sem resposta"
+em cinza nos cartões eventuais; o resto como na v69.
+
+**Não tocado.** Chips, gravação, SQL, sincronização, demais telas.
+
 ## 08/09/2026 · v69 · Resposta explícita de ausência por seção ("Nada a registrar hoje")
 
 **Entrega.** Catálogo `SECOES_BOLETIM` (26 seções, eventual × esperada,

@@ -227,8 +227,9 @@ conferir:
 3. **Chips só sem registro.** Com registro, o cabeçalho mostra o
    contador de sempre; adicionar um registro numa seção respondida
    apaga a resposta sozinho (app e gatilho no banco).
-4. **Três estados distintos no cabeçalho:** "○" (não respondido —
-   neutro, sem vermelho, sem cobrança enquanto o boletim está aberto),
+4. **Três estados distintos no cabeçalho:** "sem resposta" (não
+   respondido — texto neutro desde a v70, decisão do Nilo; sem vermelho,
+   sem cobrança enquanto o boletim está aberto),
    "sem ocorrência", "N registros". Proibidos "pendente", "faltando",
    "obrigatório", "você não respondeu", emoji de alerta, exclamação.
 5. **Seção esperada não recebe os chips** — a ausência ali é do farol

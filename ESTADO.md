@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v69** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v70** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -763,8 +763,9 @@ docs/catalogos-por-atividade.md; tabela e visão em docs/relatorios.md.
   Com registro os chips somem. Sem ação em massa. O chip declara que
   não há o que registrar, nunca que "está tudo bem".
 - **Três estados no cabeçalho** (componente único `resumoSecaoHtml`;
-  repintura por `pintarSecoesResposta`): "○" cinza = não respondido
-  (neutro: sem vermelho, sem "pendente"/"faltando"/"obrigatório", sem
+  repintura por `pintarSecoesResposta`): "sem resposta" cinza = não
+  respondido (texto neutro desde a v70, decisão do Nilo — a v69 usava
+  "○"; neutro: sem vermelho, sem "pendente"/"faltando"/"obrigatório", sem
   emoji de alerta — a janela do dia ainda não fechou); "sem ocorrência"
   cinza = respondido; "N registros" verde = com registros (Movimentação
   mantém "2 nascimentos · 1 morte").
@@ -958,12 +959,11 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   bloco reprocessa os boletins antigos quando rodar); (2) testar no
   iPhone, uma unidade de cada atividade: cartão de Pragas/Ocorrências
   (café), Pragas e ocorrências (grãos), Movimentação/Sanidade/
-  Ocorrências (pecuária) — "○" no cabeçalho, os dois chips ao abrir,
+  Ocorrências (pecuária) — "sem resposta" no cabeçalho, os dois chips ao abrir,
   toque em "Nada a registrar hoje" recolhe o cartão e o cabeçalho vira
   "sem ocorrência", 2º toque desfaz, "＋" apaga a resposta, rascunho
-  sobrevive a fechar o app, envio não muda; (3) decidir se "○" é claro
-  o bastante como "não respondido" ou se prefere um texto neutro; (4)
-  futuro: farol de completude por seção no painel (a visão
+  sobrevive a fechar o app, envio não muda; (3) [decidido em 08/09/2026:
+  texto neutro "sem resposta" no lugar do "○", v70]; (4) futuro: farol de completude por seção no painel (a visão
   `vw_completude_boletim` já existe; tela fora desta entrega) e ordem
   dos cartões (sugestão no PR).
 - **Selo "Powered by Netlify" (v68) — decisão do Nilo, sem custo:** o
