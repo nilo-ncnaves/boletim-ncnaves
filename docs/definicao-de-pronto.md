@@ -115,10 +115,12 @@ Regras:
    fontes no mesmo bloco consolida numa linha só quando couber.
 6. **Sem status conhecido, nada aparece** (visão não criada, sem rede
    e sem cache): a tela fica exatamente como antes. Nunca estimar.
-7. **Café** (regra 1): as telas do gerente de café não mostram a linha;
-   quem chama decide por `perfilDe(fz)`. Tela compartilhada entre
-   atividades (painel da Diretoria) só ganha a linha por decisão do
-   Nilo.
+7. **Café e painel** (desde a v64, decisão do Nilo em 08/09/2026): a
+   linha vale para as três atividades e para o painel da Diretoria,
+   porque a data da medição de irrigação (iCrop) e de máquinas
+   (Solinftec) é informação de gestão do cafeicultor. Só entra onde há
+   dado de integração: pós-colheita e a dica de chuva na seção Clima
+   continuam sem a linha.
 8. **Tentativa ≠ sucesso ≠ dado**: quem mexer na visão ou na tela
    mantém os três horários separados (tabela em docs/relatorios.md).
    Colapsar qualquer um deles faz dado velho parecer novo.

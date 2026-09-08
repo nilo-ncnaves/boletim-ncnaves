@@ -230,9 +230,9 @@ const statusIntegracoesExemplo = () => {
 
 async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS[fz], chave: fz }, gerente(fz, atv));
-  /* v63: grãos e pecuária recebem dado de integração do dia + estado dos robôs, para os cartões iCrop/Solinftec
-     e a linha "Dados do iCrop de hoje, 04:05" entrarem na medição. Café fica sem semente (regra 1: tela intocada). */
-  if (atv !== 'CAFE') {
+  /* v63: dado de integração do dia + estado dos robôs, para os cartões iCrop/Solinftec e a linha
+     "Dados do iCrop de hoje, 04:05" entrarem na medição. v64: café também (decisão do Nilo, 08/09/2026). */
+  {
     await page.evaluate(([f, st]) => {
       const hoje = hojeISO();
       statusIntegracoes = st;
@@ -282,6 +282,14 @@ async function cenarioPos(browser, base, R, termos) {
 async function cenarioDiretoria(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null);
   await page.click('[data-perfil="proprietario"]').catch(() => {}); await page.waitForTimeout(500);
+  /* v64: medição de ontem (iCrop e Solinftec) + estado dos robôs, para os cartões do painel e a linha de origem entrarem na medição */
+  await page.evaluate(st => {
+    const ontem = ontemISO();
+    statusIntegracoes = st;
+    D.solinftecDados = [{ fazenda_id: 'f33', data: ontem, equipamento: 'Trator 01', operacao: 'Operação 205', talhao: '', horas: 3.2, area_ha: 12, consumo_l: 40 }];
+    D.icropDados = [{ fazenda: 'NC Naves - Floramill', equipamento: 'Pivô 01', parcela: 'Gleba A', data: ontem, atualizado_em: new Date().toISOString(), irrigacao_mm: 4.2, precipitacao_mm: 0, etc: 3, eto: 4 }];
+    ir('painel');
+  }, statusIntegracoesExemplo()); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — painel', 'diretoria'));
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));

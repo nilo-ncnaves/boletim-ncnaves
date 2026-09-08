@@ -1717,7 +1717,7 @@ function cartaoSolinftecGerente(fz){
   const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
   return `<div class="cartao"><h3>📡 Solinftec — medição automática do dia</h3>
     ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${perfilDe(fz).includes("CAFE")?"":linhaOrigemDado("solinftec")}</div>`;
+    <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${linhaOrigemDado("solinftec")}</div>`;
 }
 function cartaoSolinftecPainel(){
   if(!SOLINFTEC_AUTO) return "";
@@ -1731,7 +1731,7 @@ function cartaoSolinftecPainel(){
   const num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
   return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
     ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p></div>`;
+    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p>${linhaOrigemDado("solinftec")}</div>`;
 }
 /* ---- Estado das integrações (v63): leitura da visão vw_status_integracoes (sql/045) ----
    Uma linha por fonte externa (icrop, solinftec) com três horários que NÃO se misturam:
@@ -1740,8 +1740,8 @@ function cartaoSolinftecPainel(){
    ultimo_dado_origem (dia a que o dado se refere). Tudo chega em UTC; a conversão para Brasília
    é feita aqui, com America/Sao_Paulo explícito (o gerente está em Monte Carmelo). Só leitura, na
    sincronização; sem a visão (404) ou sem rede fica o último baixado; sem cache nenhuma linha de
-   origem aparece e as telas ficam exatamente como antes. Aparelho só de café não baixa nem mostra
-   (regra 1). Regra: "Dados do iCrop de hoje, 04:05" no rodapé de cada bloco de dado externo; com
+   origem aparece e as telas ficam exatamente como antes. Desde a v64 vale para café também (decisão do
+   Nilo, 08/09/2026: dado de irrigação iCrop e de máquinas é gestão do cafeicultor) e para o painel. Regra: "Dados do iCrop de hoje, 04:05" no rodapé de cada bloco de dado externo; com
    mais de ORIGEM_LIMIAR_H horas sem sucesso do robô a linha vira "Última atualização do iCrop há N
    dias" em cor de atenção — sem ícone, sem exclamação, sem bloquear. Nunca "agora" nem "tempo real". */
 let statusIntegracoes=[];   /* linhas de vw_status_integracoes (bdf:statusIntegracoes) */
@@ -1751,8 +1751,6 @@ const FUSO_BRT="America/Sao_Paulo";
 async function baixarStatusIntegracoes(){
   if(!syncAtivo()) return [];
   try{
-    const uns=unidadesPermitidas();
-    if(uns.length && uns.every(f=>perfilDe(f.id).includes("CAFE"))) return [];   /* aparelho só de café: nenhuma tela lê */
     const cab={ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } };
     const r=await fetch(syncCfg.url+"/rest/v1/vw_status_integracoes?select=fonte,ultima_execucao_em,ultima_execucao_ok_em,ultimo_dado_em,ultimo_dado_origem,horas_desde_ultimo_sucesso&order=fonte", cab);
     if(!r.ok) return [];
@@ -2985,7 +2983,7 @@ function cartaoIcropDia(r){
           ${linhaDet("Hoje",hojeRes,hojeCorpo)}
           ${recCorpo?linhaDet("Recomendação iCrop",maxPct?`percentímetro até ${num(maxPct,0)}%`:"",recCorpo):""}
           ${soloCorpo?linhaDet("Solo e planta",soloRes,soloCorpo):""}
-          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p>${perfilDe(r.fazendaId).includes("CAFE")?"":linhaOrigemDado("icrop")}</div>`;
+          <p class="mut" style="font-size:.75rem;margin-top:6px">Medição do sistema iCrop, gravada automaticamente de madrugada. Só confira — não precisa digitar.</p>${linhaOrigemDado("icrop")}</div>`;
 }
 function secaoGraos(r){
   const perfil=perfilDe(r.fazendaId);
@@ -4187,7 +4185,7 @@ function vPainel(){
             ${v.vencendo.map(x=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(x.fazenda.replace(/^NC Naves\s*-\s*/,""))} · ${esc(x.nome)}: ${x.dias<0?"venceu em "+new Date(x.fim+"T12:00:00").toLocaleDateString("pt-BR"):x.dias===0?"vence HOJE":"vence em "+x.dias+" dia"+(x.dias>1?"s":"")} — sem novo plantio cadastrado, a lâmina fica sem destino</p>`).join("")}
             ${v.zeradas.map(n=>`<p class="mut" style="font-size:.78rem;margin:3px 0">${esc(n.replace(/^NC Naves\s*-\s*/,""))}: <b>sem nenhuma parcela ativa</b> na iCrop</p>`).join("")}
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
-        <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p></div>`;})()}
+        <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p>${linhaOrigemDado("icrop")}</div>`;})()}
     ${cartaoGraosPainel()}
     ${cartaoSolinftecPainel()}
     ${cartaoRemessasPainel()}
@@ -4518,7 +4516,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v63";
+const APP_VERSAO="v64";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

@@ -442,18 +442,21 @@ resposta 200; a coluna `tipo` do diário permite separar isso no futuro.
 
 ### Como o app usa (v63)
 
-`baixarStatusIntegracoes` (na sincronização; aparelho só de café não
-baixa) guarda as linhas em `bdf:statusIntegracoes`. `textoOrigemDado(fonte)`
+`baixarStatusIntegracoes` (na sincronização, em todo aparelho com
+sync) guarda as linhas em `bdf:statusIntegracoes`. `textoOrigemDado(fonte)`
 monta uma linha por bloco de dado externo, no rodapé, em tipografia
 secundária: "Dados do iCrop de hoje, 04:05" / "de ontem, 04:20" / "de
 05/09, 04:05" (hoje/ontem pelas duas datas mais recentes em Brasília).
 Com mais de 26 h sem sucesso: "Última atualização do iCrop há 2 dias" em
 cor de atenção, sem ícone, sem exclamação, sem bloquear. As horas são
 recontadas no aparelho (o número da visão envelhece no cache). Onde
-aparece: cartão iCrop do gerente de grãos, cartão Solinftec do gerente de
-grãos e pecuária, e o bloco "Estado dos robôs" em Escritório › Integrações
-e robôs. Telas de café e o painel da Diretoria (compartilhado) não foram
-tocados.
+aparece (v64, decisão do Nilo em 08/09/2026 de incluir o café): cartão
+iCrop do boletim do gerente (café e grãos), cartão Solinftec da casa do
+gerente (café, grãos e pecuária), cartões "iCrop — medição de ontem" e
+"Solinftec — medição de ontem" do painel da Diretoria, e o bloco "Estado
+dos robôs" em Escritório › Integrações e robôs. Sem linha: pós-colheita
+(não tem dado de integração) e a dica de chuva na seção Clima (o cartão
+iCrop do mesmo boletim já a carrega).
 
 ## Como rodar um relatório PRONTO no Cowork
 
