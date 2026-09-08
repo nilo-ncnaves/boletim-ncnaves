@@ -49,6 +49,9 @@ gravado são horários distintos; o app só lê). Desde a v64 a linha de
 origem vale também para café e para o painel da Diretoria. Desde a
 v65 as unidades de café aparecem em Diretoria › Faróis de registro
 (sem janela, só "dias sem registro" e ritmo).
+Desde a v67 (opcional, o app não lê): operacao_categoria e a coluna
+operacao_catalogo.categoria_id (sql/046; espelho do catálogo de
+categorias OP_CATEGORIAS do index.html).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -240,6 +243,40 @@ Relatórios, Faróis, Resumo do período) e de Cadastros.
 - **Proibido no cabeçalho:** produtor/empresa, ícone de cultura, custo,
   produto, dose, "não fez"/"pendente", carimbo de origem de dado (esse
   fica no rodapé do bloco, item c3).
+
+### c6) Badge de categoria da operação nas listas de leitura (desde a v67)
+Nas listas de leitura que misturam naturezas de operação, cada linha
+leva à esquerda do nome um quadrado de UMA letra maiúscula pelo
+componente ÚNICO `badgeCategoria(atividade, {id | nome})` do
+index.html — nunca uma variante por atividade. A categoria e a letra
+vêm do catálogo `OP_CATEGORIAS` (fonte:
+docs/catalogos-por-atividade.md, "Categorias de operação"), ligadas à
+operação pelo id do catálogo (`operacao_catalogo.id`): a letra é
+ATRIBUTO do catálogo, nunca derivada de pedaço de nome; máximo 5
+categorias por atividade, letra única na atividade; nenhuma categoria
+é classe de agroquímico — descreve a natureza da operação. Ideia do
+app Sigma (Fundação ABC): só o mecanismo visual, nunca as categorias.
+- **Sem cor por categoria — decisão explícita.** Fundo neutro único
+  (`--linha`) e texto `--tinta` para todas as letras. A cor é canal
+  semântico reservado ao farol (regra 4 do plano de safra): se a
+  categoria ganhasse cor, verde e vermelho passariam a significar duas
+  coisas na mesma tela. A letra já carrega a informação.
+- **Visual:** 20 × 20 px, sem raio, sem sombra, monoespaçado, à
+  esquerda do nome e centrado na primeira linha (inline dentro do
+  `<b>` do nome); nunca empurra o nome para a segunda linha.
+- **Acessível:** nome da categoria em `aria-label` e `title`;
+  `role="button"`, Enter/Espaço equivalem ao toque.
+- **Legenda só sob demanda:** toque no badge mostra o nome da
+  categoria por 2,5 s (ou até o 2º toque / toque fora). Nunca legenda
+  fixa ocupando espaço. Área de toque de 44 px por pseudo-elemento, sem
+  crescer o quadrado.
+- **Sem categoria, sem badge:** operação fora do catálogo ("Outra",
+  termo do escritório) não recebe placeholder, traço ou "?".
+- **Onde não entra:** apontamento em 3 passos; lista já filtrada por
+  uma categoria (repetir a mesma letra é ruído); resumos de uma linha.
+- Conferência: `node scripts/gerar_categorias_operacoes.cjs` (≤ 5,
+  letras únicas, toda operação em uma categoria). Espelho opcional no
+  Supabase: sql/046 (o app não lê).
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

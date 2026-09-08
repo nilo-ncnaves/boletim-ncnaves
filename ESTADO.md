@@ -655,6 +655,52 @@ espaço.
   (`unidade_manejo`) não é usada. Regressão: diferença main × branch só
   no trecho do cabeçalho, igual nas três atividades.
 
+## Badge de categoria da operação (v67) — listas de leitura, três atividades
+Regra permanente em CLAUDE.md, item c6; checagem em
+docs/definicao-de-pronto.md, item 9; categorias e letras em
+docs/catalogos-por-atividade.md, "Categorias de operação". Ideia do
+app Sigma (Fundação ABC): o quadradinho cinza de uma letra — só o
+mecanismo; as categorias do Sigma (herbicida, inseticida, fungicida,
+adubo) NÃO foram copiadas.
+- **Componente único** `badgeCategoria(atividade, {id | nome})` +
+  catálogo `OP_CATEGORIAS` + `codigoOperacao` (mesma regra de id do
+  sql/040) + `categoriaOperacao`. Uma letra maiúscula, 20 × 20 px,
+  fundo `--linha`, texto `--tinta`, monoespaçado, sem raio, sem sombra,
+  inline dentro do `<b>` do nome (centrado na primeira linha, nunca
+  empurra o nome). `aria-label` e `title` com o nome da categoria;
+  `role="button"`, Enter/Espaço = toque.
+- **Sem cor por categoria** (decisão explícita): a cor é canal do
+  farol. Fundo neutro único para todas as letras.
+- **Categoria = natureza da operação, por chave.** Grãos e pecuária:
+  a fase/grupo do catálogo (`OPS_GRAOS_FASES`, `OPS_PECUARIA_FASES`),
+  5 por atividade — grãos R/P/D/C/S (Pré-plantio, Plantio, Condução,
+  Colheita, Pós-colheita), pecuária D/S/R/L/P (Manejo diário,
+  Sanitário, Reprodutivo, Manejo de lote, Pastagem e estrutura). Café:
+  o catálogo não tinha fase; **proposta pendente de aprovação do
+  Nilo** — C Colheita · A Aplicação · T Trato cultural · M
+  Monitoramento · I Irrigação e infraestrutura (tabela no
+  docs/catalogos-por-atividade.md). Operação sem categoria ("Outra",
+  termo do escritório) não tem badge, sem placeholder.
+- **Legenda sob demanda:** toque no badge mostra o nome da categoria
+  numa etiqueta por 2,5 s (2º toque ou toque fora fecha). Nenhuma
+  legenda fixa. Área de toque de 44 px por `::before`.
+- **Onde entra:** Diretoria › Faróis › unidade (com janela e "sem
+  janela", pelo `operacao_id` da visão) e boletim enviado (cartão
+  "Atividades" do café, "Operações do dia" dos grãos e "Outros
+  manejos" da pecuária, pelo nome exato gravado). **Onde não entra,
+  por desenho:** apontamento em 3 passos; resumo de uma linha da casa
+  do gerente e do painel; movimentação/sanidade/manejo em massa da
+  pecuária (blocos de uma natureza só); Cadastros › Catálogos (grãos e
+  pecuária já listam por fase; café mantido igual).
+- **Conferência:** `node scripts/gerar_categorias_operacoes.cjs` (≤ 5,
+  letras únicas, toda operação em uma categoria; `--sql` gera o
+  espelho). Espelho opcional no Supabase: `sql/046-operacao-categoria.sql`
+  (tabela `operacao_categoria` + coluna `categoria_id`; o app NÃO lê —
+  rodar só depois da aprovação das categorias do café).
+- Sem campo novo, sem texto prescritivo, sem SQL obrigatório. Regressão:
+  diferença main × branch nas telas de leitura é só o
+  `<span class="op-cat">`, igual nas três atividades.
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -678,8 +724,12 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v66, 08/09/2026:
-**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v66 trocou a barra das
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v67, 08/09/2026:
+**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v67 acrescentou o badge de
+categoria (span de 20 px, sem raio, sem sombra, fora da lista de alvos de
+toque medidos; área de toque de 44 px por pseudo-elemento) nas linhas de
+Faróis › unidade — medido com as linhas de exemplo das três atividades,
+resultado idêntico ao da v66; a v66 trocou a barra das
 telas de leitura pelo cabeçalho contextual (mesmos botões, mesma
 posição sticky, uma faixa de 19 px a mais só no topo da página):
 resultado idêntico ao da v65; a v60 acrescentou as duas
@@ -792,6 +842,16 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Badge de categoria (v67) — decisão do Nilo antes do merge:** aprovar
+  (ou trocar) as 5 categorias e letras do café propostas em
+  docs/catalogos-por-atividade.md (C Colheita · A Aplicação · T Trato
+  cultural · M Monitoramento · I Irrigação e infraestrutura) e as letras
+  de grãos (R Pré-plantio · D Condução · S Pós-colheita, porque P e C
+  já são de Plantio e Colheita). Testar no iPhone: Diretoria › Faróis ›
+  unidade (uma de cada atividade) e um boletim enviado — o quadradinho
+  fica à esquerda do nome, na mesma linha; tocar nele mostra o nome da
+  categoria e some sozinho. Só depois de aprovar, rodar o sql/046
+  (opcional: espelho do catálogo no Supabase; o app não depende dele).
 - **Cabeçalho contextual (v66) — para o Nilo testar no iPhone:** abrir
   a casa do gerente de uma unidade de cada atividade (e o pós-colheita,
   um boletim enviado, Diretoria › Faróis › unidade): linha 1 "Fazenda ›

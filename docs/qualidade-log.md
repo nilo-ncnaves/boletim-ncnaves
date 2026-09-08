@@ -6,6 +6,65 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v67 · Badge de categoria da operação (uma letra) nas listas de leitura
+
+**Entrega.** Componente único `badgeCategoria(atividade, {id | nome})`
++ catálogo `OP_CATEGORIAS` (categoria = natureza da operação, por
+chave; letra como atributo) + `codigoOperacao` (id igual ao do
+sql/040) no `index.html`; CSS `.op-cat` (20 × 20 px, fundo `--linha`,
+sem raio, sem sombra, sem cor por categoria) e `.op-cat.mostra::after`
+(legenda por toque, 2,5 s). Aplicado em Diretoria › Faróis › unidade
+(com janela e sem janela) e no boletim enviado (Atividades do café,
+Operações do dia dos grãos, Outros manejos da pecuária), nas três
+atividades pelo mesmo componente. Grãos e pecuária usam a fase/grupo do
+catálogo; café recebe 5 categorias PROPOSTAS (pendentes de aprovação
+do Nilo). Script novo `scripts/gerar_categorias_operacoes.cjs`
+(conferência + `--sql`) e `sql/046-operacao-categoria.sql` (espelho
+opcional; o app não lê). Sem campo novo, sem texto prescritivo.
+
+**Verificado (automático, sem rede, 390 × 844).**
+- `node scripts/gerar_categorias_operacoes.cjs`: 5 categorias por
+  atividade, letras únicas e presentes no nome, as 75 operações do
+  catálogo (19 café, 28 grãos, 28 pecuária) caem cada uma em UMA
+  categoria; ids do café citados existem; "Outra" e termo do
+  escritório → sem badge (string vazia); busca por nome exato e por id
+  dão a mesma categoria.
+- Playwright (script de apoio, fora do repositório): Faróis › unidade
+  de pecuária (f26), grãos (f33) e café (f23) com linhas de exemplo —
+  badge 20 × 20 px, fundo rgb(227,221,210), texto rgb(35,32,26), raio
+  0, sombra none, topo do badge a 4,8–5,8 px do topo da linha (centrado
+  na primeira linha, nome na mesma linha, inclusive nomes de duas
+  linhas); toque → `.mostra` com etiqueta "Aplicação" (fundo
+  `--tinta`), some após 2,5 s; boletim enviado de café (exemplo b1:
+  C Colheita, I Irrigação), grãos (Colheita mecanizada C, Fungicida D,
+  Calagem R, "Termo do escritório" sem badge) e pecuária (Roçada P,
+  Vacinação S, Pesagem L). Zero erro de página.
+- `scripts/checar-poluicao.cjs`: 227 ✅ · 41 ❌ — os mesmos 41 ❌
+  herdados da v66 (nenhum novo); Faróis › unidade (pecuária e café)
+  continuam 1 tela, só leitura, nível 3, cabeçalho fixo; termos de
+  outra atividade zero.
+- `scripts/regressao_render.cjs` main × branch (passos `96-detalhe`
+  acrescentados a grãos e pecuária para cobrir o boletim enviado nas
+  três): ver resumo no PR — diferença só no `<span class="op-cat">`
+  das telas de leitura e no rodapé de versão; apontamento em 3 passos,
+  home, entrada, painel, Cadastros idênticos.
+- `node --check` no JavaScript extraído e no `sw.js`. Versão v67 no
+  rodapé e no cache.
+- `git grep` por "não fez", "pendente", "atrasad" no código novo: nada.
+
+**Teste manual (Nilo, no iPhone).** Diretoria › Faróis › unidade (uma
+de cada atividade): o quadradinho com a letra fica à esquerda do nome,
+na mesma linha, sem cor; tocar mostra o nome da categoria e some
+sozinho. Abrir um boletim enviado e conferir o mesmo no cartão de
+atividades. Decidir as categorias e letras do café (proposta) e as
+letras R/D/S dos grãos. Legibilidade sob sol forte (cinza claro ×
+texto escuro, contraste ≈ 12:1).
+
+**Não tocado.** Tela de apontamento em 3 passos, casa do gerente,
+painel, Relatórios, Resumo do período, Cadastros, pós-colheita, resumo
+WhatsApp, sincronização, catálogos de operações (nenhum nome mudou),
+`opCatDe`/`GRUPO_OP` (agrupador do painel, intacto).
+
 ## 08/09/2026 · v66 · Cabeçalho contextual persistente e colapsável (telas de leitura)
 
 **Entrega.** Componente único `cabecalhoContexto(fazendaId, {sub,

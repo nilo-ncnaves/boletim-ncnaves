@@ -271,6 +271,74 @@ porque nenhuma tela de leitura é por subdivisão.
 ARRENDADO), `1.234,56 ha`; sem área o parêntese some. Depois da linha
 2 do catálogo vem o texto próprio da tela (papel, data, período).
 
+## Categorias de operação — badge de uma letra (v67)
+
+Fonte oficial das categorias (natureza da operação) e das letras que o
+componente único `badgeCategoria(atividade, {id | nome})` do index.html
+mostra nas listas de leitura (constante `OP_CATEGORIAS`; espelho
+opcional no Supabase em `sql/046-operacao-categoria.sql`, gerado por
+`scripts/gerar_categorias_operacoes.cjs`). A decisão mora aqui: mudou a
+tabela? Muda a constante no mesmo pull request (o script confere).
+
+Regras (CLAUDE.md, item c6): no máximo 5 categorias por atividade;
+letra única dentro da atividade, sempre presente no nome; a letra é
+ATRIBUTO da categoria, nunca derivada do nome; a operação liga-se à
+categoria pelo id do catálogo (`operacao_catalogo.id`, o mesmo do
+sql/040) — em grãos e pecuária pela FASE do catálogo, que já é a
+natureza da operação; nenhuma categoria é classe de agroquímico
+(herbicida, inseticida, fungicida, adubo — vocabulário do Sigma que
+NÃO foi copiado); fundo neutro único, sem cor por categoria (a cor é
+canal do farol). Operação sem categoria ("Outra", termo acrescentado
+pelo escritório) não tem badge.
+
+### ☕ Café — PROPOSTA (pendente de aprovação do Nilo)
+O catálogo do café (LISTA_ATIV) não tem fase; as 5 categorias abaixo
+são proposta desta entrega e podem ser trocadas antes do merge (só
+dados: `OP_CATEGORIAS.CAFE` e esta tabela).
+
+| Letra | Categoria | Operações (LISTA_ATIV) |
+|---|---|---|
+| **C** | Colheita | Colheita · Catação · Repasse |
+| **A** | Aplicação (natureza: levar insumo à lavoura, qualquer produto) | Pulverização · Aplicação de herbicida · Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo · Calagem / gessagem |
+| **T** | Trato cultural (manejo da planta e do solo, manual ou mecânico) | Capina manual · Capina roçadeira / trincha · Arruação / esparramação de cisco · Desbrota · Poda / esqueletamento · Plantio / renovação |
+| **M** | Monitoramento | Monitoramento de pragas (MIP) |
+| **I** | Irrigação e infraestrutura | Irrigação · Limpeza do sistema de irrigação · Manutenção de estradas e aceiros |
+
+"Outra": sem categoria, sem badge.
+
+### 🌾 Grãos — categoria = fase do catálogo (OPS_GRAOS_FASES)
+| Letra | Categoria (fase) | Operações |
+|---|---|---|
+| **R** | Pré-plantio (p**R**é) | Dessecação de pré-plantio · Calagem · Gessagem · Gradagem / preparo de solo · Manejo da palhada · Amostragem de solo |
+| **P** | Plantio | Plantio / semeadura · Tratamento de sementes · Inoculação · Adubação de plantio (sulco) · Replantio · Avaliação de estande |
+| **D** | Condução (con**D**ução) | Adubação de cobertura · Herbicida pós-emergente · Fungicida · Inseticida · Aplicação foliar / micronutrientes · Monitoramento de pragas e doenças · Controle de daninhas manual (escape) |
+| **C** | Colheita | Dessecação de pré-colheita · Colheita mecanizada · Transporte ao armazém · Pesagem · Amostragem de umidade / impureza · Secagem / pré-limpeza |
+| **S** | Pós-colheita (pó**S**) | Destruição de restos culturais · Semeadura de cobertura · Vazio sanitário |
+
+Pré-plantio, Condução e Pós-colheita não podem usar a inicial (P e C
+já são de Plantio e Colheita): a letra escolhida é a segunda/terceira
+do nome, como manda a regra "letra que apareça no nome". "Outras
+(cadastro do escritório)": sem categoria, sem badge.
+
+### 🐂 Pecuária — categoria = grupo do catálogo (OPS_PECUARIA_FASES)
+| Letra | Categoria (grupo) | Operações |
+|---|---|---|
+| **D** | Manejo diário | Contagem · Suplementação · Conferência de água / aguadas · Rotação de pasto (entrada e saída de lote) |
+| **S** | Sanitário | Vacinação · Vermifugação · Controle de carrapato / mosca-do-chifre · Cura de bicheira · Cura de umbigo · Tratamento individual · Mortalidade |
+| **R** | Reprodutivo | Estação de monta · IATF · Diagnóstico de gestação · Parto / nascimento · Desmama |
+| **L** | Manejo de lote | Marcação / brincagem · Castração · Apartação · Pesagem · Embarque / venda · Compra / entrada de animais |
+| **P** | Pastagem e estrutura | Roçada · Adubação de pastagem · Reforma de pasto · Manutenção de cerca / cocho / bebedouro · Controle de formiga |
+
+Onde o badge aparece (v67): Diretoria › Faróis › unidade (todas as
+operações da unidade, pelo id da visão) e boletim enviado (cartão
+"Atividades" / "Operações do dia" do café e grãos; "Outros manejos" da
+pecuária), pelo nome exato gravado no boletim. Onde NÃO aparece, por
+desenho: apontamento em 3 passos; resumo de uma linha do boletim
+(casa do gerente e painel — é resumo, não lista de operações);
+movimentação, sanidade e manejo em massa da pecuária (blocos próprios,
+cada um de uma natureza só); Cadastros › Catálogos (grãos e pecuária já
+listam por fase — uma categoria por bloco; café mantido igual).
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar
