@@ -251,6 +251,26 @@ AgroGestão.
 
 ---
 
+## Cabeçalho contextual — unidade operacional e ciclo por atividade (v66)
+
+Vocabulário que o componente único `cabecalhoContexto` do index.html
+usa, por chave de atividade (constante `CTX_ATIVIDADE`; nunca
+condicional por atividade na tela). A unidade operacional das telas
+de leitura é a mesma nas três atividades — fazenda física + atividade
+(`fazendaMae` + `perfil`), identificada pelo id da fazenda — e a
+subdivisão de campo (o ONDE do apontamento) NÃO entra no cabeçalho,
+porque nenhuma tela de leitura é por subdivisão.
+
+| Atividade | Linha 1 (sempre) | Subdivisão de campo (só no apontamento) | Linha 2: ciclo / safra |
+|---|---|---|---|
+| ☕ Café | Fazenda › Café (área ha) | talhão / setor | **nenhum** — café perene; o app não modela safra de café (o plano do agrônomo tem "safra 2026/27", mas é referência, não safra operacional: não vira rótulo) |
+| 🌾 Grãos | Fazenda › Grãos (área ha) | talhão / pivô | "ciclo: Feijão, Soja" — culturas dos ciclos ativos dos talhões (`D.ciclos` por `talhaoId`, rótulo por `rotuloCultura`); sem ciclo ativo, nada. Não existe safra nem época (verão/safrinha/inverno) modelada — não inventar |
+| 🐂 Pecuária | Fazenda › Pecuária (área ha) | pasto / retiro | **nenhum** — pecuária a pasto não tem safra |
+
+Área = soma dos talhões cadastrados na unidade (sem ESTRUTURA e sem
+ARRENDADO), `1.234,56 ha`; sem área o parêntese some. Depois da linha
+2 do catálogo vem o texto próprio da tela (papel, data, período).
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar

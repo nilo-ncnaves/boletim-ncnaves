@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v65** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v66** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -616,6 +616,45 @@ dias sem registro é normal; com 60, vale olhar.
   consecutivos, sem marco. Gerente não baixa nem vê. Nenhum campo novo.
 - Versão v62 (rodapé + cache do sw.js).
 
+## Cabeçalho contextual (v66) — telas de leitura, três atividades
+Regra permanente em CLAUDE.md, item c5; checagem em
+docs/definicao-de-pronto.md, item 8; vocabulário em
+docs/catalogos-por-atividade.md, "Cabeçalho contextual". Ideia do app
+Sigma (Fundação ABC) adaptada: mesmo valor informativo, fração do
+espaço.
+- **Componente único** `cabecalhoContexto(fazendaId, {sub, voltar})`
+  substitui `topo()` nas telas de leitura com unidade escolhida: casa
+  do gerente (café, grãos, pecuária), boletim enviado (as três), casa e
+  registro do pós-colheita (café), tela do relatório quando aberta pelo
+  gerente (as três) e Diretoria › Faróis de registro › unidade (as
+  três). Painel, Relatórios, Faróis (lista) e Resumo do período são de
+  grupo (sem unidade escolhida) e ficam com `topo()`; home das abas,
+  escolha de unidade, boletim em 3 passos, formulário do pós e Cadastros
+  intocados.
+- **Linha 1** (barra sticky `.topo.ctx`, sempre visível): "Fazenda ›
+  Unidade (área)" — fazenda física por `maeDe`, unidade = rótulo da
+  atividade (`ATIVIDADES`, por id; unidade operacional = fazenda física
+  + atividade, o que evita "Mata Preta › Mata Preta — Café"), área =
+  `areaUnidade` (soma dos talhões cadastrados na unidade, sem ESTRUTURA
+  e sem ARRENDADO) em `fmtHa` ("1.234,56 ha"), tipografia secundária.
+  Sem área (Porto Buriti, Monte Carmelo — Pecuária) o parêntese some.
+- **Linha 2** (faixa `.ctx-l2`, só no topo da tela): catálogo
+  `CTX_ATIVIDADE[atv].ciclo` — grãos "ciclo: Feijão, Soja" (culturas
+  dos ciclos ativos dos talhões); café e pecuária sem ciclo (nenhuma
+  safra inventada) — mais o texto da tela: "Gerente", "dd/mm/aaaa ·
+  responsável", "Terreiro · Secador · Benefício", "dd/mm/aaaa ·
+  Pós-colheita · responsável", "nome do relatório · período", "Faróis de
+  registro".
+- **Colapso** sem JS: a faixa é estática e rola por baixo da barra
+  sticky; volta ao rolar para o topo; nada muda de altura (sem salto).
+  Medido a 390 × 844: 64 + 19 = 83 px expandido (9,9 %; 11,9 % de 700
+  px úteis), 64 px colapsado (7,6 %; piso dos botões "‹"/"⇥" de 40 px).
+- Não há régua de 7 dias (#19) no repositório; o carimbo de origem de
+  dado (#3) segue no rodapé de cada bloco.
+- Sem SQL, sem campo novo, sem texto prescritivo; a área do plano
+  (`unidade_manejo`) não é usada. Regressão: diferença main × branch só
+  no trecho do cabeçalho, igual nas três atividades.
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -639,8 +678,11 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v65, 08/09/2026:
-**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v60 acrescentou as duas
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v66, 08/09/2026:
+**227 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v66 trocou a barra das
+telas de leitura pelo cabeçalho contextual (mesmos botões, mesma
+posição sticky, uma faixa de 19 px a mais só no topo da página):
+resultado idêntico ao da v65; a v60 acrescentou as duas
 telas de faróis, todas ✅; a v61 só trocou textos de vazio e acrescentou
 os estados carregando/erro em Relatórios e Faróis, sem campo, chip ou
 seção nova; a v62 acrescentou um texto secundário "ritmo: a cada N dias"
@@ -750,6 +792,15 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Cabeçalho contextual (v66) — para o Nilo testar no iPhone:** abrir
+  a casa do gerente de uma unidade de cada atividade (e o pós-colheita,
+  um boletim enviado, Diretoria › Faróis › unidade): linha 1 "Fazenda ›
+  Atividade (área)", linha 2 abaixo; rolar e ver a linha 2 sumir por
+  baixo da barra sem tranco; voltar ao topo. Decidir: (a) nome completo
+  da unidade na linha 1 ("Mata Preta › Mata Preta — Café") em vez de
+  "Mata Preta › Café"; (b) ARRENDADO entra na área?; (c) cadastrar
+  talhões de Porto Buriti e Monte Carmelo — Pecuária (hoje sem área,
+  parêntese omitido). Nenhum SQL.
 - **Onda 1 estendida ao café (v65) — para o Nilo testar:** com código
   DIRETORIA/ADMIN, sincronizar e abrir painel › Faróis de registro: as
   10 unidades de café aparecem no fim da lista ("sem janela · N de M

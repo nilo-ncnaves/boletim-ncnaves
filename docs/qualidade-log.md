@@ -6,6 +6,67 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v66 · Cabeçalho contextual persistente e colapsável (telas de leitura)
+
+**Entrega.** Componente único `cabecalhoContexto(fazendaId, {sub,
+voltar})` + catálogo `CTX_ATIVIDADE` + `areaUnidade`/`fmtHa` no
+`index.html`; CSS `.topo.ctx`, `.ctx-area`, `.ctx-l2`. Linha 1 na
+barra sticky: "Fazenda › Unidade (1.234,56 ha)"; linha 2 em faixa
+estática que rola por baixo da barra (colapsa/expande com a rolagem,
+sem JS, sem mudança de altura). Aplicado em casa do gerente, boletim
+enviado, casa e registro do pós-colheita, relatório do gerente e
+Diretoria › Faróis › unidade — nas três atividades pelo mesmo
+componente. Sem SQL, sem campo novo, sem texto prescritivo.
+
+**Verificado (automático, sem rede, 390 × 844).**
+- Medição com Playwright (script de apoio, fora do repositório) em casa
+  de café/grãos/pecuária, casa do pós, Faróis › unidade (Rio
+  Preto-Lagamar — Grãos, nome longo com "‹"; Porto Buriti, sem área;
+  Monte Carmelo — Café): barra 64 px + faixa 19,4 px = 83,4 px
+  expandido (9,9 % de 844; 11,9 % de 700 px úteis); rolado 10 px a faixa
+  já mostra 9,4 px (colapso progressivo); rolado 400 px = 64 px (7,6 %),
+  barra grudada em y = 0; de volta ao topo = 83,4 px de novo; o
+  primeiro conteúdo começa abaixo da faixa (nenhum salto de layout).
+  Nome longo ocupa 2 linhas visuais dentro dos 40 px dos botões.
+- Áreas das 24 unidades conferidas contra o seed de talhões (ex.: Água
+  Limpa 94,88; Capoeira Grande 336,13; Floramill 885,80; Monte Carmelo
+  — Café 212,44 sem os 389,65 ha de ESTRUTURA). Porto Buriti e Monte
+  Carmelo — Pecuária = 0 → parêntese omitido. `fmtHa(1234.5)` =
+  "1.234,50".
+- Linha 2 de grãos com ciclos ativos simulados: "ciclo: Feijão, Soja ·
+  Gerente"; sem ciclo: "Gerente". Café e pecuária: `ciclo: null`.
+  Relatório do gerente: cabeçalho da unidade + "Farol de completude — 7
+  dias · 01/09 a 07/09/2026"; relatório da Diretoria mantém o `topo()`.
+- `scripts/regressao_render.cjs` main × branch (53 telas): diferença
+  SÓ no trecho `.topo.ctx`/`.ctx-l2` das telas de leitura, igual nas
+  três atividades (casa, casa após envio, boletim enviado, pós, Faróis
+  › unidade f26 e f01); boletim em 3 passos, entrada, escolha de
+  unidade, painel, Relatórios, Faróis (lista) e Cadastros byte a byte
+  iguais. Restante do diff: "Enviado às 10:00/10:01" (relógio
+  determinístico do script) e o rodapé de versão.
+- `scripts/checar-poluicao.cjs`: 227 ✅ · 41 ❌ — os mesmos 41 ❌
+  herdados da v65 (nenhum novo); termos de outra atividade zero;
+  cabeçalho fixo com "‹" em Faróis › unidade continua ✅.
+- `node --check` no JavaScript extraído e no `sw.js`. Versão v66 no
+  rodapé e no cache.
+- `git grep` por "não fez", "pendente", "atrasad" no código novo: nada.
+
+**Teste manual (Nilo, no iPhone).** Abrir a casa do gerente de uma
+unidade de cada atividade e conferir: linha 1 "Fazenda › Atividade
+(área)", linha 2 abaixo; rolar e ver a linha 2 sumir por baixo da
+barra sem tranco; voltar ao topo. Conferir se a área bate com a
+realidade (é a soma dos talhões cadastrados: se faltar talhão no
+cadastro, a área fica menor — validação implícita). Decidir: (a) se
+prefere o nome completo da unidade na linha 1 ("Mata Preta › Mata
+Preta — Café") em vez de "Mata Preta › Café"; (b) se ARRENDADO deve
+entrar na área; (c) cadastrar talhões de Porto Buriti e de Monte
+Carmelo — Pecuária para a área aparecer.
+
+**Não tocado.** Tela de apontamento em 3 passos, formulário do
+pós-colheita, home das abas, escolha de unidade, painel da Diretoria,
+Relatórios (lista e tela da Diretoria), Faróis (lista), Cadastros,
+carimbo de origem de dado (segue no rodapé dos blocos), Supabase.
+
 ## 08/09/2026 · v65 · Onda 1 estendida ao café (#17, #37, #13; #3 via v64; #19 inexistente)
 
 **Entrega.** Correção de escopo do Nilo (08/09/2026): a regra 1 isola
