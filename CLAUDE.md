@@ -338,6 +338,53 @@ Enviar com seção sem resposta, o app abre as seções, mostra um aviso
 existe "nada a registrar" legítimo nela; forçar criaria dado inventado).
 Checagem em docs/definicao-de-pronto.md, item 11.
 
+### c9) Ação de outro papel: oculta ou desabilitada visível (desde a v71)
+Toda ação sujeita a perfil passa pela função ÚNICA `estadoAcao(id, ctx)`
+do index.html, que lê o catálogo `ACOES_PERFIL` e devolve um de três
+estados: **permitido** (o botão de sempre), **bloqueado_visivel**
+(mesma forma e posição, esmaecido, nada executa) ou **oculto** (nada é
+desenhado). O botão é desenhado por `botaoAcao(id, ctx, {rotulo, aria,
+classe, attrs})`; `acaoOk(id, ctx)` responde só permitido/não. Nenhuma
+tela decide sozinha com `if(sessao.papel===…)` ou `podeCadastros()?…:""`
+em volta de um botão — a condição mora no catálogo. Mesmo componente nas
+três atividades e em todos os perfis; nunca uma variante.
+- **Regra de decisão da visibilidade** (negócio e privacidade, não
+  técnica — a tabela vigente está em docs/acoes-por-perfil.md e toda
+  linha nova é aprovada pelo Nilo antes de implementar). Só aparece
+  desabilitada a ação que cumpre as TRÊS condições: (1) quem usa se
+  beneficia de saber que ela existe — vai pedir a alguém, ou entende
+  por que a tela dele é diferente da de um colega; (2) o rótulo não
+  revela produto, dose, custo nem conteúdo de outra fazenda ou
+  atividade; (3) a ação pertence ao mesmo domínio que a pessoa já
+  enxerga. **Nunca** aparece: ação de outra atividade (pecuária não vê
+  ação de café esmaecida — regra 1); ação administrativa de ADMIN para
+  gerente ou pós-colheita; rótulo com produto, dose ou custo; ação que
+  revele outra fazenda; código de acesso. Na dúvida, oculta.
+- **Densidade:** nenhuma linha ou tela com mais da metade das ações
+  desabilitadas; passou disso, as ações voltam a ficar ocultas. A tela
+  de apontamento em 3 passos nunca recebe ação desabilitada.
+- **Visual:** cinza neutro (`--tinta-2` sobre `--papel`, borda
+  tracejada, sem sombra), mesma forma e posição da ação habilitada.
+  Sem vermelho (cor é do farol, regra 4 do plano), sem cadeado, sem
+  ícone de proibido, sem emoji novo. A borda tracejada existe para o
+  estado não depender só do esmaecimento (baixa visão).
+- **Comportamento:** o toque não executa nada e mostra por 2,5 s uma
+  linha discreta acima do botão com quem executa a ação (some no 2º
+  toque ou ao tocar fora); sem modal, sem alert. Texto pelo catálogo
+  (`papel`), no formato "Ação do gerente (até 48 h após o envio)",
+  "Ação da diretoria", "Ação do escritório (administrador)". Proibido
+  "sem permissão", "acesso negado", "não autorizado", "bloqueado", "sem
+  privilégio" — o tom nomeia o papel, não repreende a pessoa.
+- **Acessível:** `aria-disabled="true"`, `aria-label` = rótulo + " — " +
+  papel, `title`; o botão desabilitado não leva id nem data-* de ação,
+  então nenhum tratador o alcança. Enter/Espaço equivalem ao toque.
+- **Isto é interface, não segurança.** Esconder ou esmaecer botão não
+  protege nada: a autorização real é das políticas RLS do Supabase e do
+  escopo do código de acesso, que este padrão nunca afrouxa.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "9. Ação
+  desabilitada por perfil"; detalhe em docs/definicao-de-pronto.md,
+  item 12.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

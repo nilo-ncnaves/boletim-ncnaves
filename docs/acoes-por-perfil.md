@@ -1,8 +1,12 @@
 # Ações por perfil — o que fica escondido e o que aparece desabilitado
 
-**Situação: PROPOSTA (Passo 1). Aguardando aprovação do Nilo antes de
-qualquer código.** Depois da aprovação este arquivo vira a referência
-permanente (regra de decisão + tabela vigente).
+**Situação: VIGENTE desde a v71.** Tabela produzida no Passo 1 da tarefa
+(08/09/2026) e aprovada pelo Nilo antes de qualquer código; é a
+referência permanente da regra de decisão (CLAUDE.md, item c9) e a
+lista viva das ações sujeitas a perfil. Toda ação nova sujeita a perfil
+entra no catálogo `ACOES_PERFIL` do index.html E nesta tabela, com o
+motivo pelas três condições; linha nova "exibir desabilitada" só depois
+do aval do Nilo (docs/definicao-de-pronto.md, item 12).
 
 ## Como o controle de acesso funciona hoje (levantamento)
 
@@ -75,11 +79,30 @@ Uma linha discreta, cinza, sem modal, some sozinha: "Ação do escritório
 diretoria". Proibido: "sem permissão", "acesso negado", "não
 autorizado", "bloqueado", "sem privilégio".
 
-## Resumo para aprovação
+## Resultado da aprovação e implementação (v71)
 
-Proposta: **3 pontos passam a aparecer desabilitados** (#7, #8, #9); os
-outros 10 continuam escondidos. Nenhum é de outra atividade, nenhum
-mostra produto, dose, custo ou outra fazenda; nenhum código de acesso;
-nenhuma tela passa de 1 botão cinza em 3 ou 4. O Nilo pode aprovar a
-tabela inteira, tirar #9 (ou qualquer linha) ou pedir para incluir
-alguma outra.
+Aprovada a tabela inteira pelo Nilo em 08/09/2026: **#7, #8 e #9
+aparecem desabilitados**; as outras 10 linhas continuam ocultas.
+Nenhum é de outra atividade, nenhum mostra produto, dose, custo ou
+outra fazenda; nenhum código de acesso; nenhuma linha passa de 1 botão
+cinza em 4.
+
+Como ficou no index.html:
+- `ACOES_PERFIL` — catálogo: `boletim_atividade`, `pos_colheita`,
+  `painel_diretoria`, `relatorios_diretoria`, `escritorio` (todas
+  `visivel: false`, linhas #1 a #5), `cadastros_painel` (#7),
+  `corrigir_boletim` (#8, `ctx.prazo` = dentro das 48 h) e
+  `marcar_visto` (#9). Cada entrada tem `pode(ctx)`, `visivel(ctx)` e,
+  quando visível, `papel` (texto do toque).
+- `estadoAcao(id, ctx)` → `permitido` | `bloqueado_visivel` | `oculto`;
+  `acaoOk(id, ctx)` para condicionais simples; `botaoAcao(id, ctx,
+  {rotulo, aria, classe, attrs})` desenha o botão nos três estados
+  (`.acao-off` no desabilitado, sem id/data de ação).
+- Listas guiadas por escopo (#6 lista de unidades, #10 relatórios do
+  gerente, #11 faróis, #12 Cadastros, #13 preencher) continuam como
+  filtros de dado (`unidadesPermitidas`, `podeVer`, roteamento em
+  `ir()`): não são botões que se esmaecem; estão na tabela para a
+  decisão ficar registrada.
+- Toque: tratador único em `app.onclick` (antes dos botões de ação)
+  alterna a classe `mostra` (+ `dir` quando o botão está na metade
+  direita da tela) por 2,5 s; o CSS desenha `data-papel` acima do botão.

@@ -141,6 +141,9 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* 📋 diretoria — painel, filtro por fazenda, relatório */
   await cenario(browser, 'diretoria', { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null, [
+    /* v71: boletim enviado visto pela Diretoria (ação "Corrigir" do gerente aparece desabilitada) */
+    ['05-detalhe', async p => { await p.evaluate(() => { if (!sessao) sessao = { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' }; ir('detalhe', (D.boletins.find(b => b.fazendaId === 'f22c') || D.boletins[0] || {}).id); }); await pausa(p, 300); }],
+    ['06-painel', async p => { await p.evaluate(() => ir('painel')); await pausa(p, 300); }],
     ['10-painel-fz', async p => { await p.click('[data-fz="f23"]'); }],
     ['20-relatorio', async p => { await clique(p, '#bt-rel'); }],
     /* v68: textos do robô-redator semeados (um longo, um curto) + números — tela Relatórios e a folha de leitura */

@@ -6,6 +6,49 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 08/09/2026 · v71 · Ação de outro papel aparece desabilitada (três pontos aprovados pelo Nilo)
+
+**Entrega.** Catálogo `ACOES_PERFIL` + função única `estadoAcao(id, ctx)`
+(permitido · bloqueado_visivel · oculto) + componente `botaoAcao` /
+`acaoOk` no `index.html`; toque em `.acao-off` mostra "Ação do/da …" por
+2,5 s (mesmo mecanismo da legenda do badge), sem modal. Tabela de
+classificação (13 ações, docs/acoes-por-perfil.md) produzida e aprovada
+pelo Nilo ANTES do código: 3 passam a aparecer desabilitadas — "⚙
+Cadastros" no painel para a Diretoria ("Ação do escritório
+(administrador)"), "✏️ Corrigir" no boletim enviado para Diretoria/ADMIN
+("Ação do gerente (até 48 h após o envio)") e "Marcar como visto" no
+boletim enviado para o gerente ("Ação da diretoria"); as outras 10
+continuam ocultas (outra atividade, administrativas, custo/plano, outra
+fazenda, densidade). As 8 decisões de perfil das telas de entrada,
+painel e boletim enviado passaram a vir do catálogo (saída idêntica
+onde o estado é permitido/oculto). A linha de botões do painel ganhou
+`flex-wrap:wrap` (com 4 botões rolava de lado a 390 px). Docs: CLAUDE.md
+c9, definição de pronto item 12, acoes-por-perfil, ESTADO. Versão v71
+no rodapé e no cache. Nenhum SQL, nenhuma RLS, nenhum campo novo.
+
+**Verificado (automático).** `node --check` no JavaScript extraído e no
+`sw.js`; `scripts/checar-poluicao.cjs` 278 ✅ · 41 ❌ (os 41 herdados;
+grupo novo "9. Ação desabilitada por perfil" com 28 itens ✅: aria-disabled,
+sem id/data de ação, cinza neutro sem vermelho, borda tracejada, sem
+ícone, toque mostra o papel sem modal/alert/troca de tela, texto sem
+"permissão/negado/bloqueado", 1 de 4 botões por linha, zero na tela de
+apontamento); `scripts/regressao_render.cjs` main × branch: café, grãos
+e pecuária diferem só pelo botão "Marcar como visto" esmaecido no
+boletim enviado (o mesmo HTML nas três); pós-colheita idêntica; Diretoria
+ganha "Corrigir" esmaecido no boletim enviado e "Cadastros" esmaecido +
+`flex-wrap` no painel; ADMIN só o `flex-wrap` e o rodapé de versão.
+
+**Teste manual (Nilo, no iPhone).** Com código DIRETORIA: painel mostra
+"⚙ Cadastros" em cinza tracejado; tocar mostra "Ação do escritório
+(administrador)" e nada abre; abrir um boletim: "✏️ Corrigir" em cinza,
+toque mostra "Ação do gerente (até 48 h após o envio)". Com código de
+unidade: abrir um boletim enviado, "Marcar como visto" em cinza, toque
+mostra "Ação da diretoria". Sob sol: conferir leitura do texto cinza.
+
+**Não tocado.** Tela de apontamento em 3 passos, pós-colheita, Faróis,
+Relatórios, Cadastros, sincronização, `codigos_acesso`, validação do
+código de acesso, SQL/RLS.
+
 ## 08/09/2026 · v70 · "sem resposta" no lugar do "○" e envio exigindo resposta (decisões do Nilo)
 
 **Entrega.** (1) Texto do estado "não respondido" no cabeçalho das

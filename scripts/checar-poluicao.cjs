@@ -37,6 +37,12 @@
       "Números" visível sem rolar, copia o texto integral sem expandir,
       e "ler texto completo" abre a folha de tela cheia (cabeçalho fixo,
       ação principal visível, origem completa) e devolve a rolagem.
+   9. Ação desabilitada por perfil (v71): no painel da Diretoria e no
+      boletim enviado (visto pela Diretoria e pelo gerente das três
+      atividades) a ação de outro papel aparece esmaecida em cinza neutro,
+      com aria-disabled; o toque mostra "Ação do/da …" sem modal e sem
+      mudar de tela; nenhum texto de culpa ("sem permissão", "bloqueado");
+      nunca mais da metade das ações da linha; zero na tela de apontamento.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -126,6 +132,34 @@ const NA_PAGINA = {
       blocosAbertos: [...app.querySelectorAll('details.cad-bloco[open]')].map(d => d.querySelector('summary').textContent.trim().replace(/\s+/g, ' ').slice(0, 30)),
       titulo: (app.querySelector('.topo h1, h1') || {}).textContent || '',
     };
+  },
+  /* v71: ações desabilitadas por perfil (.acao-off) — visual, acessibilidade, toque, densidade */
+  acoesOff: () => {
+    const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const app = document.querySelector('#app');
+    const offs = [...app.querySelectorAll('.acao-off')].filter(vis);
+    const linhas = [...new Set(offs.map(b => b.parentElement))];
+    const total = linhas.reduce((s, l) => s + [...l.querySelectorAll('button')].filter(vis).length, 0);
+    const cores = el => { const cs = getComputedStyle(el); return [cs.color, cs.backgroundColor, cs.borderTopColor].join(' | '); };
+    const proibidos = /permiss|negad|autoriz|bloquead|privil|proibid/i;
+    let alertas = 0; const alertaOrig = window.alert; window.alert = () => { alertas++; };
+    const telaAntes = telaAtual, htmlAntes = app.innerHTML.length;
+    const itens = offs.map(b => {
+      b.click();
+      const conteudo = getComputedStyle(b, '::after').content || '';
+      const nota = /^"/.test(conteudo) ? conteudo.slice(1, -1) : '';
+      const r = {
+        rotulo: b.textContent.trim(), ariaDisabled: b.getAttribute('aria-disabled') === 'true', ariaLabel: b.getAttribute('aria-label') || '',
+        temAcao: !!(b.id || Object.keys(b.dataset).some(k => k !== 'papel')), estilo: b.classList.contains('acao-off') ? getComputedStyle(b).borderTopStyle : '',
+        cores: cores(b), vermelho: /181, 67, 46/.test(cores(b)), icone: /[\u{1F512}\u{1F6AB}\u{26D4}]/u.test(b.textContent),
+        nota, mostrou: b.classList.contains('mostra') && nota.length > 0, proibido: proibidos.test(nota + ' ' + (b.getAttribute('aria-label') || '')),
+        modal: !!document.querySelector('dialog[open], #folha-texto'),
+      };
+      b.click();
+      return r;
+    });
+    window.alert = alertaOrig;
+    return { itens, total, alertas, mesmaTela: telaAtual === telaAntes && app.innerHTML.length === htmlAntes, tela: telaAtual };
   },
   /* padrão visual da casa, medido no CSS calculado do que está visível */
   visual: () => {
@@ -354,7 +388,18 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   outras.forEach(o => { form.termosAlheios[o] = acharTermos(form.texto, termos[o]); });
   form.termosProprios = acharTermos(form.texto, termos[atv]).length;
   form.erros = erros.slice();
+  form.acoesOffForm = await page.evaluate(() => document.querySelectorAll('#app .acao-off').length);
   R.telas.push(casa, form);
+  /* v71: boletim enviado visto pelo gerente — "Marcar como visto" (ação da Diretoria) aparece desabilitado */
+  await page.evaluate(f => {
+    const hoje = hojeISO();
+    D.boletins.push({ id: 'ex-det-' + f, exemplo: true, data: hoje, fazendaId: f, responsavel: 'Exemplo', enviadoEm: hoje + ' 18:00',
+      clima: { cond: 'Sol', chuvaMm: 0 }, mo: { proprios: 2, diaristas: 0, faltas: 0, horasExtras: 0, funcoes: [] }, atividades: [], colheita: [], fito: [], ocorrencias: [] });
+    ir('detalhe', 'ex-det-' + f);
+  }, fz); await page.waitForTimeout(300);
+  const det = await medirTela(page, rot + ' — boletim enviado (gerente)', 'gerente');
+  det.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);
+  R.telas.push(det);
   await ctx.close();
 }
 
@@ -382,7 +427,14 @@ async function cenarioDiretoria(browser, base, R) {
     D.icropDados = [{ fazenda: 'NC Naves - Floramill', equipamento: 'Pivô 01', parcela: 'Gleba A', data: ontem, atualizado_em: new Date().toISOString(), irrigacao_mm: 4.2, precipitacao_mm: 0, etc: 3, eto: 4 }];
     ir('painel');
   }, statusIntegracoesExemplo()); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria — painel', 'diretoria'));
+  const painel = await medirTela(page, 'Diretoria — painel', 'diretoria');
+  painel.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);   /* v71: "⚙ Cadastros" do administrador, desabilitado */
+  R.telas.push(painel);
+  /* v71: boletim enviado visto pela Diretoria — "Corrigir" (ação do gerente) aparece desabilitado */
+  await page.evaluate(() => ir('detalhe', (D.boletins.find(b => b.fazendaId === 'f22c') || D.boletins[0] || {}).id)); await page.waitForTimeout(300);
+  const det = await medirTela(page, 'Diretoria — boletim enviado', 'diretoria');
+  det.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);
+  R.telas.push(det);
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
   /* v68: textos do robô-redator semeados — cartão colapsado, "Números" sem rolar, folha de leitura, rolagem devolvida */
@@ -567,6 +619,19 @@ function avaliar(R) {
     add(g, `${nome} — folha: padrão visual (sem gradiente, sem sombra, sem canto, toque ≥ 44 px)`, !!F && !F.visual.gradiente.length && !F.visual.sombra.length && !F.visual.raio.length && !F.visual.toque.length, F ? ['gradiente', 'sombra', 'raio', 'toque'].filter(k => F.visual[k].length).map(k => k + ': ' + F.visual[k].slice(0, 3).join('; ')).join(' | ') : '');
     add(g, `${nome} — ao fechar a folha volta à posição de rolagem anterior`, !!t.depois && !t.depois.folha && !t.depois.travado && t.depois.y === t.antesY, t.depois ? `antes ${t.antesY} px, depois ${t.depois.y} px${t.depois.travado ? '; corpo continua travado' : ''}` : '');
   });
+  /* 9. ação desabilitada por perfil (v71) */
+  {
+    const g = '9. Ação desabilitada por perfil: cinza neutro, explica ao toque, nunca mais da metade';
+    R.telas.filter(t => t.acoesOffForm !== undefined).forEach(t => add(g, `${t.nome} — nenhuma ação desabilitada na tela de apontamento`, t.acoesOffForm === 0, `${t.acoesOffForm} encontrada(s)`));
+    R.telas.filter(t => t.acoesOff).forEach(t => {
+      const x = t.acoesOff, it = x.itens, rot = it.map(i => `"${i.rotulo}"`).join(', ');
+      add(g, `${t.nome} — ação de outro papel aparece desabilitada, com aria-disabled e sem id/data de ação`, it.length > 0 && it.every(i => i.ariaDisabled && !i.temAcao && /—/.test(i.ariaLabel)), it.length ? `${rot}; aria-label ${it.map(i => `"${i.ariaLabel}"`).join(', ')}` : 'nenhuma');
+      add(g, `${t.nome} — cinza neutro: sem vermelho, borda tracejada, sem cadeado/ícone`, it.length > 0 && it.every(i => !i.vermelho && i.estilo === 'dashed' && !i.icone), it.map(i => i.cores).join(' ; '));
+      add(g, `${t.nome} — toque mostra quem executa, sem modal, sem alert e sem mudar de tela`, it.length > 0 && it.every(i => i.mostrou && !i.modal) && !x.alertas && x.mesmaTela, it.map(i => `"${i.nota}"`).join(', ') + (x.alertas ? `; ${x.alertas} alert` : '') + (x.mesmaTela ? '' : '; a tela mudou'));
+      add(g, `${t.nome} — texto nomeia o papel ("Ação do/da …"), sem "sem permissão / acesso negado / bloqueado"`, it.length > 0 && it.every(i => /^Ação d[oa] /.test(i.nota) && !i.proibido), it.map(i => `"${i.nota}"`).join(', '));
+      add(g, `${t.nome} — no máximo metade das ações da linha desabilitada`, it.length > 0 && it.length * 2 <= x.total, `${it.length} de ${x.total} botões`);
+    });
+  }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }

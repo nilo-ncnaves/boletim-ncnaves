@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v70** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v71** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -60,6 +60,12 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 - Perfis: Gerente preenche o boletim da unidade; Diretoria acompanha o
   painel; Escritório/Admin cadastra, importa e tira relatórios;
   Pós-colheita tem boletim próprio de terreiro/secador/tulha (café).
+- **Ação de outro papel (v71):** toda ação sujeita a perfil passa por
+  `estadoAcao(id)` / catálogo `ACOES_PERFIL` (permitido ·
+  bloqueado_visivel · oculto). Três ações aparecem esmaecidas em vez de
+  sumir (ver "Ações por perfil (v71)" abaixo); as demais continuam
+  ocultas. Isto é interface: a autorização real é do escopo do código e
+  das políticas do Supabase, que não mudaram.
 - Aparelhos que entraram na v45 com código de unidade continuam
   dentro (migração automática do acesso gravado); os códigos antigos
   de DIRETORIA (LG-9351) e ADMIN (AD-4786) foram substituídos pelo
@@ -801,6 +807,52 @@ docs/catalogos-por-atividade.md; tabela e visão em docs/relatorios.md.
   Café, grãos e pecuária recebem o MESMO componente; nenhum
   `if(atividade==="…")` na tela — vocabulário por chave do catálogo.
 
+## Ações por perfil (v71) — oculta ou desabilitada visível, três atividades
+Regra permanente em CLAUDE.md, item c9; checagem em
+docs/definicao-de-pronto.md, item 12; tabela vigente (ação × tela ×
+perfis × decisão × motivo) em docs/acoes-por-perfil.md.
+- **Problema resolvido:** o app escondia tudo o que o perfil não podia
+  fazer; quem nunca viu a ação não sabia que ela existia nem a quem
+  pedir (ideia do app Sigma, Fundação ABC: o botão de outro papel
+  aparece esmaecido e ensina a hierarquia sem treinamento).
+- **Limite:** mostrar demais é pior que esconder — cada botão esmaecido
+  revela que a função existe, que outro papel a executa e que a pessoa
+  não é esse papel. Regra de decisão em três condições (útil para
+  pedir · rótulo sem produto/dose/custo/outra fazenda · mesmo domínio
+  que a pessoa já vê) e lista do que nunca aparece (outra atividade,
+  administrativo para gerente, custo, outra fazenda, código). Na
+  dúvida, oculto. Classificação aprovada pelo Nilo em 08/09/2026 antes
+  do código.
+- **Aplicado (3):** "⚙ Cadastros" no painel, para a Diretoria ("Ação do
+  escritório (administrador)"); "✏️ Corrigir" no boletim enviado, para
+  Diretoria e ADMIN ("Ação do gerente (até 48 h após o envio)"); "Marcar
+  como visto" no boletim enviado, para o gerente ("Ação da diretoria").
+  Em cada linha 1 de 4 botões.
+- **Continuam ocultas (10):** botões de atividade e pós-colheita na
+  entrada (outra atividade; para a Diretoria passaria da metade),
+  Diretoria/Relatórios/Escritório na entrada do gerente (todas as
+  fazendas; administrativo), lista de unidades (outra fazenda),
+  relatórios só da Diretoria na casa do gerente (custo, plano), Faróis
+  (regra 4 do plano), tudo em Cadastros (administrativo, códigos),
+  preencher boletim para a Diretoria (só leitura; densidade).
+- **Componente:** `botaoAcao(id, ctx, {rotulo, aria, classe, attrs})`
+  desenha os três estados; o esmaecido é `.acao-off` (cinza `--tinta-2`
+  sobre `--papel`, borda tracejada, sem sombra, sem cadeado),
+  `aria-disabled`, `aria-label` com o papel, sem id/data de ação; toque
+  mostra `data-papel` por 2,5 s (classe `mostra`, `dir` quando o botão
+  está na metade direita), sem modal. Mesmo componente nas três
+  atividades e em todos os perfis.
+- **Centralização:** as 8 decisões de perfil das telas de entrada,
+  painel e boletim enviado saíram dos templates e entraram no catálogo
+  (saída HTML idêntica onde o estado é permitido/oculto — prova na
+  regressão). As listas guiadas por escopo (`unidadesPermitidas`,
+  `podeVer` nos relatórios e faróis) continuam como estão: são filtros
+  de dado, não ações. Ação nova sujeita a perfil entra no catálogo e na
+  tabela do docs, com `visivel` declarado.
+- **Fora, por regra:** tela de apontamento em 3 passos (zero ações
+  desabilitadas, medido), "Corrigir" para o próprio gerente depois de
+  48 h (regra de prazo, não de perfil; a tela já explica).
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -824,8 +876,14 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v68, 08/09/2026:
-**242 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v69 acrescentou o par de
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v71, 08/09/2026:
+**278 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v71 acrescentou o grupo
+"9. Ação desabilitada por perfil" (28 itens ✅, medidos no painel da
+Diretoria, no boletim enviado visto pela Diretoria e pelo gerente das
+três atividades — com um boletim de exemplo semeado — e a contagem zero
+na tela de apontamento) e passou a medir o boletim enviado do gerente
+como tela do grupo "Gerente (casa)"; a linha de botões do painel ganhou
+`flex-wrap` para não rolar de lado com 4 botões; a v69 acrescentou o par de
 chips de resposta explícita de ausência nas seis seções eventuais — o
 script passou a tratar `[data-resp-secao]` como parte do estado compacto
 da seção (docs/definicao-de-pronto.md, item 11), e o resultado ficou
@@ -918,9 +976,17 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   três atividades.
 
 ### Diretoria e Escritório (padrões b e c)
-- Painel da Diretoria: renderiza ✅ · 3,0 telas de altura com a busca
-  de boletins ✅ (referência) · Relatórios 1 tela ✅ · Resumo do período
+- Painel da Diretoria: renderiza ✅ · 3,2 telas de altura com a busca
+  de boletins ✅ (referência; v71: 4 botões em duas linhas, 390 px sem
+  rolar de lado ✅) · Relatórios 1 tela ✅ · Resumo do período
   1,2 telas ✅.
+- Ação desabilitada por perfil (v71, grupo 9): painel da Diretoria
+  ("⚙ Cadastros") e boletim enviado visto pela Diretoria ("✏️
+  Corrigir") e pelo gerente de café, grãos e pecuária ("Marcar como
+  visto") — aria-disabled e sem id/data ✅ · cinza neutro, tracejado,
+  sem vermelho/ícone ✅ · toque mostra o papel sem modal/alert/troca de
+  tela ✅ · texto "Ação do/da …" sem termo proibido ✅ · 1 de 4 botões
+  ✅ · zero na tela de apontamento (três atividades) ✅.
 - Diretoria › Relatórios com textos do redator (v68, medida com dois
   textos de exemplo, um longo e um curto): 13 itens do grupo "8. Texto
   longo em lista" ✅ — cartão colapsado de 3 linhas, cabe em menos de
