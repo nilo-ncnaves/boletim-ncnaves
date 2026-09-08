@@ -157,3 +157,28 @@ na tela. Antes do PR, conferir:
    abas, painel e Cadastros byte a byte iguais.
 5. **Sem** produtor, custo, produto, dose ou carimbo de origem de dado
    no cabeçalho (o carimbo fica no rodapé do bloco, item 7).
+
+## 9. Badge de categoria da operação (desde a v67)
+Lista de leitura que mistura naturezas de operação usa o componente
+único `badgeCategoria(atividade, {id | nome})` (CLAUDE.md, item c6).
+Antes do PR, conferir:
+1. **Sem cor por categoria:** todo badge tem o mesmo fundo neutro
+   (`--linha`) e o mesmo texto (`--tinta`). Cor é do farol; um badge
+   colorido é ❌.
+2. **Letra do catálogo:** vem de `OP_CATEGORIAS` por id da operação
+   (`codigoOperacao`) — nunca de `substring`, `startsWith`, regex ou
+   `opCatDe` sobre o nome. `node scripts/gerar_categorias_operacoes.cjs`
+   passa (≤ 5 por atividade, letras únicas, toda operação em uma
+   categoria).
+3. **Sem placeholder:** operação sem categoria não mostra nada (nem
+   "?", nem "—", nem quadrado vazio).
+4. **Nome acessível:** `aria-label` e `title` com o nome da categoria;
+   toque (ou Enter/Espaço) mostra o nome por 2,5 s. Nenhuma legenda
+   fixa na tela.
+5. **Não empurra o nome:** badge inline dentro do `<b>` do nome,
+   20 × 20 px; conferir a 390 px que o nome continua na mesma linha.
+6. **Onde não entra:** apontamento em 3 passos, listas de uma categoria
+   só, resumos de uma linha. Lista deixada de fora vai citada no PR com
+   o motivo.
+7. **Regressão:** a diferença main × branch nas telas de leitura é só o
+   `<span class="op-cat">`, igual nas três atividades (mesmo componente).

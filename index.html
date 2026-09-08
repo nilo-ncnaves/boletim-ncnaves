@@ -160,6 +160,12 @@ h3{font-size:.95rem;font-weight:700}
 .cad-item .cresce .mut{font-size:.78rem;white-space:normal}
 .cad-item .seta{color:var(--tinta-2);flex:none}
 .cad-item .cad-extra{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;flex:none}
+/* Badge de categoria da operação (v67): UMA letra, fundo neutro único para todas as categorias (cor é canal do
+   farol), sem raio e sem sombra, à esquerda do nome e centrado na primeira linha. Toque mostra o nome da
+   categoria (legenda sob demanda, .mostra); a área de toque cresce por ::before sem crescer o quadrado. */
+.op-cat{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:6px;vertical-align:-4px;background:var(--linha);color:var(--tinta);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;font-weight:700;line-height:1;flex:none;position:relative;cursor:pointer;-webkit-user-select:none;user-select:none}
+.op-cat::before{content:"";position:absolute;inset:-12px}
+.op-cat.mostra::after{content:attr(data-nome);position:absolute;left:0;bottom:calc(100% + 4px);background:var(--tinta);color:var(--papel);font:600 .78rem/1.2 system-ui,-apple-system,sans-serif;padding:5px 8px;white-space:nowrap;z-index:8;letter-spacing:0;text-transform:none}
 .cad-foco{outline:2px solid var(--verde);outline-offset:-2px}
 .cad-grupo{position:sticky;top:62px;z-index:5;background:var(--papel);font-size:.76rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-2);padding:12px 0 6px;margin-top:6px}
 .cad-rodape{position:sticky;bottom:0;z-index:6;background:var(--papel);padding:10px 0 calc(10px + env(safe-area-inset-bottom));margin-top:12px;border-top:1px solid var(--linha)}
@@ -1357,6 +1363,63 @@ const OPS_PECUARIA_FASES=[
   ["Pastagem e estrutura",["Roçada","Adubação de pastagem","Reforma de pasto","Manutenção de cerca / cocho / bebedouro","Controle de formiga"]]
 ];
 const LISTA_PECUARIA=OPS_PECUARIA_FASES.flatMap(([,ops])=>ops);
+/* ===== Categoria (natureza) da operação — badge de uma letra nas listas de leitura (v67) =====
+   Fonte oficial: docs/catalogos-por-atividade.md, "Categorias de operação (badge)". Identidade pela chave da
+   categoria (id) e pelo id da operação (operacao_catalogo.id do sql/040, gerado do nome inteiro por
+   codigoOperacao — igualdade exata, nunca pedaço de nome); a LETRA é atributo do catálogo, nunca derivada do
+   nome. Grãos e pecuária: a categoria é a fase do catálogo (OPS_GRAOS_FASES / OPS_PECUARIA_FASES), ligada por
+   `fase`. Café: o catálogo não tem fase; a proposta abaixo (PENDENTE de aprovação do Nilo) liga cada operação
+   pelo id em `operacoes`. Máximo 5 categorias por atividade, letra única na atividade, nenhuma categoria é
+   classe de agroquímico. Sem cor por categoria: a cor é canal semântico do farol. Operação sem categoria
+   (termo do escritório, "Outra") não tem badge — nunca placeholder. */
+const OP_CATEGORIAS={
+  GRAOS:[
+    {id:"PRE_PLANTIO",letra:"R",nome:"Pré-plantio",fase:"Pré-plantio"},
+    {id:"PLANTIO",letra:"P",nome:"Plantio",fase:"Plantio"},
+    {id:"CONDUCAO",letra:"D",nome:"Condução",fase:"Condução"},
+    {id:"COLHEITA",letra:"C",nome:"Colheita",fase:"Colheita"},
+    {id:"POS_COLHEITA",letra:"S",nome:"Pós-colheita",fase:"Pós-colheita"}],
+  PECUARIA:[
+    {id:"MANEJO_DIARIO",letra:"D",nome:"Manejo diário",fase:"Manejo diário"},
+    {id:"SANITARIO",letra:"S",nome:"Sanitário",fase:"Sanitário"},
+    {id:"REPRODUTIVO",letra:"R",nome:"Reprodutivo",fase:"Reprodutivo"},
+    {id:"MANEJO_LOTE",letra:"L",nome:"Manejo de lote",fase:"Manejo de lote"},
+    {id:"PASTAGEM_ESTRUTURA",letra:"P",nome:"Pastagem e estrutura",fase:"Pastagem e estrutura"}],
+  CAFE:[ /* proposta da v67 — pendente de aprovação do Nilo; mudar aqui e no docs/catalogos-por-atividade.md */
+    {id:"COLHEITA",letra:"C",nome:"Colheita",operacoes:["CAFE-COLHEITA","CAFE-CATACAO","CAFE-REPASSE"]},
+    {id:"APLICACAO",letra:"A",nome:"Aplicação",operacoes:["CAFE-PULVERIZACAO","CAFE-APLICACAO_DE_HERBICIDA","CAFE-ADUBACAO_VIA_LANCO","CAFE-ADUBACAO_ORGANICA","CAFE-APLICACAO_VIA_DRENCH_VIA_SOLO","CAFE-CALAGEM_GESSAGEM"]},
+    {id:"TRATO_CULTURAL",letra:"T",nome:"Trato cultural",operacoes:["CAFE-CAPINA_MANUAL","CAFE-CAPINA_ROCADEIRA_TRINCHA","CAFE-ARRUACAO_ESPARRAMACAO_DE_CISCO","CAFE-DESBROTA","CAFE-PODA_ESQUELETAMENTO","CAFE-PLANTIO_RENOVACAO"]},
+    {id:"MONITORAMENTO",letra:"M",nome:"Monitoramento",operacoes:["CAFE-MONITORAMENTO_DE_PRAGAS"]},
+    {id:"IRRIGACAO_INFRA",letra:"I",nome:"Irrigação e infraestrutura",operacoes:["CAFE-IRRIGACAO","CAFE-LIMPEZA_DO_SISTEMA_DE_IRRIGACAO","CAFE-MANUTENCAO_DE_ESTRADAS_E_ACEIROS"]}]
+};
+/* código da operação = id de operacao_catalogo (sql/040), pela MESMA regra de scripts/gerar_catalogo_operacoes.cjs */
+const codigoOperacao=(prefixo,nome)=>prefixo+"-"+String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\(.*?\)/g,"").replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+/* catálogo de operações de cada atividade no formato [[fase, [nomes]]] + prefixo do código (café: sem fase, sem "Outra") */
+const OP_CATALOGO_FONTE={CAFE:()=>["CAFE",[[null,LISTA_ATIV.filter(n=>n!=="Outra")]]],GRAOS:()=>["GRAOS",OPS_GRAOS_FASES],PECUARIA:()=>["PEC",OPS_PECUARIA_FASES]};
+let opCatIndice=null;
+function opCategoriaIndice(){
+  if(opCatIndice) return opCatIndice;
+  opCatIndice={};
+  Object.keys(OP_CATEGORIAS).forEach(atv=>{
+    const [pref,fases]=OP_CATALOGO_FONTE[atv](), porId={}, porNome={};
+    fases.forEach(([fase,ops])=>ops.forEach(nome=>{ const id=codigoOperacao(pref,nome);
+      const cat=OP_CATEGORIAS[atv].find(c=>(c.fase!=null && c.fase===fase) || (c.operacoes||[]).includes(id));
+      if(cat){ porId[id]=cat; porNome[nome]=cat; } }));
+    opCatIndice[atv]={porId,porNome};
+  });
+  return opCatIndice;
+}
+/* categoria de uma operação: pelo id do catálogo (linhas das visões) ou pelo nome EXATO gravado no boletim (apelido) */
+function categoriaOperacao(atv, ref){
+  const ix=opCategoriaIndice()[atv]; if(!ix||!ref) return null;
+  return (ref.id && ix.porId[ref.id]) || (ref.nome && ix.porNome[ref.nome]) || null;
+}
+/* Componente ÚNICO do badge (v67), igual nas três atividades: uma letra maiúscula em fundo neutro; nome da
+   categoria em aria-label e title (leitor de tela); toque mostra o nome (ligarEventos). Sem categoria → "". */
+function badgeCategoria(atv, ref){
+  const c=categoriaOperacao(atv, ref); if(!c) return "";
+  return `<span class="op-cat" role="button" tabindex="0" aria-label="${esc(c.nome)}" title="${esc(c.nome)}" data-opcat="${esc(c.id)}" data-nome="${esc(c.nome)}">${esc(c.letra)}</span>`;
+}
 /* PECUÁRIA v50 — catálogos do módulo de campo (movimentação, sanidade,
    reprodução, cocho). Tudo configurável aqui, no mesmo padrão das
    outras listas. */
@@ -2021,12 +2084,13 @@ function vFarol(un){
   const semJ=ls.filter(l=>!l.farol).sort((a,b)=>String(a.operacao_nome).localeCompare(String(b.operacao_nome),"pt-BR"));
   /* v62: ritmo observado ("a cada N dias", mediana entre registros) só com 2 registros ou mais; senão nada. v65: nas três atividades */
   const ritmo=l=>textoRitmo(ritmoDe(l.unidade_id,l.operacao_id));
+  const atv=atividadeDe(un), badge=l=>badgeCategoria(atv,{id:l.operacao_id});   /* v67: categoria pelo id do catálogo */
   const linha=l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="farol reto ${relFarolCor(l.farol)}"></span>
-      <span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}${rt?" · ritmo: "+esc(rt):""}</span></span></div>`; };
+      <span class="cresce"><b>${badge(l)}${esc(l.operacao_nome||l.operacao_id)}</b><span class="mut">${esc(l.situacao||"")} · janela: a cada ${n0(l.cadencia_dias)} dias${n0(l.tolerancia_dias)?" (+"+n0(l.tolerancia_dias)+")":""}${l.janela_origem==="proposta"?" · proposta":""}${rt?" · ritmo: "+esc(rt):""}</span></span></div>`; };
   return cabecalhoContexto(un,{sub:"Faróis de registro", voltar:true})+`
     ${comJ.length?comJ.map(linha).join(""):`<div class="cartao">${htmlEstado("vazio",{que:"operação com janela",unidade:un})}</div>`}
     ${semJ.length?`<details class="cad-bloco"><summary>Operações sem janela <span class="mut num">· ${semJ.length}</span></summary><div class="corpo" style="padding:0">
-      ${semJ.map(l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="cresce"><b>${esc(l.operacao_nome||l.operacao_id)}</b>${rt?`<span class="mut">ritmo: ${esc(rt)}</span>`:""}</span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`; }).join("")}</div></details>`:""}
+      ${semJ.map(l=>{ const rt=ritmo(l); return `<div class="cad-item"><span class="cresce"><b>${badge(l)}${esc(l.operacao_nome||l.operacao_id)}</b>${rt?`<span class="mut">ritmo: ${esc(rt)}</span>`:""}</span><span class="num cad-extra">${esc(textoDiasSemRegistro(l))}</span></div>`; }).join("")}</div></details>`:""}
     ${farolRodape(!!ls.length)}
     <button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar aos faróis</button>`;
 }
@@ -4368,7 +4432,7 @@ function blocoPainelPec(b){
         ps.condicao?esc(ps.condicao.toLowerCase()):"", ps.cerca?"cerca/porteira: "+esc(ps.cerca):"",
         ps.visita?"visita: "+esc(ps.visita.toLowerCase())+(ps.visitaObs?" ("+esc(ps.visitaObs)+")":""):""
       ].filter(Boolean).join(" · ")}</p>`:""}
-    ${(p.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${esc(e2.tipo)}</b>${e2.talhaoId?" · "+esc(nomePastoPec(e2.talhaoId)):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}
+    ${(p.eventos||[]).filter(e2=>e2.tipo).map(e2=>`<p class="mt"><b>${badgeCategoria("PECUARIA",{nome:e2.tipo})}${esc(e2.tipo)}</b>${e2.talhaoId?" · "+esc(nomePastoPec(e2.talhaoId)):""}${e2.lote?" · "+esc(e2.lote):""}${n0(e2.qtd)?" — "+n0(e2.qtd)+" cabeça"+(n0(e2.qtd)>1?"s":""):""}${e2.produto?`<br><span class="mut">Produto: ${esc(e2.produto)}${e2.dose?` — ${esc(e2.dose)} ${esc(e2.doseUn||"mL")}/cabeça`:""}</span>`:""}${n0(e2.pesoMedio)?`<br><span class="mut">Peso médio: ${n0(e2.pesoMedio).toLocaleString("pt-BR")} kg/cabeça</span>`:""}${n0(e2.valor)?`<br><span class="mut">Valor: R$ ${n0(e2.valor).toLocaleString("pt-BR")}${e2.contraparte?" · "+esc(e2.contraparte):""}</span>`:""}${e2.obs?`<br><span class="mut">${esc(e2.obs)}</span>`:""}</p>`).join("")}
     ${p.obs?`<p class="mt">📝 ${esc(p.obs)}</p>`:""}</div>`;
 }
 function vDetalhe(id){
@@ -4391,11 +4455,11 @@ function vDetalhe(id){
       <dt>Faltas</dt><dd>${n0(b.mo.faltas)}${b.mo.motivoFaltas?" — "+esc(b.mo.motivoFaltas):""}</dd>
       <dt>Horas extras</dt><dd>${n0(b.mo.horasExtras)}</dd></dl></div>
     ${(b.atividades||[]).length?`<div class="cartao"><h3>🚜 ${atividadeDe(b.fazendaId)==="GRAOS"?"Operações do dia":"Atividades"}</h3>
-      ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
+      ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${badgeCategoria("GRAOS",{nome:a.tipo})}${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
         ${(()=>{const ps=resumoOpPartes(b,a);return ps.length?`<br><span class="mut">${esc(ps.join(" · "))}</span>`:"";})()}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
         ${(a.maquinas||[]).filter(x=>x.nome).map(x=>`<br><span class="tag verde">${esc(x.nome)} — ${n0(x.horas)} h${n0(x.comb)?" · "+n0(x.comb)+" L comb.":""}</span>`).join("")}
-      </div>`:`<div class="mt"><b>${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
+      </div>`:`<div class="mt"><b>${badgeCategoria(atividadeDe(b.fazendaId),{nome:a.tipo})}${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
         ${a.status==="concluida"?` <span class="tag verde">✔ concluída</span>`:a.status==="continua"?` <span class="tag terra">⏳ continua amanhã</span>`:""}
         ${a.status==="continua"&&a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
@@ -4561,7 +4625,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v66";
+const APP_VERSAO="v67";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5984,7 +6048,13 @@ function ligarEventos(tela){
     const s=ev.target.closest("[data-impmapa]");
     if(s&&impEstado){ impEstado.mapa[s.dataset.impmapa]=s.value; return; }
   };
+  /* v67: teclado no badge de categoria (role=button): Enter/Espaço equivalem ao toque */
+  app.onkeydown = ev=>{ const bd=ev.target&&ev.target.closest&&ev.target.closest(".op-cat"); if(bd&&(ev.key==="Enter"||ev.key===" ")){ ev.preventDefault(); bd.click(); } };
   app.onclick = async ev=>{
+    /* v67: toque no badge de categoria mostra o nome da categoria (legenda sob demanda); some no 2º toque, em 2,5 s ou ao tocar fora */
+    const bd=ev.target.closest(".op-cat");
+    app.querySelectorAll(".op-cat.mostra").forEach(x=>{ if(x!==bd) x.classList.remove("mostra"); });
+    if(bd){ const on=bd.classList.toggle("mostra"); if(on) setTimeout(()=>bd.classList.remove("mostra"),2500); return; }
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
     if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
