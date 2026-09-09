@@ -43,6 +43,15 @@
       com aria-disabled; o toque mostra "Ação do/da …" sem modal e sem
       mudar de tela; nenhum texto de culpa ("sem permissão", "bloqueado");
       nunca mais da metade das ações da linha; zero na tela de apontamento.
+  10. Decisão e confirmação (v72): nenhum confirm()/alert() nativo dispara em
+      nenhum cenário; o botão de avanço (Enviar boletim / Enviar registro do
+      dia) nasce inativo no formulário vazio com o MESMO visual do botão de
+      perfil, o toque mostra o que falta (próxima ação, sem "obrigatório" /
+      "esqueceu"), e ele ativa no lugar ao escolher o clima (sem redesenhar);
+      "Descartar" abre o diálogo único: pergunta terminada em "?", sem "tem
+      certeza", emoji ou exclamação, exatamente dois botões, nenhum campo,
+      verbo no afirmativo (até três palavras, nunca Sim/OK/Confirmar) e, por
+      ser destrutivo, sem destaque; "Cancelar" fecha sem sair da tela.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -137,7 +146,7 @@ const NA_PAGINA = {
   acoesOff: () => {
     const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const app = document.querySelector('#app');
-    const offs = [...app.querySelectorAll('.acao-off')].filter(vis);
+    const offs = [...app.querySelectorAll('.acao-off[data-papel]')].filter(vis);
     const linhas = [...new Set(offs.map(b => b.parentElement))];
     const total = linhas.reduce((s, l) => s + [...l.querySelectorAll('button')].filter(vis).length, 0);
     const cores = el => { const cs = getComputedStyle(el); return [cs.color, cs.backgroundColor, cs.borderTopColor].join(' | '); };
@@ -303,6 +312,8 @@ async function novaPagina(browser, base, acesso, sessao) {
   page.on('pageerror', e => erros.push(String(e).split('\n')[0]));
   /* pedidos de rede abortados (Supabase) são o esperado offline — não contam como erro */
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FAILED|net::/.test(m.text())) erros.push('console: ' + m.text().slice(0, 120)); });
+  /* v72: nenhum diálogo nativo pode disparar — conta as chamadas em vez de deixá-las travar a página */
+  await ctx.addInitScript(() => { window.__nativos = 0; ['alert', 'confirm', 'prompt'].forEach(k => { window[k] = () => { window.__nativos++; return k === 'confirm' ? true : null; }; }); });
   await page.goto(base + '/index.html');
   await page.evaluate(([a, s]) => { localStorage.clear(); localStorage.setItem('bdf:acesso', JSON.stringify(a)); if (s) localStorage.setItem('bdf:sessao', JSON.stringify(s)); }, [acesso, sessao]);
   await page.reload(); await page.waitForTimeout(900);
@@ -310,6 +321,47 @@ async function novaPagina(browser, base, acesso, sessao) {
 }
 const gerente = (fz, atv) => ({ userId: 'u1', papel: 'gerente', nome: 'Gerente', atividade: atv, fazendaId: fz });
 
+/* v72: validação silenciosa do botão de avanço + diálogo único do "Descartar" (quando houver) */
+async function medirDecisao(page, btSel, gatilhoSel, descartarSel) {
+  const r = await page.evaluate(sel => {
+    const b = document.querySelector(sel); if (!b) return { existe: false };
+    const telaAntes = telaAtual, htmlAntes = document.querySelector('#app').innerHTML.length, nat = window.__nativos;
+    b.click();
+    const conteudo = getComputedStyle(b, '::after').content || '';
+    const nota = /^"/.test(conteudo) ? conteudo.slice(1, -1) : '';
+    const cs = getComputedStyle(b);
+    const r0 = { existe: true, inativo: b.classList.contains('acao-off') && b.getAttribute('aria-disabled') === 'true' && !!b.getAttribute('data-falta'),
+      estilo: cs.borderTopStyle, vermelho: /181, 67, 46/.test([cs.color, cs.backgroundColor, cs.borderTopColor].join(' ')), icone: /[\u{1F512}\u{1F6AB}\u{26D4}]/u.test(b.textContent),
+      nota, mostrou: b.classList.contains('mostra') && nota.length > 0, proibido: /obrigat|erro de valida|esqueceu|você|faltou|pendente/i.test(nota),
+      nativos: window.__nativos - nat };
+    b.click(); b.setAttribute('data-marca-teste', '1');   /* 2º toque some a nota; só então compara a tela */
+    r0.mesmaTela = telaAtual === telaAntes && document.querySelector('#app').innerHTML.length === htmlAntes + ' data-marca-teste="1"'.length;
+    return r0;
+  }, btSel);
+  if (!r.existe) return r;
+  /* satisfaz a pré-condição pela tela (chip de clima / lata do terreiro) e olha o botão sem redesenhar */
+  /* pelo DOM (a seção pode estar fechada): chip → click(); campo → valor + evento input, como a digitação */
+  await page.evaluate(sel => { const g = document.querySelector(sel); if (!g) return;
+    if (g.tagName === 'INPUT') { g.value = '300'; g.dispatchEvent(new Event('input', { bubbles: true })); } else g.click(); }, gatilhoSel);
+  await page.waitForTimeout(250);
+  r.depois = await page.evaluate(sel => { const b = document.querySelector(sel); return b ? { ativo: !b.classList.contains('acao-off') && !b.getAttribute('aria-disabled') && !b.getAttribute('data-falta'), noLugar: b.getAttribute('data-marca-teste') === '1' } : null; }, btSel);
+  if (descartarSel) {
+    await page.evaluate(sel => { const b = document.querySelector(sel); if (b) b.click(); }, descartarSel); await page.waitForTimeout(200);
+    r.dialogo = await page.evaluate(() => {
+      const d = document.querySelector('#dialogo'); if (!d) return null;
+      const bts = [...d.querySelectorAll('button')], sim = d.querySelector('#bt-dialogo-sim'), nao = d.querySelector('#bt-dialogo-nao');
+      const pergunta = (d.querySelector('.pergunta') || {}).textContent || '';
+      const verde = el => /47, 82, 51/.test(getComputedStyle(el).backgroundColor);
+      return { botoes: bts.length, campos: d.querySelectorAll('input, select, textarea').length, pergunta, terminaInterrogacao: /\?\s*$/.test(pergunta),
+        temCerteza: /tem certeza|!|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(pergunta), produto: /produto|dose|custo/i.test(pergunta),
+        sim: sim ? sim.textContent.trim() : '', nao: nao ? nao.textContent.trim() : '', simGenerico: /^(sim|ok|confirmar|continuar)$/i.test(sim ? sim.textContent.trim() : ''),
+        simPalavras: sim ? sim.textContent.trim().split(/\s+/).length : 0, simDestaque: sim ? verde(sim) : false, naoDestaque: nao ? verde(nao) : false, papel: d.getAttribute('role'), modal: d.getAttribute('aria-modal') };
+    });
+    await page.click('#bt-dialogo-nao').catch(() => {}); await page.waitForTimeout(150);
+    r.fechou = await page.evaluate(() => ({ aberto: !!document.querySelector('#dialogo'), tela: telaAtual }));
+  }
+  return r;
+}
 async function medirTela(page, nome, grupo, extra) {
   const m = await page.evaluate(NA_PAGINA.medir);
   const v = await page.evaluate(NA_PAGINA.visual);
@@ -372,6 +424,8 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   await page.click('#bt-preencher'); await page.waitForTimeout(400);
   const form = await medirTela(page, rot + ' — boletim (ao abrir)', 'boletim', { atividade: atv });
   form.secoes = await page.evaluate(NA_PAGINA.secoes);
+  /* v72: ainda com o formulário vazio — Enviar inativo, toque explica, clima ativa no lugar; Descartar abre o diálogo único */
+  form.decisao = await medirDecisao(page, '#bt-enviar', '[data-clima]', '#bt-descartar');
   /* toca em cada "＋" (um por seção/subseção) e olha o cartão novo */
   /* "＋ adicionar todos os pivôs" é ação em massa, não abre cartão — fica de fora */
   const ids = await page.evaluate(() => [...document.querySelectorAll('#app details.secao button')].filter(b => b.textContent.trim().startsWith('＋') && b.id && !/todos/i.test(b.textContent)).map(b => '#' + b.id));
@@ -388,7 +442,7 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   outras.forEach(o => { form.termosAlheios[o] = acharTermos(form.texto, termos[o]); });
   form.termosProprios = acharTermos(form.texto, termos[atv]).length;
   form.erros = erros.slice();
-  form.acoesOffForm = await page.evaluate(() => document.querySelectorAll('#app .acao-off').length);
+  form.acoesOffForm = await page.evaluate(() => document.querySelectorAll('#app .acao-off[data-papel]').length);
   R.telas.push(casa, form);
   /* v71: boletim enviado visto pelo gerente — "Marcar como visto" (ação da Diretoria) aparece desabilitado */
   await page.evaluate(f => {
@@ -399,6 +453,7 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   }, fz); await page.waitForTimeout(300);
   const det = await medirTela(page, rot + ' — boletim enviado (gerente)', 'gerente');
   det.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);
+  det.nativos = await page.evaluate(() => window.__nativos);
   R.telas.push(det);
   await ctx.close();
 }
@@ -412,6 +467,7 @@ async function cenarioPos(browser, base, R, termos) {
   form.texto = await page.evaluate(NA_PAGINA.textoTudo);
   form.termosAlheios = { GRAOS: acharTermos(form.texto, termos.GRAOS), PECUARIA: acharTermos(form.texto, termos.PECUARIA) };
   form.erros = erros.slice();
+  form.decisao = await medirDecisao(page, '#bt-enviar-pos', 'input[data-pt="entradaLatas"]', null);
   R.telas.push(form);
   await ctx.close();
 }
@@ -630,6 +686,25 @@ function avaliar(R) {
       add(g, `${t.nome} — toque mostra quem executa, sem modal, sem alert e sem mudar de tela`, it.length > 0 && it.every(i => i.mostrou && !i.modal) && !x.alertas && x.mesmaTela, it.map(i => `"${i.nota}"`).join(', ') + (x.alertas ? `; ${x.alertas} alert` : '') + (x.mesmaTela ? '' : '; a tela mudou'));
       add(g, `${t.nome} — texto nomeia o papel ("Ação do/da …"), sem "sem permissão / acesso negado / bloqueado"`, it.length > 0 && it.every(i => /^Ação d[oa] /.test(i.nota) && !i.proibido), it.map(i => `"${i.nota}"`).join(', '));
       add(g, `${t.nome} — no máximo metade das ações da linha desabilitada`, it.length > 0 && it.length * 2 <= x.total, `${it.length} de ${x.total} botões`);
+    });
+  }
+  /* 10. decisão e confirmação (v72) */
+  {
+    const g = '10. Decisão e confirmação: validação silenciosa, diálogo único, sem confirm/alert nativo';
+    R.telas.filter(t => t.nativos !== undefined).forEach(t => add(g, `${t.nome.split(' — ')[0]} — nenhum confirm()/alert()/prompt() nativo disparou no cenário`, t.nativos === 0, `${t.nativos} chamada(s)`));
+    R.telas.filter(t => t.decisao && t.decisao.existe).forEach(t => {
+      const x = t.decisao, nome = t.nome;
+      add(g, `${nome} — botão de avanço nasce inativo no formulário vazio, com o visual do botão de perfil (cinza, tracejado, aria-disabled)`, x.inativo && x.estilo === 'dashed' && !x.vermelho && !x.icone, `${x.inativo ? 'inativo' : 'ativo'}; borda ${x.estilo}${x.vermelho ? '; vermelho' : ''}`);
+      add(g, `${nome} — toque no botão inativo mostra o que falta (próxima ação), sem acusar, sem alert e sem sair da tela`, x.mostrou && !x.proibido && x.mesmaTela && x.nativos === 0, `"${x.nota}"${x.proibido ? ' (termo proibido)' : ''}${x.mesmaTela ? '' : '; a tela mudou'}${x.nativos ? '; ' + x.nativos + ' nativo(s)' : ''}`);
+      add(g, `${nome} — satisfeita a pré-condição, o botão ativa no lugar, sem redesenhar a tela`, !!x.depois && x.depois.ativo && x.depois.noLugar, x.depois ? `${x.depois.ativo ? 'ativo' : 'ainda inativo'}${x.depois.noLugar ? ', mesmo elemento' : ', elemento redesenhado'}` : 'botão sumiu');
+      if (x.dialogo !== undefined) {
+        const d = x.dialogo;
+        add(g, `${nome} — "Descartar" abre o diálogo único: dois botões, nenhum campo, role alertdialog`, !!d && d.botoes === 2 && d.campos === 0 && d.papel === 'alertdialog' && d.modal === 'true', d ? `${d.botoes} botões, ${d.campos} campo(s), role ${d.papel}` : 'diálogo não abriu');
+        add(g, `${nome} — pergunta termina em "?", sem "tem certeza", emoji ou exclamação, sem produto/dose/custo`, !!d && d.terminaInterrogacao && !d.temCerteza && !d.produto, d ? `"${d.pergunta}"` : '');
+        add(g, `${nome} — afirmativa com verbo e objeto (≤ 3 palavras, nunca Sim/OK/Confirmar); negativa "Cancelar"/"Voltar"/"Revisar"`, !!d && !d.simGenerico && d.simPalavras >= 2 && d.simPalavras <= 3 && /^(Cancelar|Voltar|Revisar)$/.test(d.nao), d ? `"${d.nao}" · "${d.sim}"` : '');
+        add(g, `${nome} — ação destrutiva sem destaque: nenhum dos dois botões em verde`, !!d && !d.simDestaque && !d.naoDestaque, d ? `sim ${d.simDestaque ? 'verde' : 'neutro'}, cancelar ${d.naoDestaque ? 'verde' : 'neutro'}` : '');
+        add(g, `${nome} — "Cancelar" fecha o diálogo e mantém a tela`, !!x.fechou && !x.fechou.aberto && x.fechou.tela === 'form', x.fechou ? `${x.fechou.aberto ? 'ainda aberto' : 'fechado'}; tela ${x.fechou.tela}` : '');
+      }
     });
   }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */

@@ -285,3 +285,50 @@ nunca por condicional solta na tela. Antes do PR, conferir:
    desabilitada por perfil" (painel da Diretoria, boletim enviado visto
    pela Diretoria e pelo gerente das três atividades, e contagem zero
    na tela de apontamento).
+
+## 13. Decisão e confirmação: diálogo único, validação silenciosa, verbo no botão (desde a v72)
+Regra em CLAUDE.md, item c10. Antes do PR, conferir:
+1. **Nenhum `confirm()`, `alert()` ou `prompt()` NOVO no código:**
+   `git grep -n "confirm(\|alert(\|prompt(" index.html` só pode achar
+   os quatro `prompt()` herdados (recebimento de carga, novo plantio na
+   tela do gerente), listados no ESTADO.md. Toda pergunta passa por
+   `perguntar(...)`; todo aviso que só se descobre depois do toque passa
+   por `avisoInline(...)`.
+2. **Todo diálogo tem exatamente dois botões e nenhum campo** de
+   digitação; `role="alertdialog"`, `aria-modal`; toque fora não decide.
+3. **Pergunta:** termina em "?", diz o que vai acontecer, sem "tem
+   certeza", sem emoji, sem exclamação, sem culpar, sem produto, dose ou
+   custo (vale também para as linhas de `detalhes`).
+4. **Botão afirmativo com verbo no infinitivo + objeto, até três
+   palavras;** nunca "Sim", "OK", "Confirmar", "Continuar". Negativo:
+   "Cancelar", "Voltar" ou "Revisar". Nenhum par Sim/Não genérico.
+5. **Destaque só em ação reversível e frequente.** Ação destrutiva ou
+   irreversível (descartar, remover, encerrar, inativar, publicar, gerar
+   novo código, esquecer código, envio) leva `destaque:false` — os dois
+   botões neutros. Lista das perguntas com destaque no PR, com o motivo.
+6. **Validação silenciosa:** botão de avanço cuja pré-condição é
+   visível nasce inativo por `botaoAvanco` (visual do `.acao-off` da
+   v71: cinza, tracejado, sem vermelho, `aria-disabled`), o toque mostra
+   o que falta como próxima ação, e o botão ativa no lugar quando a
+   condição é satisfeita (`atualizarAvanco`), sem redesenhar. Texto sem
+   "campo obrigatório", "preencha os dados", "erro de validação", "você
+   esqueceu", "faltou", "pendente":
+   `git grep -n "obrigat\|erro de valida\|esqueceu" index.html` no que
+   foi tocado não pode achar texto de tela.
+7. **Nunca desabilitar por condição invisível** (boletim já existente
+   naquela data, erro do servidor, arquivo sem linhas): o toque é
+   permitido e explicado por `avisoInline`. Nunca bloquear o envio por
+   seção eventual sem resposta (item 11.7 continua valendo).
+8. **Contagem de confirmações no PR:** antes × depois; a entrega não
+   pode aumentar o número. Pontos onde se pensou em confirmar e não se
+   confirmou, e confirmações que se sugere remover, vão listados.
+9. **Fluxo de apontamento em 3 passos intocado:** só rótulo de botão ou
+   troca de nativo por componente; nenhuma etapa, ordem ou comportamento
+   muda; zero botão inativo dentro do cartão de apontamento.
+10. **Medição:** `scripts/checar-poluicao.cjs`, grupo "10. Decisão e
+    confirmação" — stub de `alert`/`confirm`/`prompt` em toda página
+    (conta chamadas nativas: tem de ser zero), Enviar inativo no
+    formulário vazio das três atividades e do pós-colheita, toque explica
+    sem alert e sem sair da tela, clima/terreiro ativa o mesmo elemento,
+    Descartar abre o diálogo (dois botões, sem campo, "?", verbo ≤ 3
+    palavras, sem destaque) e Cancelar mantém a tela.
