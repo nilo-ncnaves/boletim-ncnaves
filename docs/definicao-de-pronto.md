@@ -302,6 +302,8 @@ Regra em CLAUDE.md, item c10. Antes do PR, conferir:
 4. **Botão afirmativo com verbo no infinitivo + objeto, até três
    palavras;** nunca "Sim", "OK", "Confirmar", "Continuar". Negativo:
    "Cancelar", "Voltar" ou "Revisar". Nenhum par Sim/Não genérico.
+   `git grep -n ">Salvar<\|>OK<\|>Sim<\|>Confirmar<\|>Continuar<" index.html`
+   não pode achar nada (rótulo sem objeto: resíduo achado e zerado na v73).
 5. **Destaque só em ação reversível e frequente.** Ação destrutiva ou
    irreversível (descartar, remover, encerrar, inativar, publicar, gerar
    novo código, esquecer código, envio) leva `destaque:false` — os dois

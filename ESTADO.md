@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v72** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v73** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -910,6 +910,14 @@ em vez de "OK".
   "Criar" → "Criar máquina" / "Criar insumo"; "Acrescentar" →
   "Acrescentar termo"; "Salvar" → "Salvar unidade" / "Salvar talhão" /
   "Salvar pivô". Nenhum "OK", "Sim", "Confirmar" sobrou.
+- **v73 (09/09/2026) — varredura de conferência da v72:** o único
+  resíduo encontrado foi o botão "Salvar" sozinho no formulário de
+  edição de unidade em Escritório › Unidades e Plano (ADMIN), que passou
+  a "Salvar unidade". Nada mais mudou: zero `confirm()`/`alert()`, os
+  mesmos 4 `prompt()` herdados, 20 confirmações, uma só com destaque
+  ("Abrir ciclos"). O `||"Continuar"` de reserva no tratador
+  `data-cadpede` é inalcançável (as 10 chaves de Cadastros têm verbo em
+  `CAD_VERBO`) e ficou como está.
 - **Textos do cinto de segurança reescritos:** "Esqueceu a mão de
   obra?" → "Confira a mão de obra."; "Confirma que o dia foi assim?" →
   "Confira se o dia foi assim."; o aviso de aplicação sem receita
@@ -950,7 +958,7 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v72, 09/09/2026:
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v73, 09/09/2026:
 **308 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v72 acrescentou o grupo
 "10. Decisão e confirmação" (30 itens ✅: stub de alert/confirm/prompt
 em toda página com zero chamadas nos cenários; Enviar inativo no
