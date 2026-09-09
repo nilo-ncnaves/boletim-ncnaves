@@ -521,6 +521,53 @@ filtram por período, de/até) e Cadastros.
   dia, conjunto ≤ 25 %, zero `input type=date`); detalhe em
   docs/definicao-de-pronto.md, item 14.
 
+### c12) Chips removíveis na multi-seleção (desde a v74)
+Toda multi-seleção (o gerente ou o escritório marca VÁRIOS itens de uma
+lista de chips: problemas da irrigação e setores fertirrigados do café,
+problemas do pivô dos grãos, atividades/unidades do código combinado,
+fazendas de uma máquina e estrutura de pós-colheita em Cadastros) mostra
+a seleção já feita pelo componente ÚNICO `chipsSelecao(attr, {um,
+varios})` + `pintarSelecoes()` do index.html — nunca uma variante por
+atividade ou por perfil. Ele só EXIBE a seleção: o mecanismo de escolha
+(os chips de opção com `.on`) continua o que era; seleção única
+(clima, status, destino, gravidade…) nunca recebe o componente; nenhum
+seletor nativo foi trocado por chip nesta regra ("Talhão afetado" das
+pragas fica para outra entrega). Pecuária não tem multi-seleção hoje
+(cada campo escolhe um valor) — quando tiver, entra pelo mesmo
+componente.
+- **O que aparece, só quando há item escolhido:** contador ("3 setores
+  selecionados" — substantivo por tela, vindo de quem chama, nunca de
+  `if(atividade==="…")`; docs/catalogos-por-atividade.md, "Chips
+  removíveis") e, abaixo, um chip por item na ordem do catálogo/
+  cadastro, rótulo + × à direita. Contador e chips convivem; um não
+  substitui o outro. **Seleção vazia não desenha nada:** nem contador
+  zerado, nem área reservada (`.sel-box:empty{display:none}`).
+- **O × remove na hora,** sem confirmação (é trivialmente reversível:
+  basta tocar a opção de novo) e reaproveita o tratador do chip de
+  opção (dispara o toque dele — nenhum mecanismo novo). Área de toque
+  do × ≥ 44 × 44 px (o botão tem 44 px por si, sem crescer o chip);
+  rótulo acessível "Remover <nome>" (`aria-label` e `title`), nunca só
+  "x". Remover o último é estado válido: o bloco some, nenhum aviso.
+- **O corpo do chip não faz nada** (decisão única em todo o app): a
+  lista de opções está logo abaixo, no mesmo bloco, então "abrir a
+  lista" não teria o que abrir; um alvo só evita remover o item errado
+  com o polegar no sol.
+- **Mais de 6 itens:** os 6 primeiros + um chip "+K" que expande (a
+  expansão vive só na memória, `selExpandido`, e some quando a seleção
+  cai). Quebra em linhas (`flex-wrap`); rolagem horizontal é PROIBIDA
+  (esconde itens).
+- **Visual:** mesma família dos chips de opção (`.chip`), sem cor nova
+  (a cor verde é do chip de opção aceso; o chip removível é neutro), sem
+  sombra, sem gradiente; × em `--tinta-2`. Rótulos são os do chip de
+  opção, que quem chama já desenha pelo cadastro por id — nunca pedaço
+  de nome.
+- **Onde não entra:** seleção única; apontamento em 3 passos (o ONDE e
+  o O QUÊ são escolha única); listas de leitura; resumos de uma linha.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "12. Chips
+  removíveis" (café: problemas e setores; grãos: pivô; Cadastros:
+  código combinado com 9 unidades); detalhe em
+  docs/definicao-de-pronto.md, item 15.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

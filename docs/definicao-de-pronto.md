@@ -382,3 +382,41 @@ ou teclado (regra 2 do projeto). Antes do PR, conferir:
 10. **Medição:** `scripts/checar-poluicao.cjs`, grupo "11. Régua de 7
     dias" — na casa do gerente de café, grãos e pecuária e na casa do
     pós-colheita.
+
+## 15. Chips removíveis na multi-seleção (desde a v74)
+Regra em CLAUDE.md, item c12. Toda multi-seleção por chips (café:
+problemas da irrigação e setores fertirrigados; grãos: problemas do pivô;
+Cadastros: atividades/unidades do código combinado, fazendas de uma
+máquina, estrutura de pós-colheita; qualquer multi-seleção futura) exibe
+a seleção pelo componente único `chipsSelecao` / `pintarSelecoes`. Antes
+do PR, conferir:
+1. **Só multi-seleção recebe o componente.** Seleção única (um valor por
+   campo) nunca; nenhum `<select>` nativo foi trocado por chip por causa
+   desta regra; o mecanismo de escolha (chips de opção `.on`) não mudou.
+2. **Seleção vazia não desenha nada:** o contêiner `.sel-box` fica vazio
+   e sem altura (nem "0 selecionados", nem espaço reservado).
+3. **Contador e chips juntos:** "N <substantivo> selecionad(o|a)s" acima
+   e um chip por item abaixo, na ordem do catálogo/cadastro; o
+   substantivo vem de quem chama, por tela (`{um, varios}`), nunca por
+   condicional de atividade.
+4. **× remove na hora,** sem confirmação, sem `confirm()`/diálogo, sem
+   sair da tela; o chip de opção correspondente apaga e o dado é gravado
+   pelo tratador que já existia. Área de toque ≥ 44 × 44 px; `aria-label`
+   e `title` "Remover <nome>". Remover o último volta ao vazio, sem aviso.
+5. **Toque no corpo do chip não faz nada** (decisão única no app).
+6. **Quebra em linhas, nunca rola de lado** (`flex-wrap: wrap`,
+   `scrollWidth` da página ≤ 390 px); sem sombra, sem gradiente, sem cor
+   por item (o × é `--tinta-2`, nunca vermelho).
+7. **Mais de 6 itens:** 6 chips + "+K" que expande para todos; até 6, sem
+   "+K".
+8. **Rótulos pelo cadastro por id** (o texto do chip de opção); nunca
+   pedaço de nome.
+9. **Apontamento em 3 passos intocado** (ONDE e O QUÊ são escolha única);
+   café, grãos e pecuária pelo mesmo componente — na regressão
+   (`scripts/regressao_render.cjs`) a diferença main × branch é só o
+   `.sel-box` (vazio onde nada foi escolhido; preenchido onde o cenário
+   escolhe), igual nas três atividades.
+10. **Medição:** `scripts/checar-poluicao.cjs`, grupo "12. Chips
+    removíveis" — café (problemas 2 de 8; setores todos, 8 de 8 → 6 +
+    "+2"), grãos (pivô, 2 de 6), Cadastros › Códigos › novo combinado (9
+    unidades → 6 + "+3"); pecuária registra "sem multi-seleção".

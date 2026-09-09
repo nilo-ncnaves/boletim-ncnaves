@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v73** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v74** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -918,6 +918,56 @@ português, sem datepicker nativo, sem rolagem de lado.
   passos `05-regua-ontem`/`06-regua-hoje` em
   `scripts/regressao_render.cjs`.
 
+## Chips removíveis da multi-seleção (v74) — três atividades e Cadastros
+Regra permanente em CLAUDE.md, item c12; checagem em
+docs/definicao-de-pronto.md, item 15; vocabulário do contador por tela
+em docs/catalogos-por-atividade.md, "Chips removíveis".
+- **Problema resolvido:** nas multi-seleções por chips a pessoa só via a
+  escolha pelos chips acesos espalhados na lista de opções (8 problemas,
+  8 setores, 24 unidades…): sem contagem, sem lista do que já marcou e
+  sem jeito de tirar um item senão procurá-lo na lista.
+- **Componente único** `chipsSelecao(attr, {um, varios})` +
+  `pintarSelecoes()` (CSS `.sel-box`, `.sel-cont`, `.chip.sel`, `.sel-x`,
+  `.sel-mais`; `SEL_MAX = 6`; `selExpandido`). Só EXIBE a seleção, lida do
+  estado `.on` dos chips de opção do mesmo bloco: contador ("3 setores
+  selecionados", substantivo por tela) + um chip por item na ordem do
+  cadastro, rótulo + × à direita. O × dispara o toque do chip de opção
+  correspondente — o tratador que já existia remove e grava (nenhum
+  mecanismo novo). Remoção imediata, sem confirmação. × de 44 × 44 px,
+  `aria-label`/`title` "Remover <nome>". Corpo do chip inerte (decisão
+  única). Mais de 6 → 6 + "+K" que expande. Vazio → nada desenhado.
+  Quebra em linhas; nunca rola de lado. Sem cor nova, sem sombra.
+- **Onde entra (7 multi-seleções, todas as que o app tem):** ☕ Café ›
+  Irrigação › "Qual foi o problema?" (`irrpb`) e Fertirrigação › "Em quais
+  setores?" (`irrfsec`, talhões por id); 🌾 Grãos › Irrigação (pivôs) ›
+  "Qual foi o problema?" (`igpb`, por pivô); Cadastros › Códigos › novo
+  combinado › Atividades inteiras (`combo-atv`) e Unidades avulsas
+  (`combo-uni`); Cadastros › Catálogos › Máquinas › vínculo com fazendas
+  (`vinc-faz`); Cadastros › Fazendas › detalhe › Estrutura de
+  pós-colheita (`estr`). 🐂 Pecuária: nenhuma multi-seleção hoje (cada
+  campo escolhe um valor) — nada a aplicar; quando houver, é o mesmo
+  componente.
+- **Onde NÃO entra, por desenho:** seleção única (clima, status, água,
+  destino, gravidade, nível, modo, passada, período, filtros da
+  Diretoria, chips da pecuária); os dois toques independentes de
+  "Na lavoura hoje" (florada / requeima — não são uma seleção, são dois
+  sim/não); as operações por talhão de grãos (`data-opgrao`: cada toque
+  cria um registro, que já vira linha compacta); apontamento em 3 passos
+  (ONDE e O QUÊ são escolha única); nenhum `<select>` nativo foi trocado
+  por chip ("Talhão afetado" das pragas fica para outra entrega).
+- **Isolamento:** o café recebe o componente nos dois blocos da
+  irrigação por gotejo e os grãos no cartão do pivô, pela mesma função;
+  regressão main × branch: nas telas de grãos e pecuária a diferença é
+  zero (o cenário não marca problema de pivô); no café, só o `.sel-box`
+  (vazio nos problemas; "2 setores selecionados" a partir do passo da
+  irrigação). Pós-colheita, Diretoria e Cadastros byte a byte iguais
+  (fora rodapé v73→v74 e relógio).
+- Sem campo novo, sem SQL, sem texto prescritivo, apontamento em 3
+  passos sem mudança de etapa, ordem ou comportamento (o bloco do pivô
+  ganhou só a exibição da seleção nos DETALHES; zona cinzenta declarada
+  ao Nilo no PR). Medição nova em `scripts/checar-poluicao.cjs`, grupo
+  "12. Chips removíveis" (33 ✅).
+
 ## Decisão e confirmação (v72) — diálogo único, validação silenciosa, verbo no botão
 Regra permanente em CLAUDE.md, item c10; checagem em
 docs/definicao-de-pronto.md, item 13. Três ideias do app Sigma
@@ -1009,8 +1059,16 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v73, 09/09/2026:
-**334 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v73 acrescentou o grupo
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v74, 09/09/2026:
+**367 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v74 acrescentou o grupo
+"12. Chips removíveis" (33 itens ✅: café — problemas da irrigação 2 de 8
+e setores fertirrigados 8 de 8 → 6 + "+2"; grãos — problemas do pivô 2
+de 6; Cadastros › Códigos › novo combinado — 9 unidades → 6 + "+3";
+pecuária registra "sem multi-seleção"; em cada um: vazio sem área,
+contador + chips, × de 44 px com "Remover <nome>", quebra sem rolar de
+lado, corpo inerte, × remove sem nativo e sem sair da tela, remover o
+último volta ao vazio; nenhum ❌ novo — nenhum `.sel-*` aparece em raio,
+sombra ou toque); a v73 acrescentou o grupo
 "11. Régua de 7 dias" (24 itens ✅ na casa do gerente das três
 atividades e na casa do pós-colheita, que passou a ser medida como tela
 "Gerente (casa)": 7 células de 48,3 × 48 px sem rolar de lado, dias em
@@ -1186,6 +1244,18 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Chips removíveis (v74) — decisão do Nilo antes do merge:** o PR
+  ficou aberto porque o cartão do pivô (grãos) é seção de lançamento em
+  3 passos e ganhou, nos DETALHES, a exibição da seleção de problemas
+  (contador + chips com ×) — nada mudou de etapa, ordem ou mecanismo de
+  escolha, mas é zona cinzenta da regra 7. Decidir: (a) manter nos
+  pivôs (como está) ou tirar só de lá; (b) o corpo do chip não faz nada
+  — manter?; (c) limite de 6 chips antes do "+K". Testar no iPhone: café
+  › Irrigação › "Rodou com problema" › tocar 2 problemas (aparece "2
+  problemas selecionados" + 2 chips com ×; o × tira na hora); "Sim, fez
+  fertirrigação" › tocar todos os setores (6 chips + "+2"; "+2" mostra
+  todos); grãos › pivô › "Não rodou" › problemas; ADMIN › Códigos › novo
+  combinado › marcar 9 unidades (6 + "+3"). Nenhum SQL.
 - **Régua de 7 dias (v73) — para o Nilo testar no iPhone:** na casa
   do gerente de uma unidade de cada atividade e na casa do
   pós-colheita: (1) a régua abaixo do cabeçalho, com sete dias, hoje à
