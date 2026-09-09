@@ -6,6 +6,35 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 09/09/2026 · v73 · Decisão e confirmação: varredura de conferência da v72 (resíduo de rótulo)
+
+**Entrega.** Tarefa repetida sobre o main já com a v72: o inventário foi
+refeito do zero (todo `confirm`/`alert`/`prompt`, toda chamada de
+`perguntar`, todo `botaoAvanco`, todo rótulo de confirmação) e o único
+ponto fora do padrão c10 era o botão "Salvar" sozinho do formulário de
+edição de unidade em Escritório › Unidades e Plano (ADMIN), agora
+"Salvar unidade". Versão v73 no rodapé e no cache. Nenhum SQL, nenhuma
+RLS, nenhum campo novo, nenhuma confirmação a mais (20 antes, 20
+depois); os 4 `prompt()` herdados continuam como pendência do Nilo.
+
+**Verificado (automático).** `node --check` no JavaScript extraído e no
+`sw.js`; `git grep` de `confirm(`/`alert(` acha só comentários, de
+`prompt(` só os 4 herdados, de `>Salvar<`/`>OK<`/`>Sim<`/`>Confirmar<`
+nada; as 10 chaves de `cadConfirmar` têm verbo em `CAD_VERBO`;
+`destaque:true` só em "Abrir ciclos"; `scripts/checar-poluicao.cjs`
+308 ✅ · 41 ❌ (idêntico ao retrato da v72, nenhum ❌ novo);
+`scripts/regressao_render.cjs` main × branch: telas de gerente
+(café, grãos, pecuária), pós-colheita e Diretoria idênticas fora o
+rodapé de versão — Unidades e Plano precisa de rede e fica fora da
+regressão (diferença conferida no diff do código).
+
+**Teste manual (Nilo, iPhone).** Os mesmos itens da v72 (ESTADO.md ›
+PENDÊNCIAS); a mais: com ADMIN, Escritório › Unidades e Plano › editar
+uma unidade e ver "Salvar unidade" · "Cancelar".
+
+**Não tocado.** Fluxo de apontamento em 3 passos, `perguntar`,
+`botaoAvanco`, `avisoInline`, catálogos, Supabase.
+
 ## 09/09/2026 · v72 · Decisão e confirmação: diálogo único, validação silenciosa, verbo no botão (#30, #31, #43)
 
 **Entrega.** Componentes únicos no `index.html`: `perguntar(o)` (diálogo

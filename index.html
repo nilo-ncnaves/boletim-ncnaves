@@ -2835,7 +2835,7 @@ function vUnidPlano(){
       </div>
       <label>Observação</label><textarea data-upc="obs" rows="2">${esc(u.obs||"")}</textarea>
       <p class="mut" style="font-size:.75rem">Cada campo alterado vira uma linha em unidade_manejo_log (antes → depois, quem, quando). O código ${esc(u.codigo)} não muda nunca.</p>
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="salvar" data-upv="${esc(u.id)}">Salvar</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-up="salvar" data-upv="${esc(u.id)}">Salvar unidade</button><button class="btn sec mini" data-up="cancelar">Cancelar</button></div>
     </div>`;
   const formAlias=u=>`<div class="subcartao">
       <label>Sistema</label><select data-upc="alias_sistema">${PLANO_SISTEMAS.map(s=>`<option value="${s}">${s}</option>`).join("")}</select>
@@ -4958,7 +4958,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v72";
+const APP_VERSAO="v73";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
