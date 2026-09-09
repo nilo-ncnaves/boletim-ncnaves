@@ -6,6 +6,162 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 09/09/2026 · v74 · Chips removíveis na multi-seleção (#42) + auditoria de #11 (v72), #14 (v67) e #9 (v68)
+
+**Entrega.** Lote de quatro itens num PR. Três já estavam no main
+quando a tarefa começou e foram AUDITADOS contra os critérios do lote,
+sem mudança de tela: **#11** decisão e confirmação (v72:
+`perguntar` / `botaoAvanco` / `avisoInline`), **#14** badge de categoria
+(v67: `badgeCategoria` + `OP_CATEGORIAS`), **#9** textos do robô-redator
+colapsados (v68: `cartaoTextoLongo` + folha). O item novo é o **#42**:
+componente único `chipsSelecao(attr, {um, varios})` + `pintarSelecoes()`
+(CSS `.sel-box`, `.sel-cont`, `.chip.sel`, `.sel-x`, `.sel-mais`) nas 7
+multi-seleções do app (café 2, grãos 1, Cadastros 4; pecuária não tem),
+grupo "12. Chips removíveis" no `scripts/checar-poluicao.cjs`, regra c12
+no CLAUDE.md, item 15 na definição de pronto, tabela de vocabulário no
+catálogo. Versão v74 no rodapé e no cache. Nenhum SQL, nenhum campo
+novo, nenhum texto prescritivo, nenhum `<select>` trocado por chip.
+
+**Inventário #11 — decisões e confirmações (index.html v74).**
+`git grep "confirm(\|alert(\|prompt("`: 0 `confirm()`, 0 `alert()`
+(os dois textos que sobram são comentários), 4 `prompt()` herdados
+(recebimento de carga ×2; novo plantio na tela do gerente ×2 — campos de
+digitação dentro de diálogo, decisão pendente do Nilo desde a v72).
+Pontos de confirmação por `perguntar`: **20 antes · 20 depois** (esta
+entrega não acrescenta nenhum). Reversível (R) / destrutivo ou
+irreversível (D) e destaque: Descartar rascunho D · Esquecer código
+(Sair) R-mas-neutro · Enviar boletim / Salvar correção D (cinto de
+segurança, avisos como `detalhes`) · Abrir ciclos após plantio R
+(**única com destaque**: reversível em Cadastros › Ciclos, caminho
+provável claro) · Encerrar ciclos com 100 % colhido D · Inativar unidade
+D · Encerrar apelido D · Publicar versão (Unidades e Plano) D · Remover
+talhão / pivô / termo / máquina / insumo D · Encerrar colheita D · Criar
+unidade irmã D · Unificar unidades D · Apagar exemplos D · Gerar novo
+código D. Todas: dois botões, nenhum campo, pergunta com "?", sem "tem
+certeza", sem produto/dose/custo; afirmativa com verbo + objeto (≤ 3
+palavras), negativa Cancelar/Voltar/Revisar. Botões de avanço com
+pré-condição visível (`botaoAvanco`): Enviar boletim / Salvar correção
+(três atividades), Enviar registro do dia (pós), Publicar como vigente,
+1 · Ler o arquivo, 3 · Importar N linhas, Registrar plantio, Gerar
+código combinado — o toque inativo mostra a próxima ação; nenhum
+"obrigatório / erro de validação / esqueceu". Avisos depois do toque
+(`avisoInline`, condição invisível): boletim/registro já existente na
+data, arquivo sem linhas, Excel ilegível/sem internet, área inválida,
+apelido vazio, erro do Supabase, "1, 2 ou 3" do plantio. O envio NÃO é
+bloqueado por seção eventual sem resposta (aviso âmbar da v70).
+Rótulos trocados: nenhum nesta entrega (a tabela antes/depois é a da
+v72: "Confirmar e enviar" → "Enviar boletim" / "Salvar correção";
+"Confirmar" ×10 → verbo da ação; "Criar" → "Criar máquina/insumo";
+"Acrescentar" → "Acrescentar termo"; "Salvar" → "Salvar
+unidade/talhão/pivô"). Sugestões mantidas da v72 (não implementadas):
+remover a pergunta de "Sair" (esquecer código é reversível digitando de
+novo); juntar as perguntas de ciclo ao cinto de segurança do envio.
+Pontos onde se pensou em confirmar e NÃO se confirmou nesta entrega: o
+× do chip removível (reversível num toque — confirmar treinaria o toque
+automático).
+
+**Inventário #42 — multi-seleções (todas por chips próprios; nenhum
+`<select multiple>` no app).** Onde · o que · como mostrava · opções:
+☕ Café › Irrigação › "Qual foi o problema?" (`irrpb`) · problemas ·
+chips acesos na própria lista · 8; ☕ Café › Irrigação › Fertirrigação ›
+"Em quais setores?" (`irrfsec`) · talhões por id · idem · 8 em Vereda
+Romaria (varia por unidade); 🌾 Grãos › Irrigação (pivôs) › cartão do
+pivô › "Qual foi o problema?" (`igpb`) · problemas · idem · 6;
+Cadastros › Códigos › novo combinado › Atividades inteiras
+(`combo-atv`) · 3 e Unidades avulsas (`combo-uni`) · 24; Cadastros ›
+Catálogos › Máquinas › vínculo (`vinc-faz`) · fazendas · 24;
+Cadastros › Fazendas › detalhe › Estrutura de pós-colheita (`estr`) · 4.
+🐂 Pecuária: nenhuma (todos os `chipsPecIdx`/`ch()` gravam um valor por
+campo). Seleções ÚNICAS, fora do escopo (não receberam chip): clima,
+florada/requeima (dois sim/não independentes), status/água/fertirrigação
+da irrigação, status/quimigação do pivô, modo/passada/destino da
+colheita, tipo/nome/nível da praga, gravidade, equipamento/vento/horário
+da aplicação, decisão do monitoramento, unidade de produção, todos os
+chips da pecuária, cocho/sal/água, período de Relatórios, filtro de
+atividade do painel, fazenda do plano, fonte da importação, cultura do
+plantio, mês do plano, "Grupo (todas)" da máquina, operações por talhão
+de grãos (`data-opgrao` — cada toque cria um registro que já vira linha
+compacta). Nenhum seletor nativo substituído ("Talhão afetado" das
+pragas segue como está, por escopo). Chips existentes: `.chip` (pílula
+de 46 px, borda 1,5 px `--linha`, fundo `--cartao`; aceso = `--verde`) —
+o componente novo usa a mesma classe.
+
+**Inventário #14 — categorias (já no main desde a v67).** Existe
+`OP_CATEGORIAS` por atividade, ligada à operação pelo id do catálogo
+(`codigoOperacao`, mesma regra do sql/040) — chave substituta, nunca
+texto; letra é atributo. Grãos R/P/D/C/S e pecuária D/S/R/L/P = fase/
+grupo do catálogo; café C/A/T/M/I é **proposta pendente de aprovação do
+Nilo** (docs/catalogos-por-atividade.md) — está no ar desde a v67 porque
+o PR daquela versão foi mergeado; a decisão continua em aberto na lista
+de pendências. Nenhuma categoria é classe de agroquímico. Listas de
+leitura que exibem operações e levam o badge: Diretoria › Faróis ›
+unidade (com janela e sem janela) e boletim enviado (Atividades do café,
+Operações do dia dos grãos, Outros manejos da pecuária). Listas de
+categoria única, sem badge (por desenho): movimentação, sanidade e
+manejo em massa da pecuária; Cadastros › Catálogos (grãos e pecuária já
+listam por fase); resumos de uma linha (casa do gerente e painel);
+apontamento em 3 passos. Legenda: toque no badge mostra o nome por
+2,5 s (um mecanismo só; nenhuma legenda fixa). Sem cor por categoria
+(cor é do farol). `node scripts/gerar_categorias_operacoes.cjs`: ≤ 5,
+letras únicas, toda operação em uma categoria. Nenhum SQL obrigatório
+(sql/046 é espelho opcional, só depois da aprovação do café).
+
+**Inventário #9 — textos do robô-redator (já no main desde a v68).**
+Renderização: `relTextos` → `cartaoTextoLongo(relTextoLongo(l))` em
+Diretoria › Relatórios › "Textos para revisar" e na tela do relatório
+narrativo; texto vem de `relatorios_gerados.texto` (`relCache`, lido do
+Supabase); origem compacta "robô-redator · dd/mm hh:mm" no cartão e
+completa ("Redigido no Supabase por <modelo> em …") só na folha;
+"copiar para WhatsApp" = `relCopiar` sobre o texto integral, funciona
+colapsado; "ver com os números ›" abre `ir("relat")`; o texto NÃO é
+editável e nunca foi (nada gravado pelo app); a folha de tela cheia é
+`abrirFolhaTexto` (`.folha`, fora do `#app`, corpo travado, rolagem
+devolvida ao fechar). "Confira e ajuste antes de mandar" já saiu do
+rodapé; "N unidades · todas para conferir" já implementado. Medida na
+v68 (mantida): cartão colapsado < 1 tela; "Números" visível sem rolar
+com dois textos. Selo "Powered by Netlify": investigado na v68 — não
+está no código nem em `netlify.toml` (o repositório não tem
+`netlify.toml`, `_headers` nem `_redirects`); é injetado pelo Netlify e
+se desliga sem custo em Project configuration › General › "Powered by
+Netlify badge"; decisão do Nilo, sem mexer em plano.
+
+**Verificado (automático, sem rede, 390 × 844, fuso America/Sao_Paulo).**
+- Teste de fumaça com Playwright (fora do repositório) e
+  `scripts/checar-poluicao.cjs`: **367 ✅ · 41 ❌** (os 41 herdados;
+  grupo novo "12. Chips removíveis" com 33 ✅). Café › problemas: vazio
+  0 px `display:none`; 2 toques → "2 problemas selecionados", chips
+  Bomba/Filtro, × 44 × 44 px, `aria-label` "Remover Bomba", 1 linha,
+  página 390 px; toque no corpo → nada; × → "1 problema selecionado",
+  opção apagada, 0 nativo, tela `form`; × de novo → vazio. Café ›
+  setores: 8 de 8 → 6 chips + "+2" (3 linhas), "+2" → 8 chips, × → "7
+  setores selecionados". Grãos › pivô "Não rodou" › 2 problemas → o
+  mesmo. Cadastros › novo combinado › 9 unidades → "9 unidades
+  selecionadas", 6 chips + "+3" (6 linhas, nomes longos), × redesenha a
+  tela e mantém a expansão (8 chips). Trocar o status para "Rodou
+  normal" limpa problemas e o bloco some; recarregar a página repinta a
+  seleção guardada no rascunho. `aria-live="polite"` no contêiner.
+- `scripts/regressao_render.cjs` main × branch (117 telas em 6
+  cenários): fora rodapé v73→v74 e relógio, a única diferença é o
+  `.sel-box` — café: 2 contêineres vazios de `10-form` a `30-mo` e
+  "2 setores selecionados" de `40-irrigacao` a `90-whats-rascunho`;
+  grãos e pecuária: formulário byte a byte igual (o cenário não marca
+  problema de pivô), boletim enviado e localStorage iguais; pós,
+  Diretoria e Cadastros iguais. Café × grãos × pecuária: mesmo
+  componente, mesma função — alterar uma atividade não mudou as outras.
+- `node --check` no JavaScript extraído, no `sw.js` e no script.
+  `perguntar(` 9 chamadas no main e no branch (20 pontos, contagem
+  igual); `confirm(`/`alert(` zero.
+
+**Teste manual (Nilo, no iPhone).** Ver PENDÊNCIAS do ESTADO.md ("Chips
+removíveis (v74)"): × com o polegar no sol (44 px), leitura do
+contador, "+K", e a decisão sobre o cartão do pivô (zona cinzenta da
+regra 7 — por isso o PR ficou aberto, sem merge).
+
+**Não tocado.** Mecanismo de escolha (chips de opção e tratadores),
+apontamento em 3 passos (etapas, ordem, comportamento), seleções únicas,
+`<select>` nativos, telas de leitura, textos do redator, badge, diálogo
+e botões de avanço da v72, Supabase (nenhum SQL, nenhuma RLS), Netlify.
+
 ## 09/09/2026 · v73 · Régua de 7 dias (#19) + auditoria dos estados vazios (#37) e do cabeçalho contextual (#1/#2)
 
 **Entrega.** Lote de três itens num PR, três commits (um por item).
