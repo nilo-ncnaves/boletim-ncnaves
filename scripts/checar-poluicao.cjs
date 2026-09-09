@@ -61,6 +61,15 @@
       da função única (nomeia unidade e dia, sem termo proibido); cabeçalho
       contextual + régua abaixo de 25 % da altura útil; nenhum
       input type=date na tela.
+  12. Chips removíveis da multi-seleção (v74): em toda multi-seleção (café:
+      problemas da irrigação e setores fertirrigados; grãos: problemas do
+      pivô; Cadastros: código combinado) a seleção vazia não desenha nada
+      (nem contador zerado, nem área reservada); ao escolher, aparecem o
+      contador ("N … selecionados") e um chip por item com × à direita
+      (44 × 44 px, rótulo acessível "Remover <nome>"), quebrando em linhas
+      sem rolar de lado; mais de 6 itens → 6 + "+K" que expande; o × remove
+      na hora sem confirmação, sem nativo e sem sair da tela; o toque no
+      corpo do chip não faz nada; remover o último volta ao vazio.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -369,6 +378,40 @@ async function novaPagina(browser, base, acesso, sessao) {
 }
 const gerente = (fz, atv) => ({ userId: 'u1', papel: 'gerente', nome: 'Gerente', atividade: atv, fazendaId: fz });
 
+/* v74: chips removíveis da multi-seleção — `attr` é o data-* dos chips de opção; `opcoes` são os seletores a tocar.
+   Cada toque é um passo separado com espera: a repintura roda um tique depois do toque e, em Cadastros, a tela inteira
+   redesenha a cada toque — por isso tudo é consultado de novo no DOM a cada passo. */
+const SEL_ESTADO = attr => {
+  const box = document.querySelector('.sel-box[data-sel-de="' + attr + '"]'); if (!box) return { existe: false };
+  const chips = [...box.querySelectorAll('.chip.sel')], xs = [...box.querySelectorAll('.sel-x')], mais = box.querySelector('.sel-mais'), lista = box.querySelector('.sel-chips');
+  return { existe: true, vazio: !box.innerHTML, altura: +box.getBoundingClientRect().height.toFixed(1), display: getComputedStyle(box).display, cont: ((box.querySelector('.sel-cont') || {}).textContent || '').trim(),
+    chips: chips.map(c => c.querySelector('.sel-rot').textContent.trim()), n: chips.length, mais: mais ? mais.textContent.trim() : null,
+    xMin: xs.length ? +Math.min(...xs.map(x => Math.min(x.getBoundingClientRect().width, x.getBoundingClientRect().height))).toFixed(1) : null,
+    aria: xs.map(x => x.getAttribute('aria-label') || ''), scrollW: document.documentElement.scrollWidth, wrap: lista ? getComputedStyle(lista).flexWrap : '',
+    rolaLado: lista ? lista.scrollWidth > lista.clientWidth + 1 : false, linhas: new Set(chips.map(c => Math.round(c.getBoundingClientRect().top))).size,
+    vermelho: xs.some(x => /181, 67, 46/.test(getComputedStyle(x).color)), sombra: getComputedStyle(box).boxShadow !== 'none' || chips.some(c => getComputedStyle(c).boxShadow !== 'none'),
+    gradiente: chips.some(c => /gradient/.test(getComputedStyle(c).backgroundImage)), primeiroX: xs.length ? xs[0].dataset.selRm : null, tela: telaAtual, nativos: window.__nativos };
+};
+async function medirSelecao(page, attr, opcoes) {
+  const est = () => page.evaluate(SEL_ESTADO, attr);
+  const toca = async sel => { const ok = await page.evaluate(s => { const el = document.querySelector(s); if (el) el.click(); return !!el; }, sel); await page.waitForTimeout(120); return ok; };
+  const r = { antes: await est() };
+  if (!r.antes.existe) return { existe: false };
+  r.existe = true; r.tela = r.antes.tela; r.nat0 = r.antes.nativos; r.k = 0;
+  for (const sel of opcoes) if (await toca(sel)) r.k++;
+  r.depois = await est();
+  await toca('.sel-box[data-sel-de="' + attr + '"] .sel-rot');           /* corpo do chip: nada acontece */
+  r.corpo = await est(); r.corpoTela = r.corpo.tela;
+  if (r.depois.mais) { await toca('.sel-box[data-sel-de="' + attr + '"] .sel-mais'); r.expandido = await est(); }
+  const val = (r.expandido || r.corpo).primeiroX; const alvoVal = val ? val.slice(attr.length + 1) : null;
+  await toca('.sel-box[data-sel-de="' + attr + '"] .sel-x');              /* × do primeiro */
+  r.removeu = { est: await est(), opcaoOn: await page.evaluate(([a, v]) => { const o = v === null ? null : document.querySelector('.chip[data-' + a + '="' + CSS.escape(v) + '"]'); return o ? o.classList.contains('on') : null; }, [attr, alvoVal]) };
+  r.removeu.tela = r.removeu.est.tela; r.removeu.nativos = r.removeu.est.nativos - r.nat0;
+  let guarda = 40; while (guarda-- && await page.evaluate(a => !!document.querySelector('.sel-box[data-sel-de="' + a + '"] .sel-x'), attr)) await toca('.sel-box[data-sel-de="' + attr + '"] .sel-x');
+  r.fim = await est(); r.fimTela = r.fim.tela; r.nativos = r.fim.nativos - r.nat0;
+  return r;
+}
+
 /* v72: validação silenciosa do botão de avanço + diálogo único do "Descartar" (quando houver) */
 async function medirDecisao(page, btSel, gatilhoSel, descartarSel) {
   const r = await page.evaluate(sel => {
@@ -492,6 +535,23 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   form.termosProprios = acharTermos(form.texto, termos[atv]).length;
   form.erros = erros.slice();
   form.acoesOffForm = await page.evaluate(() => document.querySelectorAll('#app .acao-off[data-papel]').length);
+  /* v74: chips removíveis das multi-seleções do boletim (café: problemas da irrigação e setores fertirrigados; grãos:
+     problemas do pivô — precisa de um pivô lançado com "Não rodou"; pecuária: não tem multi-seleção — nada a medir) */
+  form.selecoes = [];
+  await page.evaluate(() => document.querySelectorAll('#app details').forEach(d => { d.open = true; }));
+  if (atv === 'CAFE') {
+    await page.evaluate(() => { const b = document.querySelector('[data-irrst="Rodou com problema"]'); if (b) b.click(); }); await page.waitForTimeout(100);
+    form.selecoes.push(Object.assign({ nome: 'Irrigação › Qual foi o problema? (2 de 8)' }, await medirSelecao(page, 'irrpb', ['[data-irrpb="Bomba"]', '[data-irrpb="Filtro"]'])));
+    await page.evaluate(() => { const b = document.querySelector('[data-irrft="Sim"]'); if (b) b.click(); }); await page.waitForTimeout(100);
+    const setores = await page.evaluate(() => [...document.querySelectorAll('[data-irrfsec]')].map(c => '[data-irrfsec="' + c.dataset.irrfsec + '"]'));
+    form.selecoes.push(Object.assign({ nome: `Irrigação › Fertirrigação › Em quais setores? (${setores.length} de ${setores.length})` }, await medirSelecao(page, 'irrfsec', setores)));
+  }
+  if (atv === 'GRAOS') {
+    await page.evaluate(() => { const b = [...document.querySelectorAll('#app details.secao button')].find(x => /todos os piv/i.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(300);
+    await page.evaluate(() => { const s = document.querySelector('[data-igst$="|Não rodou"]'); if (s) s.click(); }); await page.waitForTimeout(200);
+    const probs = await page.evaluate(() => [...document.querySelectorAll('[data-igpb]')].slice(0, 2).map(c => '[data-igpb="' + c.dataset.igpb.replace(/"/g, '\\"') + '"]'));
+    form.selecoes.push(Object.assign({ nome: 'Irrigação (pivôs) › Qual foi o problema? (2 de 6)' }, await medirSelecao(page, 'igpb', probs)));
+  }
   R.telas.push(casa, form);
   /* v71: boletim enviado visto pelo gerente — "Marcar como visto" (ação da Diretoria) aparece desabilitado */
   await page.evaluate(f => {
@@ -636,6 +696,13 @@ async function cenarioCadastros(browser, base, R) {
   }
   await page.evaluate(() => ir('importar')); await page.waitForTimeout(250);
   R.telas.push(await medirTela(page, 'Escritório › Importar telemetria', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  /* v74: chips removíveis na multi-seleção de Cadastros › Códigos › novo combinado (9 unidades → 6 + "+3"; a tela redesenha a cada toque) */
+  await page.evaluate(() => { cadNav = [{ v: 'menu' }, { v: 'codigos' }, { v: 'codigonovo' }]; novoCombo = { ativs: [], unis: [] }; ir('cadastros'); }); await page.waitForTimeout(250);
+  const unis = await page.evaluate(() => D.fazendas.slice(0, 9).map(f => '[data-combo-uni="' + f.id + '"]'));
+  const combo = await medirSelecao(page, 'combo-uni', unis);
+  combo.nome = 'Unidades avulsas (9 de ' + await page.evaluate(() => D.fazendas.length) + ')';
+  const cadTela = R.telas.find(t => t.nome === 'Cadastros › Códigos › novo combinado');
+  if (cadTela) cadTela.selecoes = [combo];
   R.errosCadastros = erros.slice();
   await ctx.close();
 }
@@ -772,6 +839,28 @@ function avaliar(R) {
       add(g, `${nome} — toque em ontem troca o dia sem teclado nem seletor nativo, sem sair da tela; hoje continua marcado`, !!r.depois && r.depois.on === r.ordem[1] && r.depois.hojeAindaMarcado && r.depois.hojeBarra === '3px' && !r.depois.temInputDate && r.depois.foco !== 'INPUT' && r.depois.tela === 'casa' && r.depois.nativos === 0 && r.voltou, r.depois ? `escolhido ${r.depois.on}; tela ${r.depois.tela}; ${r.depois.nativos} nativo(s); volta a hoje ${r.voltou ? 'ok' : 'falhou'}` : '');
       add(g, `${nome} — dia sem registro cai no vazio da função única: nomeia unidade e dia, sem termo proibido`, !!r.depois && r.depois.nomeiaDia && !r.depois.proibido && /^Sem /.test(r.depois.texto), r.depois ? `"${r.depois.texto.slice(0, 90)}"` : '');
       add(g, `${nome} — cabeçalho contextual + régua abaixo de 25 % da altura útil; nenhum input type=date`, r.pct <= 25 && r.inputsDate === 0, `${r.conjunto} px = ${r.pct} % de ${VP.height} px; ${r.inputsDate} input date`);
+    });
+  }
+  /* 12. chips removíveis da multi-seleção (v74) */
+  {
+    const g = '12. Chips removíveis: vazio sem área, contador + chips, × de 44 px remove na hora, quebra sem rolar, +K expande';
+    R.telas.filter(t => t.selecoes).forEach(t => {
+      const tela = t.nome.split(' — ')[0];
+      if (!t.selecoes.length) { add(g, `${tela} — sem multi-seleção nesta atividade: nada a medir`, true, 'pecuária escolhe um valor por campo'); return; }
+      t.selecoes.forEach(s => {
+        const nome = `${tela} › ${s.nome}`;
+        if (!s.existe) { add(g, `${nome} — componente presente`, false, 'sem .sel-box'); return; }
+        const A = s.antes, D = s.depois, F = s.fim, X = s.removeu, k = s.k, vis = Math.min(k, 6);
+        add(g, `${nome} — seleção vazia não desenha nada (nem contador zerado, nem área reservada)`, A.vazio && A.altura === 0 && A.display === 'none', `${A.altura} px; display ${A.display}`);
+        add(g, `${nome} — contador "${k} … selecionad…" e um chip por item, rótulo + × à direita`, new RegExp('^' + k + ' .*selecionad[oa]s?$').test(D.cont) && D.n === vis && D.aria.every(a => /^Remover .+/.test(a)), `"${D.cont}"; ${D.n} chip(s): ${D.chips.slice(0, 4).join(', ')}${D.n > 4 ? ' …' : ''}`);
+        add(g, `${nome} — × com 44 × 44 px, rótulo acessível "Remover <nome>", sem vermelho`, D.xMin >= TOQUE_MIN && D.aria.length === D.n && !D.vermelho, `× ${D.xMin} px; aria "${D.aria[0] || ''}"`);
+        add(g, `${nome} — quebra em linhas, sem rolar de lado; sem sombra nem gradiente`, D.wrap === 'wrap' && !D.rolaLado && D.scrollW <= VP.width && !D.sombra && !D.gradiente, `${D.linhas} linha(s); página ${D.scrollW} px de largura`);
+        if (k > 6) add(g, `${nome} — mais de 6 itens: 6 chips + "+${k - 6}", que expande para todos`, D.mais === '+' + (k - 6) && !!s.expandido && s.expandido.n === k && !s.expandido.mais, `"${D.mais}" → ${s.expandido ? s.expandido.n : '?'} chips`);
+        else add(g, `${nome} — até 6 itens: todos os chips, sem "+K"`, D.mais === null, D.mais ? `"${D.mais}"` : '');
+        add(g, `${nome} — toque no corpo do chip não faz nada`, s.corpo.n === D.n && s.corpo.cont === D.cont && s.corpoTela === s.tela, `${s.corpo.n} chip(s) depois; tela ${s.corpoTela}`);
+        add(g, `${nome} — × remove na hora: sem confirmação, sem nativo, sem sair da tela; a opção apaga`, X.est.n === k - 1 && X.opcaoOn === false && X.nativos === 0 && X.tela === s.tela, `${X.est.n} chip(s); "${X.est.cont}"; opção ${X.opcaoOn ? 'ainda acesa' : 'apagada'}; ${X.nativos} nativo(s); tela ${X.tela}`);
+        add(g, `${nome} — remover o último volta ao vazio (estado válido, nenhum aviso)`, F.vazio && F.altura === 0 && s.nativos === 0 && s.fimTela === s.tela, `${F.altura} px; ${s.nativos} nativo(s)`);
+      });
     });
   }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */

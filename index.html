@@ -220,6 +220,19 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .op-cat{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:6px;vertical-align:-4px;background:var(--linha);color:var(--tinta);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;font-weight:700;line-height:1;flex:none;position:relative;cursor:pointer;-webkit-user-select:none;user-select:none}
 .op-cat::before{content:"";position:absolute;inset:-12px}
 .op-cat.mostra::after{content:attr(data-nome);position:absolute;left:0;bottom:calc(100% + 4px);background:var(--tinta);color:var(--papel);font:600 .78rem/1.2 system-ui,-apple-system,sans-serif;padding:5px 8px;white-space:nowrap;z-index:8;letter-spacing:0;text-transform:none}
+/* v74: chips removíveis da multi-seleção — componente ÚNICO chipsSelecao()/pintarSelecoes(). Mesma família dos chips
+   de opção (.chip), rótulo + × à direita. O × é o único alvo: 44 × 44 px por si (margens negativas — não cresce o
+   chip); o corpo não faz nada. Vazio = contêiner sem conteúdo, nada desenhado. Quebra em linhas (flex-wrap do .chips),
+   nunca rola de lado. Sem cor nova: a seleção já é o verde do chip de opção; aqui só o neutro do chip. */
+.sel-box:empty{display:none}
+.sel-box{margin:0 0 10px}
+.cad-item>.sel-box{width:100%}
+.sel-cont{margin:0 0 6px;font-size:.78rem;font-weight:700;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.chip.sel{display:inline-flex;align-items:center;gap:2px;padding-right:0;cursor:default;max-width:100%}
+.chip.sel .sel-rot{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-x{flex:none;width:44px;min-height:44px;margin:-10px 0;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;line-height:1;color:var(--tinta-2)}
+.sel-x:active{color:var(--tinta)}
+.chip.sel-mais{color:var(--tinta-2);font-variant-numeric:tabular-nums}
 .cad-foco{outline:2px solid var(--verde);outline-offset:-2px}
 .cad-grupo{position:sticky;top:62px;z-index:5;background:var(--papel);font-size:.76rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-2);padding:12px 0 6px;margin-top:6px}
 .cad-rodape{position:sticky;bottom:0;z-index:6;background:var(--papel);padding:10px 0 calc(10px + env(safe-area-inset-bottom));margin-top:12px;border-top:1px solid var(--linha)}
@@ -2543,6 +2556,36 @@ function atualizarAvanco(id, falta){
   else { b.classList.remove("acao-off","mostra","dir"); b.removeAttribute("aria-disabled"); b.removeAttribute("data-falta"); b.removeAttribute("title"); b.removeAttribute("aria-label"); }
 }
 
+/* ---------- Chips removíveis da multi-seleção (v74) — componente ÚNICO ----------
+   chipsSelecao(attr, {um, varios}) devolve o contêiner (vazio) que pintarSelecoes() preenche a partir do estado `.on`
+   dos chips de opção com data-<attr> do MESMO bloco (o pai do contêiner): contador ("3 setores selecionados" — o
+   substantivo vem de quem chama, por tela, nunca por atividade) e, abaixo, um chip por item escolhido, rótulo + ×
+   à direita. O × dispara o toque do chip de opção correspondente — a remoção reaproveita o tratador que já existe
+   (nenhum mecanismo novo de escolha), é imediata e sem confirmação (reversível num toque: basta tocar a opção de
+   novo). O corpo do chip não faz nada: a lista de opções está logo abaixo, no mesmo bloco, então "abrir a lista" não
+   teria o que abrir, e um alvo só evita remover o item errado com o polegar. Mais de SEL_MAX itens: os SEL_MAX
+   primeiros + um chip "+K" que expande (a expansão vive só na memória e some quando a seleção cai). Seleção vazia:
+   nada desenhado (nem contador zerado, nem área reservada). Ordem: a do catálogo/cadastro (a mesma da lista de
+   opções). Rótulos: os do chip de opção, que quem chama já desenha pelo cadastro por id. Mesmo componente nas três
+   atividades e em Cadastros; nunca uma variante; seleção única não recebe chip. */
+const SEL_MAX=6;
+const selExpandido=new Set();
+function chipsSelecao(attr,o){
+  return `<div class="sel-box" data-sel-de="${esc(attr)}" data-sel-um="${esc(o.um)}" data-sel-varios="${esc(o.varios)}" aria-live="polite"></div>`;
+}
+function pintarSelecoes(raiz){
+  (raiz||document).querySelectorAll(".sel-box[data-sel-de]").forEach(box=>{
+    const attr=box.dataset.selDe, pai=box.parentElement; if(!pai) return;
+    const ons=[...pai.querySelectorAll(".chip.on[data-"+attr+"]")];
+    if(!ons.length){ if(box.innerHTML) box.innerHTML=""; selExpandido.delete(attr); return; }
+    const n=ons.length, vis=selExpandido.has(attr)?ons:ons.slice(0,SEL_MAX), resto=n-vis.length;
+    const chip=b=>{ const rot=b.textContent.trim().replace(/\s+/g," ");
+      return `<span class="chip sel"><span class="sel-rot">${esc(rot)}</span><button type="button" class="sel-x" data-sel-rm="${esc(attr)}|${esc(b.getAttribute("data-"+attr))}" aria-label="Remover ${esc(rot)}" title="Remover ${esc(rot)}">×</button></span>`; };
+    box.innerHTML=`<p class="sel-cont">${n} ${esc(n===1?box.dataset.selUm:box.dataset.selVarios)}</p>
+      <div class="chips sel-chips">${vis.map(chip).join("")}${resto>0?`<button type="button" class="chip sel-mais" data-sel-mais="${esc(attr)}" aria-label="Mostrar mais ${resto}" title="Mostrar mais ${resto}">+${resto}</button>`:""}</div>`;
+  });
+}
+
 /* texto redigido pelo robô-redator (fase 2): sempre com o marcador de revisão. v68: cartão colapsado pelo
    componente único cartaoTextoLongo (prévia + copiar sem expandir; leitura completa na folha). Origem curta
    "robô-redator · dd/mm hh:mm" no cartão; a completa (modelo, Supabase) só na folha. Texto SÓ leitura: o
@@ -3220,6 +3263,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="ajuda") app.innerHTML = vAjuda();
   ligarEventos(tela, arg);
   ajustarTextosLongos();   /* v68: prévia dos textos longos (reticências e "ler texto completo" só se transbordar) */
+  pintarSelecoes();        /* v74: chips removíveis das multi-seleções, a partir do estado dos chips de opção */
 }
 
 /* ---------- Tela: código de acesso ---------- */
@@ -3867,6 +3911,7 @@ function cardIrg(r,e){
     <div class="chips mt"><button class="chip ${e.quimi==="Sim"?"on":""}" data-igqm="${esc(e.id)}">🧪 Quimigação / fertirrigação</button></div>
     ${e.quimi==="Sim"?linhasProdutos(e.quimiProdutos||[],"igp")+`<button class="btn suave mini mt" data-igp-add="${esc(e.id)}">＋ produto</button>`:""}`:""}
     ${prob?`<label class="mt">Qual foi o problema?</label>
+      ${chipsSelecao("igpb",{um:"problema selecionado",varios:"problemas selecionados"})}
       <div class="chips">${["Energia","Bomba","Torre / roda","Vazamento","Painel / automação","Outro"].map(p2=>`<button class="chip ${(e.problemas||[]).includes(p2)?"on":""}" data-igpb="${esc(e.id)}|${p2}">${p2}</button>`).join("")}</div>
       <input data-ig="obs" value="${esc(e.obs||"")}" placeholder="Detalhe rápido (opcional)" style="margin-top:8px">`:""}
   </div>`;
@@ -3892,6 +3937,7 @@ function repintarIrg(r){
   const el=$("#lista-irg"); if(!el) return;
   migrarIrg(r);
   el.innerHTML=(r.irg||[]).map(e=>cardIrg(r,e)).join("");
+  pintarSelecoes(el);   /* v74 */
   const topo=$("#topo-irg"); if(topo) topo.innerHTML=topoIrgHtml(r);
   const s=$("#res-irg");
   if(s){ const n=(r.irg||[]).filter(e=>e.status).length; s.textContent=n?n+" pivô"+(n>1?"s":"")+" lançado"+(n>1?"s":""):""; }
@@ -4234,6 +4280,7 @@ function vForm(){
       <div class="chips">${["Rodou normal","Rodou com problema","Não rodou","Dia sem irrigação"].map(s=>`<button class="chip ${(r.irr&&r.irr.status)===s?"on":""}" data-irrst="${s}">${s}</button>`).join("")}</div>
       <div data-irrpb-box style="${r.irr&&(r.irr.status==="Rodou com problema"||r.irr.status==="Não rodou")?"":"display:none"}">
         <label>Qual foi o problema? (toque)</label>
+        ${chipsSelecao("irrpb",{um:"problema selecionado",varios:"problemas selecionados"})}
         <div class="chips">${["Entupimento de gotejadores","Vazamento na linha","Bomba","Injetor de adubo","Falta de energia","Filtro","Painel/automação","Outro"].map(p=>`<button class="chip ${r.irr&&(r.irr.problemas||[]).includes(p)?"on":""}" data-irrpb="${p}">${p}</button>`).join("")}</div>
       </div>
       <label>Como está a água na captação? (piscinão / represa / córrego)</label>
@@ -4242,6 +4289,7 @@ function vForm(){
       <div class="chips"><button class="chip ${r.irr&&r.irr.fert==="Sim"?"on":""}" data-irrft="Sim">Sim, fez fertirrigação</button></div>
       <div data-fertbox style="${r.irr&&r.irr.fert==="Sim"?"":"display:none"}">
         <label>Em quais setores? (toque)</label>
+        ${chipsSelecao("irrfsec",{um:"setor selecionado",varios:"setores selecionados"})}
         <div class="chips">${talhoesDa(r.fazendaId).map(t=>`<button class="chip ${r.irr&&(r.irr.fertSetores||[]).includes(t.id)?"on":""}" data-irrfsec="${t.id}">${esc(t.nome)}</button>`).join("")}</div>
         <label>Receita do tanque ${(D.ultimasFert||{})[r.fazendaId]?`<button class="btn suave mini" style="display:inline-flex;margin-left:6px" data-ufert="1">⚡ usar a última</button>`:""}</label>
         <textarea data-irr="fertReceita" rows="2" placeholder="Como manda no grupo — ex.: 200kg MAP + 150kg KCl no tanque de 5.000 L, 2 tanques" style="width:100%;margin-top:6px">${esc(r.irr?r.irr.fertReceita||"":"")}</textarea>
@@ -5024,7 +5072,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v73";
+const APP_VERSAO="v74";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5197,6 +5245,7 @@ function cadVFazenda(id){
     </div>
     ${temCultura(f.id,"CAFE")?`<div class="cartao"><h3>Estrutura de pós-colheita</h3>
       <p class="mut" style="font-size:.78rem">Marque o que esta fazenda tem: decide para onde o café colhido pode ser enviado.</p>
+      ${chipsSelecao("estr",{um:"item selecionado",varios:"itens selecionados"})}
       <div class="chips mt">${ESTR_ITENS.map(([k,r])=>`<button class="chip ${estruturaDe(f.id)[k]?"on":""}" data-estr="${f.id}:${k}">${r}</button>`).join("")}</div></div>`:""}
     ${cadItem("codigo",f.id,"Código de acesso","código "+esc(codigoDe(f.id)||"—")+" · só esta unidade")}
     ${cadItem("talhoes",f.nome,"Talhões desta unidade",nt+" talhões · toque para ver a lista")}
@@ -5383,8 +5432,10 @@ function cadVCodigoNovo(){
     <div class="cartao">
       <p class="mut" style="font-size:.78rem">Marque atividades inteiras (pegam as unidades futuras sozinhas) e/ou unidades avulsas. O código criado abre exatamente essa combinação.</p>
       <label>Atividades inteiras</label>
+      ${chipsSelecao("combo-atv",{um:"atividade selecionada",varios:"atividades selecionadas"})}
       <div class="chips">${ATIVIDADES.map(([k,em,r])=>`<button class="chip ${fm.ativs.includes(k)?"on":""}" data-combo-atv="${k}">${em} ${r}</button>`).join("")}</div>
       <label>Unidades avulsas</label>
+      ${chipsSelecao("combo-uni",{um:"unidade selecionada",varios:"unidades selecionadas"})}
       <div class="chips">${D.fazendas.map(f=>`<button class="chip ${fm.unis.includes(f.id)?"on":""}" data-combo-uni="${f.id}">${esc(f.nome)}</button>`).join("")}</div>
       ${gerado?`<div class="aviso verde mt"><b>Código criado: <span class="num">${esc(gerado)}</span></b><br><span class="mut">Anote e repasse. Ele já aparece na lista de códigos.</span></div>`:""}
     </div>
@@ -5429,7 +5480,7 @@ function cadVMaquinas(){
       <span class="cresce"><b>${esc(m.nome)}</b><span class="mut">${esc(m.cat||"")}</span></span>
       <button class="btn suave mini" data-vinc-abrir="${m.id}">${(m.fazendas||[]).length?"🔗 ":""}${esc(rotuloVinc(m))} ▾</button>
       ${cadConfirmar("rm-maq:"+m.id,"remover","Remover a máquina "+esc(rotuloMaq(m))+" do cadastro, mantendo o nome nos boletins antigos?")}
-      ${vincAberto===m.id?`<div class="chips mt" style="width:100%"><button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
+      ${vincAberto===m.id?`${chipsSelecao("vinc-faz",{um:"fazenda selecionada",varios:"fazendas selecionadas"})}<div class="chips mt" style="width:100%"><button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
         ${D.fazendas.map(f=>`<button class="chip ${(m.fazendas||[]).includes(f.id)?"on":""}" data-vinc-faz="${m.id}:${f.id}">${esc(f.nome)}</button>`).join("")}</div>`:""}</div>`).join("")+
     (maqs.length?"":htmlEstado("vazio",{que:q?"máquina":"máquina cadastrada",filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="maquina">＋ Nova máquina</button>`);
@@ -6491,6 +6542,16 @@ function ligarEventos(tela){
     app.querySelectorAll(".acao-off.mostra").forEach(x=>{ if(x!==off) x.classList.remove("mostra","dir"); });
     if(off){ const on=off.classList.toggle("mostra"); off.classList.toggle("dir", on && off.getBoundingClientRect().left>innerWidth/2);
       if(on) setTimeout(()=>off.classList.remove("mostra","dir"),2500); return; }
+    /* v74: chips removíveis da multi-seleção — o × dispara o toque do chip de opção correspondente (o tratador que já
+       existe faz a remoção e grava); "+K" só expande a lista. Qualquer toque em chip repinta os contadores depois. */
+    const rm=ev.target.closest("[data-sel-rm]");
+    if(rm){ const v=rm.dataset.selRm, k=v.indexOf("|"), attr=v.slice(0,k), val=v.slice(k+1), box=rm.closest(".sel-box"), pai=box&&box.parentElement;
+      const alvo=pai&&pai.querySelector('.chip.on[data-'+attr+'="'+CSS.escape(val)+'"]');
+      if(alvo) alvo.click();
+      pintarSelecoes(); return; }
+    const mais=ev.target.closest("[data-sel-mais]");
+    if(mais){ selExpandido.add(mais.dataset.selMais); pintarSelecoes(); return; }
+    if(ev.target.closest(".chip")) setTimeout(pintarSelecoes,0);
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
     if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
