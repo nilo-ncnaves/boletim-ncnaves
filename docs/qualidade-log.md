@@ -6,6 +6,127 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 09/09/2026 · v73 · Régua de 7 dias (#19) + auditoria dos estados vazios (#37) e do cabeçalho contextual (#1/#2)
+
+**Entrega.** Lote de três itens num PR, três commits (um por item).
+(1) **#37** — já existia no main desde a v61/v65 (`htmlEstado` /
+`fraseVazio`): auditado contra os critérios do lote, sem mudança de
+texto de tela; corrigido o comentário da função (dizia que o café
+mantinha os textos antigos) e acrescentadas as regras 9 (vazio por dia)
+e 10 (inventário no PR) ao item 6 da definição de pronto. (2) **#1/#2**
+— já existia no main desde a v66 (`cabecalhoContexto`): auditado e
+medido de novo; orçamento conjunto com a régua escrito em CLAUDE.md c5
+e no item 8.3. (3) **#19** — componente único `reguaDias` /
+`diaRegua` / `cartaoDiaRegua` + `hojeBRT` + catálogo `DIAS_SEMANA`;
+casa do gerente (três atividades) e casa do pós-colheita; CSS `.regua`.
+Versão v73 no rodapé e no cache. Nenhum SQL, nenhum campo novo, nenhum
+texto prescritivo, apontamento em 3 passos intocado.
+
+**Inventário de estados vazios (#37, index.html v73, por tela).** Todos
+passam por `htmlEstado`/`fraseVazio`; C/E/V = distingue carregando /
+erro / vazio (só as telas que leem da rede têm C e E; as demais leem do
+aparelho e só têm V — o dado ou está no aparelho ou não está):
+- Casa do gerente (☕🌾🐂): "Últimos boletins" → "Sem boletim registrado
+  em <unidade>. Os boletins aparecem aqui depois do primeiro envio."
+  (V); **novo na v73:** cartão do dia escolhido na régua → "Sem boletim
+  registrado em <unidade> em dd/mm/aaaa." (V). Recorte: unidade, dia.
+- Casa do pós-colheita (☕): "Últimos registros" → "Sem registro de
+  pós-colheita em <unidade>. …" (V); **novo na v73:** dia escolhido →
+  "Sem registro de pós-colheita em <unidade> em dd/mm/aaaa." (V).
+- Escolha de unidade: "Sem unidade de <atividade> liberada para este
+  código." (V).
+- Boletim (formulário): Talhões e ciclos → "Sem talhão de grãos
+  cadastrado em <unidade>."; Irrigação por pivô → "Sem pivô cadastrado em
+  <unidade>. Cadastre abaixo…" (V; listas de lançamento ficam só com o
+  "＋", padrão a).
+- Painel da Diretoria: lista de boletins → nomeia atividade, unidade,
+  operação, busca e período + "Último registro há N dias" (V, com
+  "limpar filtros"); cartão da unidade → "Sem boletim registrado em
+  <unidade>…" (V); Café em trânsito → "Sem carga de café aguardando
+  confirmação do destino." (V). Rótulos de situação "Ainda sem boletim
+  hoje" / "Boletim de hoje pendente" / "Registro de hoje pendente" não
+  são vazios de lista (decisão pendente do Nilo desde a v61).
+- Resumo do período e tabelas dos relatórios → "Sem boletim … de dd/mm
+  a dd/mm/aaaa." / "Sem registro neste período." (V).
+- Relatórios (Diretoria): C "Carregando relatórios…", E "Não foi
+  possível carregar os relatórios." + Tentar de novo, V "Sem texto do
+  redator para revisar…", "Sem relatório calculado com <período>",
+  "Sem relatório calculado para as unidades deste código…"; tela do
+  relatório → "Sem relatório calculado para <período> em <unidade> /
+  nas unidades deste código." (V); "Relatório não encontrado." é erro de
+  endereço, não vazio.
+- Faróis de registro: C "Carregando faróis…", E "Não foi possível
+  carregar os faróis." + Tentar de novo, V "Sem farol baixado para as
+  unidades deste código…", "Sem operação com janela nas unidades deste
+  código." / "… em <unidade>."
+- Escritório › Unidades e Plano: C "Carregando o plano de safra…", E
+  "Não foi possível carregar o plano de safra." + motivo + Tentar de
+  novo, V "Sem fazenda com plano de safra cadastrada." / "Sem versão do
+  plano para <fazenda>." / "Sem unidade do plano em <fazenda>."
+- Cadastros (15 listas/buscas): "Sem resultado em Cadastros com
+  \"<busca>\"", "Sem unidade com …", "Sem talhão, pivô ou pasto …", "Sem
+  talhão de grãos …", "Sem ciclo encerrado em <talhão>…", "Sem unidade de
+  pecuária cadastrada.", "Sem inventário registrado para <unidade>…",
+  "Sem ajuste de inventário registrado para <unidade>.", "Sem plano
+  vigente baixado para <unidade>…", "Sem unidade do plano em <unidade>
+  com …", "Sem código de acesso com …", "Sem termo no catálogo de <atv>
+  com …", "Sem máquina cadastrada …", "Sem insumo cadastrado …", "Sem
+  importação manual feita neste aparelho."; Integrações e robôs → "Sem
+  estado de robô baixado neste aparelho…" (V).
+- Cartões que somem sem dado, por desenho (não são vazio): Solinftec,
+  iCrop, Meus relatórios, cargas a receber, avisos dos robôs.
+`git grep` por "não fez|não realizou|pendente|atrasad|faltou|esqueceu"
+no que foi tocado: nada novo (os rótulos "pendente" das casas e o
+"pendente" do relatório de rebanho são os herdados listados na v61).
+
+**Verificado (automático, sem rede, 390 × 844, fuso America/Sao_Paulo).**
+- Medição com Playwright (script de apoio, fora do repositório) na casa
+  de café (f23), grãos (f33), pecuária (f26) e pós (f23): cabeçalho 64 +
+  19,4 = 83,4 px expandido (9,9 % de 844; 11,9 % de 700), 64 px
+  colapsado; régua em y = 100,4 px, 48 px de altura, 362 px de largura,
+  7 células de 48,3 × 48 px (raio 0, sombra nenhuma), conjunto até
+  148,4 px = 17,6 % de 844 (21,2 % de 700 px úteis); pós 145,4 px
+  (17,2 %); primeiro cartão em 160,4 px; `scrollWidth` 390 (sem rolar de
+  lado); zero `input type=date`; ordem 09/09 › 03/09 (nenhum futuro);
+  rótulos "qua ter seg dom sáb sex qui"; `aria-label` "quarta-feira,
+  09/09, hoje"; toque em ontem → selecionado 08/09, hoje segue com a
+  barra verde de 3 px, foco no BODY (nenhum teclado), `scrollY` 0, texto
+  "Sem boletim registrado em Vereda Romaria em 08/09/2026." / "…
+  Floramill …" / "… Água Santa …" / "Sem registro de pós-colheita em
+  Vereda Romaria em 08/09/2026."; virada de dia simulada (reguaVista.hoje
+  antigo + `visibilitychange`) → régua volta para o hoje novo; toque em
+  hoje → "Boletim de hoje pendente" (tela de sempre); zero erros de
+  página.
+- `scripts/checar-poluicao.cjs`: **334 ✅ · 41 ❌** (os 41 herdados;
+  grupo novo "11. Régua de 7 dias" com 24 ✅; a casa do pós-colheita
+  passou a ser medida: 1 tela, ✅). Nenhum ❌ novo: as duas linhas de
+  P10 em "Gerente (casa)" só listam mais exemplos do CSS-base por causa
+  da casa do pós; nenhum elemento `.regua` aparece em raio, sombra ou
+  toque.
+- `scripts/regressao_render.cjs` main × branch (74 telas): diferença
+  SÓ o bloco `.regua` em `00-inicio` e `95-enviado` das três atividades
+  e em `00-inicio` do pós (mesmo componente, mesmos atributos);
+  formulário em 3 passos (10–90), boletim enviado (96), WhatsApp,
+  Diretoria e Cadastros byte a byte iguais (fora o rodapé v72→v73 e o
+  relógio "Enviado às"). Passos novos `05-regua-ontem` (vazio do dia) e
+  `06-regua-hoje` (volta) nos quatro cenários. Café × grãos × pecuária:
+  o mesmo diff — alterar uma atividade não mudou as outras.
+- `node --check` no JavaScript extraído, no `sw.js` e nos dois scripts.
+  Versão v73 no rodapé e no cache.
+
+**Teste manual (Nilo, no iPhone).** Ver PENDÊNCIAS do ESTADO.md
+("Régua de 7 dias (v73)"): régua nas casas, toque em ontem, barra do
+hoje, virada de dia, tamanho das células com luva. Decisões: régua
+também no boletim enviado?; manter os `input type=date` de período do
+painel da Diretoria?; rótulos "… de hoje pendente" (desde a v61).
+
+**Não tocado.** Tela de apontamento em 3 passos, formulário do
+pós-colheita, home das abas, escolha de unidade, boletim enviado,
+painel/Relatórios/Faróis/Resumo da Diretoria, Cadastros, carimbo de
+origem (segue no rodapé dos blocos), Supabase (nenhum SQL, nenhuma
+RLS), `vw_dias_sem_registro` (não usada na régua: o vazio do dia nomeia
+só unidade e dia).
+
 ## 09/09/2026 · v72 · Decisão e confirmação: diálogo único, validação silenciosa, verbo no botão (#30, #31, #43)
 
 **Entrega.** Componentes únicos no `index.html`: `perguntar(o)` (diálogo

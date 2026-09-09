@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v72** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v73** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -669,8 +669,10 @@ espaço.
   sticky; volta ao rolar para o topo; nada muda de altura (sem salto).
   Medido a 390 × 844: 64 + 19 = 83 px expandido (9,9 %; 11,9 % de 700
   px úteis), 64 px colapsado (7,6 %; piso dos botões "‹"/"⇥" de 40 px).
-- Não há régua de 7 dias (#19) no repositório; o carimbo de origem de
-  dado (#3) segue no rodapé de cada bloco.
+- Desde a v73 a régua de 7 dias (#19) entra logo abaixo do cabeçalho
+  nas casas do gerente e do pós-colheita (seção "Régua de 7 dias
+  (v73)"): conjunto medido em 148 px (17,6 % de 844); o carimbo de
+  origem de dado (#3) segue no rodapé de cada bloco.
 - Sem SQL, sem campo novo, sem texto prescritivo; a área do plano
   (`unidade_manejo`) não é usada. Regressão: diferença main × branch só
   no trecho do cabeçalho, igual nas três atividades.
@@ -859,6 +861,63 @@ perfis × decisão × motivo) em docs/acoes-por-perfil.md.
   desabilitadas, medido), "Corrigir" para o próprio gerente depois de
   48 h (regra de prazo, não de perfil; a tela já explica).
 
+## Régua de 7 dias (v73) — telas de leitura por data, três atividades e pós-colheita
+Regra permanente em CLAUDE.md, item c11; checagem em
+docs/definicao-de-pronto.md, item 14; vocabulário em
+docs/catalogos-por-atividade.md, "Régua de 7 dias". Ideia do app Sigma
+(Fundação ABC) adaptada: só o mecanismo (sete dias tocáveis); dias em
+português, sem datepicker nativo, sem rolagem de lado.
+- **Problema resolvido:** a casa do gerente e a do pós-colheita só
+  falavam de hoje; ver outro dia exigia achar o boletim na lista de
+  "Últimos boletins" (5 itens) ou pedir à Diretoria. A regra 2 proíbe
+  campo de digitação e o datepicker do iOS é ruim de uma mão só, no sol.
+- **Componente único** `reguaDias(fazendaId, dia)` + `diaRegua(fazendaId)`
+  + `cartaoDiaRegua(o)` + catálogo `DIAS_SEMANA`/`DIAS_SEMANA_LONGO` +
+  `hojeBRT()` (`FUSO_BRT`) + estado em memória `reguaVista`; CSS
+  `.regua`, `.regua-dia` (`.on`, `.hoje`, `.ds`, `.dn`). Sete células
+  fixas de 48,3 × 48 px a 390 px (362 px de régua, sem rolar de lado),
+  do mais recente (esquerda) ao mais antigo; dia da semana em cima
+  (seg · ter · qua · qui · sex · sáb · dom) e número embaixo em
+  monoespaçado; nenhum dia futuro; sem setas nem "carregar mais".
+  Selecionado = fundo verde + número em negrito + `aria-pressed`; hoje =
+  barra de 3 px embaixo (branca quando selecionado) e ", hoje" no
+  `aria-label`. Um toque (`data-regua`) troca o dia e redesenha a casa
+  mantendo a rolagem; a escolha volta para hoje ao trocar de unidade, ao
+  sair da janela de 7 dias e ao voltar ao primeiro plano depois da
+  virada do dia (`visibilitychange`). "Hoje" é o dia civil em Brasília,
+  comparação por texto AAAA-MM-DD (sem deslocamento em relação ao banco).
+- **Onde entra:** casa do gerente (café, grãos, pecuária — mesmo
+  componente) logo abaixo do cabeçalho contextual e da faixa de cor da
+  atividade, e casa do pós-colheita abaixo do cabeçalho. Fora, por
+  desenho: tela de apontamento em 3 passos, home das abas, escolha de
+  unidade, boletim enviado (uma data só), painel e Resumo do período da
+  Diretoria (filtram por período de/até com os `input type=date` que já
+  existiam — ver PENDÊNCIAS), Faróis (sem data), Cadastros.
+- **O que muda com o dia escolhido:** só o cartão do dia e o cartão
+  Solinftec. Hoje selecionado = tela idêntica à v72 ("Boletim de hoje
+  enviado/pendente", "Preencher boletim de hoje", "O que ficou de
+  ontem", "Últimos boletins"). Outro dia: linha tocável "Boletim de
+  dd/mm enviado · Enviado às hh:mm · resumo" (abre o boletim; farol
+  vermelho com ocorrência/praga alta ou irrigação crítica, como na
+  lista) ou o vazio pela função única — "Sem boletim registrado em
+  Floramill em 05/09/2026." / "Sem registro de pós-colheita em Vereda
+  Romaria em 05/09/2026." (`periodo: periodoVazio(dia, dia)`); Solinftec
+  "medição automática de dd/mm" com a linha de origem no rodapé (c3).
+  Nada de preencher boletim de dia passado pela régua (o apontamento
+  continua só o de hoje).
+- **Medidas** (390 × 844): cabeçalho 83,4 px + faixa 3 px + régua 48 px
+  + margem 12 px = 148,4 px (17,6 % de 844; 21,2 % de 700 px úteis;
+  pós-colheita 145,4 px, 17,2 %) — abaixo do teto de ~25 %; régua
+  estática (não sticky), o primeiro cartão começa em 160 px.
+- Sem SQL, sem campo novo, sem texto prescritivo, sem navegação além de
+  7 dias. Regressão main × branch: diferença só o bloco `.regua` nas
+  casas (igual nas três atividades e no pós); apontamento em 3 passos,
+  boletim enviado, painel, Relatórios, Faróis e Cadastros byte a byte
+  iguais. Medição nova em `scripts/checar-poluicao.cjs` (grupo 11, 24
+  itens ✅, inclusive a casa do pós-colheita, que passou a ser medida) e
+  passos `05-regua-ontem`/`06-regua-hoje` em
+  `scripts/regressao_render.cjs`.
+
 ## Decisão e confirmação (v72) — diálogo único, validação silenciosa, verbo no botão
 Regra permanente em CLAUDE.md, item c10; checagem em
 docs/definicao-de-pronto.md, item 13. Três ideias do app Sigma
@@ -950,8 +1009,17 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v72, 09/09/2026:
-**308 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v72 acrescentou o grupo
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v73, 09/09/2026:
+**334 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v73 acrescentou o grupo
+"11. Régua de 7 dias" (24 itens ✅ na casa do gerente das três
+atividades e na casa do pós-colheita, que passou a ser medida como tela
+"Gerente (casa)": 7 células de 48,3 × 48 px sem rolar de lado, dias em
+pt-BR do mais recente à esquerda, zero dia futuro, hoje selecionado e
+marcado, toque em ontem sem nativo e sem sair da tela, vazio "Sem
+boletim registrado em … em dd/mm/aaaa.", conjunto 148,4 px = 17,6 %,
+zero `input type=date`; as duas linhas ❌ de P10 em "Gerente (casa)"
+listam mais exemplos por causa da casa do pós, todos do CSS-base —
+nenhum da régua, que tem raio 0 e sombra nenhuma); a v72 acrescentou o grupo
 "10. Decisão e confirmação" (30 itens ✅: stub de alert/confirm/prompt
 em toda página com zero chamadas nos cenários; Enviar inativo no
 formulário vazio das três atividades e do pós-colheita, toque explica
@@ -1118,6 +1186,26 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Régua de 7 dias (v73) — para o Nilo testar no iPhone:** na casa
+  do gerente de uma unidade de cada atividade e na casa do
+  pós-colheita: (1) a régua abaixo do cabeçalho, com sete dias, hoje à
+  esquerda em verde; tocar em ontem e ver o cartão do dia mudar (boletim
+  daquele dia ou "Sem boletim registrado em … em dd/mm/aaaa."), sem
+  abrir teclado; (2) hoje continua com a barra embaixo quando outro dia
+  está escolhido; (3) deixar o app aberto na virada do dia e voltar a
+  ele: a régua deve mostrar o novo hoje; (4) com luva/sol: as células
+  têm 48 px — se parecerem pequenas, a alternativa prevista é 5 dias
+  (nunca rolagem). **Decisões que ficaram com o Nilo:** (a) a régua
+  entrou só nas casas do gerente e do pós-colheita — entrar também no
+  boletim enviado (trocar de dia sem voltar) é possível com o mesmo
+  componente; (b) o painel e o Resumo do período da Diretoria continuam
+  com os dois `input type=date` (de/até) que já existiam desde antes da
+  v61 — são filtro de período, não escolha de dia, e não foram trocados
+  nesta entrega; (c) os itens #37 (estados vazios, v61/v65) e #1/#2
+  (cabeçalho contextual, v66) já estavam no main — a v73 só os auditou
+  contra os critérios do lote e mediu de novo; os rótulos "Boletim de
+  hoje pendente" / "Registro de hoje pendente" seguem como estavam,
+  aguardando a decisão da v61.
 - **Decisão e confirmação (v72) — para o Nilo:** (1) testar no iPhone,
   numa unidade de cada atividade: abrir o boletim vazio e tocar em
   "Enviar boletim" (cinza tracejado; aparece "Registre o clima ou uma
@@ -1186,10 +1274,9 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   "ritmo: a cada N dias". Com código de gerente de café numa unidade sem
   boletim no aparelho, ver "Sem boletim registrado em …" na casa; com
   pós-colheita, "Sem registro de pós-colheita em …". Nenhum SQL novo.
-  **Régua de 7 dias (#19):** não existe no repositório (nenhum PR,
-  branch ou código) — não havia o que estender; se o item ainda for
-  desejado, é tarefa nova com a especificação original. Decisão da v60
-  mantida: café continua sem janela (sem farol colorido).
+  **Régua de 7 dias (#19):** entregue na v73 (seção "Régua de 7 dias
+  (v73)"). Decisão da v60 mantida: café continua sem janela (sem farol
+  colorido).
 - **Estado das integrações (v63):** `sql/045-status-integracoes.sql`
   RODADO pelo Nilo em 08/09/2026 e conferido pela REST pública logo
   depois: as duas linhas da visão (iCrop: tentativa 07:20 UTC, sucesso

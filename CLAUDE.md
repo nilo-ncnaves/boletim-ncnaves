@@ -245,6 +245,15 @@ Relatórios, Faróis, Resumo do período) e de Cadastros.
 - **Ordem de corte se não couber:** atividade (já é a unidade da linha
   1), depois ciclo; fazenda, unidade e área ficam. A linha 1 pode
   ocupar duas linhas visuais dentro dos 40 px dos botões (line-clamp).
+- **Orçamento conjunto com a régua de 7 dias (desde a v73, item c11):**
+  nenhuma tela empilha outra barra sticky sobre o cabeçalho; a régua é
+  estática, logo abaixo dele, e o conteúdo vem abaixo dos dois.
+  Medido a 390 × 844: cabeçalho expandido 83 px + faixa de cor 3 px +
+  régua 48 px + margem 12 px = 148 px (17,6 % de 844; 21,2 % de 700 px
+  úteis; no pós-colheita, sem faixa de cor, 145 px) — teto de ~25 %.
+  Colapsado (rolando), só a barra de 64 px fica fixa. Se um dia não
+  couber, o cabeçalho corta na ordem acima antes de a régua encolher;
+  a régua nunca ganha rolagem.
 - **Proibido no cabeçalho:** produtor/empresa, ícone de cultura, custo,
   produto, dose, "não fez"/"pendente", carimbo de origem de dado (esse
   fica no rodapé do bloco, item c3).
@@ -450,6 +459,67 @@ cinza até existir ponto marcado e "Fazer Upload" no lugar de "OK").
   vazio, toque explica, clima ativa no lugar; Descartar abre o diálogo
   com dois botões, sem campo, pergunta com "?", verbo, sem destaque);
   detalhe em docs/definicao-de-pronto.md, item 13.
+
+### c11) Régua de 7 dias nas telas de leitura por data (desde a v73)
+Toda tela de leitura por data (hoje: casa do gerente nas três
+atividades e casa do pós-colheita) escolhe o dia pelo componente ÚNICO
+`reguaDias(fazendaId, dia)` do index.html, com `diaRegua(fazendaId)`
+(dia escolhido; hoje por padrão) e `cartaoDiaRegua({dia, reg, que,
+unidade, rotulo, attr, sub, farol})` (registro do dia escolhido ou o
+vazio pela função única) — nunca uma variante por atividade ou por
+perfil; nunca `input type="date"` nem datepicker nativo (regra 2:
+nenhum campo de digitação). Fora, por desenho: tela de apontamento em
+3 passos, home das abas, escolha de unidade, boletim enviado (uma
+data só), telas de grupo da Diretoria (o painel e o Resumo do período
+filtram por período, de/até) e Cadastros.
+- **Sete células fixas**, do mais recente (esquerda — o polegar chega
+  primeiro) ao mais antigo; nenhum dia futuro; sem rolagem de lado,
+  sem setas, sem "carregar mais" (escopo fechado em 7 dias). Se um dia
+  não couber com legibilidade, reduz para 5 — nunca rola. Medido a
+  390 px: 7 células de 48,3 × 48 px (≥ 44 px), régua de 362 px.
+- **Duas linhas por célula:** dia da semana em cima pelo catálogo
+  `DIAS_SEMANA` (seg · ter · qua · qui · sex · sáb · dom — português,
+  nunca Mon/Sun), número do dia embaixo em monoespaçado tabular.
+- **Selecionado não depende só da cor:** fundo `--verde`, texto
+  branco, número em negrito e `aria-pressed="true"`. **Hoje é
+  reconhecível com outro dia escolhido:** barra de 3 px embaixo da
+  célula (verde; branca quando também selecionada) e ", hoje" no
+  `aria-label`/`title` ("quarta-feira, 09/09, hoje").
+- **Um toque troca o dia** (`data-regua`) e redesenha a tela mantendo
+  a rolagem; a escolha vive só na memória (`reguaVista`) e volta para
+  hoje ao trocar de unidade, ao sair da janela de 7 dias e ao virar o
+  dia com o app aberto (`visibilitychange` → primeiro plano recalcula
+  "hoje" e redesenha a casa).
+- **"Hoje" é o dia civil em Brasília** (`hojeBRT()`, `FUSO_BRT`),
+  independente do fuso do aparelho; os registros guardam a data como
+  texto AAAA-MM-DD e a comparação é por texto — sem deslocamento em
+  relação ao banco (UTC).
+- **Dia escolhido ≠ hoje:** a tela mostra o registro daquele dia numa
+  linha tocável ("Boletim de 05/09 enviado · Enviado às 18:02 · …",
+  abre o boletim) ou o vazio pela função única
+  (`htmlEstado("vazio", {que, unidade, periodo: periodoVazio(dia,dia)})`
+  → "Sem boletim registrado em Vereda Romaria em 05/09/2026."). O
+  cartão de hoje, o botão "Preencher boletim de hoje", "O que ficou de
+  ontem" e "Últimos boletins" continuam como eram (hoje selecionado =
+  tela idêntica à v72). O cartão Solinftec segue o dia escolhido
+  ("medição automática de 05/09"); o carimbo de origem fica no rodapé
+  do bloco (c3), nunca na régua.
+- **Vocabulário por chave:** o rótulo do registro ("Boletim" /
+  "Registro" do pós-colheita) e o `que` do vazio ("boletim registrado"
+  / "registro de pós-colheita") vêm de quem chama, por perfil de tela,
+  nunca por `if(atividade==="…")`; dias e "hoje" são iguais nas três
+  atividades (docs/catalogos-por-atividade.md, "Régua de 7 dias").
+- **Altura:** régua estática (não sticky) abaixo do cabeçalho
+  contextual; orçamento conjunto em c5 (148 px = 17,6 % de 844).
+- **Proibido:** dia futuro, rolagem horizontal, datepicker ou teclado,
+  navegação além dos 7 dias, "atrasado"/"pendente"/"faltou" no dia sem
+  registro, cor como único sinal de seleção, régua na tela de
+  apontamento.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "11. Régua de 7
+  dias" (7 células ≥ 44 px sem rolar de lado, pt-BR, hoje selecionado e
+  marcado, toque sem nativo e sem sair da tela, vazio nomeia unidade e
+  dia, conjunto ≤ 25 %, zero `input type=date`); detalhe em
+  docs/definicao-de-pronto.md, item 14.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

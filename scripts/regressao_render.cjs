@@ -83,6 +83,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* ☕ café — boletim completo: clima, mão de obra, irrigação + fertirrigação, atividades, colheita, fito, ocorrência, envio, WhatsApp, detalhe */
   await cenario(browser, 'cafe-f23', { codigo: CODIGOS.f23, chave: 'f23' }, ger('f23', 'CAFE'), [
+    ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73: régua de 7 dias — dia sem registro cai no vazio */
+    ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-form', async p => { await clique(p, '#bt-preencher'); }],
     ['20-clima', async p => { await clique(p, '[data-clima="Ensolarado"]'); await clique(p, '[data-cflor="florada"]'); await preenche(p, 'input[data-c="chuvaMm"]', '12'); await preenche(p, 'input[data-c="obs"]', 'vento fraco'); }],
     ['30-mo', async p => { await clique(p, '[data-step="1"][data-alvo="proprios"]'); await clique(p, '[data-step="1"][data-alvo="proprios"]'); await clique(p, '[data-step="1"][data-alvo="diaristas"]'); }],
@@ -104,6 +106,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* 🌾 grãos — operações, irrigação por pivô, fito/ocorrências */
   await cenario(browser, 'graos-f33', { codigo: CODIGOS.f33, chave: 'f33' }, ger('f33', 'GRAOS'), [
+    ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73 */
+    ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-form', async p => { await clique(p, '#bt-preencher'); }],
     ['20-clima', async p => { await clique(p, '[data-clima="Nublado"]'); await preenche(p, 'input[data-c="chuvaMm"]', '3'); }],
     ['30-operacao', async p => { await clique(p, '#bt-add-ativ'); const t = await primeiraOpcao(p, 'select[data-a="talhaoId"]'); await escolhe(p, 'select[data-a="talhaoId"]', t); await abrirDetails(p); const chip = await p.$('[data-escop]'); if (chip) { await chip.click(); await pausa(p); } }],
@@ -119,6 +123,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* 🐂 pecuária — movimentação, sanidade, cocho, pasto, observação */
   await cenario(browser, 'pecuaria-f26', { codigo: CODIGOS.f26, chave: 'f26' }, ger('f26', 'PECUARIA'), [
+    ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73 */
+    ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-form', async p => { await clique(p, '#bt-preencher'); }],
     ['20-clima', async p => { await clique(p, '[data-clima="Ensolarado"]'); }],
     ['22-enviar-sem-resposta', async p => { await clique(p, '#bt-enviar'); }],   /* v70 */
@@ -135,6 +141,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* 🏭 pós-colheita */
   await cenario(browser, 'pos-f23', { codigo: CODIGOS.f23, chave: 'f23' }, { userId: 'u4', papel: 'pos', nome: 'Pós-colheita', fazendaId: 'f23' }, [
+    ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73 */
+    ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-formpos', async p => { await clique(p, '#bt-preencher-pos'); }],
     ['20-terreiro', async p => { await preenche(p, 'input[data-pt="entradaLatas"]', '300'); }],
   ]);

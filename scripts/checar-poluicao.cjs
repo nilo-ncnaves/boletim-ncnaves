@@ -52,6 +52,15 @@
       certeza", emoji ou exclamação, exatamente dois botões, nenhum campo,
       verbo no afirmativo (até três palavras, nunca Sim/OK/Confirmar) e, por
       ser destrutivo, sem destaque; "Cancelar" fecha sem sair da tela.
+  11. Régua de 7 dias (v73): na casa do gerente das três atividades e na
+      casa do pós-colheita a régua tem 7 células fixas (sem rolar de lado,
+      cada uma ≥ 44 px), dias em português (seg…dom), do mais recente à
+      esquerda, nenhum dia futuro, hoje selecionado ao abrir e marcado
+      mesmo com outro dia escolhido; o toque troca o dia sem teclado nem
+      seletor nativo, sem sair da tela, e o dia sem registro cai no vazio
+      da função única (nomeia unidade e dia, sem termo proibido); cabeçalho
+      contextual + régua abaixo de 25 % da altura útil; nenhum
+      input type=date na tela.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -303,6 +312,45 @@ const NA_PAGINA = {
   },
 };
 
+/* v73: régua de 7 dias — medidas na casa do gerente / do pós-colheita */
+NA_PAGINA.regua = () => {
+  const cels = [...document.querySelectorAll('#app .regua-dia')];
+  if (!cels.length) return { existe: false };
+  const r = document.querySelector('#app .regua').getBoundingClientRect();
+  const hoje = hojeBRT();
+  const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  return { existe: true, n: cels.length, scrollW: document.documentElement.scrollWidth, larguraRegua: +r.width.toFixed(1),
+    minW: Math.min(...cels.map(c => c.getBoundingClientRect().width)), minH: Math.min(...cels.map(c => c.getBoundingClientRect().height)),
+    ordem: cels.map(c => c.dataset.regua), futuros: cels.filter(c => c.dataset.regua > hoje).length,
+    decrescente: cels.every((c, i) => !i || c.dataset.regua < cels[i - 1].dataset.regua),
+    diasPt: cels.every(c => dias.includes(c.querySelector('.ds').textContent.trim())),
+    rotulos: cels.map(c => c.querySelector('.ds').textContent.trim()).join(' '),
+    hojeSelecionado: (cels.find(c => c.classList.contains('on')) || {}).dataset && cels.find(c => c.classList.contains('on')).dataset.regua === hoje,
+    hojeMarcado: cels.some(c => c.classList.contains('hoje') && c.dataset.regua === hoje),
+    ariaPressed: cels.every(c => c.getAttribute('aria-pressed') === (c.classList.contains('on') ? 'true' : 'false')),
+    conjunto: +r.bottom.toFixed(1), pct: +(r.bottom / innerHeight * 100).toFixed(1), inputsDate: document.querySelectorAll('#app input[type=date]').length };
+};
+NA_PAGINA.reguaDepois = () => {
+  const cels = [...document.querySelectorAll('#app .regua-dia')];
+  const on = cels.find(c => c.classList.contains('on')), hj = cels.find(c => c.classList.contains('hoje'));
+  const cart = document.querySelector('#app .regua ~ .cartao');
+  const texto = cart ? cart.textContent.trim().replace(/\s+/g, ' ') : '';
+  return { on: on && on.dataset.regua, hojeAindaMarcado: !!hj && hj.dataset.regua === hojeBRT() && hj !== on,
+    hojeBarra: hj ? getComputedStyle(hj).borderBottomWidth : '', texto, temInputDate: !!document.querySelector('#app input[type=date]'),
+    foco: document.activeElement ? document.activeElement.tagName : '', tela: telaAtual, nativos: window.__nativos,
+    proibido: /n[aã]o fez|n[aã]o realizou|pendente|atrasad|faltou|esqueceu|nada aqui|nenhum dado/i.test(texto),
+    nomeiaDia: /\d{2}\/\d{2}\/\d{4}/.test(texto) };
+};
+async function medirRegua(page) {
+  const antes = await page.evaluate(NA_PAGINA.regua);
+  if (!antes.existe) return antes;
+  await page.click('#app .regua-dia >> nth=1'); await page.waitForTimeout(300);
+  antes.depois = await page.evaluate(NA_PAGINA.reguaDepois);
+  await page.click('#app .regua-dia >> nth=0'); await page.waitForTimeout(300);
+  antes.voltou = await page.evaluate(() => { const on = document.querySelector('#app .regua-dia.on'); return on && on.dataset.regua === hojeBRT(); });
+  return antes;
+}
+
 /* ---------- cenários ---------- */
 async function novaPagina(browser, base, acesso, sessao) {
   const ctx = await browser.newContext({ viewport: VP, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
@@ -421,6 +469,7 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
     await page.waitForTimeout(300);
   }
   const casa = await medirTela(page, rot + ' — casa do gerente', 'gerente');
+  casa.regua = await medirRegua(page);   /* v73 */
   await page.click('#bt-preencher'); await page.waitForTimeout(400);
   const form = await medirTela(page, rot + ' — boletim (ao abrir)', 'boletim', { atividade: atv });
   form.secoes = await page.evaluate(NA_PAGINA.secoes);
@@ -460,6 +509,10 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
 
 async function cenarioPos(browser, base, R, termos) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.f23, chave: 'f23' }, { userId: 'u4', papel: 'pos', nome: 'Pós-colheita', fazendaId: 'f23' });
+  const casaPos = await medirTela(page, 'Pós-colheita (f23) — casa', 'gerente');   /* v73: régua na casa do pós */
+  casaPos.regua = await medirRegua(page);
+  casaPos.erros = erros.slice();
+  R.telas.push(casaPos);
   await page.click('#bt-preencher-pos').catch(() => {}); await page.waitForTimeout(400);
   const form = await medirTela(page, 'Pós-colheita (f23) — registro (ao abrir)', 'boletim', { atividade: 'CAFE' });
   form.secoes = await page.evaluate(NA_PAGINA.secoes);
@@ -705,6 +758,20 @@ function avaliar(R) {
         add(g, `${nome} — ação destrutiva sem destaque: nenhum dos dois botões em verde`, !!d && !d.simDestaque && !d.naoDestaque, d ? `sim ${d.simDestaque ? 'verde' : 'neutro'}, cancelar ${d.naoDestaque ? 'verde' : 'neutro'}` : '');
         add(g, `${nome} — "Cancelar" fecha o diálogo e mantém a tela`, !!x.fechou && !x.fechou.aberto && x.fechou.tela === 'form', x.fechou ? `${x.fechou.aberto ? 'ainda aberto' : 'fechado'}; tela ${x.fechou.tela}` : '');
       }
+    });
+  }
+  /* 11. régua de 7 dias (v73) */
+  {
+    const g = '11. Régua de 7 dias: sete células fixas, pt-BR, hoje marcado, toque sem seletor nativo, vazio nomeia o dia';
+    R.telas.filter(t => t.regua).forEach(t => {
+      const r = t.regua, nome = t.nome;
+      add(g, `${nome} — régua presente com 7 células, sem rolar de lado, cada uma ≥ ${TOQUE_MIN} px`, r.existe && r.n === 7 && r.scrollW <= VP.width && r.minW >= TOQUE_MIN && r.minH >= TOQUE_MIN, r.existe ? `${r.n} células de ${r.minW.toFixed(1)} × ${r.minH} px; ${r.larguraRegua} px em ${r.scrollW} px` : 'sem régua');
+      if (!r.existe) return;
+      add(g, `${nome} — dias em português (seg…dom), do mais recente à esquerda, nenhum dia futuro`, r.diasPt && r.decrescente && r.futuros === 0, `${r.rotulos}; ${r.futuros} futuro(s)`);
+      add(g, `${nome} — hoje selecionado ao abrir, marcado (barra) e aria-pressed coerente`, r.hojeSelecionado && r.hojeMarcado && r.ariaPressed, `selecionado ${r.ordem[0]}`);
+      add(g, `${nome} — toque em ontem troca o dia sem teclado nem seletor nativo, sem sair da tela; hoje continua marcado`, !!r.depois && r.depois.on === r.ordem[1] && r.depois.hojeAindaMarcado && r.depois.hojeBarra === '3px' && !r.depois.temInputDate && r.depois.foco !== 'INPUT' && r.depois.tela === 'casa' && r.depois.nativos === 0 && r.voltou, r.depois ? `escolhido ${r.depois.on}; tela ${r.depois.tela}; ${r.depois.nativos} nativo(s); volta a hoje ${r.voltou ? 'ok' : 'falhou'}` : '');
+      add(g, `${nome} — dia sem registro cai no vazio da função única: nomeia unidade e dia, sem termo proibido`, !!r.depois && r.depois.nomeiaDia && !r.depois.proibido && /^Sem /.test(r.depois.texto), r.depois ? `"${r.depois.texto.slice(0, 90)}"` : '');
+      add(g, `${nome} — cabeçalho contextual + régua abaixo de 25 % da altura útil; nenhum input type=date`, r.pct <= 25 && r.inputsDate === 0, `${r.conjunto} px = ${r.pct} % de ${VP.height} px; ${r.inputsDate} input date`);
     });
   }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */

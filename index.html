@@ -50,6 +50,20 @@ h3{font-size:.95rem;font-weight:700}
 .topo.ctx h1{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.18}
 .topo.ctx .ctx-area{font-size:.8rem;font-weight:500;opacity:.85;white-space:nowrap}
 .ctx-l2{background:var(--verde);color:#fff;margin:0 -14px 14px;padding:0 16px 5px;font-size:.72rem;line-height:1.25;opacity:.98;font-weight:500;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* v73: régua de 7 dias — componente ÚNICO reguaDias() das telas de leitura por data. Sete células fixas
+   (sem rolagem de lado), do mais recente (esquerda) ao mais antigo; duas linhas por célula (dia da semana
+   em pt-BR e número); sem raio, sem sombra; toque ≥ 44 px. Selecionado = fundo verde + número em negrito +
+   aria-pressed (não depende só da cor); hoje = barra de 3 px embaixo, sempre visível (branca quando
+   selecionado). Estática (rola com a tela): não empilha barra fixa em cima do cabeçalho contextual. */
+.regua{display:flex;gap:4px;margin:0 0 12px}
+.regua-dia{flex:1;min-width:0;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 0 3px;border:1.5px solid var(--linha);border-bottom-width:3px;background:var(--cartao);color:var(--tinta)}
+.regua-dia .ds{font-size:.68rem;font-weight:600;color:var(--tinta-2);line-height:1.1}
+.regua-dia .dn{font-size:1.02rem;font-weight:600;line-height:1.15;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.regua-dia.hoje{border-bottom-color:var(--verde)}
+.regua-dia.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.regua-dia.on .ds{color:#fff}
+.regua-dia.on .dn{font-weight:800}
+.regua-dia.on.hoje{border-bottom-color:#fff}
 /* Botões */
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border-radius:var(--raio);font-weight:700;font-size:1.02rem;background:var(--verde);color:#fff;box-shadow:var(--sombra)}
 .btn:active{background:var(--verde-esc)}
@@ -270,9 +284,10 @@ const emSafra = () => { const m=new Date().getMonth()+1; return m>=5 && m<=9; };
    nunca de trabalho: proibidos "não fez", "não realizou", "pendente", "atrasado", "faltou",
    "esqueceu"; sem exclamação, sem emoji, sem culpar quem usa; uma frase, no máximo duas
    linhas no iPhone. Nomes vêm do cadastro pelo id (fazenda(id).nome, talhao(id).nome),
-   nunca de pedaço de nome. Café (regra 1 do projeto): as telas do gerente de café
-   mantêm o texto que já tinham — quem chama decide por atividadeDe(fz) e só manda
-   grãos/pecuária e as telas compartilhadas (Diretoria, Relatórios, Cadastros) para cá.
+   nunca de pedaço de nome. Vale para as três atividades pela mesma função (café desde a
+   v65 — CLAUDE.md, c4: isolamento é de comportamento, não de arquivo); nenhuma tela decide
+   texto de vazio por atividadeDe(fz). Vazio de UM dia (régua de 7 dias, v73): passe
+   periodo:periodoVazio(dia,dia) → "em 05/09/2026"; não existe parâmetro "dia" separado.
    Uso:
      fraseVazio({que:"boletim", atividade:"GRAOS", operacao:"Capina manual", unidade:"f33",
        talhao:"t125", filtro:"texto digitado", periodo:periodoVazio(de,ate), ultimo:"2026-08-31",
@@ -1926,12 +1941,12 @@ function solinftecDo(data,fz){
     && maeIdDe(fzAtual(l.fazenda_id))===maeIdDe(fz));
   return linhas.length?linhas:null;
 }
-function cartaoSolinftecGerente(fz){
+function cartaoSolinftecGerente(fz, dia){
   if(!SOLINFTEC_AUTO) return "";
-  const linhas=solinftecDo(hojeISO(),fz);
+  const linhas=solinftecDo(dia||hojeISO(),fz);   /* v73: dia escolhido na régua; sem régua, hoje */
   if(!linhas) return "";
   const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
-  return `<div class="cartao"><h3>📡 Solinftec — medição automática do dia</h3>
+  return `<div class="cartao"><h3>📡 Solinftec — medição automática ${dia&&dia!==hojeBRT()?"de "+fmtDataCurta(dia):"do dia"}</h3>
     ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
     <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${linhaOrigemDado("solinftec")}</div>`;
 }
@@ -3270,20 +3285,24 @@ function vEscolheFazenda(){
 /* ---------- Tela: casa do gerente ---------- */
 function vCasaGerente(){
   const fz = sessao.fazendaId;
-  const b = boletimDoDia(hojeISO(), fz);
+  const hoje = hojeBRT(), dia = diaRegua(fz);   /* v73: dia escolhido na régua (hoje por padrão) */
+  const b = boletimDoDia(hoje, fz);
   const st = statusDoDia(fz);
-  const ontem = boletinsOrdenados().find(x=>x.data<hojeISO() && x.fazendaId===fz);
+  const ontem = boletinsOrdenados().find(x=>x.data<hoje && x.fazendaId===fz);
   const temRasc = rascunho && !rascunho.id && rascunho.fazendaId===fz;
-  const rec = envioRecente && (boletimDoDia(hojeISO(),fz)||{}).id===envioRecente ? envioRecente : null;
+  const rec = envioRecente && (boletimDoDia(hoje,fz)||{}).id===envioRecente ? envioRecente : null;
   const atCasa=atividadeDe(fz);
+  const bDia = dia===hoje ? b : boletimDoDia(dia, fz);
+  const critico = x => (x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou"));
   return cabecalhoContexto(fz,{sub:"Gerente"})
-  +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`+`
+  +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`
+  +reguaDias(fz, dia)+`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
       <h2>✅ Boletim enviado!</h2>
       <p class="mut">Quer avisar o grupo? Um toque e o resumo já vai pronto.</p>
       <button class="btn mt" data-zap="${rec}">📲 Mandar resumo no WhatsApp</button>
     </div>`:""}
-    <div class="cartao">
+    ${dia===hoje?`<div class="cartao">
       <div class="linha-flex">
         <span class="farol ${st}"></span>
         <div class="cresce">
@@ -3291,9 +3310,10 @@ function vCasaGerente(){
           <p class="mut">${b?("Enviado às "+esc((b.enviadoEm||"").split(" ")[1]||"")+(b.editadoEm?" · editado":"")):"Preencha até as 19h"}</p>
         </div>
       </div>
-    </div>
+    </div>`:cartaoDiaRegua({dia, reg:bDia, que:"boletim registrado", unidade:fz, rotulo:"Boletim", attr:"data-ver", farol:bDia&&critico(bDia)?"critico":"ok",
+      sub:bDia?("Enviado às "+esc((bDia.enviadoEm||"").split(" ")[1]||"")+(bDia.editadoEm?" · editado":"")+" · "+esc(resumo1linha(bDia))):""})}
     ${cartaoCargas(fz)}
-    ${cartaoSolinftecGerente(fz)}
+    ${cartaoSolinftecGerente(fz, dia)}
     ${cartaoRelatoriosGerente(fz)}
     ${syncFila.length?`<div class="aviso">${syncStatus()}</div>`:""}
     ${temRasc?`<div class="aviso">📝 Você tem um rascunho de ${fmtData(rascunho.data)} guardado neste aparelho. Ele não se perde sem internet.</div>`:""}
@@ -3364,6 +3384,52 @@ function cabecalhoContexto(fz, o){
     <h1>${esc(mae.nome)} › ${esc(rotuloAtividade(atv))}${area>0?` <span class="ctx-area num">(${fmtHa(area)} ha)</span>`:""}</h1>
     <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button>
   </div>${l2?`<div class="ctx-l2 no-print">${esc(l2)}</div>`:""}`;
+}
+/* ---------- Régua de 7 dias (v73) ----------
+   Componente ÚNICO das telas de leitura por data (casa do gerente nas três atividades e casa do
+   pós-colheita), abaixo do cabeçalho contextual e acima do conteúdo. Sete células fixas, do mais
+   recente (esquerda — o polegar chega primeiro) ao mais antigo; nenhum dia futuro; sem rolagem de
+   lado; sem teclado nem seletor nativo (regra 2: nenhum campo de digitação). Dia da semana pelo
+   catálogo DIAS_SEMANA (pt-BR: seg · ter · … · dom). "Hoje" é o dia civil em Brasília (FUSO_BRT),
+   independente do fuso do aparelho; os registros guardam a data como texto AAAA-MM-DD, então a
+   comparação é por texto, sem deslocamento de fuso. Um toque troca o dia e redesenha a tela
+   (data-regua); a escolha vive só na memória (reguaVista) e volta para hoje ao trocar de unidade,
+   ao virar o dia com o app aberto (visibilitychange) ou ao sair da janela de 7 dias. Dia sem
+   registro cai no vazio da função única (htmlEstado, periodo: periodoVazio(dia, dia)).
+   Altura a 390 px: 48 px de célula + 12 px de margem; com o cabeçalho (83 px expandido) dá 146 px =
+   17,3 % de 844 (20,9 % de 700 px úteis) — abaixo do teto de ~25 %. Documentação: CLAUDE.md, c11. */
+const REGUA_DIAS=7;
+const DIAS_SEMANA=["dom","seg","ter","qua","qui","sex","sáb"];
+const DIAS_SEMANA_LONGO=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+let reguaVista={dia:"", fz:"", hoje:""};
+const hojeBRT=()=>{ try{ const s=new Date().toLocaleDateString("sv-SE",{timeZone:FUSO_BRT}); return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:hojeISO(); }catch(e){ return hojeISO(); } };
+function diasRegua(){
+  const base=new Date(hojeBRT()+"T12:00:00"), out=[];
+  for(let i=0;i<REGUA_DIAS;i++){ const d=new Date(base); d.setDate(base.getDate()-i);
+    out.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")); }
+  return out;
+}
+/* dia escolhido para a unidade; hoje por padrão (e sempre que a escolha deixou de valer) */
+function diaRegua(fz){
+  const h=hojeBRT();
+  if(reguaVista.fz!==fz || reguaVista.hoje!==h || !diasRegua().includes(reguaVista.dia)) reguaVista={dia:h, fz, hoje:h};
+  return reguaVista.dia;
+}
+function reguaDias(fz, dia){
+  const h=hojeBRT();
+  return `<div class="regua no-print" role="group" aria-label="Dia do registro">${diasRegua().map(iso=>{
+    const d=new Date(iso+"T12:00:00"), sel=iso===dia, hj=iso===h;
+    const rot=DIAS_SEMANA_LONGO[d.getDay()]+", "+fmtDataCurta(iso)+(hj?", hoje":"");
+    return `<button class="regua-dia${sel?" on":""}${hj?" hoje":""}" data-regua="${iso}" aria-pressed="${sel}" aria-label="${esc(rot)}" title="${esc(rot)}"><span class="ds">${DIAS_SEMANA[d.getDay()]}</span><span class="dn num">${d.getDate()}</span></button>`; }).join("")}</div>`;
+}
+/* cartão do dia escolhido quando NÃO é hoje: o registro daquele dia (linha tocável) ou o vazio pela função única */
+function cartaoDiaRegua(o){
+  if(!o.reg) return `<div class="cartao"><div class="linha-flex"><span class="farol vazio"></span>
+      <div class="cresce">${htmlEstado("vazio",{que:o.que,unidade:o.unidade,periodo:periodoVazio(o.dia,o.dia)},{classe:"mut",estilo:"margin:0"})}</div></div></div>`;
+  return `<div class="cartao"><button class="linha-flex" style="width:100%;text-align:left" ${o.attr}="${esc(o.reg.id)}">
+      <span class="farol ${o.farol||"ok"}"></span>
+      <div class="cresce"><h2>${esc(o.rotulo)} de ${fmtDataCurta(o.dia)} enviado</h2><p class="mut">${o.sub||""}</p></div>
+      <span class="mut">›</span></button></div>`;
 }
 
 /* ---------- Seções multicultura do formulário ---------- */
@@ -4958,7 +5024,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v72";
+const APP_VERSAO="v73";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6052,17 +6118,19 @@ const bensDe = p => p.beneficios || (p.beneficio ? [p.beneficio] : []);
 const tulhasDe = p => p.tulhas || [];
 function salvarRascPos(){ Persist.set("bdf:rascpos", JSON.stringify(rascunhoPos)); if(rascunhoPos) atualizarAvanco("bt-enviar-pos", faltaEnvioPos(rascunhoPos)); }   /* v72 */
 function vCasaPos(){
-  const fz=sessao.fazendaId, p=posDoDia(hojeISO(),fz);
+  const fz=sessao.fazendaId, hoje=hojeBRT(), dia=diaRegua(fz), p=posDoDia(hoje,fz);   /* v73: régua de 7 dias */
+  const pDia = dia===hoje ? p : posDoDia(dia,fz);
   const rec = envioRecentePos && p && p.id===envioRecentePos ? p.id : null;
   const ult=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz).sort((a,b)=>a.data<b.data?1:-1).slice(0,5);
-  return cabecalhoContexto(fz,{sub:"Terreiro · Secador · Benefício"})+`
+  return cabecalhoContexto(fz,{sub:"Terreiro · Secador · Benefício"})+reguaDias(fz, dia)+`
     ${cartaoCargas(fz)}
     ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>✅ Registro enviado!</h2>
       <p class="mut">Um toque e o resumo vai pro grupo.</p>
       <button class="btn mt" data-zappos="${rec}">📲 Mandar resumo no WhatsApp</button></div>`:""}
-    <div class="cartao"><div class="linha-flex"><span class="farol ${p?"ok":(new Date().getHours()>=17?"espera":"vazio")}"></span>
+    ${dia===hoje?`<div class="cartao"><div class="linha-flex"><span class="farol ${p?"ok":(new Date().getHours()>=17?"espera":"vazio")}"></span>
       <div class="cresce"><h2>${p?"Registro de hoje enviado":"Registro de hoje pendente"}</h2>
-      <p class="mut">Terreiro, secador e benefício — preencha só o que teve.</p></div></div></div>
+      <p class="mut">Terreiro, secador e benefício — preencha só o que teve.</p></div></div></div>`
+    :cartaoDiaRegua({dia, reg:pDia, que:"registro de pós-colheita", unidade:fz, rotulo:"Registro", attr:"data-verpos", sub:pDia?esc(pDia.responsavel||""):""})}
     ${(()=>{ const ontem=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz&&x.data<hojeISO()).sort((a,b)=>a.data<b.data?1:-1)[0];
       const rodando=ontem?secsDe(ontem).filter(s=>estadoSec(s)==="continua"&&s.lote):[];
       return rodando.length?`<div class="cartao"><h3>Ficou rodando de ${fmtData(ontem.data)}</h3>
@@ -6542,6 +6610,7 @@ function ligarEventos(tela){
     if(d.zap){ abrirWhats(d.zap); envioRecente=null; return; }
     if(d.zappos){ abrirWhatsPos(d.zappos); envioRecentePos=null; return; }
     if(d.verpos){ ir("detalhepos", d.verpos); return; }
+    if(d.regua){ reguaVista.dia=d.regua; ir(telaAtual,null,true); return; }   /* v73: um toque troca o dia; sem teclado, sem seletor nativo */
     if(t.id==="bt-preencher-pos"){
       const p=posDoDia(hojeISO(), sessao.fazendaId);
       if(p){ ir("detalhepos", p.id); return; }
@@ -7229,6 +7298,8 @@ function vHistorico(){ return vPainel(); }
      em trocar fazenda/atividade) */
   ir(!acesso ? "codigo"
     : sessao ? (((sessao.papel==="gerente"||sessao.papel==="pos") && !sessao.fazendaId) ? "entrada" : "casa") : "entrada");
+  /* v73: virou o dia com o app aberto? ao voltar ao primeiro plano a régua recalcula "hoje" (Brasília) e a casa redesenha */
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && reguaVista.hoje && reguaVista.hoje!==hojeBRT() && telaAtual==="casa") ir("casa",null,true); });
 })();
 </script>
 <script>
