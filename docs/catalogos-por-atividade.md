@@ -289,6 +289,31 @@ Não existe termo de dia próprio de uma atividade (piquete, retiro,
 talhão, pivô não entram na régua: a tela de leitura é por unidade, não
 por subdivisão — mesma decisão do cabeçalho contextual acima).
 
+## Chips removíveis — vocabulário do contador por tela (v74)
+
+Componente único `chipsSelecao(attr, {um, varios})` (CLAUDE.md, item
+c12). O substantivo do contador é dado por quem chama, por tela — nunca
+por `if(atividade==="…")`. "selecionado(s)/selecionada(s)" acompanha o
+gênero do substantivo. Tabela vigente:
+
+| Tela / bloco | `attr` (data-* do chip de opção) | 1 item | N itens |
+|---|---|---|---|
+| ☕ Café › Irrigação › "Qual foi o problema?" | `irrpb` | 1 problema selecionado | N problemas selecionados |
+| ☕ Café › Irrigação › Fertirrigação › "Em quais setores?" | `irrfsec` | 1 setor selecionado | N setores selecionados |
+| Cadastros › Códigos › novo combinado › Atividades inteiras | `combo-atv` | 1 atividade selecionada | N atividades selecionadas |
+| Cadastros › Códigos › novo combinado › Unidades avulsas | `combo-uni` | 1 unidade selecionada | N unidades selecionadas |
+| Cadastros › Catálogos › Máquinas › vínculo com fazendas | `vinc-faz` | 1 fazenda selecionada | N fazendas selecionadas |
+| Cadastros › Fazendas › detalhe › Estrutura de pós-colheita | `estr` | 1 item selecionado | N itens selecionados |
+
+🌾 Grãos: a única multi-seleção ("Qual foi o problema?" no cartão do
+pivô, `igpb`) mora DENTRO da tela de apontamento em 3 passos e por isso
+NÃO recebe o componente (CLAUDE.md, item c12; regra 7). Se um dia os
+grãos ganharem multi-seleção fora do apontamento, ela entra nesta tabela
+com o mesmo componente. 🐂 Pecuária: nenhuma multi-seleção hoje (cada
+campo escolhe um valor); mesma regra. Rótulos dos chips: os do chip de
+opção (nome do talhão/unidade/fazenda pelo cadastro por id; opções fixas
+pelo catálogo). Limite visível: 6 + "+K".
+
 ## Categorias de operação — badge de uma letra (v67)
 
 Fonte oficial das categorias (natureza da operação) e das letras que o
