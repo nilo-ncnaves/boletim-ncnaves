@@ -65,6 +65,17 @@ h3{font-size:.95rem;font-weight:700}
 .acao-off:active,.btn.acao-off:active{background:var(--papel)}
 .acao-off.mostra::after{content:attr(data-papel);position:absolute;left:0;bottom:calc(100% + 4px);background:var(--tinta);color:var(--papel);font:600 .78rem/1.2 system-ui,-apple-system,sans-serif;padding:5px 8px;white-space:nowrap;z-index:8;letter-spacing:0;text-transform:none}
 .acao-off.mostra.dir::after{left:auto;right:0}
+/* v72: botão de avanço com pré-condição em falta — MESMO visual do .acao-off (um só estilo de "inativo" no app);
+   data-falta diz a próxima ação ("Registre o clima ou uma observação do dia"), nunca acusa; o toque mostra por 2,5 s.
+   Diferente do botão de perfil, este guarda o id: a pré-condição muda sem redesenhar a tela (atualizarAvanco). */
+.acao-off[data-falta].mostra::after{content:attr(data-falta);white-space:normal;left:0;right:0;text-align:left}
+/* v72: diálogo binário — componente ÚNICO (perguntar): pergunta curta, dois botões, nenhum campo. Afirmativa à direita;
+   destaque (verde) só em ação reversível e frequente; ação destrutiva ou irreversível fica com os dois botões neutros. */
+.dialogo{position:fixed;inset:0;z-index:70;background:rgba(35,32,26,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.dialogo .cartao{max-width:440px;width:100%;margin:0;max-height:85vh;overflow:auto}
+.dialogo .pergunta{font-weight:700;font-size:1.02rem;line-height:1.35}
+.dialogo .acoes{display:flex;gap:10px;margin-top:14px}
+.dialogo .acoes .btn{flex:1;min-width:0;font-size:.95rem;padding:0 8px;text-align:center}
 /* Cartões */
 .cartao{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio);padding:14px;margin-bottom:12px;box-shadow:var(--sombra)}
 .cartao.toque{cursor:pointer}
@@ -1101,7 +1112,8 @@ async function carregarTudo(){
 }
 async function salvarDados(){ await Persist.set("bdf:dados", JSON.stringify(D)); }
 function salvarDadosDebounce(){ clearTimeout(salvandoTimer); salvandoTimer=setTimeout(salvarDados,400); }
-function salvarRascunho(){ clearTimeout(rascunhoTimer); rascunhoTimer=setTimeout(()=>Persist.set("bdf:rascunho", JSON.stringify(rascunho)),300); }
+function salvarRascunho(){ clearTimeout(rascunhoTimer); rascunhoTimer=setTimeout(()=>Persist.set("bdf:rascunho", JSON.stringify(rascunho)),300);
+  if(rascunho) atualizarAvanco("bt-enviar", faltaEnvio(rascunho)); }   /* v72: validação silenciosa do Enviar, no lugar */
 
 /* ---------- Consultas ---------- */
 const talhao = id => D.talhoes.find(t=>t.id===id)||{nome:"?",area:0};
@@ -2441,7 +2453,80 @@ function fecharFolhaTexto(){
   f.remove(); document.body.classList.remove("folha-aberta"); document.body.style.top="";
   window.scrollTo(0,folhaScrollY);
 }
-document.addEventListener("keydown",ev=>{ if(ev.key==="Escape") fecharFolhaTexto(); });
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"){ fecharFolhaTexto(); fecharDialogo(false); } });
+
+/* ---------- Diálogo binário (v72) — componente ÚNICO ----------
+   perguntar(o) → Promise<boolean>. Substitui todo confirm() nativo (proibido desde a v72). Uma pergunta curta em
+   linguagem natural, terminada em "?", que DIZ o que vai acontecer (nunca "tem certeza?"; sem emoji, sem exclamação,
+   sem culpar; nunca produto, dose ou custo). Exatamente dois botões e nenhum campo de digitação: à esquerda a
+   alternativa neutra ("Cancelar" / "Voltar" / "Revisar"), à direita a afirmativa com VERBO no infinitivo + objeto
+   (até três palavras: "Descartar rascunho", "Enviar boletim", "Abrir ciclos").
+   o = { pergunta, sim, nao (padrão "Cancelar"), destaque, detalhes (lista de linhas, opcional) }.
+   destaque:true pinta a afirmativa de verde — SÓ quando a ação é reversível e o caminho provável é claramente o
+   mais frequente ("o sistema propõe, a pessoa aceita"). Ação destrutiva ou irreversível (descartar rascunho,
+   remover, encerrar, publicar, gerar novo código, envio do boletim) NUNCA leva destaque: os dois botões ficam neutros
+   para a pessoa parar e escolher — destaque em tudo treina o toque automático e esvazia as outras perguntas.
+   Toque fora não decide nada; Escape = alternativa. Nunca uma variante por atividade ou por perfil. */
+let dialogoResolve=null;
+function perguntar(o){
+  fecharDialogo(false);
+  return new Promise(res=>{
+    dialogoResolve=res;
+    const f=document.createElement("div"); f.className="dialogo"; f.id="dialogo";
+    f.setAttribute("role","alertdialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-labelledby","dialogo-pergunta");
+    f.innerHTML=`<div class="cartao">
+      <p class="pergunta" id="dialogo-pergunta">${esc(o.pergunta)}</p>
+      ${(o.detalhes||[]).length?`<div class="aviso mt" style="margin-bottom:0">${o.detalhes.map(a=>`<p style="margin:6px 0">${esc(a)}</p>`).join("")}</div>`:""}
+      <div class="acoes">
+        <button type="button" class="btn sec" id="bt-dialogo-nao">${esc(o.nao||"Cancelar")}</button>
+        <button type="button" class="btn${o.destaque?"":" sec"}" id="bt-dialogo-sim">${esc(o.sim)}</button>
+      </div></div>`;
+    document.body.appendChild(f);
+    f.onclick=ev=>{ const t=ev.target.closest("button"); if(!t) return;
+      if(t.id==="bt-dialogo-sim") fecharDialogo(true); else if(t.id==="bt-dialogo-nao") fecharDialogo(false); };
+    const foco=f.querySelector(o.destaque?"#bt-dialogo-sim":"#bt-dialogo-nao"); if(foco) foco.focus();
+  });
+}
+function fecharDialogo(resposta){
+  const f=document.getElementById("dialogo"); if(!f) return;
+  f.remove(); const r=dialogoResolve; dialogoResolve=null; if(r) r(!!resposta);
+}
+/* ---------- Aviso inline (v72) — substitui todo alert() nativo ----------
+   avisoInline(ancora, texto): UMA linha discreta (classe .aviso) logo acima do botão que foi tocado (ou no topo da
+   tela, se não houver âncora), rolada para a vista; some no próximo redesenho ou na próxima chamada. Serve para o
+   que a pessoa NÃO consegue enxergar antes do toque (boletim já existente naquela data, erro do servidor, arquivo
+   sem linhas): nesses casos o toque é permitido e explicado. O que ela consegue enxergar (formulário vazio, chip não
+   escolhido) vira botão inativo por botaoAvanco, não aviso. Texto diz a próxima ação; nunca "campo obrigatório",
+   "erro de validação", "você esqueceu". */
+function avisoInline(ancora, texto){
+  document.querySelectorAll("[data-aviso-inline]").forEach(x=>x.remove());
+  const el=(typeof ancora==="string")?document.querySelector(ancora):ancora;
+  const av=document.createElement("div"); av.className="aviso"; av.setAttribute("data-aviso-inline","1"); av.setAttribute("role","status");
+  av.textContent=texto;
+  if(el && el.parentNode) el.parentNode.insertBefore(av, el);
+  else { const app=$("#app"), topo=app.querySelector(".topo,.ctx-l2"); if(topo&&topo.nextSibling) app.insertBefore(av, topo.nextSibling); else app.prepend(av); }
+  av.scrollIntoView({behavior:"smooth",block:"center"});
+}
+/* ---------- Botão de avanço com validação silenciosa (v72) — componente ÚNICO ----------
+   botaoAvanco(id, {rotulo, falta, classe, attrs}): enquanto `falta` (o que ainda não foi feito, em forma de próxima
+   ação: "Registre o clima ou uma observação do dia") não for vazio, o botão nasce INATIVO com o MESMO visual do
+   botão de perfil da v71 (classe acao-off: cinza neutro, borda tracejada, sem vermelho, sem cadeado) e não executa —
+   o tratador de clique intercepta .acao-off antes de qualquer ação; o toque mostra `falta` por 2,5 s. Diferença
+   única em relação ao botão de perfil: este guarda o id e leva data-falta, porque a pré-condição muda com a
+   digitação e atualizarAvanco(id, falta) troca o estado no lugar, sem redesenhar a tela. Só se aplica a
+   pré-condição que a pessoa enxerga na tela; condição invisível continua permitindo o toque (avisoInline).
+   Nunca por seção eventual sem resposta (v70 decide isso com o aviso âmbar, não com bloqueio). */
+function botaoAvanco(id, o){
+  const falta=o.falta||"", cls=o.classe||"btn";
+  if(!falta) return `<button class="${cls}" id="${id}"${o.attrs?" "+o.attrs:""}>${o.rotulo}</button>`;
+  return `<button class="${cls} acao-off" id="${id}" aria-disabled="true" aria-label="${esc(o.aria||o.rotulo)} — ${esc(falta)}" title="${esc(falta)}" data-falta="${esc(falta)}"${o.attrs?" "+o.attrs:""}>${o.rotulo}</button>`;
+}
+function atualizarAvanco(id, falta){
+  const b=document.getElementById(id); if(!b) return;
+  const rot=b.getAttribute("data-rotulo")||b.textContent.trim();
+  if(falta){ b.classList.add("acao-off"); b.setAttribute("aria-disabled","true"); b.setAttribute("data-falta",falta); b.setAttribute("title",falta); b.setAttribute("aria-label",rot+" — "+falta); }
+  else { b.classList.remove("acao-off","mostra","dir"); b.removeAttribute("aria-disabled"); b.removeAttribute("data-falta"); b.removeAttribute("title"); b.removeAttribute("aria-label"); }
+}
 
 /* texto redigido pelo robô-redator (fase 2): sempre com o marcador de revisão. v68: cartão colapsado pelo
    componente único cartaoTextoLongo (prévia + copiar sem expandir; leitura completa na folha). Origem curta
@@ -2777,7 +2862,7 @@ function vUnidPlano(){
         ${auditoriaHtml(p)}
         ${p.status==="rascunho"?`<button class="btn sec mini mt" data-up="auditar" data-upv="${esc(p.id)}">Rodar auditoria</button>
           <label>Aprovado por (nome do agrônomo)</label><input data-upc="aprovado_por:${esc(p.id)}" value="${esc(p.aprovado_por||"")}" placeholder="Ex.: Salvino">
-          <button class="btn mt" data-up="publicar" data-upv="${esc(p.id)}" ${(p.auditoria_ok&&p.aprovado_por)?"":"disabled"}>Publicar como vigente</button>
+          ${botaoAvanco("bt-publicar-"+esc(p.id),{rotulo:"Publicar como vigente", classe:"btn mt", falta:faltaPublicar(p,p.aprovado_por), attrs:`data-up="publicar" data-upv="${esc(p.id)}"`})}
           <p class="mut" style="font-size:.75rem">Só habilita com auditoria ✔ e o nome do agrônomo. Publicar passa a versão vigente atual para "superado"; os celulares baixam a nova na próxima sincronização.</p>`:""}
       </div>`).join(""):htmlEstado("vazio",{que:"versão do plano",prep:"para",unidade:fzId,onde:fzId?"":(fz?"para "+fz:"")})}
     </div>
@@ -2843,12 +2928,17 @@ function auditarPlano(p, unidades, pus, adubo, cal){
   add("Todo insumo-mês tem via (fertirrigação / lanço) definida (informa — na v1 nenhuma tem, é esperado)", false, semVia?[semVia+" de "+adubo.length+" linhas sem via"]:[]);
   return { ok:itens.filter(i=>i.bloqueante).every(i=>i.ok), quando:new Date().toISOString(), versao_app:"v52", itens };
 }
+/* v72: pré-condições visíveis de "Publicar como vigente" (auditoria ✔ na tela e nome em "Aprovado por") — botão de avanço */
+function faltaPublicar(p, nome){
+  if(!p||!p.auditoria_ok) return "Rode a auditoria e resolva os itens ✱";
+  if(!String(nome||"").trim()) return "Escreva o nome do agrônomo em Aprovado por";
+  return "";
+}
 function upInput(el){
   const k=el.dataset.upc||"";
   if(k.indexOf("aprovado_por:")===0){ const pid=k.slice("aprovado_por:".length);
     const p=((upEstado.dados&&upEstado.dados.planos)||[]).find(x=>x.id===pid);
-    const bt=$("#app").querySelector('[data-up="publicar"][data-upv="'+pid+'"]');
-    if(bt) bt.disabled=!(p&&p.auditoria_ok&&el.value.trim()); }
+    atualizarAvanco("bt-publicar-"+pid, faltaPublicar(p, el.value)); }
 }
 async function upClique(d,t){
   const e=upEstado, acao=d.up, v=d.upv, app=$("#app");
@@ -2868,8 +2958,8 @@ async function upClique(d,t){
       const areaTxt=val("area_ha").trim().replace(",",".");
       const novo={ nome_curto:val("nome_curto").trim()||null, status:val("status")||u.status, status_desde:val("status_desde")||null,
         area_ha:areaTxt===""?null:Number(areaTxt), fonte_area:val("fonte_area")||null, obs:val("obs").trim()||null };
-      if(novo.area_ha!==null && !(novo.area_ha>0)){ alert("Área inválida."); return; }
-      if(novo.area_ha!==null && !novo.fonte_area){ alert("Diga a fonte da área (estimativa, calcário, iCrop…)."); return; }
+      if(novo.area_ha!==null && !(novo.area_ha>0)){ avisoInline(t, "Escreva a área em hectares, maior que zero, ou deixe em branco."); return; }
+      if(novo.area_ha!==null && !novo.fonte_area){ avisoInline(t, "Escolha a fonte da área (estimativa, calcário, iCrop…)."); return; }
       const mud={}, linhas=[];
       Object.keys(novo).forEach(k=>{ const antes=(u[k]==null?null:String(u[k])), depois=(novo[k]==null?null:String(novo[k]));
         if(antes!==depois){ mud[k]=novo[k]; linhas.push({unidade_id:u.id, campo:k, antes, depois}); } });
@@ -2879,21 +2969,21 @@ async function upClique(d,t){
       await log(linhas);
       e.editando=null; await upRecarregar(); await baixarPlano(); return; }
     if(acao==="inativar" && u){
-      if(!confirm("Inativar "+u.codigo+" — "+(u.nome_curto||u.nome_plano)+"? Ela sai das listas, mas nada é apagado.")) return;
+      if(!await perguntar({pergunta:"Inativar a unidade "+u.codigo+" — "+(u.nome_curto||u.nome_plano)+", tirando-a das listas sem apagar nada?", sim:"Inativar unidade", nao:"Cancelar", destaque:false})) return;
       await planoReq("PATCH","unidade_manejo?id=eq."+u.id,{ativo:false, inativado_em:agora(), atualizado_em:agora()},"return=minimal");
       await log([{unidade_id:u.id, campo:"ativo", antes:"true", depois:"false"}]);
       await upRecarregar(); await baixarPlano(); return; }
     if(acao==="alias-salvar" && u){
       const sistema=val("alias_sistema"); let alias=val("alias_texto").trim();
       if(sistema==="app"){ const sel=val("alias_app"); if(sel) alias=sel; }
-      if(!alias){ alert("Escreva o apelido (ou, no sistema app, escolha o talhão)."); return; }
+      if(!alias){ avisoInline(t, "Escreva o apelido ou, no sistema app, escolha o talhão."); return; }
       t.disabled=true;
       await planoReq("POST","unidade_alias",[{unidade_id:u.id, fazenda_app:u.fazenda_app, sistema, alias}],"return=minimal");
       await log([{unidade_id:u.id, campo:"alias:"+sistema, antes:null, depois:alias}]);
       e.aliasEm=null; await upRecarregar(); await baixarPlano(); return; }
     if(acao==="alias-fim"){
       const a=e.dados.aliases.find(x=>x.id===v); if(!a) return;
-      if(!confirm("Encerrar o apelido \""+a.alias+"\" ("+a.sistema+")? Ele fica no histórico com a data de fim.")) return;
+      if(!await perguntar({pergunta:"Encerrar o apelido \""+a.alias+"\" ("+a.sistema+"), guardando-o no histórico com a data de fim?", sim:"Encerrar apelido", nao:"Cancelar", destaque:false})) return;
       await planoReq("PATCH","unidade_alias?id=eq."+a.id,{vigente_ate:hojeISO()},"return=minimal");
       await log([{unidade_id:a.unidade_id, campo:"alias:"+a.sistema, antes:a.alias, depois:null}]);
       await upRecarregar(); await baixarPlano(); return; }
@@ -2909,14 +2999,13 @@ async function upClique(d,t){
       await upRecarregar(); return; }
     if(acao==="publicar" && p){
       const nome=val("aprovado_por:"+p.id).trim();
-      if(!p.auditoria_ok){ alert("Rode a auditoria e resolva os itens ✱ antes de publicar."); return; }
-      if(!nome){ alert("Preencha o nome do agrônomo em \"Aprovado por\"."); return; }
-      if(!confirm("Publicar a versão "+p.versao+" de "+p.fazenda_app+" como VIGENTE? A versão vigente atual (se houver) passa a \"superado\".")) return;
+      const falta=faltaPublicar(p, nome); if(falta){ atualizarAvanco("bt-publicar-"+p.id, falta); return; }
+      if(!await perguntar({pergunta:"Publicar a versão "+p.versao+" de "+p.fazenda_app+" como vigente, passando a atual (se houver) a superada?", sim:"Publicar versão", nao:"Cancelar", destaque:false})) return;
       t.disabled=true;
       await planoReq("PATCH","plano_safra?fazenda_app=eq."+encodeURIComponent(p.fazenda_app)+"&safra=eq."+encodeURIComponent(p.safra)+"&status=eq.vigente",{status:"superado"},"return=minimal");
       await planoReq("PATCH","plano_safra?id=eq."+p.id,{status:"vigente", vigente_de:hojeISO(), aprovado_por:nome, aprovado_em:agora()},"return=minimal");
       await upRecarregar(); await baixarPlano(); return; }
-  }catch(err){ alert("Não deu: "+err.message); await upRecarregar(); }
+  }catch(err){ await upRecarregar(); avisoInline(null, "Não foi possível concluir: "+err.message); }
 }
 function telemetriaDo(data,fz){
   const out={maquinas:[],lamina:[]};
@@ -4137,7 +4226,7 @@ function vForm(){
 
   <div class="rodape no-print"><div class="interno">
     <button class="btn sec mini" id="bt-descartar" style="flex:0 0 auto">Descartar</button>
-    <button class="btn" id="bt-enviar">${r.id?"Salvar correção":"Enviar boletim"}</button>
+    ${botaoAvanco("bt-enviar",{rotulo:r.id?"Salvar correção":"Enviar boletim", falta:faltaEnvio(r)})}
   </div></div>`;
 }
 function cardFn(f,i){
@@ -4755,7 +4844,7 @@ function vImportar(){
     <input type="file" id="imp-arq" accept=".csv,.txt,.tsv,.xlsx,.xls" style="width:100%">
     <p class="mut" style="font-size:.78rem">Ou copie a tabela no Excel/Numbers e cole aqui embaixo:</p>
     <textarea id="imp-cola" rows="3" placeholder="Cole aqui as linhas copiadas da planilha…" style="width:100%"></textarea>
-    <button class="btn mt" id="imp-ler">1 · Ler o arquivo</button>
+    ${botaoAvanco("imp-ler",{rotulo:"1 · Ler o arquivo", classe:"btn mt", falta:"Escolha o arquivo ou cole a tabela"})}
   </div>
   ${e&&e.cab?`<div class="cartao"><h3>2 · Diga qual coluna é o quê</h3>
     <p class="mut" style="font-size:.78rem">O aplicativo guarda essa escolha — da próxima vez já vem pronta.</p>
@@ -4763,7 +4852,7 @@ function vImportar(){
     <input type="date" id="imp-dia" value="${e.dia||ontemISO()}">
     ${campos.map(([k,rot,obrig])=>`<label>${rot}${obrig?` <b>*</b>`:""}</label>
       <select data-impmapa="${k}">${["<option value=''>—</option>"].concat(e.cab.map((c,i)=>`<option value="${i}" ${(e.mapa[k]!==undefined?e.mapa[k]==i:mapaSalvo[k]==c)?"selected":""}>${esc(c)}</option>`)).join("")}</select>`).join("")}
-    <button class="btn mt" id="imp-rodar">3 · Importar ${e.linhas.length} linha(s)</button>
+    ${botaoAvanco("imp-rodar",{rotulo:"3 · Importar "+e.linhas.length+" linha(s)", classe:"btn mt", falta:faltaImportar(e)})}
   </div>`:""}
   ${e&&e.resultado?`<div class="cartao"><h3>Resultado</h3><p>${e.resultado}</p>
     ${(e.semMaq||[]).length?`<p class="mt"><b>Máquinas que não reconheci</b> — vincule uma vez, fica aprendido:</p>
@@ -4789,7 +4878,7 @@ function carregarXLSX(){
 }
 function impLerTexto(txt){
   const grade=separarCSV(txt);
-  if(grade.length<2){ alert("Não achei linhas na tabela. Confira o arquivo ou o que colou."); return; }
+  if(grade.length<2){ avisoInline("#imp-ler", "Não achei linhas na tabela. Confira o arquivo ou o que colou."); return; }
   /* exports reais vêm com linhas de enfeite antes do cabeçalho — acha a linha com mais células preenchidas */
   let iCab=0, melhor=0;
   for(let i=0;i<Math.min(grade.length,8);i++){
@@ -4799,6 +4888,21 @@ function impLerTexto(txt){
   impEstado={ fonte:(impEstado?impEstado.fonte:"solinftec"), cab:grade[iCab], linhas:grade.slice(iCab+1).filter(l=>l.some(c=>c!=="")), mapa:{}, semMaq:[], semTal:[], resultado:"" };
   ir("importar");
 }
+/* v72: pré-condições visíveis do "3 · Importar" (selects de coluna e data do arquivo) — botão de avanço; o mapa salvo da
+   última vez conta como escolhido */
+function faltaImportar(e){
+  if(!e||!e.cab) return "";
+  const campos=CAMPOS_IMPORT[e.fonte], salvo=(D.mapaImport||{})[e.fonte]||{};
+  const tem=k=>(e.mapa[k]!==undefined&&e.mapa[k]!=="") || e.cab.indexOf(salvo[k])>=0;
+  for(const [k,rot,obrig] of campos){ if(obrig&&!tem(k)) return "Diga qual coluna é: "+rot; }
+  const diaEl=document.getElementById("imp-dia"), dia=diaEl?diaEl.value:(e.dia||ontemISO());
+  if(e.fonte==="solinftec" && !tem("data") && !dia) return "Informe de que dia é o arquivo";
+  return "";
+}
+function faltaLerArquivo(){
+  const arq=document.getElementById("imp-arq"), cola=document.getElementById("imp-cola");
+  return ((arq&&arq.files&&arq.files.length) || (cola&&cola.value.trim())) ? "" : "Escolha o arquivo ou cole a tabela";
+}
 function impRodar(){
   const e=impEstado; if(!e) return;
   const campos=CAMPOS_IMPORT[e.fonte];
@@ -4806,8 +4910,7 @@ function impRodar(){
   const salvo=(D.mapaImport||{})[e.fonte]||{};
   campos.forEach(([k])=>{ if(e.mapa[k]===undefined){ const i=e.cab.indexOf(salvo[k]); if(i>=0) e.mapa[k]=String(i); } });
   const diaEl=document.getElementById("imp-dia"); e.dia=diaEl?diaEl.value:(e.dia||ontemISO());
-  for(const [k,rot,obrig] of campos){ if(obrig&&(e.mapa[k]===undefined||e.mapa[k]==="")){ alert("Falta dizer qual coluna é: "+rot); return; } }
-  if(e.fonte==="solinftec" && (e.mapa.data===undefined||e.mapa.data==="") && !e.dia){ alert("Informe de que dia é o arquivo."); return; }
+  const falta=faltaImportar(e); if(falta){ atualizarAvanco("imp-rodar", falta); return; }
   D.mapaImport=D.mapaImport||{}; D.mapaImport[e.fonte]={};
   campos.forEach(([k])=>{ if(e.mapa[k]!==undefined&&e.mapa[k]!=="") D.mapaImport[e.fonte][k]=e.cab[e.mapa[k]]; });
   const col=k=>e.mapa[k]!==undefined&&e.mapa[k]!==""?+e.mapa[k]:null;
@@ -4855,7 +4958,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v71";
+const APP_VERSAO="v72";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -4898,10 +5001,10 @@ const cadMais=(h,rot)=>`<details class="cad-bloco"${cadUI.mais?" open":""}><summ
 const cadZona=h=>`<details class="cad-bloco zona"${cadUI.zona?" open":""}><summary>Zona de cuidado</summary><div class="corpo">${h}</div></details>`;
 const cadCampo=(rot,k,val,attrs)=>`<label>${rot}</label><input data-cadc="${k}" value="${esc(val==null?"":val)}" ${attrs||""}>`;
 const cadSelect=(rot,k,ops,val)=>`<label>${rot}</label><select data-cadc="${k}">${ops.map(([v,r])=>`<option value="${esc(v)}" ${String(val)===String(v)?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
-const cadConfirmar=(chave,rotulo,pergunta,classe)=> cadUI.confirma===chave
-  ? `<div class="aviso" style="border-color:var(--cereja)"><b>${pergunta}</b>
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadok="${esc(chave)}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`
-  : `<button class="btn ${classe||"suave"} mini" data-cadpede="${esc(chave)}">${rotulo}</button>`;
+/* v72: o botão da Zona de cuidado abre o diálogo único (perguntar) — pergunta e verbo vêm daqui, por ação; nunca
+   "Confirmar". Tudo aqui é remoção, encerramento ou troca de código: afirmativa SEM destaque. cadOk executa se sim. */
+const CAD_VERBO={"rm-talhao":"Remover talhão","desmembrar":"Criar unidade irmã","rm-pivo":"Remover pivô","enc-ciclo":"Encerrar colheita","unificar":"Unificar unidades","limpar-teste":"Apagar exemplos","novo-cod":"Gerar novo código","rm-termo":"Remover termo","rm-maq":"Remover máquina","rm-ins":"Remover insumo"};
+const cadConfirmar=(chave,rotulo,pergunta,classe)=>`<button class="btn ${classe||"suave"} mini" data-cadpede="${esc(chave)}" data-pergunta="${esc(pergunta)}">${rotulo}</button>`;
 const cadVal=k=>{ const el=$("#app").querySelector('[data-cadc="'+k+'"]'); return el?el.value.trim():""; };
 const cadNorm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const cadBate=(q,...txts)=>{ const n=cadNorm(q); return !n || txts.some(t=>cadNorm(t).includes(n)); };
@@ -5039,7 +5142,7 @@ function cadVFazenda(id){
       ${irmas.length?`<p class="mt"><b>Unificar</b> — passa os talhões desta unidade para uma irmã e deixa esta inativa. Os boletins antigos continuam abrindo.</p>
       ${cadSelect("Unificar com","alvoUnif",irmas.map(x=>[x.id,x.nome]),irmas[0].id)}
       <div class="mt">${cadConfirmar("unificar:"+f.id,"Unificar nesta irmã","Passar os "+nt+" talhões para a unidade escolhida e inativar esta?","sec")}</div>`:""}`)}
-    ${cadRodape(`<button class="btn" data-cadacao="salvar-fazenda" data-cadid="${f.id}">Salvar</button>`)}`;
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-fazenda" data-cadid="${f.id}">Salvar unidade</button>`)}`;
 }
 
 /* ================= 2. TALHÕES, PIVÔS E PASTOS ================= */
@@ -5076,8 +5179,8 @@ function cadVTalhao(id){
     ${novo?"":cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(t.id)}</b>.</p>
       ${t.tipo==="GRAO_ANUAL"?`<p class="mt">${c?"Ciclo ativo: <b>"+rotuloCultura(c.cultura)+"</b> desde "+fmtData(c.plantio):"Sem ciclo ativo (preparo / pousio)"} · ${hist.length} ciclo(s) no histórico.</p>
       <div class="mt">${cadItem("ciclo",t.id,"Ciclos e plantios deste talhão","novo plantio, encerrar colheita, histórico")}</div>`:""}`)}
-    ${novo?"":cadZona(cadConfirmar("rm-talhao:"+t.id,"Remover talhão","Remover "+esc(t.nome)+"? Boletins antigos continuam mostrando o nome pelo id.","sec"))}
-    ${cadRodape(`<button class="btn" data-cadacao="salvar-talhao" data-cadid="${esc(id)}">${novo?"Criar talhão":"Salvar"}</button>`)}`;
+    ${novo?"":cadZona(cadConfirmar("rm-talhao:"+t.id,"Remover talhão","Remover o talhão "+esc(t.nome)+" do cadastro, mantendo o nome nos boletins antigos?","sec"))}
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-talhao" data-cadid="${esc(id)}">${novo?"Criar talhão":"Salvar talhão"}</button>`)}`;
 }
 function cadVPivo(id){
   const [fz,pid]=id.split(":"), p=pivosLocaisDa(fz).find(x=>x.id===pid);
@@ -5086,7 +5189,7 @@ function cadVPivo(id){
     <div class="cartao">${cadCampo("Nome do pivô","nome",p.nome)}
       <p class="mut mt" style="font-size:.78rem">Cadastrado pelo gerente na seção Irrigação (fazenda sem pivô no cadastro oficial). Para virar talhão oficial, crie o talhão em "Talhões" e remova este.</p></div>
     ${cadZona(cadConfirmar("rm-pivo:"+id,"Remover pivô","Remover o pivô "+esc(p.nome)+" do cadastro local desta unidade?","sec"))}
-    ${cadRodape(`<button class="btn" data-cadacao="salvar-pivo" data-cadid="${esc(id)}">Salvar</button>`)}`;
+    ${cadRodape(`<button class="btn" data-cadacao="salvar-pivo" data-cadid="${esc(id)}">Salvar pivô</button>`)}`;
 }
 
 /* ================= 3. CICLOS E PLANTIOS (grãos) ================= */
@@ -5110,14 +5213,14 @@ function cadVCiclo(talId){
     <div class="cartao">
       ${t.tipo==="ARRENDADO"?`<p><span class="tag amarelo">Arrendado — sementeira</span></p><p class="mut mt">Área arrendada a sementeira: não tem ciclo no app (só etiqueta no boletim).</p>`
       :c?`<p>Ciclo ativo: <b>${rotuloCultura(c.cultura)}</b> · plantio em <b>${fmtData(c.plantio)}</b></p>
-        <div class="mt">${cadConfirmar("enc-ciclo:"+c.id,"Encerrar colheita","Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+esc(t.nome)+"? O ciclo fica guardado no histórico.")}</div>`
+        <div class="mt">${cadConfirmar("enc-ciclo:"+c.id,"Encerrar colheita","Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+esc(t.nome)+", guardando o ciclo no histórico?")}</div>`
       :`<p>Sem ciclo ativo — <b>em preparo / pousio</b>.</p>
         <label class="mt">Novo plantio — cultura</label>
         <div class="chips">${CULTURAS_ANUAIS.map(([k,r])=>`<button class="chip ${fm.cultura===k?"on":""}" data-cadchip="cultura:${k}">${r}</button>`).join("")}</div>
         <label>Data do plantio</label><input type="date" data-cadc="plantio" value="${esc(fm.data)}">`}
     </div>
     ${cadMais(hist.length?`<ul class="lista-limpa">${hist.map(h=>`<li><b>${rotuloCultura(h.cultura)}</b> <span class="mut">· ${fmtData(h.plantio)} → ${fmtData(h.encerradoEm)}</span></li>`).join("")}</ul>`:htmlEstado("vazio",{que:"ciclo encerrado",talhao:t.id,dica:"O histórico nunca é apagado."}),"Histórico do talhão ("+hist.length+")")}
-    ${(!c && t.tipo!=="ARRENDADO")?cadRodape(`<button class="btn" data-cadacao="novo-ciclo" data-cadid="${t.id}">Registrar plantio</button>`):""}`;
+    ${(!c && t.tipo!=="ARRENDADO")?cadRodape(botaoAvanco("bt-novo-ciclo",{rotulo:"Registrar plantio", falta:fm.cultura?"":"Escolha a cultura do plantio", attrs:`data-cadacao="novo-ciclo" data-cadid="${t.id}"`})):""}`;
 }
 
 /* ================= 4. LOTES E INVENTÁRIO (pecuária) ================= */
@@ -5205,7 +5308,7 @@ function cadVCodigo(chave){
       ${novo?`<div class="aviso verde mt"><b>Novo código gerado: <span class="num">${esc(novo)}</span></b><br><span class="mut">Anote e repasse. O antigo deixa de valer nos aparelhos na próxima sincronização.</span></div>`:""}
     </div>
     ${cadZona(`<p class="mut" style="font-size:.78rem">"Gerar novo" invalida o código atual (código vazou ou funcionário saiu). Os aparelhos com o antigo voltam para a tela de código na próxima sincronização.</p>
-      <div class="mt">${cadConfirmar("novo-cod:"+chave,"Gerar novo código","Gerar novo código para "+esc(rotuloDaChave(chave))+"? O atual ("+esc(codigoDe(chave))+") deixa de valer.")}</div>`)}`;
+      <div class="mt">${cadConfirmar("novo-cod:"+chave,"Gerar novo código","Gerar novo código para "+esc(rotuloDaChave(chave))+", no lugar do atual ("+esc(codigoDe(chave))+")?")}</div>`)}`;
 }
 function cadVCodigoNovo(){
   const fm=novoCombo||{ativs:[],unis:[]}; novoCombo=fm;
@@ -5219,7 +5322,7 @@ function cadVCodigoNovo(){
       <div class="chips">${D.fazendas.map(f=>`<button class="chip ${fm.unis.includes(f.id)?"on":""}" data-combo-uni="${f.id}">${esc(f.nome)}</button>`).join("")}</div>
       ${gerado?`<div class="aviso verde mt"><b>Código criado: <span class="num">${esc(gerado)}</span></b><br><span class="mut">Anote e repasse. Ele já aparece na lista de códigos.</span></div>`:""}
     </div>
-    ${cadRodape(`<button class="btn" data-cadacao="combo-gerar">Gerar código combinado</button>`)}`;
+    ${cadRodape(botaoAvanco("bt-combo-gerar",{rotulo:"Gerar código combinado", falta:(fm.ativs.length||fm.unis.length)?"":"Marque uma atividade ou uma unidade", attrs:'data-cadacao="combo-gerar"'}))}`;
 }
 
 /* ================= 7. CATÁLOGOS ================= */
@@ -5240,12 +5343,12 @@ function cadVCatalogo(atv){
     (cadUI.novo==="termo"?`<div class="cartao"><h3>Acrescentar termo</h3>
       ${cadSelect("Em qual lista",`catk`,editaveis.map(([k,rot])=>[k,rot]),fm.cat)}
       ${cadCampo("Termo","termo","","placeholder=\"Como o gerente vai ler no boletim\"")}
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="termo-add" data-cadid="${atv}">Acrescentar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="termo-add" data-cadid="${atv}">Acrescentar termo</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
     (cats.map(([k,rot,lista,edit])=>{ const pad=lista.filter(t=>cadBate(q,t)), ex=catExtra(k).filter(t=>cadBate(q,t)); if(!pad.length&&!ex.length) return "";
       const aberto=!!q || cadUI.confirma.indexOf("rm-termo:"+k+"|")===0 || (cadUI.form&&cadUI.form.abertos||[]).includes(k);
       return `<details class="cad-bloco" ${aberto?"open":""} data-cadlista="${esc(k)}"><summary>${esc(rot)} <span class="mut num">· ${lista.length+catExtra(k).length}${edit?"":" · só leitura"}</span></summary><div class="corpo" style="padding:0">`
         +pad.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)}</span><span class="mut" style="font-size:.72rem">padrão</span></div>`).join("")
-        +ex.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)} <span class="tag verde">acrescentado</span></span>${cadUI.confirma==="rm-termo:"+k+"|"+t?`<button class="btn mini" data-cadok="rm-termo:${esc(k)}|${esc(t)}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-termo:${esc(k)}|${esc(t)}">remover</button>`}</div>`).join("")+`</div></details>`;
+        +ex.map(t=>`<div class="cad-item" style="cursor:default;border-left:none;border-right:none"><span class="cresce">${esc(t)} <span class="tag verde">acrescentado</span></span>${cadConfirmar("rm-termo:"+k+"|"+t,"remover","Remover o termo \""+esc(t)+"\" da lista, mantendo-o nos registros antigos?")}</div>`).join("")+`</div></details>`;
     }).join("")||htmlEstado("vazio",{que:"termo",onde:"no catálogo de "+ROTULO_CULT[atv].toLowerCase(),filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="termo">＋ Acrescentar termo</button>`);
 }
@@ -5255,11 +5358,11 @@ function cadVMaquinas(){
   return cadTopo("Máquinas e equipamentos",maqs.length+" de "+D.maquinas.length)+cadBusca("cad-m-busca","Buscar por nome, COD ou categoria…")+
     `<p class="mut" style="font-size:.78rem">Uma máquina pode atender mais de uma fazenda: toque no vínculo e marque as que ela serve. Sem nenhuma marcada = Grupo (todas).</p>`+
     (cadUI.novo==="maquina"?`<div class="cartao"><h3>Nova máquina</h3>${cadCampo("Nome (com COD, se tiver)","mnome","")}${cadCampo("Categoria","mcat","Outros")}
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="maquina-add">Criar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="maquina-add">Criar máquina</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
     maqs.map(m=>`<div class="cad-item" data-cadfoco="maq:${m.id}" style="cursor:default;flex-wrap:wrap">
       <span class="cresce"><b>${esc(m.nome)}</b><span class="mut">${esc(m.cat||"")}</span></span>
       <button class="btn suave mini" data-vinc-abrir="${m.id}">${(m.fazendas||[]).length?"🔗 ":""}${esc(rotuloVinc(m))} ▾</button>
-      ${cadUI.confirma==="rm-maq:"+m.id?`<button class="btn mini" data-cadok="rm-maq:${m.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-maq:${m.id}">remover</button>`}
+      ${cadConfirmar("rm-maq:"+m.id,"remover","Remover a máquina "+esc(rotuloMaq(m))+" do cadastro, mantendo o nome nos boletins antigos?")}
       ${vincAberto===m.id?`<div class="chips mt" style="width:100%"><button class="chip ${!(m.fazendas||[]).length?"on":""}" data-vinc-grupo="${m.id}">Grupo (todas)</button>
         ${D.fazendas.map(f=>`<button class="chip ${(m.fazendas||[]).includes(f.id)?"on":""}" data-vinc-faz="${m.id}:${f.id}">${esc(f.nome)}</button>`).join("")}</div>`:""}</div>`).join("")+
     (maqs.length?"":htmlEstado("vazio",{que:q?"máquina":"máquina cadastrada",filtro:q},{classe:"mut centro mt"}))+
@@ -5269,9 +5372,9 @@ function cadVInsumos(){
   const q=cadUI.filtro, ins=D.insumos.filter(i=>cadBate(q,i.nome,i.un));
   return cadTopo("Insumos",D.insumos.length+" cadastrados")+(D.insumos.length>12?cadBusca("cad-i-busca","Buscar insumo…"):"")+
     (cadUI.novo==="insumo"?`<div class="cartao"><h3>Novo insumo</h3>${cadCampo("Nome","inome","")}${cadCampo("Unidade (L, kg, t…)","iun","")}
-      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="insumo-add">Criar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="insumo-add">Criar insumo</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
     ins.map(i=>`<div class="cad-item" data-cadfoco="ins:${i.id}" style="cursor:default"><span class="cresce"><b>${esc(i.nome)}</b><span class="mut">${esc(i.un||"")}</span></span>
-      ${cadUI.confirma==="rm-ins:"+i.id?`<button class="btn mini" data-cadok="rm-ins:${i.id}">Confirmar</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button>`:`<button class="btn suave mini" data-cadpede="rm-ins:${i.id}">remover</button>`}</div>`).join("")+
+      ${cadConfirmar("rm-ins:"+i.id,"remover","Remover o insumo "+esc(i.nome)+" do cadastro, mantendo o nome nos boletins antigos?")}</div>`).join("")+
     (ins.length?"":htmlEstado("vazio",{que:q?"insumo":"insumo cadastrado",filtro:q},{classe:"mut centro mt"}))+
     cadRodape(`<button class="btn" data-cadnovo="insumo">＋ Novo insumo</button>`);
 }
@@ -5339,7 +5442,7 @@ function cadVSync(){
       <label>Chave (publishable / anon)</label><input id="sync-key" value="${esc(syncCfg.chave)}" placeholder="sb_publishable_…">
       <button class="btn mini mt" data-cadacao="sync-salvar">Testar e salvar</button>`,"Mais opções · conexão")}
     ${cadZona(`<p class="mut" style="font-size:.78rem">Registros de exemplo (marcados "exemplo") vieram com a instalação e nunca sobem para o banco.</p>
-      <div class="mt">${teste?cadConfirmar("limpar-teste","Limpar dados de teste ("+teste+")","Apagar os "+teste+" registros de exemplo deste aparelho? Boletins reais não são tocados.","sec"):`<span class="mut">Sem dados de teste neste aparelho.</span>`}</div>`)}
+      <div class="mt">${teste?cadConfirmar("limpar-teste","Limpar dados de teste ("+teste+")","Apagar os "+teste+" registros de exemplo deste aparelho, sem tocar nos boletins reais?","sec"):`<span class="mut">Sem dados de teste neste aparelho.</span>`}</div>`)}
     ${cadRodape(`<button class="btn" data-cadacao="sync-agora">${syncOcupado?"Sincronizando…":"Sincronizar agora"}</button>`)}`;
 }
 
@@ -5400,7 +5503,8 @@ function cadClique(t,d){
   if(d.cadsalto!==undefined){ cadUI.filtro=d.cadsalto; cadRender(); return true; }
   if(d.cadnovo!==undefined){ cadUI.novo=d.cadnovo; cadUI.confirma=""; if(cadAtual().v==="lote") cadUI.zona=true; cadRender(); return true; }
   if(d.cadcancel!==undefined){ cadUI.novo=""; cadUI.confirma=""; cadRender(); return true; }
-  if(d.cadpede!==undefined){ cadUI.confirma=d.cadpede; cadUI.zona=true; cadRender(); return true; }
+  if(d.cadpede!==undefined){ const chave=d.cadpede, tipo=chave.slice(0,chave.indexOf(":")>=0?chave.indexOf(":"):chave.length);
+    perguntar({pergunta:d.pergunta||"", sim:CAD_VERBO[tipo]||"Continuar", nao:"Cancelar", destaque:false}).then(ok=>{ if(ok) cadOk(chave); }); return true; }
   if(d.cadchip!==undefined){ const [k,v]=d.cadchip.split(":"); cadUI.form=cadUI.form||{}; cadUI.form[k]=(k==="mes")?parseInt(v):(cadUI.form[k]===v?"":v); if(k==="mes") cadUI.filtro=""; cadRender(); return true; }
   if(d.cadok!==undefined){ cadOk(d.cadok); return true; }
   if(d.cadacao!==undefined){ cadAcao(d.cadacao,d.cadid||""); return true; }
@@ -5946,7 +6050,7 @@ const secsDe = p => p.secadores || (p.secador ? [p.secador] : []);
 const estadoSec = s => s.estado || (s.fim==="Sim" ? "fim" : "");
 const bensDe = p => p.beneficios || (p.beneficio ? [p.beneficio] : []);
 const tulhasDe = p => p.tulhas || [];
-function salvarRascPos(){ Persist.set("bdf:rascpos", JSON.stringify(rascunhoPos)); }
+function salvarRascPos(){ Persist.set("bdf:rascpos", JSON.stringify(rascunhoPos)); if(rascunhoPos) atualizarAvanco("bt-enviar-pos", faltaEnvioPos(rascunhoPos)); }   /* v72 */
 function vCasaPos(){
   const fz=sessao.fazendaId, p=posDoDia(hojeISO(),fz);
   const rec = envioRecentePos && p && p.id===envioRecentePos ? p.id : null;
@@ -6032,17 +6136,22 @@ function vFormPos(){
       </div>`).join("")}
       <button class="btn suave mini mt" data-add-ben="1">＋ outro lote beneficiado</button>
     </div></details>
-  <button class="btn mt" id="bt-enviar-pos">Enviar registro do dia</button>`;
+  ${botaoAvanco("bt-enviar-pos",{rotulo:"Enviar registro do dia", classe:"btn mt", falta:faltaEnvioPos(r)})}`;
 }
-function validarEnviarPos(){
-  const r=rascunhoPos;
-  const tem = ["entradaLatas","viradas","saiu"].some(k=>r.terreiro[k]!=="") ||
+/* v72: pré-condição visível do envio do pós-colheita (formulário vazio) — botão inativo que explica ao toque */
+function faltaEnvioPos(r){
+  if(!r) return "";
+  const tem = ["entradaLatas","viradas","saiu"].some(k=>(r.terreiro||{})[k]!=="") ||
     (r.secadores||[]).some(s=>["lote","temp","horas","umidade"].some(k=>s[k]!=="")||estadoSec(s)) ||
     (r.tulhas||[]).some(u=>u.lote||u.mov) ||
     (r.beneficios||[]).some(b=>["lote","sacas"].some(k=>b[k]!==""));
-  if(!tem){ alert("Preencha pelo menos uma informação antes de enviar."); return; }
+  return tem ? "" : "Registre terreiro, secador, tulha ou benefício do dia";
+}
+function validarEnviarPos(){
+  const r=rascunhoPos;
+  if(faltaEnvioPos(r)){ atualizarAvanco("bt-enviar-pos", faltaEnvioPos(r)); return; }
   const dup=(D.posColheitas||[]).find(p=>p.data===r.data && p.fazendaId===r.fazendaId && p.id!==r.id);
-  if(dup){ alert("Já existe registro de pós-colheita para "+fmtData(r.data)+". Abra-o na lista para corrigir."); return; }
+  if(dup){ avisoInline("#bt-enviar-pos", "Já existe registro de pós-colheita de "+fmtData(r.data)+". Abra-o na lista para corrigir."); return; }
   D.posColheitas=D.posColheitas||[];
   if(!r.id){ r.id=uid(); r.enviadoEm=hojeISO()+" "+new Date().toTimeString().slice(0,5); D.posColheitas.push(r); }
   if(r.responsavel){ Persist.set("bdf:nomeResp", r.responsavel); nomeRespLembrado=r.responsavel; }
@@ -6109,7 +6218,7 @@ function vDetalhePos(id){
 let nomeRespLembrado="";
 /* Colheita lançada como operação vira registro em r.colheita (painel, relatório e CSV continuam valendo).
    Só as linhas espelhadas (id "opcol-") são recriadas; colheitas antigas ficam intactas. */
-function espelharColheitaGraos(r){
+async function espelharColheitaGraos(r){
   const ops=(r.atividades||[]).filter(a=>a.gr&&opCatDe(a.tipo)==="COLHEITA");
   r.colheita=(r.colheita||[]).filter(c=>!String(c.id||"").startsWith("opcol-"));
   ops.forEach(a=>{
@@ -6118,18 +6227,22 @@ function espelharColheitaGraos(r){
     r.colheita.push({id:"opcol-"+a.id, talhaoId:a.talhaoId, areaHa:a.areaHa||"", sacas:sacas||"", kg:kg||"",
       umidade:a.umidade||"", impureza:a.impureza||"", destino:a.destino||"", cargas:a.cargas||"", obs:a.obs||""});
   });
-  /* 100% da área colhida? oferece encerrar o ciclo */
+  /* 100% da área colhida? oferece encerrar o ciclo — v72: diálogo único, UMA pergunta para todos os talhões,
+     sem destaque (encerrar não se desfaz na tela: a pessoa lê e escolhe) */
+  const encerrar=[];
   [...new Set(ops.map(a=>a.talhaoId).filter(Boolean))].forEach(tid=>{
     const c=cicloAtivo(tid), t=talhao(tid);
     if(!c||!n0(t.area)) return;
     const antes=D.boletins.filter(b=>b.fazendaId===r.fazendaId&&b.data>=(c.plantio||"")&&b.id!==r.id)
       .reduce((s,b)=>s+(b.colheita||[]).filter(x=>x.talhaoId===tid).reduce((x2,cc)=>x2+n0(cc.areaHa),0),0);
     const hoje2=r.colheita.filter(x=>x.talhaoId===tid).reduce((s,x)=>s+n0(x.areaHa),0);
-    if(antes+hoje2>=n0(t.area)*0.999){
-      if(confirm("Área de "+t.nome+" 100% colhida ("+rotuloCultura(c.cultura)+"). Encerrar o ciclo? Ele fica no histórico."))
-        c.encerradoEm=r.data;
-    }
+    if(antes+hoje2>=n0(t.area)*0.999) encerrar.push({c,t});
   });
+  if(encerrar.length){
+    const ok=await perguntar({ pergunta:"Encerrar o ciclo dos talhões com 100 % da área colhida, guardando-os no histórico?",
+      detalhes:encerrar.map(x=>x.t.nome+" — "+rotuloCultura(x.c.cultura)), sim:"Encerrar ciclos", nao:"Manter abertos", destaque:false });
+    if(ok) encerrar.forEach(x=>{ x.c.encerradoEm=r.data; });
+  }
 }
 /* Cinto de segurança do envio: junta os avisos que merecem uma conferida antes de mandar */
 function avisosEnvio(r){
@@ -6144,16 +6257,16 @@ function avisosEnvio(r){
     const lim=(()=>{const d=new Date(r.data+"T12:00:00"); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10);})();
     const teveGente=D.boletins.some(b=>b.fazendaId===r.fazendaId && b.id!==r.id && b.data>=lim && b.data<r.data
       && (n0(b.mo&&b.mo.proprios)+n0(b.mo&&b.mo.diaristas))>0);
-    if(teveGente) avisos.push("Dia útil com 0 pessoas — esta fazenda teve gente trabalhando nos últimos 7 dias. Esqueceu a mão de obra?");
+    if(teveGente) avisos.push("Dia útil com 0 pessoas — esta fazenda teve gente trabalhando nos últimos 7 dias. Confira a mão de obra.");
   }
   if((r.colheita||[]).some(c=>!c.talhaoId)) avisos.push(atividadeDe(r.fazendaId)==="CAFE"?"Colheita lançada sem talhão. Diga de qual talhão saiu o café.":"Colheita lançada sem talhão. Diga de qual talhão saiu a produção.");
   if(!(r.atividades||[]).length && !(r.colheita||[]).length && pessoas===0 && !(r.ocorrencias||[]).length && !temPecuaria(r) && !(r.irg||[]).some(e2=>e2.status))
-    avisos.push("Boletim praticamente vazio — sem atividades, colheita nem equipe. Confirma que o dia foi assim?");
+    avisos.push("Boletim praticamente vazio — sem atividades, colheita nem equipe. Confira se o dia foi assim.");
   /* grãos: rastreabilidade e informado × medido */
   if(temCultura(r.fazendaId,"GRAOS")&&!temCultura(r.fazendaId,"CAFE")){
     (r.atividades||[]).forEach(a=>{
       if(a.gr&&a.tipo&&opCatDe(a.tipo)==="APLICACAO"&&!(a.produtos||[]).some(p=>p.nome))
-        avisos.push("Aplicação \""+a.tipo+"\" em "+talhao(a.talhaoId).nome+" sem produto na receita. Sem produto e dose não dá para fechar custo nem rastrear.");
+        avisos.push("Aplicação \""+a.tipo+"\" em "+talhao(a.talhaoId).nome+" sem receita preenchida. Sem ela não dá para rastrear a aplicação.");
       if(a.gr&&a.tipo&&!a.talhaoId)
         avisos.push("Operação \""+a.tipo+"\" sem talhão. Diga onde foi feita.");
     });
@@ -6187,32 +6300,27 @@ function mostrarSecoesSemResposta(lista){
   primeira.parentNode.insertBefore(av, primeira);
   av.scrollIntoView({behavior:"smooth",block:"start"});
 }
-function caixaAvisosEnvio(avisos){
-  const antiga=document.getElementById("caixa-avisos"); if(antiga) antiga.remove();
-  const fundo=document.createElement("div");
-  fundo.id="caixa-avisos";
-  fundo.style.cssText="position:fixed;inset:0;background:rgba(35,32,26,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px";
-  fundo.innerHTML=`<div class="cartao" style="max-width:440px;width:100%;margin:0;max-height:85vh;overflow:auto">
-    <h3>Antes de enviar, confira:</h3>
-    <div class="aviso mt">${avisos.map(a=>`<p style="margin:6px 0">⚠️ ${esc(a)}</p>`).join("")}</div>
-    <div class="linha-flex mt" style="gap:10px">
-      <button class="btn sec" id="bt-aviso-revisar">Revisar</button>
-      <button class="btn" id="bt-aviso-confirmar">Confirmar e enviar</button>
-    </div></div>`;
-  document.body.appendChild(fundo);
-  fundo.querySelector("#bt-aviso-revisar").onclick=()=>fundo.remove();
-  fundo.querySelector("#bt-aviso-confirmar").onclick=()=>{
-    fundo.remove();
-    if(rascunho){ rascunho.avisosConfirmados=avisos; concluirEnvio(); }
-  };
+/* v72: cinto de segurança do envio pelo diálogo único — pergunta diz o que vai acontecer, avisos como detalhes,
+   "Revisar" à esquerda e o verbo do envio à direita SEM destaque (o envio é tratado como definitivo: a pessoa lê). */
+async function caixaAvisosEnvio(avisos){
+  const corrigindo=!!(rascunho&&rascunho.id);
+  const ok=await perguntar({ pergunta: corrigindo?"Salvar a correção com estes avisos?":"Enviar o boletim com estes avisos?",
+    detalhes:avisos, nao:"Revisar", sim:corrigindo?"Salvar correção":"Enviar boletim", destaque:false });
+  if(ok && rascunho){ rascunho.avisosConfirmados=avisos; concluirEnvio(); }
+}
+/* v72: pré-condição visível do Enviar (formulário vazio) — o botão nasce inativo e explica ao toque (botaoAvanco);
+   a mesma função vale para as três atividades. Texto diz a próxima ação, nunca "campo obrigatório". */
+function faltaEnvio(r){
+  if(!r) return "";
+  const tem = (r.clima&&r.clima.cond) || (r.atividades||[]).length || r.obsGeral || (r.ocorrencias||[]).length || temPecuaria(r) || (r.irg||[]).some(e2=>e2.status);
+  return tem ? "" : "Registre o clima ou uma observação do dia";
 }
 function validarEnviar(){
   const r=rascunho;
-  if(!r.clima.cond && !r.atividades.length && !r.obsGeral && !r.ocorrencias.length && !temPecuaria(r) && !(r.irg||[]).some(e2=>e2.status)){
-    alert("Registre pelo menos o clima ou uma observação do dia."); return;
-  }
+  if(faltaEnvio(r)){ atualizarAvanco("bt-enviar", faltaEnvio(r)); return; }
+  /* boletim já existente na data: a pessoa não enxerga isso no formulário — o toque é permitido e explicado (avisoInline) */
   const jaExiste = D.boletins.find(b=>b.data===r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
-  if(jaExiste){ alert("Já existe boletim para "+fmtData(r.data)+". Abra-o pela lista para corrigir."); return; }
+  if(jaExiste){ avisoInline("#bt-enviar", "Já existe boletim de "+fmtData(r.data)+" nesta unidade. Abra-o pela lista para corrigir."); return; }
   /* v70 (decisão do Nilo): toda seção eventual precisa de resposta antes do envio — registro ou "Nada a registrar hoje".
      Só as eventuais (as que têm o chip); as esperadas seguem a regra de sempre. Sem ação em massa: um toque por seção. */
   const semResposta=secoesEventuaisDa(atividadeDe(r.fazendaId)).filter(s=>estadoSecao(r,s).k==="nao_respondido");
@@ -6222,8 +6330,9 @@ function validarEnviar(){
   delete r.avisosConfirmados;
   concluirEnvio();
 }
-function concluirEnvio(){
+async function concluirEnvio(){
   const r=rascunho;
+  const propostasCiclo=[];   /* v72: plantio lançado → propostas de abrir/completar ciclo, perguntadas de uma vez ao fim */
   /* v69: "sem ocorrência" nunca sobe junto com registro; quem respondeu = quem assina o boletim, se o chip veio antes do nome */
   limparRespostasSecao(r);
   Object.values(r.secoes||{}).forEach(x=>{ if(x && !x.por) x.por=r.responsavel||""; });
@@ -6250,17 +6359,23 @@ function concluirEnvio(){
         D.ultimasReceitasTal[a.talhaoId]={tipo:a.tipo,alvo:a.alvo||"",produtos:JSON.parse(JSON.stringify(a.produtos)),caldaLha:a.caldaLha||"",equip:a.equip||""};
       (a.produtos||[]).forEach(p=>aprender(p.nome));
       aprender(a.produtoAdb); aprender(a.formulacao); aprender(a.produtoInoc);
-      /* plantio lançado: oferece abrir (ou completar) o ciclo do talhão com a data */
+      /* plantio lançado: oferece abrir (ou completar) o ciclo do talhão com a data — juntado em UMA pergunta abaixo */
       if(cat==="PLANTIO"&&a.talhaoId!=="geral"){
         const c=cicloAtivo(a.talhaoId);
-        if(!c){ if(a.culturaPl && confirm("Abrir o ciclo de "+rotuloCultura(a.culturaPl)+" em "+talhao(a.talhaoId).nome+" com plantio em "+fmtData(r.data)+"?"))
-          D.ciclos.push({id:uid(),talhaoId:a.talhaoId,cultura:a.culturaPl,plantio:r.data}); }
-        else if(!c.plantio && confirm("Atualizar o ciclo de "+rotuloCultura(c.cultura)+" em "+talhao(a.talhaoId).nome+" com a data de plantio "+fmtData(r.data)+"?"))
-          c.plantio=r.data;
+        if(!c){ if(a.culturaPl && !propostasCiclo.some(x=>x.talhaoId===a.talhaoId)) propostasCiclo.push({talhaoId:a.talhaoId, cultura:a.culturaPl, abrir:true}); }
+        else if(!c.plantio && !propostasCiclo.some(x=>x.talhaoId===a.talhaoId)) propostasCiclo.push({talhaoId:a.talhaoId, cultura:c.cultura, ciclo:c});
       }
     });
+    /* o sistema propõe, a pessoa aceita com um toque: ação reversível (o ciclo pode ser encerrado ou corrigido em
+       Cadastros › Ciclos) e caminho provável claro → afirmativa com destaque. Uma pergunta para todos os talhões. */
+    if(propostasCiclo.length){
+      const linhas=propostasCiclo.map(x=>rotuloCultura(x.cultura)+" em "+talhao(x.talhaoId).nome+(x.abrir?"":" (ciclo já aberto, sem data)"));
+      const ok=await perguntar({ pergunta:"Abrir o ciclo dos talhões plantados hoje, com plantio em "+fmtData(r.data)+"?",
+        detalhes:linhas, sim:"Abrir ciclos", nao:"Deixar como está", destaque:true });
+      if(ok) propostasCiclo.forEach(x=>{ if(x.abrir) D.ciclos.push({id:uid(),talhaoId:x.talhaoId,cultura:x.cultura,plantio:r.data}); else x.ciclo.plantio=r.data; });
+    }
     (r.irg||[]).forEach(e2=>(e2.quimiProdutos||[]).forEach(p=>aprender(p.nome)));
-    espelharColheitaGraos(r);
+    await espelharColheitaGraos(r);
   }
   if(r.pecuaria){
     const evs=(r.pecuaria.eventos||[]).filter(e2=>e2.tipo);
@@ -6295,10 +6410,6 @@ function ligarEventos(tela){
   const setResumo=(id,txt)=>{ const el=$("#"+id); if(el) el.textContent=txt; };
   const resumoContagem=(id,n)=>setResumo(id, n? n+" registro"+(n>1?"s":"") : "");
 
-  app.onchange = ev=>{
-    const s=ev.target.closest("[data-impmapa]");
-    if(s&&impEstado){ impEstado.mapa[s.dataset.impmapa]=s.value; return; }
-  };
   /* v67: teclado no badge de categoria (role=button): Enter/Espaço equivalem ao toque */
   app.onkeydown = ev=>{ const bd=ev.target&&ev.target.closest&&ev.target.closest(".op-cat"); if(bd&&(ev.key==="Enter"||ev.key===" ")){ ev.preventDefault(); bd.click(); } };
   app.onclick = async ev=>{
@@ -6328,14 +6439,8 @@ function ligarEventos(tela){
       sessao=null; rascunho=null; Persist.del("bdf:sessao");
       entrarPeloAcesso(); syncTudo(); return; }
     if(t.id==="bt-sair-aparelho"){
-      if(confirm("Esquecer o código deste aparelho? Para entrar de novo vai precisar digitar o código.")) sairDoAparelho();
+      if(await perguntar({pergunta:"Esquecer o código de acesso neste aparelho e digitá-lo de novo na próxima entrada?", sim:"Esquecer código", nao:"Cancelar", destaque:false})) sairDoAparelho();
       return; }
-    if(d.novoCod){ if(!podeCadastros()) return;
-      const chave=d.novoCod, nome=rotuloDaChave(chave);
-      if(!confirm("Gerar novo código para "+nome+"? O código atual ("+codigoDe(chave)+") deixa de valer nos aparelhos na próxima sincronização.")) return;
-      const novo=gerarNovoCodigo(chave);
-      alert("Novo código de "+nome+": "+novo+"\nAnote e repasse — o antigo não abre mais.");
-      ir("cadastros",null,true); return; }
     /* novo código combinado (só ADMIN): escolhe atividades e/ou unidades */
     if(t.id==="bt-novo-combo"){ if(!podeCadastros()) return; novoCombo={ativs:[],unis:[]}; ir("cadastros",null,true); return; }
     if(t.id==="bt-combo-cancelar"){ novoCombo=null; ir("cadastros",null,true); return; }
@@ -6345,14 +6450,6 @@ function ligarEventos(tela){
     if(d.comboUni && novoCombo){ const i=novoCombo.unis.indexOf(d.comboUni);
       if(i>=0) novoCombo.unis.splice(i,1); else novoCombo.unis.push(d.comboUni);
       ir("cadastros",null,true); return; }
-    if(t.id==="bt-combo-gerar"){ if(!podeCadastros()||!novoCombo) return;
-      if(!novoCombo.ativs.length && !novoCombo.unis.length){ alert("Marque pelo menos uma atividade ou unidade."); return; }
-      const ordem=["CAFE","GRAOS","PECUARIA"];
-      const chave="MIX:"+ordem.filter(a=>novoCombo.ativs.includes(a)).join("+")+":"+novoCombo.unis.slice().sort().join("+");
-      const jaTinha=!!((D.codigosAcesso||{})[chave]);
-      const novo=gerarNovoCodigo(chave);
-      alert("Código combinado ("+rotuloDaChave(chave)+"): "+novo+(jaTinha?"\nJá existia um código com este mesmo escopo — o antigo não abre mais.":"")+"\nAnote e repasse.");
-      novoCombo=null; ir("cadastros",null,true); return; }
     /* Escritório: Unidades e Plano de safra (v52) — só ADMIN */
     if(t.id==="bt-unidplano"){ if(!podeCadastros()) return; upEstado.dados=null; upEstado.erro=""; ir("unidplano"); upRecarregar(); return; }
     if(t.id==="bt-relatorios"){ if(!podeCadastros()) return; window.open("relatorios.html","_blank"); return; }
@@ -6391,14 +6488,6 @@ function ligarEventos(tela){
       return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
     if(d.sync!==undefined){ syncTudo(); ir(telaAtual,null,true); return; } /* "Tentar de novo" do estado de erro (v61): redesenha já em "carregando" */
-    if(t.id==="bt-sync-salvar"){
-      const u=(app.querySelector("#sync-url")||{}).value||"", k=(app.querySelector("#sync-key")||{}).value||"";
-      syncCfg={ url:u.trim().replace(/\/+$/,""), chave:k.trim() };
-      Persist.set("bdf:sync", JSON.stringify(syncCfg));
-      if(!syncAtivo()){ alert("Preencha os dois campos."); return; }
-      syncBaixar().then(ok=>{ alert(ok?"✅ Conectado! Sincronização ligada.":"❌ Não conectou. Confira a URL e a chave.");
-        ir("cadastros",null,true); });
-      return; }
     if(d.receber){ confirmarRemessa(d.receber); return; }
     if(d.limparFiltros){ filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:"", atv:""}; ir(telaAtual,null,true); return; }
     if(d.atvFiltro!==undefined && sessao && (sessao.papel==="proprietario"||sessao.papel==="admin")){
@@ -6420,13 +6509,13 @@ function ligarEventos(tela){
               const wb=XLSX.read(new Uint8Array(fr.result),{type:"array"});
               const ws=wb.Sheets[wb.SheetNames[0]];
               seguir(XLSX.utils.sheet_to_csv(ws,{FS:";"}));
-            }catch(e){ alert("Não consegui ler este Excel. Abra a planilha, copie as células e cole na caixa de texto."); ir("importar"); } };
+            }catch(e){ ir("importar"); avisoInline("#imp-ler", "Não consegui ler este Excel. Abra a planilha, copie as células e cole na caixa de texto."); } };
           fr.readAsArrayBuffer(arq);
-        }).catch(()=>{ alert("Para ler Excel preciso de internet nesta primeira vez. Conecte e tente de novo — ou copie as células e cole na caixa."); ir("importar"); });
+        }).catch(()=>{ ir("importar"); avisoInline("#imp-ler", "Para ler Excel é preciso internet nesta primeira vez. Conecte e tente de novo, ou copie as células e cole na caixa."); });
         return; }
       if(arq){ const fr=new FileReader(); fr.onload=()=>seguir(fr.result); fr.readAsText(arq,"utf-8"); }
       else if(cola){ seguir(cola); }
-      else alert("Escolha o arquivo ou cole a tabela.");
+      else atualizarAvanco("imp-ler", faltaLerArquivo());
       return; }
     if(t.id==="imp-rodar"){ impRodar(); return; }
     if(t.id==="imp-vinc"){
@@ -6480,14 +6569,11 @@ function ligarEventos(tela){
       const escolha=prompt("Novo plantio em "+nomeTal+" — qual cultura?\n1 = Feijão\n2 = Soja\n3 = Milho comercial","3");
       if(escolha===null) return;
       const cult={"1":"FEIJAO","2":"SOJA","3":"MILHO_COMERCIAL"}[String(escolha).trim()];
-      if(!cult){ alert("Digite 1, 2 ou 3."); return; }
+      if(!cult){ avisoInline(t, "Escolha 1, 2 ou 3 para a cultura do plantio."); return; }
       const dt=prompt("Data do plantio (dia/mês/ano):",fmtData(hojeISO())); if(dt===null) return;
       D.ciclos=D.ciclos||[];
       D.ciclos.push({id:uid(), talhaoId:d.novoCiclo, cultura:cult, plantio:dataNorm(dt)||hojeISO()});
       salvarDados(); ir(telaAtual,null,true); return; }
-    if(d.encCiclo){ const c=(D.ciclos||[]).find(x=>x.id===d.encCiclo); if(!c) return;
-      if(!confirm("Encerrar a colheita de "+rotuloCultura(c.cultura)+" em "+talhao(c.talhaoId).nome+"? O ciclo fica guardado no histórico.")) return;
-      c.encerradoEm=hojeISO(); salvarDados(); ir(telaAtual,null,true); return; }
     if(d.vincAbrir){ vincAberto = (vincAberto===d.vincAbrir) ? "" : d.vincAbrir; ir("cadastros",null,true); return; }
     if(d.vincGrupo){ const m=D.maquinas.find(x=>x.id===d.vincGrupo); if(m){ m.fazendas=[]; salvarDados(); ir("cadastros",null,true); } return; }
     if(d.vincFaz){ const [mid,fid]=d.vincFaz.split(":");
@@ -6537,10 +6623,12 @@ function ligarEventos(tela){
     if(t.id==="bt-rel-csv"){ csvRelatorio(); return; }
     if(t.id==="bt-pdf"){ window.print(); return; }
     if(t.id==="bt-enviar"){ validarEnviar(); return; }
-    if(t.id==="bt-descartar"){ if(confirm("Descartar este rascunho?")){ rascunho=null; Persist.del("bdf:rascunho"); ir("casa"); } return; }
+    if(t.id==="bt-descartar"){ /* destrutivo: sem destaque, verbo nomeia a destruição */
+      if(await perguntar({pergunta:"Descartar o rascunho deste boletim e perder o que foi preenchido hoje?", sim:"Descartar rascunho", nao:"Cancelar", destaque:false})){ rascunho=null; Persist.del("bdf:rascunho"); ir("casa"); }
+      return; }
 
     /* formulário — tudo atualizado no lugar, sem redesenhar a tela */
-    if(!rascunho){ cadastroClique(d,t); return; }
+    if(!rascunho) return;
     const r=rascunho;
 
     if(t.id==="bt-copiar-ontem"){
@@ -6898,6 +6986,7 @@ function ligarEventos(tela){
   app.oninput = ev=>{
     const el=ev.target, d=el.dataset;
     if(telaAtual==="cadastros" && cadInput(el)) return;
+    if(el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }   /* v72: colar a tabela ativa "1 · Ler" */
     if(d.r!==undefined && rascunho){ rascunho[d.r]=el.value; salvarRascunho(); return; }
     if(d.pr!==undefined && rascunhoPos){ rascunhoPos[d.pr]=el.value; salvarRascPos(); return; }
     if(d.pt!==undefined && rascunhoPos){ rascunhoPos.terreiro[d.pt]=el.value; salvarRascPos(); return; }
@@ -6994,6 +7083,12 @@ function ligarEventos(tela){
   };
   app.onchange = async ev=>{
     const el=ev.target, d=el.dataset;
+    /* Importar (ADMIN): mapa de colunas e data do arquivo → estado do "3 · Importar" no lugar; arquivo/texto → "1 · Ler".
+       (v72: este bloco vivia num app.onchange anterior que era sobrescrito por este — os selects não eram lidos.) */
+    const sImp=el.closest("[data-impmapa]");
+    if(sImp&&impEstado){ impEstado.mapa[sImp.dataset.impmapa]=el.value; atualizarAvanco("imp-rodar", faltaImportar(impEstado)); return; }
+    if(el.id==="imp-dia" && impEstado){ atualizarAvanco("imp-rodar", faltaImportar(impEstado)); return; }
+    if(el.id==="imp-arq"||el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }
     if(d.fotoInput && el.files && el.files[0] && rascunho){
       const durl=await comprimirFoto(el.files[0]);
       if(durl){ const o=rascunho.ocorrencias.find(x=>x.id===d.fotoInput);
@@ -7120,34 +7215,6 @@ function atualizarMatura(card, c){
   a.style.width=(s?100*n0(c.cereja)/s:33)+"%"; a.textContent=n0(c.cereja)||"";
   b.style.width=(s?100*n0(c.verde)/s:34)+"%"; b.textContent=n0(c.verde)||"";
   d.style.width=(s?100*n0(c.seco)/s:33)+"%"; d.textContent=n0(c.seco)||"";
-}
-function cadastroClique(d,t){
-  if(d.addCad){
-    const tipo=d.addCad;
-    if(tipo==="talhao"){ const nome=prompt("Nome do talhão:"); if(!nome) return;
-      const area=n0(prompt("Área (ha):")||0);
-      const nf=prompt("Fazenda (digite parte do nome):")||"";
-      const fz=D.fazendas.find(f=>f.nome.toLowerCase().includes(nf.toLowerCase()));
-      D.talhoes.push({id:uid(),nome,area,fazendaId:fz?fz.id:null,tipo:tipoPeloPerfil(nome, fz?perfilDe(fz.id):["CAFE"])}); }
-    if(tipo==="maquina"){ const nome=prompt("Nome da máquina (com COD, se tiver):"); if(!nome) return;
-      const cat=prompt("Categoria (ex.: Tratores café):","Outros")||"Outros";
-      const nf=prompt("Fazendas que ela atende, separadas por vírgula (vazio = grupo todo):")||"";
-      const fzs=nf.split(",").map(x=>x.trim()).filter(Boolean)
-        .map(x=>D.fazendas.find(f=>f.nome.toLowerCase().includes(x.toLowerCase()))).filter(Boolean).map(f=>f.id);
-      D.maquinas.push({id:uid(),nome,cat,fazendas:[...new Set(fzs)]}); }
-    if(tipo==="insumo"){ const nome=prompt("Nome do insumo:"); if(!nome) return;
-      const un=prompt("Unidade (L, kg, t…):")||""; D.insumos.push({id:uid(),nome,un}); }
-    if(tipo==="usuario"){ const nome=prompt("Nome:"); if(!nome) return;
-      const papel=prompt("Papel (gerente / proprietario / admin):")||"gerente"; D.usuarios.push({id:uid(),nome,papel}); }
-    salvarDados(); ir("cadastros"); return;
-  }
-  if(d.rmCad){
-    const [tipo,id]=d.rmCad.split(":");
-    if(!confirm("Remover este cadastro?")) return;
-    const mapa={talhao:"talhoes",maquina:"maquinas",insumo:"insumos",usuario:"usuarios"};
-    D[mapa[tipo]]=D[mapa[tipo]].filter(x=>x.id!==id);
-    salvarDados(); ir("cadastros");
-  }
 }
 
 /* ---------- Histórico simples (reuso do painel para o gerente) ---------- */

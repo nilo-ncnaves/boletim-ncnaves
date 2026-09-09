@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v71** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v72** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -66,6 +66,12 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   sumir (ver "Ações por perfil (v71)" abaixo); as demais continuam
   ocultas. Isto é interface: a autorização real é do escopo do código e
   das políticas do Supabase, que não mudaram.
+- **Decisão e confirmação (v72):** nenhum `confirm()`/`alert()` nativo;
+  toda pergunta passa pelo diálogo único `perguntar` (dois botões, verbo
+  no afirmativo, destaque só em ação reversível), o botão de avanço
+  nasce inativo enquanto falta o que a pessoa enxerga (`botaoAvanco`,
+  mesmo visual do botão de perfil) e o que ela não enxerga é explicado
+  depois do toque (`avisoInline`). Ver "Decisão e confirmação (v72)".
 - Aparelhos que entraram na v45 com código de unidade continuam
   dentro (migração automática do acesso gravado); os códigos antigos
   de DIRETORIA (LG-9351) e ADMIN (AD-4786) foram substituídos pelo
@@ -853,6 +859,74 @@ perfis × decisão × motivo) em docs/acoes-por-perfil.md.
   desabilitadas, medido), "Corrigir" para o próprio gerente depois de
   48 h (regra de prazo, não de perfil; a tela já explica).
 
+## Decisão e confirmação (v72) — diálogo único, validação silenciosa, verbo no botão
+Regra permanente em CLAUDE.md, item c10; checagem em
+docs/definicao-de-pronto.md, item 13. Três ideias do app Sigma
+(Fundação ABC): o diálogo Não/Sim que resolve um planejamento num
+toque, o "Prosseguir" cinza até existir ponto marcado e "Fazer Upload"
+em vez de "OK".
+- **Problema resolvido:** o app tinha 11 `confirm()`, 22 `alert()` e
+  14 `prompt()` nativos (caixa cinza do sistema, botão "OK", fora do
+  visual do app), mais dois padrões próprios de confirmação (a caixa
+  "Antes de enviar, confira" com "Confirmar e enviar" verde e o
+  `cadConfirmar` inline de Cadastros com "Confirmar" verde). Metade dos
+  nativos estava em tratadores mortos desde os Cadastros da v56.
+- **Diálogo binário — componente único `perguntar({pergunta, sim, nao,
+  destaque, detalhes})`** (Promise, `role="alertdialog"`, dois botões,
+  nenhum campo, Escape cancela, toque fora não decide). Pontos (20
+  confirmações, contagem igual à de antes — 11 nativas + 9 inline):
+  Descartar rascunho · Esquecer código (Sair) · cinto de segurança do
+  envio (Revisar · Enviar boletim / Salvar correção, avisos como
+  detalhes) · Abrir ciclos depois de plantio lançado (grãos; ÚNICA com
+  destaque: reversível em Cadastros › Ciclos e caminho provável claro;
+  uma pergunta para todos os talhões do dia) · Encerrar ciclos com 100 %
+  colhido (grãos; uma pergunta, sem destaque) · Inativar unidade ·
+  Encerrar apelido · Publicar versão (Unidades e Plano) · Remover
+  talhão / pivô / termo / máquina / insumo · Encerrar colheita · Criar
+  unidade irmã · Unificar unidades · Apagar exemplos · Gerar novo código
+  (Cadastros, Zona de cuidado — antes inline, agora o mesmo diálogo).
+  Todas as perguntas terminam em "?", dizem o que vai acontecer e não
+  citam produto, dose ou custo.
+- **Validação silenciosa — `botaoAvanco(id, {rotulo, falta, classe,
+  attrs})` + `atualizarAvanco(id, falta)`:** Enviar boletim / Salvar
+  correção (três atividades; falta "Registre o clima ou uma observação
+  do dia"; `salvarRascunho` atualiza no lugar), Enviar registro do dia
+  (pós-colheita; "Registre terreiro, secador, tulha ou benefício do
+  dia"; `salvarRascPos`), Publicar como vigente (auditoria ✔ e nome do
+  agrônomo — antes `disabled` nativo sem explicação), 1 · Ler o arquivo e
+  3 · Importar N linhas (arquivo/colar; coluna obrigatória e data),
+  Registrar plantio (cultura por chip) e Gerar código combinado (chips)
+  em Cadastros. Mesmo visual do `.acao-off` da v71 (cinza neutro, borda
+  tracejada, `aria-disabled`); o toque mostra `data-falta` por 2,5 s;
+  guarda o id porque o estado muda com a digitação.
+- **Aviso depois do toque — `avisoInline(ancora, texto)`** para o que a
+  pessoa não enxerga antes: boletim/registro já existente naquela data,
+  arquivo sem linhas, Excel ilegível ou sem internet, área inválida ou
+  sem fonte, apelido vazio, erro do Supabase em Unidades e Plano, "1, 2
+  ou 3" do novo plantio. Uma linha `.aviso` acima do botão; some no
+  próximo redesenho.
+- **Rótulos com verbo:** "Confirmar e enviar" → "Enviar boletim" /
+  "Salvar correção"; "Confirmar" (×10 em Cadastros) → verbo da ação;
+  "Criar" → "Criar máquina" / "Criar insumo"; "Acrescentar" →
+  "Acrescentar termo"; "Salvar" → "Salvar unidade" / "Salvar talhão" /
+  "Salvar pivô". Nenhum "OK", "Sim", "Confirmar" sobrou.
+- **Textos do cinto de segurança reescritos:** "Esqueceu a mão de
+  obra?" → "Confira a mão de obra."; "Confirma que o dia foi assim?" →
+  "Confira se o dia foi assim."; o aviso de aplicação sem receita
+  deixou de citar produto, dose e custo ("sem receita preenchida. Sem
+  ela não dá para rastrear a aplicação.").
+- **Removido (código morto, sem elemento que o acionasse):** tratadores
+  `data-novo-cod`, `bt-combo-gerar`, `bt-sync-salvar`, `data-enc-ciclo`
+  e `cadastroClique` (add/rm de cadastro por `prompt`), todos
+  substituídos pelos Cadastros da v56.
+- **Fica como pendência (fora desta entrega):** 4 `prompt()` — "✔
+  Confirmar recebimento" da carga de café (quantas carretas; observação
+  se diferente) e "🌱 Novo plantio" na tela do gerente de grãos (cultura
+  1/2/3 e data). São campos de digitação dentro de diálogo nativo;
+  trocar por chips/campos na tela é mudança de fluxo, a decidir com o
+  Nilo. O envio do boletim NÃO é bloqueado por seção eventual sem
+  resposta (v70 continua com o aviso âmbar).
+
 ## Carteira de relatórios: ver docs/relatorios.md
 Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
@@ -876,8 +950,16 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v71, 08/09/2026:
-**278 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v71 acrescentou o grupo
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v72, 09/09/2026:
+**308 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v72 acrescentou o grupo
+"10. Decisão e confirmação" (30 itens ✅: stub de alert/confirm/prompt
+em toda página com zero chamadas nos cenários; Enviar inativo no
+formulário vazio das três atividades e do pós-colheita, toque explica
+sem alert e sem sair da tela, clima/terreiro ativa o mesmo elemento;
+Descartar abre o diálogo único com dois botões, sem campo, pergunta com
+"?", verbo de até três palavras e sem destaque; Cancelar mantém a tela)
+e passou a contar no grupo 9 só o botão de perfil (`.acao-off[data-papel]`);
+a v71 acrescentou o grupo
 "9. Ação desabilitada por perfil" (28 itens ✅, medidos no painel da
 Diretoria, no boletim enviado visto pela Diretoria e pelo gerente das
 três atividades — com um boletim de exemplo semeado — e a contagem zero
@@ -980,6 +1062,14 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   de boletins ✅ (referência; v71: 4 botões em duas linhas, 390 px sem
   rolar de lado ✅) · Relatórios 1 tela ✅ · Resumo do período
   1,2 telas ✅.
+- Decisão e confirmação (v72, grupo 10): boletim de café, grãos e
+  pecuária e registro do pós-colheita — Enviar inativo ao abrir (cinza,
+  tracejado, aria-disabled) ✅ · toque mostra "Registre o clima ou uma
+  observação do dia" / "Registre terreiro, secador, tulha ou benefício
+  do dia" sem alert e sem sair da tela ✅ · ativa no mesmo elemento ao
+  escolher o clima / digitar a lata ✅ · Descartar abre o diálogo com 2
+  botões, 0 campos, "?" no fim, "Cancelar" · "Descartar rascunho", ambos
+  neutros ✅ · zero nativos nos cenários ✅.
 - Ação desabilitada por perfil (v71, grupo 9): painel da Diretoria
   ("⚙ Cadastros") e boletim enviado visto pela Diretoria ("✏️
   Corrigir") e pelo gerente de café, grãos e pecuária ("Marcar como
@@ -1028,6 +1118,18 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Decisão e confirmação (v72) — para o Nilo:** (1) testar no iPhone,
+  numa unidade de cada atividade: abrir o boletim vazio e tocar em
+  "Enviar boletim" (cinza tracejado; aparece "Registre o clima ou uma
+  observação do dia" por 2,5 s), escolher o clima e ver o botão ficar
+  verde sem a tela piscar, tocar em "Descartar" e ver o diálogo com
+  "Cancelar" · "Descartar rascunho" (os dois neutros), cancelar; no
+  pós-colheita, o mesmo com "Enviar registro do dia"; (2) em grãos,
+  lançar uma operação de plantio e enviar: a pergunta "Abrir o ciclo dos
+  talhões plantados hoje…?" com "Abrir ciclos" em verde; (3) decidir
+  sobre os 4 `prompt()` que ficaram (recebimento de carga; novo plantio
+  na tela do gerente) e sobre as sugestões do PR (remover a pergunta de
+  "Sair", juntar as perguntas de ciclo ao cinto de segurança do envio).
 - **Resposta explícita de ausência (v69) — para o Nilo:** (1) rodar
   `sql/047-secao-resposta.sql` no SQL Editor (bloco único, passo a
   passo no cabeçalho; até lá a resposta já sobe dentro do payload e o

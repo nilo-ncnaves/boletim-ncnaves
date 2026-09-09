@@ -385,6 +385,72 @@ três atividades e em todos os perfis; nunca uma variante.
   desabilitada por perfil"; detalhe em docs/definicao-de-pronto.md,
   item 12.
 
+### c10) Decisão e confirmação: diálogo único, validação silenciosa, verbo no botão (desde a v72)
+Três padrões ligados a decisão (ideias do app Sigma, Fundação ABC: o
+diálogo Não/Sim que resolve um planejamento num toque, o "Prosseguir"
+cinza até existir ponto marcado e "Fazer Upload" no lugar de "OK").
+- **Diálogo binário — componente ÚNICO `perguntar({pergunta, sim, nao,
+  destaque, detalhes})`** do index.html (Promise<boolean>). `confirm()`
+  e `alert()` nativos são PROIBIDOS (quebram o visual e não aceitam
+  verbo no botão). Pergunta curta, em linguagem natural, terminada em
+  "?", que DIZ o que vai acontecer — nunca "tem certeza?", sem emoji,
+  sem exclamação, sem culpar ou advertir, nunca produto, dose ou custo.
+  Exatamente dois botões e nenhum campo de digitação (regra 2): à
+  esquerda a alternativa neutra ("Cancelar", "Voltar", "Revisar"); à
+  direita a afirmativa com o verbo. `detalhes` (lista de linhas) só para
+  o cinto de segurança do envio. Toque fora não decide; Escape cancela.
+  Nunca uma variante por atividade ou por perfil.
+- **Quando destacar a afirmativa (`destaque:true`, verde):** SÓ quando
+  a ação é reversível E o caminho provável é claramente o mais frequente
+  ("o sistema propõe, a pessoa aceita" — hoje só "Abrir ciclos" depois de
+  um plantio lançado). **Nunca** em ação destrutiva ou irreversível
+  (descartar rascunho, remover, encerrar, inativar, publicar, gerar novo
+  código, esquecer o código, envio do boletim): os dois botões ficam
+  neutros (`btn sec`) para a pessoa parar e escolher. Destaque em tudo
+  treina o toque automático e esvazia as outras perguntas. Nunca usar
+  diálogo binário para decisão cuja consequência a pessoa não prevê
+  pelo texto da pergunta.
+- **Validação silenciosa — componente ÚNICO `botaoAvanco(id, {rotulo,
+  falta, classe, attrs})` / `atualizarAvanco(id, falta)`.** Botão de
+  avanço, envio ou conclusão cuja pré-condição a pessoa ENXERGA na tela
+  (formulário vazio, chip não escolhido, coluna não mapeada) nasce
+  inativo com o MESMO visual do botão de perfil (c9: classe `.acao-off`,
+  cinza neutro, borda tracejada, sem vermelho, sem cadeado — um só
+  estilo de "inativo" no app), `aria-disabled`, não executa; o toque
+  mostra `data-falta` por 2,5 s (mesmo mecanismo do `data-papel`) e,
+  satisfeita a condição, o botão ativa NO LUGAR, sem redesenhar
+  (`salvarRascunho` / `salvarRascPos` / `onchange` chamam
+  `atualizarAvanco`). Diferença única em relação ao botão de perfil: este
+  guarda o id (o interceptador de `.acao-off` no clique garante que nada
+  executa). Texto de `falta` diz a próxima ação ("Registre o clima ou uma
+  observação do dia", "Escolha a cultura do plantio"); proibidos "campo
+  obrigatório", "preencha os dados", "erro de validação", "você
+  esqueceu". Condição INVISÍVEL na tela (boletim já existente na data,
+  erro do servidor, arquivo sem linhas) NÃO desabilita: o toque é
+  permitido e explicado por `avisoInline(ancora, texto)` — uma linha
+  `.aviso` acima do botão, que some no próximo redesenho. Nunca bloquear
+  o envio por seção eventual sem resposta (c8/v70 decide isso com o
+  aviso âmbar). A tela de apontamento em 3 passos não recebe botão de
+  avanço (c4).
+- **Verbo no botão:** todo botão de confirmação diz o que faz — verbo no
+  infinitivo + objeto, até três palavras ("Enviar boletim", "Descartar
+  rascunho", "Remover talhão", "Publicar versão"). Proibidos "OK", "Sim",
+  "Confirmar", "Continuar", "Salvar" sozinho. O par nunca é Sim/Não:
+  o afirmativo carrega o verbo, o negativo é "Cancelar"/"Voltar"/
+  "Revisar". Botão que destrói nomeia a destruição.
+- **Contenção:** entrega nova NÃO aumenta o número de confirmações do
+  app (v72: 20 pontos, contagem no PR). Ponto que "poderia" ter
+  confirmação e não tem vira sugestão no PR, nunca código; confirmação
+  desnecessária em ação trivialmente reversível vira proposta de remoção
+  (só com aval do Nilo). `prompt()` (campo dentro de diálogo) não entra
+  em diálogo novo; os quatro que restam (recebimento de carga, novo
+  plantio) estão listados no ESTADO.md como pendência.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "10. Decisão e
+  confirmação" (nenhum nativo dispara; Enviar inativo no formulário
+  vazio, toque explica, clima ativa no lugar; Descartar abre o diálogo
+  com dois botões, sem campo, pergunta com "?", verbo, sem destaque);
+  detalhe em docs/definicao-de-pronto.md, item 13.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

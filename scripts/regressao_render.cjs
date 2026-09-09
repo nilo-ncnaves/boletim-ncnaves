@@ -97,7 +97,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['80-ocorrencia', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de equipamento'); await clique(p, '[data-ograv="Média"]'); await preenche(p, 'textarea[data-o="texto"]', 'mangueira estourou'); }],
     ['85-obs', async p => { await preenche(p, 'textarea[data-t="obsGeral"]', 'dia normal'); await preenche(p, 'textarea[data-t="pendencias"]', 'terminar setor 3'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar'); if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],
     ['97-whats-enviado', async p => { const txt = await p.evaluate(() => resumoWhats(D.boletins[D.boletins.length - 1])); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
   ]);
@@ -113,7 +113,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['50-fito', async p => { await clique(p, '#bt-add-fito'); await clique(p, '[data-ftipo="Praga"]'); const t = await primeiraOpcao(p, 'select[data-f="talhaoId"]'); await escolhe(p, 'select[data-f="talhaoId"]', t); await clique(p, '[data-fniv="Baixo"]'); }],
     ['60-ocorr', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de máquina'); await clique(p, '[data-ograv="Baixa"]'); await preenche(p, 'textarea[data-o="texto"]', 'pneu'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar'); if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],   /* v67: boletim enviado (badge de categoria) */
   ]);
 
@@ -129,7 +129,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['60-pasto', async p => { await clique(p, '[data-psc="condicao|No ponto"]'); }],
     ['70-obs', async p => { await preenche(p, 'textarea[data-pec="obs"]', 'tudo em ordem'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar'); if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],   /* v67: boletim enviado (badge de categoria) */
   ]);
 

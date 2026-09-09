@@ -6,6 +6,53 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 09/09/2026 · v72 · Decisão e confirmação: diálogo único, validação silenciosa, verbo no botão (#30, #31, #43)
+
+**Entrega.** Componentes únicos no `index.html`: `perguntar(o)` (diálogo
+binário, Promise, dois botões, nenhum campo, destaque só em ação
+reversível), `botaoAvanco` / `atualizarAvanco` (botão de avanço inativo
+com o MESMO visual do `.acao-off` da v71 enquanto falta o que a pessoa
+enxerga; ativa no lugar) e `avisoInline` (uma linha acima do botão para
+o que só se descobre depois do toque). Zero `confirm()`/`alert()`: 11
+confirm e 22 alert substituídos ou removidos (metade eram tratadores
+mortos desde a v56); `caixaAvisosEnvio` e o `cadConfirmar` de Cadastros
+passaram a usar o diálogo; 20 confirmações antes, 20 depois (as duas
+perguntas de ciclo de grãos, antes uma por talhão, viraram uma por
+tipo). Rótulos: "Confirmar e enviar" → "Enviar boletim"/"Salvar
+correção"; "Confirmar" ×10 → verbo da ação; "Criar"/"Acrescentar"/
+"Salvar" ganharam objeto. Avisos do cinto de segurança sem "Esqueceu",
+sem "Confirma que" e sem produto/dose/custo. Docs: CLAUDE.md c10,
+definição de pronto item 13, ESTADO. Versão v72 no rodapé e no cache.
+Nenhum SQL, nenhuma RLS, nenhum campo novo de digitação; os 4
+`prompt()` herdados ficam listados como pendência.
+
+**Verificado (automático).** `node --check` no JavaScript extraído, no
+`sw.js` e nos dois scripts; `git grep "confirm(\|alert("` no index.html
+acha só comentários; `scripts/checar-poluicao.cjs` 308 ✅ · 41 ❌ (os 41
+herdados; grupo novo "10. Decisão e confirmação" com 30 ✅: stub de
+alert/confirm/prompt com zero chamadas nos cenários de café, grãos e
+pecuária; Enviar inativo no formulário vazio das três atividades e do
+pós-colheita, toque explica sem alert e sem mudar de tela, clima/lata
+ativa o mesmo elemento; Descartar abre o diálogo com 2 botões, 0 campos,
+"?" no fim, verbo ≤ 3 palavras, ambos neutros; Cancelar mantém a tela);
+`scripts/regressao_render.cjs` main × branch: as únicas diferenças são
+o `#bt-enviar`/`#bt-enviar-pos` do formulário vazio (mesmos atributos
+nas três atividades e no pós-colheita) e o texto reescrito do aviso de
+aplicação sem receita em `avisosConfirmados` (grãos); Diretoria e
+Cadastros byte a byte iguais; os envios das três atividades concluem
+pelo diálogo (`#bt-dialogo-sim`); erros de página iguais aos do main.
+
+**Teste manual (Nilo, iPhone).** Listado em ESTADO.md › PENDÊNCIAS
+("Decisão e confirmação (v72)"): Enviar cinza no boletim vazio e verde
+ao escolher o clima; Descartar com "Cancelar" · "Descartar rascunho";
+pergunta "Abrir ciclos" depois de plantio em grãos; decisões sobre os
+`prompt()` e as sugestões do PR.
+
+**Não tocado.** Fluxo de apontamento em 3 passos (etapas, ordem e
+comportamento; zero botão inativo nos cartões, medido), exigência de
+resposta nas seções eventuais (v70), políticas do Supabase, tabelas,
+catálogos, `relatorios.html`.
+
 ## 08/09/2026 · v71 · Ação de outro papel aparece desabilitada (três pontos aprovados pelo Nilo)
 
 **Entrega.** Catálogo `ACOES_PERFIL` + função única `estadoAcao(id, ctx)`
