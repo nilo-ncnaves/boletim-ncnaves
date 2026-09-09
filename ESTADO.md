@@ -669,8 +669,10 @@ espaço.
   sticky; volta ao rolar para o topo; nada muda de altura (sem salto).
   Medido a 390 × 844: 64 + 19 = 83 px expandido (9,9 %; 11,9 % de 700
   px úteis), 64 px colapsado (7,6 %; piso dos botões "‹"/"⇥" de 40 px).
-- Não há régua de 7 dias (#19) no repositório; o carimbo de origem de
-  dado (#3) segue no rodapé de cada bloco.
+- Desde a v73 a régua de 7 dias (#19) entra logo abaixo do cabeçalho
+  nas casas do gerente e do pós-colheita (seção "Régua de 7 dias
+  (v73)"): conjunto medido em 148 px (17,6 % de 844); o carimbo de
+  origem de dado (#3) segue no rodapé de cada bloco.
 - Sem SQL, sem campo novo, sem texto prescritivo; a área do plano
   (`unidade_manejo`) não é usada. Regressão: diferença main × branch só
   no trecho do cabeçalho, igual nas três atividades.

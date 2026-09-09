@@ -245,6 +245,15 @@ Relatórios, Faróis, Resumo do período) e de Cadastros.
 - **Ordem de corte se não couber:** atividade (já é a unidade da linha
   1), depois ciclo; fazenda, unidade e área ficam. A linha 1 pode
   ocupar duas linhas visuais dentro dos 40 px dos botões (line-clamp).
+- **Orçamento conjunto com a régua de 7 dias (desde a v73, item c11):**
+  nenhuma tela empilha outra barra sticky sobre o cabeçalho; a régua é
+  estática, logo abaixo dele, e o conteúdo vem abaixo dos dois.
+  Medido a 390 × 844: cabeçalho expandido 83 px + faixa de cor 3 px +
+  régua 48 px + margem 12 px = 148 px (17,6 % de 844; 21,2 % de 700 px
+  úteis; no pós-colheita, sem faixa de cor, 145 px) — teto de ~25 %.
+  Colapsado (rolando), só a barra de 64 px fica fixa. Se um dia não
+  couber, o cabeçalho corta na ordem acima antes de a régua encolher;
+  a régua nunca ganha rolagem.
 - **Proibido no cabeçalho:** produtor/empresa, ícone de cultura, custo,
   produto, dose, "não fez"/"pendente", carimbo de origem de dado (esse
   fica no rodapé do bloco, item c3).

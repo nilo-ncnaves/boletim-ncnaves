@@ -159,7 +159,9 @@ na tela. Antes do PR, conferir:
    390 × 844; 64 px colapsado); a linha 2 rola por baixo da barra sem
    JS e sem mudar altura de nada. Tela nova não pode empilhar outra
    barra sticky em cima — se precisar de régua ou filtro fixo, a soma
-   com o cabeçalho fica abaixo de ~25 % da altura útil.
+   com o cabeçalho fica abaixo de ~25 % da altura útil. Medido na v73
+   com a régua de 7 dias (item 14): 148 px = 17,6 % de 844 (21,2 % de
+   700 px úteis) na casa do gerente; 145 px no pós-colheita.
 4. **Regressão** (`scripts/regressao_render.cjs`): a diferença entre
    main e branch nas telas de leitura é só o trecho `.topo.ctx` +
    `.ctx-l2`, igual nas três atividades; tela de apontamento, home das
