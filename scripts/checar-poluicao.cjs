@@ -61,15 +61,17 @@
       da função única (nomeia unidade e dia, sem termo proibido); cabeçalho
       contextual + régua abaixo de 25 % da altura útil; nenhum
       input type=date na tela.
-  12. Chips removíveis da multi-seleção (v74): em toda multi-seleção (café:
-      problemas da irrigação e setores fertirrigados; grãos: problemas do
-      pivô; Cadastros: código combinado) a seleção vazia não desenha nada
+  12. Chips removíveis da multi-seleção (v74): em toda multi-seleção FORA do
+      apontamento em 3 passos (café: problemas da irrigação e setores
+      fertirrigados; Cadastros: código combinado) a seleção vazia não desenha nada
       (nem contador zerado, nem área reservada); ao escolher, aparecem o
       contador ("N … selecionados") e um chip por item com × à direita
       (44 × 44 px, rótulo acessível "Remover <nome>"), quebrando em linhas
       sem rolar de lado; mais de 6 itens → 6 + "+K" que expande; o × remove
       na hora sem confirmação, sem nativo e sem sair da tela; o toque no
-      corpo do chip não faz nada; remover o último volta ao vazio.
+      corpo do chip não faz nada; remover o último volta ao vazio. Nos grãos a
+      única multi-seleção (problemas do pivô) mora no cartão de apontamento e por
+      isso NÃO recebe o componente — o script prova a ausência com a seleção feita.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -547,10 +549,14 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
     form.selecoes.push(Object.assign({ nome: `Irrigação › Fertirrigação › Em quais setores? (${setores.length} de ${setores.length})` }, await medirSelecao(page, 'irrfsec', setores)));
   }
   if (atv === 'GRAOS') {
+    /* a única multi-seleção dos grãos (problemas do pivô) mora DENTRO do cartão de apontamento em 3 passos:
+       por desenho (regra 7) ela não recebe o componente — o script prova a ausência, com a seleção feita */
     await page.evaluate(() => { const b = [...document.querySelectorAll('#app details.secao button')].find(x => /todos os piv/i.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(300);
     await page.evaluate(() => { const s = document.querySelector('[data-igst$="|Não rodou"]'); if (s) s.click(); }); await page.waitForTimeout(200);
-    const probs = await page.evaluate(() => [...document.querySelectorAll('[data-igpb]')].slice(0, 2).map(c => '[data-igpb="' + c.dataset.igpb.replace(/"/g, '\\"') + '"]'));
-    form.selecoes.push(Object.assign({ nome: 'Irrigação (pivôs) › Qual foi o problema? (2 de 6)' }, await medirSelecao(page, 'igpb', probs)));
+    form.selApontamento = await page.evaluate(() => {
+      [...document.querySelectorAll('[data-igpb]')].slice(0, 2).forEach(c => c.click());
+      return { escolhidos: document.querySelectorAll('#app .chip.on[data-igpb]').length, caixas: document.querySelectorAll('#app .sel-box').length };
+    }); await page.waitForTimeout(200);
   }
   R.telas.push(casa, form);
   /* v71: boletim enviado visto pelo gerente — "Marcar como visto" (ação da Diretoria) aparece desabilitado */
@@ -844,9 +850,10 @@ function avaliar(R) {
   /* 12. chips removíveis da multi-seleção (v74) */
   {
     const g = '12. Chips removíveis: vazio sem área, contador + chips, × de 44 px remove na hora, quebra sem rolar, +K expande';
+    R.telas.filter(t => t.selApontamento).forEach(t => add(g, `${t.nome} — nenhum chip removível dentro do cartão de apontamento em 3 passos`, t.selApontamento.caixas === 0 && t.selApontamento.escolhidos === 2, `${t.selApontamento.escolhidos} problema(s) escolhido(s) no pivô; ${t.selApontamento.caixas} contêiner(es) na tela`));
     R.telas.filter(t => t.selecoes).forEach(t => {
       const tela = t.nome.split(' — ')[0];
-      if (!t.selecoes.length) { add(g, `${tela} — sem multi-seleção nesta atividade: nada a medir`, true, 'pecuária escolhe um valor por campo'); return; }
+      if (!t.selecoes.length) { add(g, `${tela} — sem multi-seleção fora do apontamento: nada a medir`, true, t.selApontamento ? 'a única multi-seleção (problemas do pivô) mora no cartão de apontamento' : 'pecuária escolhe um valor por campo'); return; }
       t.selecoes.forEach(s => {
         const nome = `${tela} › ${s.nome}`;
         if (!s.existe) { add(g, `${nome} — componente presente`, false, 'sem .sel-box'); return; }

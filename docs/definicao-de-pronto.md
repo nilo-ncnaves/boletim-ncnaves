@@ -384,15 +384,17 @@ ou teclado (regra 2 do projeto). Antes do PR, conferir:
     pós-colheita.
 
 ## 15. Chips removíveis na multi-seleção (desde a v74)
-Regra em CLAUDE.md, item c12. Toda multi-seleção por chips (café:
-problemas da irrigação e setores fertirrigados; grãos: problemas do pivô;
+Regra em CLAUDE.md, item c12. Toda multi-seleção por chips FORA da tela de
+apontamento (café: problemas da irrigação e setores fertirrigados;
 Cadastros: atividades/unidades do código combinado, fazendas de uma
 máquina, estrutura de pós-colheita; qualquer multi-seleção futura) exibe
 a seleção pelo componente único `chipsSelecao` / `pintarSelecoes`. Antes
 do PR, conferir:
-1. **Só multi-seleção recebe o componente.** Seleção única (um valor por
-   campo) nunca; nenhum `<select>` nativo foi trocado por chip por causa
-   desta regra; o mecanismo de escolha (chips de opção `.on`) não mudou.
+1. **Só multi-seleção recebe o componente, e nunca dentro do apontamento
+   em 3 passos** (regra 7 — o cartão do pivô dos grãos fica de fora).
+   Seleção única (um valor por campo) nunca; nenhum `<select>` nativo foi
+   trocado por chip por causa desta regra; o mecanismo de escolha (chips
+   de opção `.on`) não mudou.
 2. **Seleção vazia não desenha nada:** o contêiner `.sel-box` fica vazio
    e sem altura (nem "0 selecionados", nem espaço reservado).
 3. **Contador e chips juntos:** "N <substantivo> selecionad(o|a)s" acima
@@ -411,12 +413,13 @@ do PR, conferir:
    "+K".
 8. **Rótulos pelo cadastro por id** (o texto do chip de opção); nunca
    pedaço de nome.
-9. **Apontamento em 3 passos intocado** (ONDE e O QUÊ são escolha única);
-   café, grãos e pecuária pelo mesmo componente — na regressão
-   (`scripts/regressao_render.cjs`) a diferença main × branch é só o
-   `.sel-box` (vazio onde nada foi escolhido; preenchido onde o cenário
-   escolhe), igual nas três atividades.
+9. **Apontamento em 3 passos intocado, byte a byte:** nenhuma multi-seleção
+   de dentro dele recebe o componente; na regressão
+   (`scripts/regressao_render.cjs`) o formulário de grãos e o de pecuária
+   ficam idênticos ao main, e no café a única diferença é o `.sel-box`
+   (vazio onde nada foi escolhido; preenchido onde o cenário escolhe).
 10. **Medição:** `scripts/checar-poluicao.cjs`, grupo "12. Chips
     removíveis" — café (problemas 2 de 8; setores todos, 8 de 8 → 6 +
-    "+2"), grãos (pivô, 2 de 6), Cadastros › Códigos › novo combinado (9
-    unidades → 6 + "+3"); pecuária registra "sem multi-seleção".
+    "+2"), Cadastros › Códigos › novo combinado (9 unidades → 6 + "+3");
+    grãos prova a AUSÊNCIA no cartão do pivô (dois problemas escolhidos,
+    zero contêiner); pecuária registra "sem multi-seleção".

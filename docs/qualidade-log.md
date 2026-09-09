@@ -15,12 +15,28 @@ sem mudança de tela: **#11** decisão e confirmação (v72:
 (v67: `badgeCategoria` + `OP_CATEGORIAS`), **#9** textos do robô-redator
 colapsados (v68: `cartaoTextoLongo` + folha). O item novo é o **#42**:
 componente único `chipsSelecao(attr, {um, varios})` + `pintarSelecoes()`
-(CSS `.sel-box`, `.sel-cont`, `.chip.sel`, `.sel-x`, `.sel-mais`) nas 7
-multi-seleções do app (café 2, grãos 1, Cadastros 4; pecuária não tem),
+(CSS `.sel-box`, `.sel-cont`, `.chip.sel`, `.sel-x`, `.sel-mais`) nas 6
+multi-seleções do app FORA da tela de apontamento (café 2, Cadastros 4),
 grupo "12. Chips removíveis" no `scripts/checar-poluicao.cjs`, regra c12
 no CLAUDE.md, item 15 na definição de pronto, tabela de vocabulário no
 catálogo. Versão v74 no rodapé e no cache. Nenhum SQL, nenhum campo
 novo, nenhum texto prescritivo, nenhum `<select>` trocado por chip.
+
+**Decisão de escopo tomada antes do merge (autorizada pelo Nilo em
+09/09/2026: "faça do jeito que achar melhor").** A primeira versão do
+branch punha o componente também no cartão do pivô dos grãos, nos
+DETALHES (problemas do pivô). Esse cartão é tela de apontamento em 3
+passos, e a regra 7 do projeto só admite ali troca de rótulo de botão e
+substituição de diálogo nativo — nenhum elemento novo, mesmo que não
+mude etapa nem ordem. O componente foi RETIRADO de lá (uma linha em
+`cardIrg` e o `pintarSelecoes` do `repintarIrg`), o que também alinhou o
+código ao que a própria regra c12 já dizia ("onde não entra: apontamento
+em 3 passos"). Consequência assumida e registrada: a atividade grãos não
+recebeu o componente em lugar nenhum, porque a sua única multi-seleção
+mora dentro do apontamento — o script passou a provar a AUSÊNCIA (dois
+problemas escolhidos no pivô, zero contêiner na tela). Se o Nilo quiser a
+contagem de problemas no pivô, é decisão dele e vira tarefa própria,
+junto da revisão do "＋ pivô" (❌ herdado: pivô em seletor).
 
 **Inventário #11 — decisões e confirmações (index.html v74).**
 `git grep "confirm(\|alert(\|prompt("`: 0 `confirm()`, 0 `alert()`
@@ -61,12 +77,14 @@ Pontos onde se pensou em confirmar e NÃO se confirmou nesta entrega: o
 automático).
 
 **Inventário #42 — multi-seleções (todas por chips próprios; nenhum
-`<select multiple>` no app).** Onde · o que · como mostrava · opções:
+`<select multiple>` no app).** Onde · o que · como mostrava · opções
+(a marcada com ⛔ está no apontamento e ficou de fora):
 ☕ Café › Irrigação › "Qual foi o problema?" (`irrpb`) · problemas ·
 chips acesos na própria lista · 8; ☕ Café › Irrigação › Fertirrigação ›
 "Em quais setores?" (`irrfsec`) · talhões por id · idem · 8 em Vereda
-Romaria (varia por unidade); 🌾 Grãos › Irrigação (pivôs) › cartão do
-pivô › "Qual foi o problema?" (`igpb`) · problemas · idem · 6;
+Romaria (varia por unidade); ⛔ 🌾 Grãos › Irrigação (pivôs) › cartão do
+pivô › "Qual foi o problema?" (`igpb`) · problemas · idem · 6 — **não
+recebeu o componente: é tela de apontamento em 3 passos**;
 Cadastros › Códigos › novo combinado › Atividades inteiras
 (`combo-atv`) · 3 e Unidades avulsas (`combo-uni`) · 24; Cadastros ›
 Catálogos › Máquinas › vínculo (`vinc-faz`) · fazendas · 24;
@@ -127,27 +145,32 @@ Netlify badge"; decisão do Nilo, sem mexer em plano.
 
 **Verificado (automático, sem rede, 390 × 844, fuso America/Sao_Paulo).**
 - Teste de fumaça com Playwright (fora do repositório) e
-  `scripts/checar-poluicao.cjs`: **367 ✅ · 41 ❌** (os 41 herdados;
-  grupo novo "12. Chips removíveis" com 33 ✅). Café › problemas: vazio
+  `scripts/checar-poluicao.cjs`: **361 ✅ · 41 ❌** (os 41 herdados;
+  grupo novo "12. Chips removíveis" com 27 ✅, incluindo a prova de
+  ausência no cartão do pivô dos grãos). Café › problemas: vazio
   0 px `display:none`; 2 toques → "2 problemas selecionados", chips
   Bomba/Filtro, × 44 × 44 px, `aria-label` "Remover Bomba", 1 linha,
   página 390 px; toque no corpo → nada; × → "1 problema selecionado",
   opção apagada, 0 nativo, tela `form`; × de novo → vazio. Café ›
   setores: 8 de 8 → 6 chips + "+2" (3 linhas), "+2" → 8 chips, × → "7
-  setores selecionados". Grãos › pivô "Não rodou" › 2 problemas → o
-  mesmo. Cadastros › novo combinado › 9 unidades → "9 unidades
+  setores selecionados". Grãos › pivô "Não rodou" › 2 problemas
+  escolhidos → **zero contêiner na tela** (a ausência que a regra 7
+  exige). Cadastros › novo combinado › 9 unidades → "9 unidades
   selecionadas", 6 chips + "+3" (6 linhas, nomes longos), × redesenha a
   tela e mantém a expansão (8 chips). Trocar o status para "Rodou
   normal" limpa problemas e o bloco some; recarregar a página repinta a
   seleção guardada no rascunho. `aria-live="polite"` no contêiner.
 - `scripts/regressao_render.cjs` main × branch (117 telas em 6
-  cenários): fora rodapé v73→v74 e relógio, a única diferença é o
-  `.sel-box` — café: 2 contêineres vazios de `10-form` a `30-mo` e
-  "2 setores selecionados" de `40-irrigacao` a `90-whats-rascunho`;
-  grãos e pecuária: formulário byte a byte igual (o cenário não marca
-  problema de pivô), boletim enviado e localStorage iguais; pós,
-  Diretoria e Cadastros iguais. Café × grãos × pecuária: mesmo
-  componente, mesma função — alterar uma atividade não mudou as outras.
+  cenários), rodado de novo depois da retirada do pivô: fora rodapé
+  v73→v74 e relógio, a única diferença é o `.sel-box` do café (2
+  contêineres vazios de `10-form` a `30-mo`; "2 setores selecionados" de
+  `40-irrigacao` a `90-whats-rascunho`). **Grãos e pecuária: todas as
+  telas do formulário e do boletim enviado idênticas ao main** (só o
+  número da versão no rodapé muda); pós-colheita idêntico em tudo;
+  Diretoria e Cadastros idênticos fora os `.sel-box` de Cadastros. A
+  única outra diferença é o milissegundo do carimbo de hora do rascunho
+  de pecuária (relógio, não código). Alterar uma atividade não mudou as
+  outras.
 - `node --check` no JavaScript extraído, no `sw.js` e no script.
   `perguntar(` 9 chamadas no main e no branch (20 pontos, contagem
   igual); `confirm(`/`alert(` zero.

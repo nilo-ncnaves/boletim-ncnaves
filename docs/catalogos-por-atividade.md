@@ -300,16 +300,19 @@ gênero do substantivo. Tabela vigente:
 |---|---|---|---|
 | ☕ Café › Irrigação › "Qual foi o problema?" | `irrpb` | 1 problema selecionado | N problemas selecionados |
 | ☕ Café › Irrigação › Fertirrigação › "Em quais setores?" | `irrfsec` | 1 setor selecionado | N setores selecionados |
-| 🌾 Grãos › Irrigação (pivôs) › "Qual foi o problema?" | `igpb` | 1 problema selecionado | N problemas selecionados |
 | Cadastros › Códigos › novo combinado › Atividades inteiras | `combo-atv` | 1 atividade selecionada | N atividades selecionadas |
 | Cadastros › Códigos › novo combinado › Unidades avulsas | `combo-uni` | 1 unidade selecionada | N unidades selecionadas |
 | Cadastros › Catálogos › Máquinas › vínculo com fazendas | `vinc-faz` | 1 fazenda selecionada | N fazendas selecionadas |
 | Cadastros › Fazendas › detalhe › Estrutura de pós-colheita | `estr` | 1 item selecionado | N itens selecionados |
 
-🐂 Pecuária: nenhuma multi-seleção hoje (cada campo escolhe um valor);
-quando houver, entra nesta tabela com o mesmo componente. Rótulos dos
-chips: os do chip de opção (nome do talhão/unidade/fazenda pelo cadastro
-por id; opções fixas pelo catálogo). Limite visível: 6 + "+K".
+🌾 Grãos: a única multi-seleção ("Qual foi o problema?" no cartão do
+pivô, `igpb`) mora DENTRO da tela de apontamento em 3 passos e por isso
+NÃO recebe o componente (CLAUDE.md, item c12; regra 7). Se um dia os
+grãos ganharem multi-seleção fora do apontamento, ela entra nesta tabela
+com o mesmo componente. 🐂 Pecuária: nenhuma multi-seleção hoje (cada
+campo escolhe um valor); mesma regra. Rótulos dos chips: os do chip de
+opção (nome do talhão/unidade/fazenda pelo cadastro por id; opções fixas
+pelo catálogo). Limite visível: 6 + "+K".
 
 ## Categorias de operação — badge de uma letra (v67)
 

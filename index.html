@@ -2566,8 +2566,9 @@ function atualizarAvanco(id, falta){
    teria o que abrir, e um alvo só evita remover o item errado com o polegar. Mais de SEL_MAX itens: os SEL_MAX
    primeiros + um chip "+K" que expande (a expansão vive só na memória e some quando a seleção cai). Seleção vazia:
    nada desenhado (nem contador zerado, nem área reservada). Ordem: a do catálogo/cadastro (a mesma da lista de
-   opções). Rótulos: os do chip de opção, que quem chama já desenha pelo cadastro por id. Mesmo componente nas três
-   atividades e em Cadastros; nunca uma variante; seleção única não recebe chip. */
+   opções). Rótulos: os do chip de opção, que quem chama já desenha pelo cadastro por id. Mesmo componente em toda
+   multi-seleção; nunca uma variante; seleção única não recebe chip. NUNCA entra na tela de apontamento em 3 passos
+   (regra 7) — por isso o cartão do pivô dos grãos, cuja única multi-seleção mora ali, ficou de fora. */
 const SEL_MAX=6;
 const selExpandido=new Set();
 function chipsSelecao(attr,o){
@@ -3911,7 +3912,6 @@ function cardIrg(r,e){
     <div class="chips mt"><button class="chip ${e.quimi==="Sim"?"on":""}" data-igqm="${esc(e.id)}">🧪 Quimigação / fertirrigação</button></div>
     ${e.quimi==="Sim"?linhasProdutos(e.quimiProdutos||[],"igp")+`<button class="btn suave mini mt" data-igp-add="${esc(e.id)}">＋ produto</button>`:""}`:""}
     ${prob?`<label class="mt">Qual foi o problema?</label>
-      ${chipsSelecao("igpb",{um:"problema selecionado",varios:"problemas selecionados"})}
       <div class="chips">${["Energia","Bomba","Torre / roda","Vazamento","Painel / automação","Outro"].map(p2=>`<button class="chip ${(e.problemas||[]).includes(p2)?"on":""}" data-igpb="${esc(e.id)}|${p2}">${p2}</button>`).join("")}</div>
       <input data-ig="obs" value="${esc(e.obs||"")}" placeholder="Detalhe rápido (opcional)" style="margin-top:8px">`:""}
   </div>`;
@@ -3937,7 +3937,6 @@ function repintarIrg(r){
   const el=$("#lista-irg"); if(!el) return;
   migrarIrg(r);
   el.innerHTML=(r.irg||[]).map(e=>cardIrg(r,e)).join("");
-  pintarSelecoes(el);   /* v74 */
   const topo=$("#topo-irg"); if(topo) topo.innerHTML=topoIrgHtml(r);
   const s=$("#res-irg");
   if(s){ const n=(r.irg||[]).filter(e=>e.status).length; s.textContent=n?n+" pivô"+(n>1?"s":"")+" lançado"+(n>1?"s":""):""; }

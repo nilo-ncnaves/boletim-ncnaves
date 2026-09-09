@@ -522,10 +522,10 @@ filtram por período, de/até) e Cadastros.
   docs/definicao-de-pronto.md, item 14.
 
 ### c12) Chips removíveis na multi-seleção (desde a v74)
-Toda multi-seleção (o gerente ou o escritório marca VÁRIOS itens de uma
-lista de chips: problemas da irrigação e setores fertirrigados do café,
-problemas do pivô dos grãos, atividades/unidades do código combinado,
-fazendas de uma máquina e estrutura de pós-colheita em Cadastros) mostra
+Toda multi-seleção FORA da tela de apontamento (o gerente ou o escritório
+marca VÁRIOS itens de uma lista de chips: problemas da irrigação e setores
+fertirrigados do café; atividades/unidades do código combinado, fazendas de
+uma máquina e estrutura de pós-colheita em Cadastros) mostra
 a seleção já feita pelo componente ÚNICO `chipsSelecao(attr, {um,
 varios})` + `pintarSelecoes()` do index.html — nunca uma variante por
 atividade ou por perfil. Ele só EXIBE a seleção: o mecanismo de escolha
@@ -561,11 +561,16 @@ componente.
   sombra, sem gradiente; × em `--tinta-2`. Rótulos são os do chip de
   opção, que quem chama já desenha pelo cadastro por id — nunca pedaço
   de nome.
-- **Onde não entra:** seleção única; apontamento em 3 passos (o ONDE e
-  o O QUÊ são escolha única); listas de leitura; resumos de uma linha.
+- **Onde não entra:** seleção única; **tela de apontamento em 3 passos**
+  (regra 7: nem no ONDE, nem no O QUÊ, nem nos DETALHES) — é por isso
+  que o cartão do pivô dos grãos, cuja única multi-seleção ("Qual foi o
+  problema?") mora ali, ficou de fora, e os grãos hoje não têm nenhuma
+  multi-seleção fora do apontamento; listas de leitura; resumos de uma
+  linha.
 - Conferência: `scripts/checar-poluicao.cjs`, grupo "12. Chips
-  removíveis" (café: problemas e setores; grãos: pivô; Cadastros:
-  código combinado com 9 unidades); detalhe em
+  removíveis" (café: problemas e setores; Cadastros: código combinado
+  com 9 unidades) — e, nos grãos, a prova da AUSÊNCIA: com dois
+  problemas do pivô escolhidos, zero contêiner na tela. Detalhe em
   docs/definicao-de-pronto.md, item 15.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
