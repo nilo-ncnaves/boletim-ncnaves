@@ -270,9 +270,10 @@ const emSafra = () => { const m=new Date().getMonth()+1; return m>=5 && m<=9; };
    nunca de trabalho: proibidos "não fez", "não realizou", "pendente", "atrasado", "faltou",
    "esqueceu"; sem exclamação, sem emoji, sem culpar quem usa; uma frase, no máximo duas
    linhas no iPhone. Nomes vêm do cadastro pelo id (fazenda(id).nome, talhao(id).nome),
-   nunca de pedaço de nome. Café (regra 1 do projeto): as telas do gerente de café
-   mantêm o texto que já tinham — quem chama decide por atividadeDe(fz) e só manda
-   grãos/pecuária e as telas compartilhadas (Diretoria, Relatórios, Cadastros) para cá.
+   nunca de pedaço de nome. Vale para as três atividades pela mesma função (café desde a
+   v65 — CLAUDE.md, c4: isolamento é de comportamento, não de arquivo); nenhuma tela decide
+   texto de vazio por atividadeDe(fz). Vazio de UM dia (régua de 7 dias, v73): passe
+   periodo:periodoVazio(dia,dia) → "em 05/09/2026"; não existe parâmetro "dia" separado.
    Uso:
      fraseVazio({que:"boletim", atividade:"GRAOS", operacao:"Capina manual", unidade:"f33",
        talhao:"t125", filtro:"texto digitado", periodo:periodoVazio(de,ate), ultimo:"2026-08-31",

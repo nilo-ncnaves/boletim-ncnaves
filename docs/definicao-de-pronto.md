@@ -80,6 +80,15 @@ dado no app):
    a v64 o café mantinha os textos antigos por uma leitura
    conservadora da regra 1; a leitura correta está em CLAUDE.md, c4.
    Nenhuma tela decide texto de vazio por `atividadeDe(fz)`.
+9. **Tela de leitura por data** (desde a v73): o vazio de um dia
+   escolhido nomeia o dia — `periodo: periodoVazio(dia, dia)` → "Sem
+   boletim registrado em Vereda Romaria em 05/09/2026." Nunca "sem
+   boletim ainda", "dia em branco" ou "nada neste dia". Hoje e dia
+   passado usam a mesma frase; a régua (item 15) só troca o recorte.
+10. **Inventário no PR:** toda tarefa que toque numa tela de leitura
+   lista no PR os pontos de vazio da tela (o que exibe, filtros ativos,
+   se distingue carregando/erro/vazio). O inventário completo feito na
+   v73 está em docs/qualidade-log.md (entrada da v73).
 
 Parâmetros de `fraseVazio(o)`: `que` (o que falta: "boletim
 registrado", "relatório calculado", "unidade"…), `atividade` (chave
