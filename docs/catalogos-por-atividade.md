@@ -271,6 +271,24 @@ porque nenhuma tela de leitura é por subdivisão.
 ARRENDADO), `1.234,56 ha`; sem área o parêntese some. Depois da linha
 2 do catálogo vem o texto próprio da tela (papel, data, período).
 
+## Régua de 7 dias — vocabulário por tela (v73)
+
+O componente único `reguaDias` (CLAUDE.md, item c11) é o mesmo nas
+três atividades e no pós-colheita: dias da semana pelo catálogo
+`DIAS_SEMANA` (dom, seg, ter, qua, qui, sex, sáb — português, nunca
+Mon/Sun) e "hoje" pela data civil em Brasília. O que muda por tela é
+só o nome do registro e o `que` do vazio — passados por quem chama,
+por perfil de tela, nunca por condicional de atividade:
+
+| Tela | Rótulo do registro do dia | `que` do vazio | Frase do vazio (exemplo) |
+|---|---|---|---|
+| Casa do gerente — ☕ café, 🌾 grãos, 🐂 pecuária | "Boletim de dd/mm enviado" | boletim registrado | "Sem boletim registrado em Floramill em 05/09/2026." |
+| Casa do pós-colheita (café) | "Registro de dd/mm enviado" | registro de pós-colheita | "Sem registro de pós-colheita em Vereda Romaria em 05/09/2026." |
+
+Não existe termo de dia próprio de uma atividade (piquete, retiro,
+talhão, pivô não entram na régua: a tela de leitura é por unidade, não
+por subdivisão — mesma decisão do cabeçalho contextual acima).
+
 ## Categorias de operação — badge de uma letra (v67)
 
 Fonte oficial das categorias (natureza da operação) e das letras que o

@@ -84,7 +84,7 @@ dado no app):
    escolhido nomeia o dia — `periodo: periodoVazio(dia, dia)` → "Sem
    boletim registrado em Vereda Romaria em 05/09/2026." Nunca "sem
    boletim ainda", "dia em branco" ou "nada neste dia". Hoje e dia
-   passado usam a mesma frase; a régua (item 15) só troca o recorte.
+   passado usam a mesma frase; a régua (item 14) só troca o recorte.
 10. **Inventário no PR:** toda tarefa que toque numa tela de leitura
    lista no PR os pontos de vazio da tela (o que exibe, filtros ativos,
    se distingue carregando/erro/vazio). O inventário completo feito na
@@ -343,3 +343,42 @@ Regra em CLAUDE.md, item c10. Antes do PR, conferir:
     sem alert e sem sair da tela, clima/terreiro ativa o mesmo elemento,
     Descartar abre o diálogo (dois botões, sem campo, "?", verbo ≤ 3
     palavras, sem destaque) e Cancelar mantém a tela.
+
+## 14. Régua de 7 dias nas telas de leitura por data (desde a v73)
+Regra em CLAUDE.md, item c11. Tela de leitura por data (casa do gerente
+das três atividades, casa do pós-colheita; qualquer tela futura em que
+o dia é escolhido) usa o componente único `reguaDias` /
+`diaRegua` / `cartaoDiaRegua` — nunca `input type="date"`, datepicker
+ou teclado (regra 2 do projeto). Antes do PR, conferir:
+1. **Sete células fixas**, do mais recente à esquerda ao mais antigo,
+   sem rolagem de lado, sem setas, sem "carregar mais"; nenhum dia
+   futuro. Cada célula ≥ 44 × 44 px (medido: 48,3 × 48 a 390 px). Só
+   reduz para 5 se 7 não couberem com legibilidade — nunca rola.
+2. **Dias em português abreviado** pelo catálogo `DIAS_SEMANA` (seg …
+   dom) e número do dia embaixo; `aria-label` com o dia por extenso e a
+   data ("terça-feira, 08/09").
+3. **Hoje selecionado ao abrir** e reconhecível com outro dia escolhido
+   (barra de 3 px embaixo; ", hoje" no rótulo acessível); selecionado
+   com fundo, negrito e `aria-pressed` — nunca só cor.
+4. **Um toque troca o dia** e redesenha mantendo a rolagem; nenhum
+   teclado ou seletor nativo abre; `telaAtual` não muda.
+5. **"Hoje" em Brasília** (`hojeBRT`), comparação por texto
+   AAAA-MM-DD, sem deslocamento de fuso; ao voltar ao primeiro plano
+   depois da virada do dia, a régua recalcula "hoje" e a casa redesenha
+   (`visibilitychange`).
+6. **Dia sem registro cai no vazio da função única** (item 6, regra 9):
+   "Sem boletim registrado em <unidade> em dd/mm/aaaa." — nomeia unidade
+   e dia, sem termo proibido, sem "dia em branco".
+7. **Hoje selecionado = tela idêntica à anterior:** o cartão de hoje,
+   o botão de preencher, "O que ficou de ontem" e "Últimos boletins" não
+   mudam; a regressão (`scripts/regressao_render.cjs`) só pode mostrar o
+   bloco `.regua` como diferença, igual nas três atividades e no
+   pós-colheita; tela de apontamento, boletim enviado, painel e
+   Cadastros byte a byte iguais.
+8. **Orçamento de altura** com o cabeçalho contextual (item 8.3): a
+   soma fica abaixo de ~25 % da altura útil; a régua é estática, nunca
+   uma segunda barra sticky.
+9. **Sem SQL, sem campo novo, sem navegação além de 7 dias.**
+10. **Medição:** `scripts/checar-poluicao.cjs`, grupo "11. Régua de 7
+    dias" — na casa do gerente de café, grãos e pecuária e na casa do
+    pós-colheita.
