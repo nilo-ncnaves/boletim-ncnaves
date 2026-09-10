@@ -771,6 +771,26 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
   títulos saíam de linha (10 px medidos a 390 px). Regra: numa fileira de
   colunas rotuladas, o rótulo ancora no topo (`flex-start`), para os títulos
   ficarem sempre na mesma linha de base qualquer que seja a altura do valor.
+- **Fileira de filtros NÃO rola de lado (desde a v80).** Chip fora da tela é chip que
+  não existe: na v79 as seis situações ("A iniciar", "Em execução", "Finalizado",
+  "Aguardando terceiro", "Aguardando clima", "Cancelado") ficavam depois da borda
+  direita e só apareciam arrastando. `.cad-saltos` passou a QUEBRAR EM LINHAS
+  (`flex-wrap`), pela mesma razão que a rolagem lateral já era proibida nos chips
+  removíveis da v74 (c12). Regras da fileira de filtros:
+  (a) **nasce fechada** — a lista é o que a pessoa veio ver; o painel abre por
+  `planBarraFiltros` num toque (P5);
+  (b) **filtro ligado nunca fica invisível**: com o painel fechado, a própria linha
+  nomeia o que está ligado e traz "limpar";
+  (c) **cada grupo tem rótulo** (Prazo · Situação · Unidade · Origem) — sem rótulo a
+  fileira quebrada vira um amontoado de chips sem sentido;
+  (d) fileira com mais de `PLAN_FILA_MAX` chips mostra os primeiros e um "＋N" que abre
+  o resto no lugar (mesmo mecanismo do "+K" da v74), e a fileira do filtro escolhido
+  abre sozinha;
+  (e) medido a 390 px: fechado, a 1ª tarefa começa a 193 px; aberto, os 22 chips
+  visíveis, **zero escondidos e nenhuma fileira rolando**.
+  A mesma classe serve os atalhos de Cadastros (`cadSaltos`), que tinham o defeito
+  PIOR — 18 de 21 fazendas fora da tela: lá o teto é `CAD_SALTOS_MAX` e o atalho
+  escolhido entra sempre entre os visíveis, para a escolha não sumir atrás do "＋N".
 - **O alvo de 44 px é do BOTÃO, não do contêiner que o embrulha.** Na v78 o
   `.plan-tres > span` tinha 44 px e o `.plan-exec` dentro dele tinha 26 px — o
   dedo tinha 26 px. Hoje o botão ocupa a linha inteira na forma de uma linha, e
