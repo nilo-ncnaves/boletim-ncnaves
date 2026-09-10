@@ -151,8 +151,104 @@ As listas são filtradas pela cultura do ciclo do talhão.
 ---
 
 ## CAFÉ
-Catálogo original do app (LISTA_ATIV, LISTA_FUNCOES, SUGESTAO_FITO)
-— INTOCADO por este redesenho.
+Fonte: `OPS_CAFE_GRUPOS`, `LISTA_FUNCOES`, `DEPARA_NOMES`,
+`TERMOS_LEGADO` e `SUGESTAO_FITO` do index.html. Revisto na v76 com o
+Nilo: o termo é o que o funcionário fala, e diz COMO o serviço foi feito
+(manual × mecanizado × químico), porque é isso que muda o custo e o
+planejamento. Nada do que já foi lançado é reescrito — quem traduz nome
+antigo para nome de hoje é a leitura (item 17 da definição de pronto).
+
+### Princípios de tela (café)
+- Atividade por talhão em 3 passos: ONDE (talhão) → O QUÊ (grupos por
+  natureza, RECOLHIDOS; toque no grupo abre só as operações dele) →
+  DETALHES (pessoas, como terminou o dia, calda, máquinas). Nada do
+  passo seguinte aparece antes do toque no anterior; nenhum grupo nasce
+  aberto. O seletor agrupado é o componente ÚNICO `seletorOperacao`, o
+  mesmo dos grãos — lá o grupo é a FASE do ciclo, aqui é a NATUREZA do
+  serviço (CLAUDE.md, c4).
+- Irrigação de café é seção própria (💧 gotejo). As operações
+  "Irrigação manual", "Irrigação automática" e "Adubação via
+  fertirrigação" existem na lista por talhão porque são serviço de gente
+  no talhão, com custo e apontamento — não substituem a seção.
+
+### Operações por talhão — 4 grupos, 27 termos (`OPS_CAFE_GRUPOS`)
+**Tratos culturais (badge T) — 18**
+Pulverização manual · Pulverização mecanizada · Adubação manual ·
+Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo
+· Calagem / gessagem · Capina manual · Capina mecânica com trincha ·
+Capina mecânica com roçadeira · Capina química manual · Capina química
+mecanizada · Desbrota manual · Poda mecanizada esqueletamento ·
+Levantar café · Arruação / esparramação de cisco · Monitoramento de
+pragas (MIP) · Plantio / renovação
+
+**Irrigação e fertirrigação (badge I) — 4**
+Irrigação manual · Irrigação automática · Adubação via fertirrigação ·
+Limpeza do sistema de irrigação
+
+**Colheita e pós-colheita (badge C) — 3**
+Colheita · Catação · Repasse
+
+**Estrutura e apoio (badge E) — 2**
+Manutenção de estradas e aceiros · Outra
+
+"Outra" não é operação identificável: não entra no espelho do Supabase
+nem recebe badge. Termos que o escritório acrescentar em Cadastros ›
+Catálogos entram num 5º grupo, "Outras (cadastro do escritório)", que só
+aparece quando existe pelo menos um.
+
+### Funções de mão de obra — 25 (`LISTA_FUNCOES`)
+Colheita manual (derriça) · Varrição / rapagem · Abanação ·
+Carregamento de café · Terreiro (mexer/rodar café) · Secador / tulha
+(apoio) · Benefício (apoio) · Capina manual · Capina mecânica com
+roçadeira · Capina química manual · Arranquio de corda-de-viola ·
+Desbrota manual · Poda mecanizada esqueletamento · Levantar café ·
+Arruação · Esparramação de cisco · Adubação manual · Pulverização manual
+· Plantio / replantio de mudas · Irrigação manual · Irrigação
+(manutenção/filtros) · Limpeza de carreadores · Manutenção de
+cercas/benfeitorias · Apoio a máquinas (abastecimento) · Serviços gerais
+
+A lista de funções é de MÃO DE OBRA: entram os serviços que uma pessoa
+faz. Os termos mecanizados que só existem como operação de máquina
+(Pulverização mecanizada, Capina mecânica com trincha, Capina química
+mecanizada, Irrigação automática, Adubação via fertirrigação) ficam de
+fora daqui — quem trabalha na máquina aparece em "Apoio a máquinas
+(abastecimento)" e a máquina é apontada na própria atividade.
+"Irrigação (manutenção/filtros)" continua separada de "Irrigação
+manual": uma é conserto, a outra é molhar a lavoura.
+
+### De-para de nomenclatura (v76) — `DEPARA_NOMES`
+Termo antigo → termo de hoje. Vale na LEITURA (exibição, soma, plano,
+filtro, badge); o registro no banco nunca muda.
+
+| termo antigo | termo de hoje | onde |
+| --- | --- | --- |
+| Desbrota | Desbrota manual | atividade e função |
+| Poda / esqueletamento | Poda mecanizada esqueletamento | atividade |
+| Poda (decote/esqueletamento) | Poda mecanizada esqueletamento | função |
+| Roçada costal | Capina mecânica com roçadeira | função |
+| Aplicação de herbicida (costal) | Capina química manual | função |
+| Aplicação de defensivo (costal) | Pulverização manual | função |
+
+### Termos legados — `TERMOS_LEGADO.CAFE` (aguardam decisão do Nilo)
+Um antigo que se abriu em DOIS novos: o app não adivinha. Some da
+escolha de lançamento novo, continua legível e continua somando com o
+nome gravado. O valor guardado é a NATUREZA, igual nos dois candidatos,
+para o badge e as somas por natureza não se perderem.
+
+| termo antigo | natureza | pergunta em aberto |
+| --- | --- | --- |
+| Pulverização | Tratos culturais | manual ou mecanizada? |
+| Aplicação de herbicida | Tratos culturais | capina química manual ou mecanizada? |
+| Capina roçadeira / trincha | Tratos culturais | com trincha ou com roçadeira? |
+| Irrigação | Irrigação e fertirrigação | manual ou automática? |
+
+### Espelho no Supabase
+`operacao_catalogo` (o grupo vai na coluna `fase`) e `operacao_alias` (o
+nome antigo é apelido da operação de hoje), gerados por
+`node scripts/gerar_catalogo_operacoes.cjs`. O bloco pronto para rodar
+está em `sql/049-nomenclatura-cafe.sql`; o mesmo seed está recolado
+entre os marcadores do `sql/040`. As duas operações renomeadas 1 para 1
+saem de cena com `ativo = false` — nunca com `delete`.
 
 ## PECUÁRIA (módulo de campo — v50)
 
@@ -314,6 +410,74 @@ campo escolhe um valor); mesma regra. Rótulos dos chips: os do chip de
 opção (nome do talhão/unidade/fazenda pelo cadastro por id; opções fixas
 pelo catálogo). Limite visível: 6 + "+K".
 
+## Plano do dia seguinte — vocabulário por atividade (v75)
+
+Componente único `abrirFolhaPlano` / `faixaPlanoHoje` / `avaliarPlano`
+(CLAUDE.md, item c13). O que muda por atividade vem do catálogo
+`PLANO_ATIVIDADE` do index.html, por chave — nunca de `if(atividade===…)`
+nas telas. Tabela vigente:
+
+| Atividade | Rótulo do ONDE (1º passo) | Opção "área toda" | Catálogo do O QUÊ (2º passo) | Onde o app procura o registro do dia |
+|---|---|---|---|---|
+| ☕ Café | Talhão | Área geral | `LISTA_ATIV` (sem "Outra") | `atividades[].tipo` + `talhaoId`; "continua amanhã" → ◐ parcial |
+| 🌾 Grãos | Talhão / pivô | Área geral / sede | `OPS_GRAOS_FASES` (todas as fases) | `atividades[].tipo` + `talhaoId`; "continua amanhã" → ◐ parcial |
+| 🐂 Pecuária | Pasto / retiro | Toda a fazenda | `LISTA_PECUARIA` (`OPS_PECUARIA_FASES`) | `pecuaria.eventos[].tipo` + o de-para `PLANO_PEC_DEPARA` (abaixo) |
+
+O 3º passo (DETALHES) é igual nas três: "Quantas pessoas você prevê" —
+um campo, sem obrigatoriedade. Nenhum termo exclusivo de uma atividade
+aparece na tela de outra: "pivô" só nos grãos, "pasto/retiro" só na
+pecuária, "talhão" (que não é exclusivo) no café e nos grãos.
+
+**De-para da pecuária (`PLANO_PEC_DEPARA`).** Espelho exato de
+`operacao_alias` (sql/040-dias-sem-registro.sql): o plano conta como
+feito o que o gerente registrou na seção própria, não só em "Outros
+manejos".
+
+| Bloco do payload | Valor registrado | Operação do catálogo |
+|---|---|---|
+| `pecuaria.mov[].tipo` | Nascimento | Parto / nascimento |
+| `pecuaria.mov[].tipo` | Morte | Mortalidade (com causa) |
+| `pecuaria.mov[].tipo` | Desmama | Desmama |
+| `pecuaria.mov[].tipo` | Mudança de pasto | Rotação de pasto — entrada de lote |
+| `pecuaria.mov[].tipo` | Entrada | Compra / entrada de animais |
+| `pecuaria.mov[].tipo` | Saída | Embarque / venda |
+| `pecuaria.massa[].tipo` | Vacinação | Vacinação (especificar) |
+| `pecuaria.massa[].tipo` | Vermifugação | Vermifugação |
+| `pecuaria.san[].problema` | Bicheira | Cura de bicheira |
+| `pecuaria.san[].problema` | Carrapato / mosca em excesso | Controle de carrapato / mosca-do-chifre |
+| `pecuaria.lotes[]` (cabeças > 0) | — | Contagem |
+| `pecuaria.nut[]` (repôs no cocho) | — | Suplementação (sal mineral / proteinado / ração) |
+| `pecuaria.rep.iatfEtapa` | — | IATF |
+| `pecuaria.rep.dgPrenhes/dgVazias` | — | Diagnóstico de gestação |
+
+**Motivos do desvio (`PLANO_MOTIVOS`).** Iguais nas três atividades — o
+motivo é de gestão, não de agronomia. "Clima" não é chip: só o app o usa,
+quando o dia foi impedido pelo clima declarado no boletim.
+
+| id | Rótulo no chip | Conta como |
+|---|---|---|
+| `clima` | *(não aparece — automático)* | clima |
+| `chuva` | Choveu | clima |
+| `maquina` | Máquina quebrou | evitável |
+| `gente` | Faltou gente | evitável |
+| `insumo` | Faltou insumo | evitável |
+| `prioridade` | Mudou a prioridade | evitável |
+| `outro` | Outro *(revela uma linha de texto)* | evitável |
+| *(sem resposta)* | — | evitável, como "não informado" |
+
+**Clima que impede o dia (`CLIMA_IMPEDITIVO`, `PLANO_CHUVA_MM`).** Só o
+clima DECLARADO pelo gerente na seção Clima — nada é inferido de estação
+nem de fora do boletim: condição "Chuva forte", "Granizo" ou "Geada", ou
+chuva declarada ≥ 25 mm no dia. Vale igual nas três atividades e serve às
+duas contas: o desvio do dia vira "clima" e o dia sai dos trabalháveis.
+A lista e o limite são parâmetros do catálogo — mudar é decisão do Nilo
+com o agrônomo, na mesma tarefa que atualizar esta tabela.
+
+**Status do item.** ✅ feito · ◐ parcial · ⚪ não feito, sempre no
+sentido de REGISTRO. O rótulo visível é a palavra ao lado do ícone
+("feito", "parcial", "não feito"); a cor não é usada como sinal (canal
+reservado ao farol, regra 4 do plano de safra).
+
 ## Categorias de operação — badge de uma letra (v67)
 
 Fonte oficial das categorias (natureza da operação) e das letras que o
@@ -334,20 +498,23 @@ NÃO foi copiado); fundo neutro único, sem cor por categoria (a cor é
 canal do farol). Operação sem categoria ("Outra", termo acrescentado
 pelo escritório) não tem badge.
 
-### ☕ Café — PROPOSTA (pendente de aprovação do Nilo)
-O catálogo do café (LISTA_ATIV) não tem fase; as 5 categorias abaixo
-são proposta desta entrega e podem ser trocadas antes do merge (só
-dados: `OP_CATEGORIAS.CAFE` e esta tabela).
+### ☕ Café — categoria = grupo do catálogo (OPS_CAFE_GRUPOS), desde a v76
+Até a v75 as categorias do café eram uma proposta à parte, pendente de
+aprovação. Na v76 a proposta caiu: a categoria do café É o grupo por
+natureza que o gerente vê no seletor do boletim, ligado por `fase`
+exatamente como em grãos e pecuária. Uma fonte só, um agrupamento só.
 
-| Letra | Categoria | Operações (LISTA_ATIV) |
+| Letra | Categoria (grupo) | Operações |
 |---|---|---|
-| **C** | Colheita | Colheita · Catação · Repasse |
-| **A** | Aplicação (natureza: levar insumo à lavoura, qualquer produto) | Pulverização · Aplicação de herbicida · Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo · Calagem / gessagem |
-| **T** | Trato cultural (manejo da planta e do solo, manual ou mecânico) | Capina manual · Capina roçadeira / trincha · Arruação / esparramação de cisco · Desbrota · Poda / esqueletamento · Plantio / renovação |
-| **M** | Monitoramento | Monitoramento de pragas (MIP) |
-| **I** | Irrigação e infraestrutura | Irrigação · Limpeza do sistema de irrigação · Manutenção de estradas e aceiros |
+| **T** | Tratos culturais | Pulverização manual · Pulverização mecanizada · Adubação manual · Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo · Calagem / gessagem · Capina manual · Capina mecânica com trincha · Capina mecânica com roçadeira · Capina química manual · Capina química mecanizada · Desbrota manual · Poda mecanizada esqueletamento · Levantar café · Arruação / esparramação de cisco · Monitoramento de pragas (MIP) · Plantio / renovação |
+| **I** | Irrigação e fertirrigação | Irrigação manual · Irrigação automática · Adubação via fertirrigação · Limpeza do sistema de irrigação |
+| **C** | Colheita e pós-colheita | Colheita · Catação · Repasse |
+| **E** | Estrutura e apoio | Manutenção de estradas e aceiros |
 
-"Outra": sem categoria, sem badge.
+"Outra": sem categoria, sem badge. Termo ANTIGO gravado num boletim de
+antes da v76 continua com badge: o de-para (`DEPARA_NOMES`) leva ao
+termo de hoje e, quando o antigo é ambíguo, `TERMOS_LEGADO` guarda a
+natureza dele — que é a mesma nos dois candidatos.
 
 ### 🌾 Grãos — categoria = fase do catálogo (OPS_GRAOS_FASES)
 | Letra | Categoria (fase) | Operações |
@@ -450,6 +617,140 @@ Sem ação em massa, sem modal, sem campo novo de digitação. Desde a v70
 (decisão do Nilo) o envio exige resposta em toda seção eventual:
 registro ou "Nada a registrar hoje"; seção esperada fica fora.
 
+## Planejamento — reunião mensal e semana (v77)
+
+Fonte oficial do vocabulário do módulo de planejamento. Componentes
+ÚNICOS nas três atividades: o que muda por atividade é o de-para de
+descrição → operação do boletim (sinônimos abaixo), nunca a tela.
+
+### Status da tarefa (`PLAN_STATUS`)
+
+| id | rótulo | farol |
+|---|---|---|
+| `a_iniciar` | A iniciar | por prazo (🟢 🟡 🔴) |
+| `em_execucao` | Em execução | por prazo (🟢 🟡 🔴) |
+| `finalizado` | Finalizado | ✅ |
+| `aguardando_terceiro` | Aguardando terceiro | ⏸️ cinza — **nunca vermelho** |
+| `aguardando_clima` | Aguardando clima | ⏸️ cinza — **nunca vermelho** |
+| `cancelado` | Cancelado (com motivo) | — |
+
+Tarefa **sem prazo** também é ⏸️ cinza. Vermelho é só 2 dias, hoje ou
+vencido (rótulo ATRASADO, que descreve o PRAZO, nunca a pessoa);
+amarelo é de 3 a 7 dias; verde é mais de 7 dias.
+
+### Motivos de trava (`PLAN_MOTIVOS_TRAVA`) — chips de um toque
+
+| id | chip | vira o status |
+|---|---|---|
+| `insumo` | falta insumo | aguardando terceiro ("aguardando insumo") |
+| `peca` | falta peça | aguardando terceiro ("aguardando peça") |
+| `gente` | falta gente | aguardando terceiro ("aguardando gente") |
+| `maquina` | falta máquina | aguardando terceiro ("aguardando máquina") |
+| `chuva` | chuva | aguardando clima ("aguardando o tempo firmar") |
+| `outro` | outro | aguardando terceiro ("aguardando") |
+
+### Novo prazo em um toque (`PLAN_NOVOS_PRAZOS`)
+`+7 dias` · `+15 dias` · `fim do mês` · `próxima reunião` (dia 10).
+Nunca calendário nem teclado: quem está no campo não digita.
+
+### Origem da tarefa (`PLAN_ORIGENS`)
+`mensal` = rodada da reunião · `semana` = tarefa nova da semana ·
+`avulsa` = criada no escritório fora dos dois ritos.
+
+### Tipo do item (`PLAN_TIPOS_ITEM`)
+`tarefa` (tem unidade e prazo) · `assunto` (assuntos gerais da ata) ·
+`investimento` (necessidades de investimento). Assunto e investimento
+não têm fazenda nem prazo, por desenho.
+
+### De-para da ata (`DEPARA_ATA_PADRAO`, editável em Cadastros)
+
+| nome na ata | unidade do app | observação |
+|---|---|---|
+| FMC Igrejinha | f14c Monte Carmelo — Café | área "Igrejinha" |
+| FMC Lazaro | f14c Monte Carmelo — Café | área "Lazaro" |
+| FMC Caxico | f14c Monte Carmelo — Café | área "Caxico" |
+| FMC Ernane | f14c Monte Carmelo — Café | área "Ernane" |
+| FMC Arrendo | f14c Monte Carmelo — Café | área "José Eustáquio" |
+| Lagamar (Rodrigo) | f20 Lagamar Café (Rodrigo) | |
+| Lagamar (Grupo) | f03c Rio Preto-Lagamar — Café | |
+| Café 5º · Café 6º | f24 Vereda Café 5º e 6º | |
+| Romaria | f23 Vereda Romaria | |
+| Vereda | f22c Vereda — Café | |
+| Mata Preta | f13c Mata Preta — Café | |
+| Água Limpa | f01 Água Limpa | |
+| São Félix | f21 São Félix — Arrendamento | |
+| Marimbondo · Cristo Redentor · Córrego Grande (Dr. Adilson) | — | **fora do escopo**: ignoradas sempre, sem perguntar |
+
+Identidade pelo **id** da unidade, nunca por pedaço de nome. Nome que
+não está aqui NÃO é adivinhado: entra na pré-visualização como
+"unidade não reconhecida" e a pessoa escolhe (regra 3 do plano de
+safra). Igrejinha e Lazaro entraram como áreas de Monte Carmelo — Café
+(talhões `t057` e `t058`, área a confirmar em Cadastros), no mesmo
+padrão de Caxico, Ernane e José Eustáquio.
+
+### Leitura da ata pela linguagem
+
+| o que aparece na linha | vira |
+|---|---|
+| `PRAZO: DD/MM/AA` | prazo (sem isso, tarefa sem prazo → farol cinza) |
+| `96 há`, `22 ha`, `40 hectares` | área em ha |
+| "Ok", "Finalizado", "Concluído", "Pronto", "Feito" | FINALIZADO |
+| "em andamento", "iniciou", "iniciado", "finalizando", "começou" | EM EXECUÇÃO |
+| "falta", "fazer", "aplicar", "programar", "iniciar" | A INICIAR (é também o padrão) |
+| "aguardando…", "falta chegar", "falta entregar", "falta peças", "cobrar <fornecedor>", "aguardando repasse", "aguardando aprovar" | AGUARDANDO TERCEIRO (captura o terceiro: Cooxupé, Diferpan, Cemig…) |
+| "aguardando sol", "quando parar as chuvas", "N dias de sol", "parar de chover" | AGUARDANDO CLIMA |
+| `(Renatinho/ Renato)`, "Definido com Cristian" | responsável |
+| "Assuntos gerais", "Necessidades de investimento" | lista separada, sem fazenda e sem prazo |
+
+Ordem de decisão: FINALIZADO vence tudo; depois clima; depois terceiro;
+depois a linguagem de execução. Reimportar a mesma ata não duplica
+(chave: rodada + unidade + descrição normalizada).
+
+### Vínculo com o boletim (`PLAN_SINONIMOS`) — o app SUGERE, nunca conclui
+
+Descrição da tarefa → operação do catálogo da atividade da unidade. Só
+para SUGERIR a conclusão quando o registro correspondente entra no
+boletim do dia; a conclusão continua sendo um toque da pessoa.
+
+- **Café:** kcl → Adubação via lanço · ferti/fertirrigação → Adubação
+  via fertirrigação · esqueletar/esqueletamento → Poda mecanizada
+  esqueletamento · varrição → Colheita · levantar → Levantar café ·
+  calcário/gesso → Calagem / gessagem · herbicida → Capina química
+  manual · roçada → Capina mecânica com roçadeira · adubação → Adubação
+  manual · desbrota → Desbrota manual · pulverização → Pulverização
+  manual · irrigação → Irrigação automática.
+- **Grãos:** kcl/cobertura → Adubação de cobertura · calcário → Calagem ·
+  gesso → Gessagem · dessecação → Dessecação de pré-plantio · plantio →
+  Plantio / semeadura · colheita → Colheita mecanizada · herbicida →
+  Herbicida pós-emergente · fungicida → Fungicida · inseticida →
+  Inseticida.
+- **Pecuária:** vacina/vacinação → Vacinação (especificar) ·
+  vermifugação → Vermifugação · roçada → Roçada · cerca/cocho →
+  Manutenção de cerca / cocho / bebedouro · pesagem → Pesagem · desmama
+  → Desmama · formiga → Controle de formiga.
+
+Além dos sinônimos, casa por palavra inteira de 5+ letras do nome da
+operação. **Tarefa de estrutura** (caixa d'água, piscinão, talude,
+adutora, barracão, cerca, estrada, aceiro, represa, bomba, poço, rede
+elétrica, curral, laboratório, reforma, construção, montagem) NUNCA
+recebe sugestão: status só manual.
+
+### Planejado × executado (v78) — o que cada número significa
+
+| número | de onde sai | regra |
+|---|---|---|
+| **planejado** | `t.meta` (informada pelo escritório) ou `t.area` (a área que a ata trouxe) | sem nenhum dos dois não há barra nem restante — o app conta os lançamentos e diz que falta a área |
+| **executado** | soma da área dos talhões DISTINTOS com lançamento casado, na janela da tarefa | o mesmo talhão lançado duas vezes conta UMA vez; nunca passa da meta na barra (o excedente aparece à parte) |
+| **restante** | planejado − executado | arredondado depois do executado: os três SEMPRE fecham na tela |
+| **janela da tarefa** | de `inicioReal` (ou `criadoEm`) até hoje — ou até `concluidoEm` | tarefa concluída congela o número |
+| **esforço** | lançamentos (talhão × operação × dia) e, quando houver, pessoas-dia | é o denominador do "% fora do plano" |
+
+**Executado fora do plano** = lançamento do mês que não casou com nenhuma
+tarefa da unidade (qualquer status, menos cancelada). Não é cobrança: é o
+que apareceu no dia e não estava na ata — assunto para a próxima reunião.
+**Sem lançamento** = nenhum registro do boletim casou com a tarefa; é
+ausência de REGISTRO, nunca afirmação de que não foi feito.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar
@@ -466,6 +767,13 @@ café, cafezal, cereja, florada, requeima, lata, latas, terreiro,
 secador, tulha, gotejo, gotejadores, derriça, desbrota, arruação,
 esparramação, peneira, catação, bicho-mineiro, broca-do-café,
 passada, repasse, maturação, benefício
+
+> A revisão de nomenclatura da v76 não acrescentou termo exclusivo
+> novo: "desbrota" já estava na lista (e "Desbrota manual" a contém),
+> "Levantar café" cai em "café", e "trincha", "roçadeira",
+> "pulverização", "capina", "adubação" e "fertirrigação" têm uso
+> legítimo em grãos e/ou pecuária — pelo mesmo motivo que "roçada" e
+> "plantio" ficaram de fora desde o começo.
 
 ### Grãos
 pivô, pivôs, soja, milho, feijão, percentímetro, dessecação,

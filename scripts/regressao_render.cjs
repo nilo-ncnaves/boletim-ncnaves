@@ -65,6 +65,11 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   await page.goto(base + '/index.html');
   await page.evaluate(([a, s]) => { localStorage.clear(); localStorage.setItem('bdf:acesso', JSON.stringify(a)); if (s) localStorage.setItem('bdf:sessao', JSON.stringify(s)); }, [acesso, sessao]);
   await page.reload(); await pausa(page, 1500);
+  /* v77: do dia 10 em diante (e na sexta) a porta da Diretoria/Escritório é a tela curta do ritual
+     do planejamento. É o comportamento esperado — e é provado em scripts/teste_planejamento.cjs e
+     no grupo 14 de scripts/checar-poluicao.cjs. Aqui a pessoa pula, para o roteiro de sempre seguir
+     igual entre as duas versões (na versão antiga a variável nem existe). */
+  await page.evaluate(() => { try { ritualPuladoSessao = true; } catch (e) {} });
   const dumps = {};
   dumps['00-inicio'] = await html(page);
   for (const [rot, fn] of passos) {
@@ -83,14 +88,22 @@ async function cenario(browser, nome, acesso, sessao, passos) {
 
   /* ☕ café — boletim completo: clima, mão de obra, irrigação + fertirrigação, atividades, colheita, fito, ocorrência, envio, WhatsApp, detalhe */
   await cenario(browser, 'cafe-f23', { codigo: CODIGOS.f23, chave: 'f23' }, ger('f23', 'CAFE'), [
+    /* v75: plano de HOJE semeado (feito ontem) — exercita a faixa "O plano de ontem para hoje", o status
+       automático e, no envio, a pergunta do motivo. Só no café: em grãos e pecuária a ausência do plano
+       prova que a entrega não mexe em nada quando não há plano. */
+    ['02-plano-semeado', async p => { await p.evaluate(() => { const fz = 'f23', hoje = hojeBRT();
+      const tals = planoCat(fz).onde(fz).slice(0, 3).map(t => t.id), ops = planoCat(fz).ops(fz);
+      D.planoDia = [{ id: 'plr', fazendaId: fz, data: hoje, criadoEm: diaISO(hoje, -1), por: 'João Batista',
+        itens: [{ op: ops[0], ondes: [tals[0]], pessoas: '8' }, { op: ops[5], ondes: [tals[1]], pessoas: '4' }, { op: ops[9], ondes: [tals[2]], pessoas: '3' }], obs: '' }];
+      salvarDados(); ir('casa'); }); await pausa(p, 300); }],
     ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73: régua de 7 dias — dia sem registro cai no vazio */
     ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-form', async p => { await clique(p, '#bt-preencher'); }],
     ['20-clima', async p => { await clique(p, '[data-clima="Ensolarado"]'); await clique(p, '[data-cflor="florada"]'); await preenche(p, 'input[data-c="chuvaMm"]', '12'); await preenche(p, 'input[data-c="obs"]', 'vento fraco'); }],
     ['30-mo', async p => { await clique(p, '[data-step="1"][data-alvo="proprios"]'); await clique(p, '[data-step="1"][data-alvo="proprios"]'); await clique(p, '[data-step="1"][data-alvo="diaristas"]'); }],
     ['40-irrigacao', async p => { await clique(p, '[data-irrst="Rodou normal"]'); await clique(p, '[data-irrag="Máximo"]'); await clique(p, '[data-irrft="Sim"]'); await abrirDetails(p); await p.click('[data-irrfsec] >> nth=0'); await p.click('[data-irrfsec] >> nth=1'); await preenche(p, 'textarea[data-irr="fertReceita"]', '200 kg MAP + 150 kg KCl, 2 tanques'); }],
-    ['50-atividade', async p => { await clique(p, '#bt-add-ativ'); const t = await primeiraOpcao(p, 'select[data-a="talhaoId"]'); await escolhe(p, 'select[data-a="talhaoId"]', t); await escolhe(p, 'select[data-a="tipo"]', 'Pulverização'); await preenche(p, 'input[data-a="pessoas"]', '3'); await clique(p, '[data-ast="concluida"]'); await preenche(p, 'textarea[data-a="receita"]', '500 ml Mirus, 1,2 L Priori Top'); await preenche(p, 'input[data-a="tanques"]', '4'); await preenche(p, 'input[data-a="ltanque"]', '2000'); await clique(p, '[data-add-maq]'); await preenche(p, 'input[data-m="nome"]', '13'); await preenche(p, 'input[data-m="horas"]', '6'); }],
-    ['55-atividade2', async p => { await clique(p, '#bt-add-ativ'); const sel = 'select[data-a="talhaoId"] >> nth=1'; const t = await p.evaluate(() => { const s = document.querySelectorAll('select[data-a="talhaoId"]')[1]; const o = [...s.options].find(x => x.value && x.value !== 'geral'); return o ? o.value : ''; }); await escolhe(p, sel, t); await escolhe(p, 'select[data-a="tipo"] >> nth=1', 'Calagem / gessagem'); await abrirDetails(p); await p.click('[data-ast="continua"] >> nth=1'); await p.fill('input[data-a="falta"] >> nth=1', '3 ruas do fundo'); }],
+    ['50-atividade', async p => { await clique(p, '#bt-add-ativ'); const t = await primeiraOpcao(p, 'select[data-a="talhaoId"]'); await escolhe(p, 'select[data-a="talhaoId"]', t); await clique(p, '[data-escop$="|Pulverização mecanizada"]'); await preenche(p, 'input[data-a="pessoas"]', '3'); await clique(p, '[data-ast="concluida"]'); await preenche(p, 'textarea[data-a="receita"]', '500 ml Mirus, 1,2 L Priori Top'); await preenche(p, 'input[data-a="tanques"]', '4'); await preenche(p, 'input[data-a="ltanque"]', '2000'); await clique(p, '[data-add-maq]'); await preenche(p, 'input[data-m="nome"]', '13'); await preenche(p, 'input[data-m="horas"]', '6'); }],
+    ['55-atividade2', async p => { await clique(p, '#bt-add-ativ'); const sel = 'select[data-a="talhaoId"] >> nth=1'; const t = await p.evaluate(() => { const s = document.querySelectorAll('select[data-a="talhaoId"]')[1]; const o = [...s.options].find(x => x.value && x.value !== 'geral'); return o ? o.value : ''; }); await escolhe(p, sel, t); await clique(p, '[data-escop$="|Calagem / gessagem"] >> nth=0'); await abrirDetails(p); await p.click('[data-ast="continua"] >> nth=1'); await p.fill('input[data-a="falta"] >> nth=1', '3 ruas do fundo'); }],
     ['60-colheita', async p => { await clique(p, '#bt-add-col'); const t = await primeiraOpcao(p, 'select[data-cc="talhaoId"]'); await escolhe(p, 'select[data-cc="talhaoId"]', t); await clique(p, '[data-cmodo="Mecânica"]'); await preenche(p, 'input[data-cc="carretas"]', '9,5'); await preenche(p, 'input[data-cc="sacas"]', '40'); await clique(p, '[data-cpas="1ª passada"]'); await clique(p, '[data-dest="Terreiro"]'); await preenche(p, 'input[data-cc="cereja"]', '60'); await preenche(p, 'input[data-cc="verde"]', '25'); await preenche(p, 'input[data-cc="seco"]', '15'); }],
     ['62-enviar-sem-resposta', async p => { await clique(p, '#bt-enviar'); }],   /* v70: seção eventual sem resposta → aviso âmbar, não envia */
     ['65-nada-fito', async p => { await clique(p, '[data-resp-nada="CAFE-FITO"]'); }],   /* v69: "Nada a registrar hoje" — cai sozinho no 70-fito */
@@ -99,7 +112,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['80-ocorrencia', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de equipamento'); await clique(p, '[data-ograv="Média"]'); await preenche(p, 'textarea[data-o="texto"]', 'mangueira estourou'); }],
     ['85-obs', async p => { await preenche(p, 'textarea[data-t="obsGeral"]', 'dia normal'); await preenche(p, 'textarea[data-t="pendencias"]', 'terminar setor 3'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } const pl = await p.$('#bt-plano-pular');   /* v75: folha "Amanhã" — pulada, para o resto do roteiro seguir igual */ if (pl) { await pl.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],
     ['97-whats-enviado', async p => { const txt = await p.evaluate(() => resumoWhats(D.boletins[D.boletins.length - 1])); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
   ]);
@@ -117,7 +130,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['50-fito', async p => { await clique(p, '#bt-add-fito'); await clique(p, '[data-ftipo="Praga"]'); const t = await primeiraOpcao(p, 'select[data-f="talhaoId"]'); await escolhe(p, 'select[data-f="talhaoId"]', t); await clique(p, '[data-fniv="Baixo"]'); }],
     ['60-ocorr', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de máquina'); await clique(p, '[data-ograv="Baixa"]'); await preenche(p, 'textarea[data-o="texto"]', 'pneu'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } const pl = await p.$('#bt-plano-pular');   /* v75: folha "Amanhã" — pulada, para o resto do roteiro seguir igual */ if (pl) { await pl.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],   /* v67: boletim enviado (badge de categoria) */
   ]);
 
@@ -135,7 +148,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['60-pasto', async p => { await clique(p, '[data-psc="condicao|No ponto"]'); }],
     ['70-obs', async p => { await preenche(p, 'textarea[data-pec="obs"]', 'tudo em ordem'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
-    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } }],
+    ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } const pl = await p.$('#bt-plano-pular');   /* v75: folha "Amanhã" — pulada, para o resto do roteiro seguir igual */ if (pl) { await pl.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],   /* v67: boletim enviado (badge de categoria) */
   ]);
 
@@ -173,6 +186,12 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   ]);
 
   /* ⚙️ admin — entrada, painel, cadastros, unidades e plano (v52) */
+  /* v77: área Planejamento do Escritório — na versão antiga o passo cai em FALHOU (tela nova) */
+  const PASSOS_PLANEJAMENTO = [
+    ['70-planejamento-menu', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }]; ir('planejamento'); }); await pausa(p, 300); }],
+    ['72-planejamento-importar', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.ata = null; ir('planejamento'); }); await pausa(p, 300); }],
+    ['74-planejamento-semana', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'semana' }]; ir('planejamento'); }); await pausa(p, 300); }],
+  ];
   await cenario(browser, 'admin', { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null, [
     ['10-painel', async p => { await p.click('[data-perfil="admin"]'); }],
     ['20-cadastros', async p => { await clique(p, '#bt-cad'); }],
@@ -180,6 +199,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['40-unidplano-fz2', async p => { const chip = await p.$('[data-up="fz"][data-upv="Água Limpa"]'); if (chip) { await chip.click(); await pausa(p, 300); } else { const chips = await p.$$('[data-up="fz"]'); if (chips.length > 1) { await chips[1].click(); await pausa(p, 300); } } }],
     ['50-editar', async p => { const b = await p.$('[data-up="editar"]'); if (b) { await b.click(); await pausa(p, 300); } }],
     ['60-auditar', async p => { const b = await p.$('[data-up="auditar"]'); if (b) { await b.click(); await pausa(p, 1500); } }],
+    ...PASSOS_PLANEJAMENTO,
   ]);
 
   await browser.close();

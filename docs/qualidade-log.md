@@ -6,6 +6,445 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 10/09/2026 · v78 · Reforço do planejado × executado: três números, rastreabilidade e o que ficou fora do plano
+
+**Entrega.** O módulo de planejamento da v77 dizia o que estava combinado e em
+que pé estava. A v78 passa a dizer QUANTO: toda tarefa mostra planejado ·
+executado · restante, com barra; o executado é rastreável até o lançamento que
+o compôs; o lançamento do boletim mostra que abateu a tarefa; e o que foi feito
+SEM estar na ata aparece como "executado fora do plano". Regra permanente em
+CLAUDE.md, item c15; catálogo em docs/catalogos-por-atividade.md
+("Planejado × executado"); checagem em docs/definicao-de-pronto.md, itens 11 a 14.
+
+**As cinco peças.**
+- *Três números sempre.* `planTrio` na folha do gerente e nas listas da área
+  Planejamento. `planProgresso` arredonda ANTES de subtrair — planejado =
+  executado + restante SEMPRE fecha na tela (era o único jeito de o número
+  merecer confiança). A meta é a área da ata ou a que o escritório informa pelo
+  chip "Definir meta"; **sem meta não há barra nem restante**, e o app diz isso
+  com todas as letras em vez de inventar denominador.
+- *Rastreabilidade total.* Um toque em "executado" abre, no lugar, a lista dos
+  lançamentos: data, local, área e quem lançou, com o cabeçalho "N lançamentos
+  em M locais · P pessoas-dia · de dd/mm a dd/mm". A soma em ha conta cada
+  talhão UMA vez; a janela vai do "Comecei" até hoje ou até o "Concluí".
+- *O lançamento diz o que abateu.* `planTagVinculo` põe "📋 abate: …" no
+  lançamento, no boletim em edição e no enviado, nas três atividades — etiqueta
+  de leitura, nunca botão (regra c4-4).
+- *Executado fora do plano.* Tela nova por unidade, no mês corrente, agrupada
+  por operação, com % dos lançamentos e pessoas-dia; sai também em texto para a
+  próxima ata. A tela DIZ que não é cobrança.
+- *Fechamento mensal.* % do plano executado em área, % do esforço fora do plano
+  e as tarefas sem NENHUM lançamento — na rodada, no Mês por unidade, no cartão
+  do painel e no texto de copiar.
+
+**O que foi verificado (como).**
+- `node scripts/teste_planejamento.cjs` — **64 ✅ · 0 ❌** (48 da v77 + 16 novos,
+  todos com o texto real da ata e relógio fixo): os três números fechando
+  (96 = 42 + 54); o executado igual à soma dos talhões distintos (16 + 23 + 3);
+  cada lançamento com data, talhão, área e autor; a foto `{ha:42, n:3, meta:96}`
+  gravada na tarefa para o Supabase ler; a meta informada pelo escritório
+  ligando a barra numa tarefa que a ata trouxe sem área; o lançamento de
+  "Catação" virando fora do plano (1 de 4, 25%) enquanto o de "Levantar café"
+  casa; o texto para a próxima ata; o fechamento com 33% de área, 25% fora do
+  plano e 4 tarefas sem lançamento; na tela, os três rótulos juntos com barra a
+  44%, o toque abrindo 3 linhas de rastreabilidade sem sair da tela e com alvo
+  de 44 px; e, no celular do gerente, o placar "42 de 96 ha" na faixa, os três
+  números na folha com **0 campos de digitação** e a etiqueta "📋 abate:" no
+  boletim enviado.
+- `node scripts/checar-poluicao.cjs` — **589 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58, comparados item a item com a saída da v77: **nenhum ❌ novo**.
+  Sete itens novos no grupo 14 e uma tela nova medida com as regras de
+  Cadastros ("Planejamento › Executado fora do plano").
+- `scripts/regressao_render.cjs` main × v78: telas do gerente e do pós-colheita
+  sem tarefa aberta continuam idênticas; a etiqueta 📋 e o placar só aparecem
+  quando há tarefa casada.
+- Sintaxe do JavaScript extraído (`node --check`), cache do service worker em
+  `boletim-lgs-v78` e rodapé em v78.
+
+**Decisões que valem registrar.**
+- *Não inventar denominador.* A tarefa sem área podia ganhar uma barra de "0% /
+  100%" pelo status. Não ganhou: barra sem meta é número inventado. Em vez
+  disso, o escritório pode informar a meta em um toque + um campo, e aí a barra
+  liga. Fica em PENDÊNCIAS para o Nilo decidir onde vale a pena.
+- *Esforço medido em lançamentos.* O "% fora do plano" usa lançamentos (talhão ×
+  operação × dia) como denominador, uniforme nas três atividades, e mostra
+  pessoas-dia ao lado quando o boletim tem o número. Trocar a medida principal
+  para pessoas-dia é uma linha — está em PENDÊNCIAS.
+- *Quem calcula é o app.* Casar "Fazer KCL e ferti" com "Adubação via lanço"
+  depende do de-para de sinônimos, que mora no index.html. Por isso o app grava
+  a foto `payload.exec` em cada tarefa e o SQL só LÊ — em vez de duplicar o
+  de-para no banco, onde ele envelheceria em silêncio.
+
+**O que depende de teste manual no iPhone (Nilo).**
+1. Rodar de novo `sql/050-planejamento.sql` e `sql/051-ata-x-executado.sql` (as
+   duas versões novas substituem a visão e as funções; nenhum dado é tocado).
+2. Numa unidade com tarefa de área, lançar a atividade no boletim e conferir a
+   etiqueta "📋 abate:" e o placar subindo na faixa.
+3. Tocar em "executado" numa tarefa e ver se a lista de lançamentos bate com o
+   que aconteceu no campo.
+4. Abrir Planejamento › Executado fora do plano e ver se as operações listadas
+   fazem sentido como pauta da próxima reunião.
+
+**O que NÃO foi tocado.** Boletim das três atividades (nenhum campo novo,
+nenhuma seção nova, nada bloqueia o envio), pós-colheita, plano do dia (v75),
+plano de safra (v52), robôs, motor de relatórios da fase 1, robô-redator,
+códigos de acesso e CSS-base. O único acréscimo fora do módulo é a etiqueta 📋
+no lançamento — leitura pura, sem alterar nada do que é gravado.
+
+## 10/09/2026 · v77 · Módulo de planejamento: reunião mensal + planejamento semanal
+
+**Entrega.** O app passou a guardar o que a reunião administrativa do mês
+combina e o que a sexta-feira repactua — a MESMA tarefa vista em dois
+horizontes, com acompanhamento automático de prazos e uma interface que não
+deixa esquecer. A ata entra por colagem (nada de planilha), o gerente
+responde com UM toque no topo do boletim, e o escritório recebe a cobrança
+pronta. Regra permanente em CLAUDE.md, item c15; catálogo em
+docs/catalogos-por-atividade.md ("Planejamento — reunião mensal e semana");
+checagem em docs/definicao-de-pronto.md, item 18.
+
+**O que foi verificado (como).**
+- `node scripts/teste_planejamento.cjs` — script novo, sem rede, 390 px,
+  relógio fixo: **48 ✅ · 0 ❌**. Importa o texto REAL da ata da reunião de
+  10/09/26 e confere o resultado esperado item a item: Vereda com 5 tarefas
+  (uma de 96 ha em AGUARDANDO CLIMA e farol cinza; uma com responsável
+  "Renatinho/ Renato"; uma AGUARDANDO TERCEIRO por repasse; uma sem prazo);
+  Mata Preta com 1 em execução, 1 finalizada e 1 aguardando clima; Lagamar
+  (Grupo) com 1 finalizada, 1 aguardando Cooxupé e 1 a iniciar. Depois:
+  reimportar a mesma ata não duplica (15 → 15); a semana é criada, 3 tarefas
+  são comprometidas, 1 concluída, 1 travada por falta de insumo e 1 fica sem
+  ação — o fechamento da sexta seguinte devolve `{n:3, concluídas:1,
+  travadas:1, abertas:1}` e o placar "cumprimos 1 de 3"; a projeção dos 96 ha
+  sai "feito 42 de 96 ha · conclui em 30/09 (10 dias do prazo)"; o alerta de
+  travada há mais de 7 dias dispara; a pauta da sexta, a cobrança por
+  fornecedor ("Cooxupé: … desde 10/09 — 1 fazenda parada."), o fechamento do
+  mês e o rascunho da próxima ata saem no formato certo.
+- `node scripts/checar-poluicao.cjs` — **575 ✅ · 41 ❌**, exatamente os
+  mesmos 41 ❌ herdados da v58 (comparação item a item com a saída da v76):
+  **nenhum ❌ novo**. Grupo novo "14. Planejamento" (10 itens ✅) e 16 telas
+  do módulo medidas com as MESMAS regras de Cadastros (altura, busca em
+  lista longa, ação principal fixa, níveis, cabeçalho, padrão visual).
+  Durante a construção três ❌ apareceram e foram zerados antes do PR: o
+  fechamento da rodada (2,75 telas e 15 itens), a revisão das arrastadas
+  (3,7 telas) e a conferência da ata (13 itens) nasceram sem busca — as três
+  ganharam busca (P3).
+- `scripts/regressao_render.cjs` main × v77: as telas do **gerente nas três
+  atividades e do pós-colheita ficaram IDÊNTICAS** (só o `localStorage`
+  difere, pelas coleções novas) — a prova de que sem tarefa aberta o módulo
+  não desenha nada. Diferenças, todas intencionais: porta de entrada e
+  painel (pastilhas + botão e cartão do Planejamento), menu de Cadastros
+  (item "De-para da ata", 2 talhões novos, versão v77) e as três telas novas
+  do Escritório. Nenhum erro de JavaScript novo; os 3 pedidos de rede a mais
+  são as 3 tabelas novas do Supabase, abortadas offline como todas as outras.
+- Sintaxe do JavaScript extraído do index.html (`node --check`) e do
+  `sw.js`; cache do service worker trocado para `boletim-lgs-v77` junto com
+  o rodapé.
+
+**Autorrevisão por escrito (as quatro perguntas da tarefa).**
+1. *O gerente muda status em um toque?* **Sim.** A faixa do topo abre a
+   folha e Comecei · Concluí · Travado (chips) resolvem no toque seguinte. O
+   teste prova `0 campo(s) de digitação` na folha, `0 diálogo nativo` e que
+   a pessoa não sai da tela. Novo prazo, quando aparece, é chip (+7 · +15 ·
+   fim do mês · próxima reunião) — nunca calendário.
+2. *Tarefa travada por terceiro fica vermelha para o campo?* **Não.** Os
+   dois "aguardando" e a tarefa sem prazo têm farol ⏸️ cinza por construção
+   (`planFarol` devolve "cinza" antes de olhar o prazo). Provado duas vezes:
+   no teste (travada por insumo → cinza; a de 96 ha por clima → cinza) e no
+   grupo 14 da checagem de poluição.
+3. *A cobrança de fornecedor e o rascunho da ata saem prontos sem ferramenta
+   externa?* **Sim.** Os quatro textos são montados no próprio aparelho e
+   copiados por botão (`abrirTextoZap`), do que já está no app. Nenhuma
+   planilha, nenhuma exportação, nenhum programa de fora.
+4. *Alguém precisa lembrar de abrir alguma tela para o sistema funcionar?*
+   **Não.** `planMotor()` roda na abertura do app, a cada sincronização e ao
+   entrar no módulo (farol, dias de chuva, saída automática da pausa por
+   clima, criação da semana). As pastilhas nascem na porta de entrada e somem
+   sem pendência; na sexta e do dia 10 em diante a porta da Diretoria é a
+   tela do ritual, pulável só para a sessão. **A única exceção honesta são as
+   notificações**: sem servidor de push, elas disparam quando o app é aberto
+   a partir da hora marcada — está no ESTADO.md, em PENDÊNCIAS, como
+   limitação e como tarefa própria.
+
+**O que depende de teste manual no iPhone (Nilo).**
+1. Rodar `sql/050-planejamento.sql` e, depois, `sql/051-ata-x-executado.sql`
+   no SQL Editor. Sem eles o módulo funciona inteiro no aparelho, mas não
+   sincroniza entre celulares.
+2. Colar a ata de verdade da próxima reunião em Planejamento › Importar ata
+   e conferir a pré-visualização item a item antes de gravar — é ali que
+   aparece um nome de fazenda que o de-para ainda não conhece.
+3. Na sexta, conferir que a tela "Fechar a semana e planejar a próxima" abre
+   sozinha; e no dia 10, a de "Importar a ata".
+4. No celular de um gerente, conferir a faixa "📋 Tarefas da reunião" no topo
+   da casa e do boletim (no máximo 3 linhas) e responder com um toque.
+5. Tocar uma vez em "Ativar avisos do planejamento" no painel e ver se o
+   iPhone aceita (exige o app instalado na tela de início).
+
+**O que NÃO foi tocado.** O boletim das três atividades (nenhum campo novo,
+nenhuma seção nova, nada bloqueia o envio), o pós-colheita, o plano do dia
+(v75), o plano de safra (v52), os robôs iCrop/Solinftec, o motor de
+relatórios da fase 1, o robô-redator, os códigos de acesso e o CSS-base. O
+único acréscimo fora do módulo foi o farol de tarefas na primeira linha do
+resumo do WhatsApp (pedido no item 12 da tarefa) e a inclusão de
+`plano_x_executado_diario` na lista de relatórios baixados — ele estava no
+catálogo desde a v75 mas nunca era baixado, então nunca chegava à tela.
+
+## 10/09/2026 · v76 · Nomenclatura das atividades e funções do café na palavra da lavoura
+
+**Entrega.** As listas de atividade por talhão e de função de mão de obra
+do café passaram a usar os termos que o funcionário fala, e que dizem
+COMO o serviço foi feito (manual × mecanizado × químico). A lista cresceu
+de 20 para 27 termos, então o passo O QUÊ virou 4 grupos por natureza,
+recolhidos: Tratos culturais (18) · Irrigação e fertirrigação (4) ·
+Colheita e pós-colheita (3) · Estrutura e apoio (2). O cartão de
+atividade do café virou cascata de verdade — ONDE (talhão) → O QUÊ
+(grupos) → DETALHES. Regra nova em CLAUDE.md ("Nomenclatura e histórico"
+e item c14); checagem em docs/definicao-de-pronto.md, item 17.
+
+**A regra central: nenhum boletim já lançado perde sentido.** Nada do que
+foi gravado foi tocado. O de-para antigo → novo vive na tabela única
+`DEPARA_NOMES` e é aplicado só na LEITURA pela função única
+`nomeAtual(nome)`: exibição (boletim enviado, casa do gerente, "o que
+ficou de ontem", plano, resumo de uma linha, CSV, WhatsApp), comparação
+(`avaliarPlano`, filtro do painel, chave de "última receita") e
+classificação (`categoriaOperacao`/badge). No Supabase, o nome antigo
+virou APELIDO da operação de hoje em `operacao_alias` e as duas operações
+renomeadas saíram com `ativo = false` — sem `delete`, sem `update` de
+payload (`sql/049-nomenclatura-cafe.sql`).
+
+**Três colunas (o inventário exigido pela regra).**
+- *Substituídos (6 de-para):* Desbrota → Desbrota manual (atividade e
+  função); Poda / esqueletamento → Poda mecanizada esqueletamento;
+  Poda (decote/esqueletamento) → Poda mecanizada esqueletamento;
+  Roçada costal → Capina mecânica com roçadeira; Aplicação de herbicida
+  (costal) → Capina química manual; Aplicação de defensivo (costal) →
+  Pulverização manual.
+- *Acrescentados (13):* Pulverização manual · Pulverização mecanizada ·
+  Adubação manual (atividade; já existia como função) · Capina mecânica
+  com trincha · Capina mecânica com roçadeira · Capina química manual ·
+  Capina química mecanizada · Adubação via fertirrigação · Irrigação
+  manual · Irrigação automática · Desbrota manual · Poda mecanizada
+  esqueletamento · Levantar café.
+- *Mantidos (13 atividades + 18 funções):* Colheita · Catação · Repasse ·
+  Adubação via lanço · Adubação orgânica · Aplicação via drench / via
+  solo · Calagem / gessagem · Capina manual · Arruação / esparramação de
+  cisco · Monitoramento de pragas (MIP) · Limpeza do sistema de irrigação
+  · Plantio / renovação · Manutenção de estradas e aceiros · Outra; e as
+  funções de colheita, terreiro, secador/tulha, benefício, abanação,
+  varrição/rapagem, carregamento, arranquio de corda-de-viola, arruação,
+  esparramação de cisco, plantio/replantio de mudas, irrigação
+  (manutenção/filtros), limpeza de carreadores, cercas/benfeitorias,
+  apoio a máquinas e serviços gerais.
+- *Ambíguos — perguntados ao Nilo, NÃO decididos:* "Pulverização",
+  "Aplicação de herbicida", "Capina roçadeira / trincha" e "Irrigação"
+  viraram DOIS termos cada. Ficaram em `TERMOS_LEGADO` com a natureza
+  deles: saem da escolha nova, continuam legíveis e continuam somando com
+  o nome gravado. Estão em ESTADO.md › PENDÊNCIAS.
+
+**Verificado (automático, sem rede, 390 × 844 px).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: **454 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58 — **nenhum ❌ novo**. A única linha que mudou de texto
+  é a do café "＋ Adicionar atividade": de "2 seletores, 5 campos, 2
+  chips, 7 rótulos" para "1 seletor, 0 campos, 0 chips, 1 rótulo" (o
+  mesmo retrato do "＋ operação" dos grãos). Ela continua ❌ porque o
+  ONDE ainda é `<select>` nas três atividades — zerar isso mexeria em
+  grãos, que esta tarefa tinha de deixar intacto; virou pendência.
+- `scripts/regressao_render.cjs` main × branch, 6 cenários: **grãos e
+  pecuária idênticos** (a única diferença nos dois é o relógio do envio,
+  12:12 × 12:13). Fora deles, só o esperado: rodapé v75 → v76, o filtro
+  "Todas as atividades" do painel com os termos novos, a contagem de
+  itens em Cadastros › Catálogos (696 → 705) e, na tela de detalhe de um
+  boletim de exemplo com "Pulverização", o badge que sumiu — corrigido
+  ainda nesta entrega pelo `TERMOS_LEGADO` (que guarda a natureza), e
+  reconferido depois.
+- **`node scripts/teste_nomenclatura.cjs`** (novo nesta entrega, fica no
+  repositório para as próximas renomeações): 23 checagens ✅, sem rede,
+  390 × 844 px. De-para antigo →
+  novo nos 6 termos; termo sem de-para volta igual; badge do termo
+  renomeado e do termo legado achando a natureza certa; plano gravado com
+  o nome ANTIGO fecha como "feito" com registro no nome NOVO, e o
+  contrário também; boletim de 08/09 semeado com "Desbrota"/"Roçada
+  costal" aparece na tela como "Desbrota manual"/"Capina mecânica com
+  roçadeira" enquanto o armazenamento continua `["Desbrota",
+  "Pulverização"]` — nada reescrito.
+  Ainda no mesmo script, os 3 passos: depois do "＋", 1 seletor e 0
+  campos; escolhido o talhão, 4 grupos e ZERO chip visível (cartão de
+  369 px); aberto "Tratos culturais", 18 chips com "Capina mecânica com
+  trincha", "Levantar café" e "Desbrota manual"; escolhida a atividade,
+  os detalhes aparecem.
+- `node scripts/gerar_categorias_operacoes.cjs`: ✅ catálogo consistente
+  (café 4/26, grãos 5/28, pecuária 5/28; ≤ 5 categorias, letra única,
+  toda operação em uma categoria).
+- Vocabulário: `git grep` por "não fez", "atrasad", "pendente", "faltou",
+  "esqueceu" no que foi tocado — nada.
+
+- `sql/049-nomenclatura-cafe.sql` rodado **2×** num PostgreSQL local
+  (pgserver), com as linhas antigas do catálogo semeadas antes: sem
+  erro, idempotente (2ª rodada = `INSERT 0 0` nos apelidos), 27
+  operações ativas de café, `CAFE-DESBROTA` e
+  `CAFE-PODA_ESQUELETAMENTO` com `ativo = false` (sem apagar), o
+  apelido "Desbrota" pertencendo às duas linhas (a antiga, inativa, e a
+  de hoje) e os termos legados continuando ativos de propósito.
+
+**Depende de teste manual (Nilo).**
+1. Rodar `sql/049-nomenclatura-cafe.sql` no SQL Editor do Supabase (uma
+   vez; pode repetir sem estragar). A conferência do fim mostra os 4
+   grupos do café e a lista "operação de hoje × nome antigo reconhecido".
+2. No iPhone, numa unidade de café: abrir o boletim, tocar em "＋
+   Adicionar atividade", escolher o talhão e conferir se ele reconhece as
+   palavras dentro de "Tratos culturais". **A pergunta que vale:** "o
+   funcionário acha aqui a palavra que ele usa?" Falta alguma? É uma
+   linha do catálogo.
+3. Abrir um boletim antigo de café (Últimos boletins) e conferir que ele
+   continua fazendo sentido, agora com os nomes de hoje.
+4. Responder as 4 perguntas de PENDÊNCIAS (mais a 5ª, sobre "Adubação via
+   lanço" e "Adubação orgânica").
+
+**Não tocado.** Nenhuma tela de grãos e de pecuária (provado pela
+regressão), nenhuma outra seção do café (clima, irrigação, colheita,
+pós-colheita, fito, ocorrências), nenhum registro já gravado, nenhuma
+tabela nova no Supabase, `syncTudo` e o caminho de sincronização.
+
+## 10/09/2026 · v75 · Planejamento do dia seguinte no boletim + correlação planejado × executado
+
+**Entrega.** O gerente planeja SÓ o dia seguinte, ao fechar o boletim
+(folha "📋 Amanhã", pulável, até 3 linhas em 3 passos), e o app confere
+sozinho no boletim do dia seguinte o que foi registrado (✅ / ◐ / ⚪),
+pergunta uma vez o motivo do desvio, e calcula aderência 7/30 dias,
+motivos, desvios evitáveis × de clima, dias trabalháveis × impedidos e
+precisão de esforço. Componentes únicos nas três atividades; vocabulário
+por catálogo (`PLANO_ATIVIDADE`). Nenhuma tabela nova: o plano fecha
+dentro de `boletins.payload.plano` e sincroniza pelo caminho que já
+existia. Regra em CLAUDE.md, item c13; checagem em
+docs/definicao-de-pronto.md, item 16.
+
+**Escopo NÃO entregue, por dependência declarada.** A tarefa tinha como
+pré-requisito um módulo de programação/metas do mês. Ele NÃO existe no
+repositório (busca por meta/programação/semáforo/F1..F5 em index.html,
+docs e sql: zero). Por isso ficaram de fora, e estão registrados em
+ESTADO.md › PENDÊNCIAS: (a) a pré-marcação das atividades das metas em
+risco na folha "Amanhã" — no lugar dela, a sugestão vem do que o gerente
+marcou como "continua amanhã"; (b) META × RITMO (item 3c) e "quais metas
+atrasaram por motivo evitável vs clima" no cartão da Diretoria; (c) a
+faixa não fica "junto ao semáforo de metas" (não há semáforo) — fica no
+topo do boletim. Item 3e (dias efetivos) foi entregue usando a única
+fonte declarada que existe, o clima do próprio boletim: a taxonomia
+F1..F5 citada na tarefa também não existe no repositório.
+
+**Verificado (automático, sem rede, 390 × 844 px e 360 px).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: **454 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58 (**nenhum ❌ novo**; a única mudança nos herdados é um
+  exemplo a mais nas duas linhas de P10 da Diretoria — o `.cartao` novo,
+  com o raio e a sombra do CSS-base). Grupo novo **"13. Plano do dia"**
+  com 93 itens, todos ✅: um cenário por atividade (café f23, grãos f33,
+  pecuária f26), a variante do dia de chuva no café e o cartão da
+  Diretoria com três boletins de exemplo. Em cada cenário:
+  - sem plano, nem linha na casa nem faixa no boletim;
+  - linha única na casa em tom de espelho, sem termo proibido;
+  - faixa com 3 linhas e zero campo; a 360 px, 3 itens em 3 linhas
+    visuais, página com 360 px de largura, faixa de 154,3 px = 18,3 % (e
+    202 px = 23,9 % no pior caso medido à mão: observação de amanhã
+    escrita + dia replanejado, com as duas linhas extras);
+  - "0 de 3 ✅" ao abrir → "1 de 3 ✅" depois de UM lançamento que casa
+    com a 1ª linha, trocado no lugar (sem redesenhar o formulário);
+  - a folha "Amanhã" abre depois do cinto de segurança, sem sair do
+    formulário, com "Pular" · "Salvar plano" e zero nativo;
+  - zero régua, `.sel-box`, `.acao-off`, `data-falta`, `.op-cat` e
+    `input type=date` na folha;
+  - 3 passos revelados um a um: ONDE com 9 (café) / 14 (grãos) / 11
+    (pecuária) chips e ZERO campo e ZERO seletor → O QUÊ em chips, ainda
+    sem campo → 1 campo (pessoas previstas) + "Adicionar linha"; depois
+    de adicionar, a linha fica compacta e o cartão fecha;
+  - o plano de hoje fecha dentro do boletim com `feito · nao_feito ·
+    nao_feito` calculado, o de amanhã fica guardado, o boletim é enviado
+    e a tela volta para a casa;
+  - dia de chuva forte (40 mm): a pergunta do motivo NÃO aparece e o
+    motivo gravado é `{"id":"clima","auto":true,"texto":"Chuva forte"}`;
+  - zero termo de outra atividade na faixa e na folha (detector ativo).
+  - Diretoria: 2 unidades no cartão, ordem Floramill → Vereda Romaria
+    (mais desvios evitáveis / menor aderência), evitáveis 1 × clima 1,
+    vazio "Sem plano do dia registrado nas unidades deste código de
+    12/08 a 10/09/2026.", nenhum nome de pessoa.
+- `scripts/regressao_render.cjs` main × branch: **80 telas, 41
+  diferentes** (café 18 de 22, grãos 10 de 15, pecuária 10 de 16,
+  pós-colheita 0 de 6, Diretoria 2 de 13, Escritório 1 de 8), comparadas
+  normalizando o rodapé de versão, horários e ids. Com plano semeado só
+  no café (passo novo `02-plano-semeado`), as diferenças são exatamente
+  as esperadas:
+  - **🌾 grãos e 🐂 pecuária:** só o rótulo do campo de pendências
+    ("Pendente / programado para amanhã" → "O que ficou para terminar")
+    e o `bdf:dados` do localStorage (que passou a ter `planoDia: []`).
+    Nenhuma seção, chip, campo ou comportamento novo; o cartão de
+    apontamento em 3 passos ficou byte a byte igual.
+  - **🏭 pós-colheita:** 0 telas diferentes.
+  - **Diretoria / Escritório:** só o cartão novo "📋 Planejado ×
+    Executado", com o vazio nomeando o recorte ("… em Vereda Romaria de
+    12/08 a 10/09/2026." quando há unidade filtrada).
+  - **☕ café:** a faixa do plano no topo do boletim (com o badge de
+    categoria de cada operação), a linha na casa e, no envio, a folha
+    "Amanhã" (pulada pelo roteiro, para o resto seguir igual).
+- Testes de mesa fora do checklist, no mesmo Chromium offline: 3 linhas
+  planejadas + 1 lançada → ✅/⚪/⚪ automáticos; replanejar pelo botão
+  "ajustar" (remover a 3ª linha) → faixa "0 de 2 ✅" + "Plano replanejado
+  hoje." e `replanejado:true` com hora; `planoResumo` com boletins
+  semeados → aderência 67 % (7 e 30 dias) em f23 e 17 % em f33, motivos
+  "50% máquina quebrou · 50% choveu", dias trabalháveis 2 de 3, precisão
+  de esforço 100 %; pecuária pelo de-para (`massa.tipo` "Vacinação" →
+  "Vacinação (especificar)", `lotes` → "Contagem") → três itens ✅;
+  resumo de sexta com a linha "📋 Plano da semana: 50% do que foi
+  planejado saiu (1 de 2 linhas em 1 dia) · 100% máquina quebrou" e,
+  fora de sexta, nenhuma linha de plano no resumo.
+- Vocabulário: `git grep` por "não fez", "não realizou", "atrasad",
+  "pendente", "faltou", "esqueceu" no diff do index.html — as únicas
+  ocorrências são intencionais e não são cobrança de registro: os chips
+  de motivo "Faltou gente" e "Faltou insumo" (nomeados na própria
+  tarefa; é a explicação que o gerente dá de uma causa, não um juízo
+  sobre ele) e o identificador interno `planoPendente`. Por isso o
+  rótulo do campo de texto ficou "O que ficou para terminar", sem a
+  palavra "pendente" que o rótulo antigo tinha. O "Boletim de hoje
+  pendente" da casa continua como estava, aguardando a decisão da v61.
+
+**Teste manual (Nilo) — PENDENTE.** Roteiro em ESTADO.md › PENDÊNCIAS
+("Plano do dia (v75) — para o Nilo testar no iPhone"): planejar e pular,
+planejar e salvar, ver a caixinha virar ✅ na hora, responder o motivo,
+conferir o dia de chuva e o cartão da Diretoria. Duas decisões de texto
+e uma de escopo ficaram com ele (rótulo do campo de pendências; motivo e
+plano na mesma folha; limite de 3 linhas), além de confirmar com o
+agrônomo os 25 mm de `PLANO_CHUVA_MM` e a inclusão de "Geada" em
+`CLIMA_IMPEDITIVO`.
+
+**SQL — testado localmente, a rodar no Supabase.**
+`sql/048-plano-x-executado-diario.sql` (visão `vw_plano_x_executado` e
+relatório mensal `plano_x_executado_diario` em `relatorios_gerados`) foi
+executado num PostgreSQL 16 local, sobre stubs mínimos das dependências
+do sql/020 (`boletins`, `rel_unidades`, `relatorios_gerados`,
+`relatorios_execucoes`, `rel_gravar`, `rel_executar`, `rel_hoje_brt`) e
+com cinco boletins semeados no formato que o app grava. Conferido:
+- carrega sem erro (visão + 2 funções + os 2 `revoke`);
+- a visão devolve 8 linhas (um item de plano por linha) — o boletim SEM
+  plano e o boletim marcado `exemplo` ficam de fora, como deve;
+- `rel_rodar_plano_dia()` grava 3 linhas (f23, f33 e a linha do grupo) e
+  o diário de bordo registra `ok = true`, sem erro; rodar de novo
+  mantém 3 linhas (idempotente pelo índice único);
+- números conferidos à mão em f23: 6 itens, 3 feitos → aderência 50 %,
+  1 parcial, 2 sem registro, 2 dias com plano, 1 replanejado, 1 dia
+  impedido, desvios **1 de clima + 1 evitável** (a máquina), 30 pessoas
+  previstas × 14 lançadas = 47 %; f33 0 % com 1 evitável (insumo);
+  grupo 8 itens, 3 feitos → 38 %;
+- segurança: com `set role anon`, a visão é legível (8 linhas) e a função
+  `rel_plano_x_executado_diario` dá "permission denied".
+Falta rodar no Supabase (só o Nilo tem o SQL Editor). Sem ele o app
+funciona igual — só o consolidado mensal não aparece na vitrine de
+Relatórios. Nenhuma tabela nova; nenhuma tabela existente alterada.
+
+**Não tocado.** A tela de apontamento em 3 passos do boletim (nenhuma
+etapa, ordem ou elemento novo), nenhuma seção de lançamento existente,
+a régua de 7 dias, o cabeçalho contextual, os chips de resposta de
+ausência, os chips removíveis, o diálogo único, o pós-colheita, o plano
+de safra (v52) e seus faróis, Cadastros, `syncTudo` e o formato de
+sincronização (o plano viaja no payload que já subia), todas as tabelas
+e visões do Supabase que já existiam.
+
 ## 09/09/2026 · v74 · Chips removíveis na multi-seleção (#42) + auditoria de #11 (v72), #14 (v67) e #9 (v68)
 
 **Entrega.** Lote de quatro itens num PR. Três já estavam no main

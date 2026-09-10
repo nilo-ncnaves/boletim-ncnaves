@@ -62,6 +62,7 @@ DIRETORIA; **A** = ADMIN.
 | 11 | Faróis de registro (botão e telas) | Painel › Faróis | D, A | G, P | **continuar oculta** | Regra 4 do plano de safra: o gerente não vê farol nenhum. |
 | 12 | Tudo em Cadastros (Fazendas, Talhões, Ciclos, Lotes, Plano do mês, Códigos de acesso, Catálogos, Integrações e robôs, Importações, Sincronização, Unidades e versões do plano, gerar código, novo código combinado, relatorios.html) | Cadastros / Escritório | A | G, P, D | **continuar oculta** | Ação administrativa; códigos de acesso nunca aparecem fora de ADMIN (ESTADO.md). |
 | 13 | Preencher boletim / pós-colheita | Entrada, casa | G, P | D | **continuar oculta** | D é só leitura por desenho; mostrar 3 a 4 botões cinza na entrada da Diretoria passaria da metade (limite de densidade). |
+| 14 | 📋 Planejamento (área da reunião mensal e da semana) — **v77** | Entrada, painel | D, A | G, P | **continuar oculta** | A área lista tarefas de TODAS as unidades e as pendências com fornecedores — fora do domínio do gerente (condição 3) e com nome de outra fazenda no rótulo das listas (condição 2). O gerente já vê as tarefas DELE na faixa do topo do boletim e da casa, e responde num toque; não há nada para ele pedir a partir de um botão cinza. Densidade: a entrada da Diretoria já tem 3 botões, e cinza aqui não ajudaria ninguém. |
 
 Fora do escopo desta tarefa (não é regra de perfil): "Corrigir" some para
 o próprio gerente depois de 48 h e a tela já explica ("Prazo de correção
@@ -89,7 +90,8 @@ cinza em 4.
 
 Como ficou no index.html:
 - `ACOES_PERFIL` — catálogo: `boletim_atividade`, `pos_colheita`,
-  `painel_diretoria`, `relatorios_diretoria`, `escritorio` (todas
+  `painel_diretoria`, `relatorios_diretoria`, `planejamento` (v77),
+  `escritorio` (todas
   `visivel: false`, linhas #1 a #5), `cadastros_painel` (#7),
   `corrigir_boletim` (#8, `ctx.prazo` = dentro das 48 h) e
   `marcar_visto` (#9). Cada entrada tem `pode(ctx)`, `visivel(ctx)` e,

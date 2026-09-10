@@ -423,3 +423,197 @@ do PR, conferir:
     "+2"), Cadastros › Códigos › novo combinado (9 unidades → 6 + "+3");
     grãos prova a AUSÊNCIA no cartão do pivô (dois problemas escolhidos,
     zero contêiner); pecuária registra "sem multi-seleção".
+
+## 16. Plano do dia seguinte × executado (desde a v75)
+Regra em CLAUDE.md, item c13. Toda entrega que mexer no plano do dia (a
+folha "📋 Amanhã", a faixa do topo do boletim, a linha da casa, o cartão
+da Diretoria, o status automático ou as correlações) precisa conferir,
+antes do PR:
+1. **Unidade sem plano não mostra nada.** Sem `D.planoDia` e sem
+   `b.plano`: nenhuma linha na casa do gerente, nenhuma faixa no boletim,
+   nenhuma linha no cartão da Diretoria (que cai no vazio da função única
+   `htmlEstado`, nomeando o recorte).
+2. **A faixa cabe em 3 linhas.** No máximo `PLANO_MAX_ITENS` (3) itens e
+   cada item em UMA linha visual a 360 px (`nowrap` + reticências), sem
+   rolagem lateral e sem campo de digitação. Medir a altura da faixa e
+   guardá-la no ESTADO.md: hoje 154,3 px (18,3 % de 844) no caso comum e
+   202 px (23,9 %) no pior caso — com observação de amanhã escrita E o dia
+   replanejado —, abaixo do teto de ~25 % da casa. Linha nova na faixa
+   exige medir de novo os dois casos.
+3. **O status é do app, nunca do gerente.** Ao abrir, "0 de 3 ✅"; ao
+   lançar um registro que casa com uma linha, a caixinha vira ✅ NO LUGAR
+   (`pintarPlanoHoje` chamado por `salvarRascunho`), sem redesenhar o
+   formulário e sem nenhum campo novo. Nenhum status é digitado.
+4. **Vocabulário de espelho.** Nem na faixa, nem na casa, nem na folha,
+   nem no cartão da Diretoria pode aparecer "não fez", "não realizou",
+   "pendente", "atrasado", "faltou", "esqueceu"; sem exclamação e sem
+   emoji novo. ⚪ é "não feito" no sentido de SEM REGISTRO.
+5. **A folha "Amanhã" é pulável e não bloqueia.** Abre depois do cinto de
+   segurança e antes de gravar, só quando o boletim que fecha é de hoje;
+   dois botões no rodapé, com verbo ("Pular" · "Salvar plano"); Escape
+   vale como pular; nenhum `confirm()`/`alert()`/`prompt()` nativo
+   dispara; ao fechar, o corpo destrava e a rolagem volta.
+6. **3 passos dentro da folha.** Ao tocar em ＋ aparecem SÓ os chips do
+   ONDE (zero campo, zero `<select>`); escolhido o ONDE, só os chips do
+   O QUÊ; escolhido o O QUÊ, só o campo de pessoas previstas e a ação de
+   adicionar. Depois de adicionar, a linha fica compacta e o cartão fecha.
+7. **A folha não recebe nada de fora do apontamento:** zero `.regua`
+   (c11), zero `.sel-box` (c12), zero `.acao-off` (c9), zero `data-falta`
+   (c10), zero `.op-cat` (c6), zero `input type=date`, zero métrica (c4).
+8. **Motivo: uma pergunta, por chips, uma vez.** Só quando há ⚪ ou ◐;
+   sem campo aberto por padrão ("Outro" revela uma linha); sem resposta
+   grava "não informado" e o envio segue. **Dia impedido pelo clima
+   declarado no boletim não pergunta nada:** o motivo entra automático
+   como "clima" (`{id:"clima", auto:true, texto:<condição declarada>}`) e
+   não conta como desvio evitável em lugar nenhum.
+9. **Replanejar não é falha.** O botão "ajustar" da faixa reabre a folha
+   para o próprio dia; salvar marca `replanejado` e a faixa passa a dizer
+   "Plano replanejado hoje.". Em nenhuma tela isso vira desvio.
+10. **Privacidade e tom na Diretoria.** O cartão lista UNIDADES (nunca
+    nome de pessoa), ordenado por "unidades com mais desvios evitáveis";
+    o desvio de dia de clima aparece separado dos evitáveis.
+11. **Nada digitado duas vezes.** O plano é a única entrada de "amanhã"
+    no boletim; o campo de texto é "O que ficou para terminar". As pessoas
+    previstas são comparadas com as que a mão de obra já registra — sem
+    campo novo.
+12. **As três atividades pelo mesmo componente,** com o vocabulário do
+    catálogo `PLANO_ATIVIDADE` (café "Talhão", grãos "Talhão / pivô",
+    pecuária "Pasto / retiro"); zero termo de outra atividade na faixa e
+    na folha.
+13. **Medição:** `scripts/checar-poluicao.cjs`, grupo "13. Plano do dia"
+    — um cenário por atividade, mais a variante do dia de chuva no café e
+    o cartão da Diretoria. Regressão (`scripts/regressao_render.cjs`): com
+    plano semeado no café e sem plano em grãos e pecuária, a única
+    diferença fora do café é o rótulo do campo de pendências e o cartão
+    novo da Diretoria.
+
+## 17. Renomear termo exige DEPARA_NOMES; histórico nunca é reescrito (desde a v76)
+
+Regra permanente, nascida da revisão da nomenclatura do café (v76) e
+válida para QUALQUER catálogo do app (operações por talhão, funções de
+mão de obra, eventos de pecuária, fases de grãos, chips de qualquer
+seção), nas três atividades. Vale toda vez que uma tarefa troca o
+TEXTO de um termo que o app já gravou em algum boletim.
+
+1. **Nada de reescrever o passado.** Nenhuma tarefa altera
+   `boletins.payload` (nem `pos_colheitas`, `remessas`, `boletim_pecuaria`
+   ou qualquer registro já enviado) para acomodar um nome novo. O que foi
+   lançado fica exatamente como foi lançado: é o documento do dia, com a
+   palavra que a pessoa usou. Nenhum `update` de payload entra em arquivo
+   `sql/` por causa de renomeação.
+2. **Quem traduz é a leitura.** O termo antigo vira o termo de hoje na
+   hora de MOSTRAR e de SOMAR, pela função única `nomeAtual(nome)` do
+   index.html, que lê a tabela única `DEPARA_NOMES` (antigo → novo).
+   Nenhuma tela monta o seu próprio de-para, e nenhum `if` de nome solto
+   pelo código.
+3. **Onde `nomeAtual` é obrigatório** em toda renomeação: exibição
+   (boletim enviado, casa do gerente, "o que ficou de ontem", plano,
+   resumo de uma linha, exportação CSV, resumo do WhatsApp), comparação
+   (`avaliarPlano`, filtro do painel por atividade, chave de "última
+   receita") e classificação (`categoriaOperacao`, badge). Um passo
+   esquecido aparece como registro que "sumiu" do total — por isso o
+   inventário do item 5 abaixo.
+4. **De-para é de UM para UM.** Termo antigo que se abre em DOIS novos
+   (o app não tem como saber qual foi) NÃO é adivinhado: entra em
+   `TERMOS_LEGADO`, some da escolha de lançamento novo, continua legível
+   e continua somando com o nome que foi gravado, e a pergunta vai para o
+   Nilo no resumo do PR. O valor de `TERMOS_LEGADO` é a NATUREZA (grupo
+   do catálogo), que costuma ser a mesma nos dois candidatos — assim o
+   badge e as somas por natureza não se perdem enquanto a decisão não vem.
+5. **Inventário no PR.** Todo PR que renomeie termo traz três colunas —
+   **termo antigo → termo novo** (substituições), **termos acrescentados**
+   e **termos mantidos** — mais a lista dos ambíguos com a pergunta ao
+   Nilo. Sem as três colunas o PR não abre.
+6. **Espelho no Supabase pela mesma regra.** O nome antigo entra como
+   APELIDO da operação nova em `operacao_alias` (igualdade exata, nunca
+   pedaço de nome), gerado por
+   `node scripts/gerar_catalogo_operacoes.cjs` a partir de
+   `DEPARA_NOMES`; a operação substituída sai de cena com
+   `ativo = false`, nunca com `delete`. É o que faz `vw_dias_sem_registro`
+   e o motor de relatórios continuarem contando o histórico na operação
+   de hoje.
+7. **Prova antes do PR:** `node scripts/teste_nomenclatura.cjs
+   http://localhost:8152` (Chromium sem rede, 390 px; 23 checagens na
+   v76) — (a) um boletim antigo semeado
+   com o termo substituído continua aparecendo, com o nome de hoje, e o
+   dado bruto no armazenamento continua com o nome antigo; (b) um plano
+   gravado com o nome antigo fecha como "feito" com um registro no nome
+   novo, e o contrário também; (c) a regressão
+   (`scripts/regressao_render.cjs`) mostra as outras duas atividades
+   idênticas. O ESTADO.md registra o de-para vigente.
+8. **O rótulo é da lavoura, não do escritório.** A pergunta que decide um
+   termo novo é "o funcionário reconhece nesta lista a palavra que ele
+   usa?". Termo que só o escritório entende continua existindo em
+   Cadastros › Catálogos, nunca no lugar do termo de campo.
+
+## 18. Planejamento: um toque no campo, cobrança no escritório (desde a v77)
+
+O módulo de planejamento (reunião mensal + planejamento semanal) é a
+MESMA tarefa vista em dois horizontes. Antes de abrir PR que mexa nele,
+conferir — e colar a resposta no resumo:
+
+1. **`node scripts/teste_planejamento.cjs` passa inteiro?** É a validação
+   escrita na tarefa da v77: importa o texto REAL da ata (Vereda, Mata
+   Preta e Lagamar (Grupo)), confere item a item (96 ha, aguardando clima,
+   aguardando terceiro por repasse e por Cooxupé, responsável entre
+   parênteses, tarefa sem prazo), prova a idempotência, cria a semana,
+   compromete 3 tarefas, conclui 1, trava 1 por falta de insumo, fecha a
+   semana sozinha, projeta o ritmo dos 96 ha, dispara o alerta de travada
+   há mais de 7 dias, gera pauta, cobrança, fechamento e rascunho da
+   próxima ata, e prova a sexta abrindo o ritual e a pastilha do dia 11.
+   Roda sem rede, a 390 px, com relógio fixo. Sai com código 1 se falhar.
+2. **`scripts/checar-poluicao.cjs`, grupo "14. Planejamento", todo ✅?**
+   As telas do módulo entram no MESMO grupo de medida de Cadastros
+   (altura ≤ 2 telas ou busca, busca em lista > 12 itens, ação principal
+   fixa no rodapé, no máximo 3 níveis, cabeçalho fixo com "‹ Voltar",
+   "Mais opções" fechado, padrão visual) porque usam as classes `cad-*`
+   (P10). Tela nova do módulo entra na lista `niveis` do cenário.
+3. **O gerente muda status em UM toque e nunca digita?** A folha da tarefa
+   não pode ter `input`, `select` nem `textarea`. Novo prazo é chip, nunca
+   calendário. Nenhum `confirm`/`alert`/`prompt` dispara.
+4. **Tarefa travada fica vermelha para o campo?** Não pode. Os dois
+   "aguardando" e a tarefa sem prazo são ⏸️ cinza; vermelho só em A
+   INICIAR / EM EXECUÇÃO com 2 dias, hoje ou vencido. A prova está no
+   grupo 14 e no teste (farol da travada por chuva e por insumo).
+5. **A faixa do gerente cabe em 3 linhas a 360 px?** Uma linha visual por
+   item, alvo de toque ≥ 44 px, "＋N tarefas" para o resto, ordem
+   🔴 → 🟡 → ⏸️ → 🟢 e nenhum termo de cobrança ("não fez", "pendente",
+   "faltou", "esqueceu"). Sem tarefa aberta na unidade, a faixa não
+   aparece — e a regressão prova que a tela do gerente fica idêntica.
+6. **Alguém precisa lembrar de abrir alguma tela?** Não pode. `planMotor()`
+   roda na abertura do app, a cada sincronização e ao entrar no módulo;
+   as pastilhas nascem na porta de entrada e somem sem pendência; sexta e
+   dia 10 abrem o ritual sozinhos, pulável só para a sessão.
+7. **A cobrança e o rascunho da ata saem sem ferramenta externa?** Os
+   quatro textos (pauta da sexta, cobrança por fornecedor, fechamento do
+   mês, rascunho da próxima ata) saem por botão copiar, montados do que já
+   está no app.
+8. **Nome novo de fazenda na ata foi adivinhado?** Não pode. Sem linha no
+   de-para, o item entra como "unidade não reconhecida" e a pessoa
+   escolhe; `fora:true` é ignorado sempre, sem perguntar. Catálogo
+   vigente em docs/catalogos-por-atividade.md, "Planejamento (v77)".
+9. **A entrega aumentou o número de confirmações do app?** Não pode
+   (item 13). O módulo tem ZERO diálogo: toda ação é reversível e fica
+   registrada em `D.tarefaHistorico`; cancelar é STATUS com motivo.
+10. **Tabela nova no Supabase?** `sql/050-planejamento.sql` (tabelas e a
+    visão) e `sql/051-ata-x-executado.sql` (relatório mensal) precisam
+    estar no repositório e avisados ao Nilo no resumo do PR.
+11. **Os três números fecham?** (desde a v78) Toda tarefa mostra planejado ·
+    executado · restante com barra; `planProgresso` arredonda ANTES de
+    subtrair, então planejado = executado + restante SEMPRE na tela. Sem
+    meta não há barra nem restante: o app conta os lançamentos e DIZ que
+    não há área — nunca inventa denominador.
+12. **O executado é rastreável?** (v78) Um toque em "executado" abre, no
+    lugar (sem tela nova, sem modal, alvo ≥ 44 px), a lista dos lançamentos
+    que o compuseram: data, local, área e quem lançou. A soma em ha conta
+    cada talhão UMA vez; a janela vai do começo da tarefa até hoje ou até o
+    dia da conclusão.
+13. **O lançamento diz o que abateu?** (v78) Registro do boletim que casa
+    com uma tarefa leva a etiqueta "📋 abate: …" — no boletim em edição e no
+    enviado, nas três atividades. Etiqueta de leitura, nunca botão nem
+    métrica (regra c4-4).
+14. **A outra metade da história está na tela?** (v78) O lançamento que não
+    casou com tarefa nenhuma aparece em Planejamento › Executado fora do
+    plano, por unidade, com % dos lançamentos — e a tela DIZ que não é
+    cobrança. O fechamento mensal por unidade traz % do plano executado em
+    área, % do esforço fora do plano e as tarefas sem NENHUM lançamento.

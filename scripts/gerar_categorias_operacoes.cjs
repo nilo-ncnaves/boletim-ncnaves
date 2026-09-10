@@ -28,7 +28,7 @@ const sql = process.argv.includes('--sql');
 
 function trecho(ini, fim) { const i = html.indexOf(ini); if (i < 0) throw new Error('não achei ' + ini); const j = html.indexOf(fim, i); return html.slice(i, j + fim.length); }
 const src = [
-  trecho('const LISTA_ATIV = [', '];\n'),
+  trecho('const OPS_CAFE_GRUPOS = [', '\n];\n'),
   trecho('const OPS_GRAOS_FASES=[', '\n];\n'),
   trecho('const OPS_PECUARIA_FASES=[', '\n];\n'),
   trecho('const OP_CATEGORIAS={', '\n};\n'),
