@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v80** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v81** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1214,6 +1214,34 @@ bruto no armazenamento segue `["Desbrota","Pulverização"]`; plano
 gravado com o nome antigo fecha como "feito" com registro no nome novo, e
 o contrário também; regressão main × branch com grãos e pecuária
 idênticos (só o relógio do envio difere).
+
+## "Assumir" no lugar de "comprometer" (v81)
+Troca de vocabulário pedida pelo Nilo em 10/09/2026, depois de perguntar o que o
+botão "comprometer" fazia. Se o dono do app precisou perguntar, o escritório
+também precisaria. Nada de comportamento mudou — só a palavra.
+- **Botão:** `comprometer` → **`assumir`** (nas duas telas: Semana › Sugestões e
+  o ritual da sexta).
+- **Cabeçalho da semana:** "1 COMPROMISSO(S)" → "1 TAREFA ASSUMIDA" (plural
+  correto: "3 TAREFAS ASSUMIDAS").
+- **Título do grupo:** "Parte A · compromissos da semana" → "Parte A · tarefas
+  assumidas nesta semana".
+- **Vazios:** "Nenhum compromisso marcado ainda…" → "Nenhuma tarefa assumida
+  ainda. Toque em «assumir» nas sugestões abaixo."; "Nenhum compromisso na semana
+  que passou." → "Nenhuma tarefa assumida na semana que passou."
+- **Menu da área:** "N comprometida(s)" → "N assumida(s)".
+- **Histórico:** "comprometida na semana" → "assumida na semana". Como
+  `planHistTexto` monta o texto na LEITURA a partir de `h.campo`, **o registro
+  antigo também passa a ler "assumida"** — nada gravado foi reescrito (regra da
+  v76, item 2).
+- **A chave `campo:"compromisso"` NÃO mudou** em `D.tarefaHistorico`: é chave
+  substituta, nunca aparece na tela, e trocá-la apagaria o sentido do histórico já
+  gravado.
+- **O placar continua "cumprimos X de Y"** — não usa a palavra e é o que dá sentido
+  ao botão: Y é quantas tarefas foram assumidas na semana.
+- Provas: `teste_planejamento` 64 ✅ · 0 ❌ (nenhuma prova dependia da palavra);
+  `checar-poluicao` 589 ✅ · 41 ❌, os mesmos herdados; `teste_nomenclatura` tudo
+  certo. Medido na tela: cabeçalho "1 TAREFA ASSUMIDA", grupo "Parte A · tarefas
+  assumidas nesta semana", os dois botões "assumir", histórico "assumida na semana".
 
 ## Filtros de Planejamento sem rolagem lateral (v80)
 Correção pedida pelo Nilo em 10/09/2026: em Planejamento › Todas as tarefas, as seis
