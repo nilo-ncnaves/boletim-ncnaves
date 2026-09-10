@@ -581,17 +581,119 @@ que a mesma calagem está contada duas vezes.
 
 ## 10. Bloco SQL de leitura — para o Nilo rodar
 
-Este bloco **só lê**. Não cria, não altera e não apaga nada.
+Os dois blocos abaixo **só leem**. Não criam, não alteram e não apagam nada, e
+podem ser rodados quantas vezes quiser — antes e depois dos SQL pendentes, para
+comparar.
+
+> **Não tente copiar o resultado: tire um print.** A grade de resultado do
+> Supabase no iPhone não deixa marcar mais de uma linha — foi por isso que a
+> versão curta existe. Print da tela resolve, e vale para qualquer consulta.
 
 **Como fazer, pelo iPhone:**
 
 1. Abra o **Supabase** (projeto `syvehtgrbqteyuqhoban`).
-2. Toque em **SQL Editor**.
+2. Toque em **SQL Editor** e em **New query**.
 3. Cole **o bloco inteiro** de uma vez (é uma consulta só).
 4. Toque em **Run**.
-5. Copie o resultado (46 linhas, em 3 colunas) e mande de volta.
+5. **Tire o print** da tabela de resultado e mande.
 
-Se der erro, copie a mensagem inteira e mande também — não tente consertar.
+Se der erro, tire o print da mensagem inteira e mande também — não tente
+consertar.
+
+### 10.1 Versão curta — 6 linhas (é esta que se usa no iPhone)
+
+Mesma informação da versão completa, condensada em seis linhas, para caber num
+print só, sem rolar. Se alguma linha aparecer cortada com "…", tocar na célula
+abre o texto inteiro.
+
+```sql
+-- Boletim NCNaves — raio-X compacto (6 linhas). SÓ LÊ.
+with t(n) as (select unnest(array[
+  'plano_safra','plano_unidade','plano_adubo_mes','plano_calagem','plano_fito_mes',
+  'plano_gantt','unidade_manejo','unidade_alias'])),
+p(n) as (select unnest(array[
+  'planejamento_rodada','planejamento_semana','planejamento_tarefa','vw_planejamento_mes'])),
+cnt as (
+  select n, case when to_regclass('public.'||n) is null then null
+    else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.'||n, false,true,'')))[1]::text::bigint
+    end as k from (select n from t union all select n from p) z),
+b as (select fazenda_id, data, payload from public.boletins
+      where coalesce((payload->>'exemplo')::boolean,false)=false),
+lst as (select e from b cross join lateral jsonb_array_elements(
+  case when jsonb_typeof(payload->'atividades')='array' then payload->'atividades' else '[]'::jsonb end) e),
+nm as (select btrim(p->>'nome') as nome from lst, lateral jsonb_array_elements(
+    case when jsonb_typeof(e->'insumos')='array' then e->'insumos' else '[]'::jsonb end) p
+  union all select btrim(p->>'nome') from lst, lateral jsonb_array_elements(
+    case when jsonb_typeof(e->'produtos')='array' then e->'produtos' else '[]'::jsonb end) p),
+nk as (select nome, upper(translate(nome,'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+       'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')) as ch from nm where coalesce(nome,'')<>''),
+sc as (select payload from b where jsonb_typeof(payload->'secoes')='object'),
+rp as (select
+  (select min((v->>'em')::timestamptz) from jsonb_each(payload->'secoes') s(k,v) where v->>'em' ~ '^\d{4}-\d{2}-\d{2}T') i,
+  (select max((v->>'em')::timestamptz) from jsonb_each(payload->'secoes') s(k,v) where v->>'em' ~ '^\d{4}-\d{2}-\d{2}T') f,
+  (select count(*) from jsonb_each(payload->'secoes') s(k,v) where v->>'resposta'='sem_ocorrencia') n from sc)
+select '1 plano do agronomo' as bloco,
+  (select count(*) filter (where k is not null) from cnt join t on t.n=cnt.n)||' de 8 tabelas'
+  || ' · vigentes: ' || coalesce(case when to_regclass('public.plano_safra') is null then 'sem tabela'
+       else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.plano_safra where status=''vigente''',false,true,'')))[1]::text end,'?') as resposta
+union all select '2 planejamento',
+  (select count(*) filter (where k is not null) from cnt join p on p.n=cnt.n)||' de 4'
+  || ' · tarefas: ' || case when to_regclass('public.planejamento_tarefa') is null then 'sem tabela'
+     else coalesce((xpath('/row/c/text()', query_to_xml($q$
+       select coalesce(string_agg(status||' '||n,', ' order by status),'0') as c
+       from (select status, count(*) n from public.planejamento_tarefa group by status) z $q$,false,true,'')))[1]::text,'0') end
+  || ' · plano do dia: ' || (select count(*) from b where jsonb_typeof(payload->'plano')='object')
+union all select '3 identidade',
+  'ops ' || coalesce(case when to_regclass('public.operacao_catalogo') is null then 'sem tabela'
+     else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.operacao_catalogo',false,true,'')))[1]::text end,'?')
+  || ' · sem de-para ' || case when to_regclass('public.operacao_alias') is null then 'sem tabela'
+     else (xpath('/row/c/text()', query_to_xml($q$
+       select count(distinct t) as c from (select e->>'tipo' t from public.boletins b cross join lateral
+         jsonb_array_elements(case when jsonb_typeof(b.payload->'atividades')='array' then b.payload->'atividades' else '[]'::jsonb end) e
+         where coalesce(e->>'tipo','')<>'') x
+       where t not in (select termo from public.operacao_alias where origem='atividades.tipo') $q$,false,true,'')))[1]::text end
+  || ' · Outra ' || (select count(*) from lst where e->>'tipo'='Outra')
+  || ' · produtos ' || (select count(distinct nome) from nk)
+  || ', dobrados ' || (select count(*) from (select ch from nk group by ch having count(distinct nome)>1) g)
+union all select '4 apontamento',
+  (select count(*) from b)||' bol · '||(select count(distinct fazenda_id) from b)||' un · '
+  || (select coalesce(min(data)::text,'-')||' a '||coalesce(max(data)::text,'-') from b)
+  || ' · ' || (select case when relrowsecurity then 'RLS ligado' else 'RLS DESLIGADO' end from pg_class where oid='public.boletins'::regclass)
+  || ', ' || coalesce((select count(*)::text from pg_policies where schemaname='public' and tablename='boletins'),'0') || ' policies'
+union all select '5 secoes',
+  (select count(*) from sc)||' c/secoes · '||(select count(*) from rp where n>0)||' c/nada-a-registrar'
+  || ' · ate 10s ' || (select count(*) from rp where n>1 and f-i<=interval '10 seconds')
+  || ' de '|| (select count(*) from rp where n>1)||' c/2+ respostas'
+union all select '6 fontes externas',
+  'icrop_manejo ' || coalesce(case when to_regclass('public.icrop_manejo') is null then 'sem tabela'
+     else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.icrop_manejo',false,true,'')))[1]::text end,'?')
+  || ' · solinftec_diario ' || coalesce(case when to_regclass('public.solinftec_diario') is null then 'sem tabela'
+     else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.solinftec_diario',false,true,'')))[1]::text end,'?')
+order by 1;
+```
+
+O resultado tem esta forma (exemplo de teste, não o banco real):
+
+```
+1 plano do agronomo | 0 de 8 tabelas · vigentes: sem tabela
+2 planejamento      | 4 de 4 · tarefas: a_iniciar 2, em_execucao 1, finalizado 1 · plano do dia: 1
+3 identidade        | ops 1 · sem de-para 2 · Outra 1 · produtos 3, dobrados 1
+4 apontamento       | 2 bol · 2 un · 2026-09-01 a 2026-09-05 · RLS ligado, 2 policies
+5 secoes            | 1 c/secoes · 1 c/nada-a-registrar · ate 10s 1 de 1 c/2+ respostas
+6 fontes externas   | icrop_manejo 0 · solinftec_diario sem tabela
+```
+
+**Conferida** num PostgreSQL 16 local em dois cenários — (a) o banco de hoje,
+sem as tabelas de plano nem as de planejamento, com `data` do boletim em texto e
+payload malformado (`atividades` e `plano.itens` gravados como texto em vez de
+lista); (b) planejamento rodando, com tarefas em quatro status, RLS ligada e
+boletins com plano do dia. Nos dois: **6 linhas, sem erro**; tabela que não
+existe aparece como `sem tabela` em vez de derrubar a consulta.
+
+### 10.2 Versão completa — 46 linhas (para o computador, ou quando faltar detalhe)
+
+Abre cada tabela e cada número separadamente. No iPhone precisa de dois ou três
+prints; num computador o resultado se copia inteiro.
 
 ```sql
 -- Boletim NCNaves — raio-X de leitura para a investigação da cadeia de estados.
@@ -723,20 +825,20 @@ agregada numa linha só (`a_iniciar: 1 · em_execucao: 1 …`); e a contagem de
 grafias juntou corretamente `SULFATO DE MANGANES`, `Sulfato de manganes` e
 `sulfato de Manganês` como o mesmo produto com 3 grafias.
 
-**Como ler o resultado:**
+### 10.3 Como ler o resultado (vale para as duas versões)
 
-| Se aparecer | Quer dizer |
-|---|---|
-| `tabela planejamento_tarefa · NAO EXISTE` | o `sql/050` não rodou — o planejamento existe só nos celulares |
-| `tarefas por status · a_iniciar: 12 · em_execucao: 3 …` | o módulo está sincronizando de verdade |
-| `tarefas com historico no payload · 0` | as tarefas subiram mas ninguém mudou status ainda |
-| `boletins com plano do dia seguinte · 0` | a v75 ainda não chegou aos celulares, ou ninguém salvou plano |
-| `tabela plano_safra · NAO EXISTE` | o `sql/005` nunca rodou |
-| `plano_safra · 8 linhas` + `planos vigentes · 0` | o seed entrou mas nada foi publicado — o app não lê |
-| `grafias de operacao sem de-para no catalogo` alto | há registro que a cadeia não enxerga (o `sql/049` pode ser a causa) |
-| `produtos com mais de uma grafia` alto | é o caso do Sigma acontecendo aqui |
-| `RLS DESLIGADO` em `boletins` | qualquer um com a chave pública lê e grava boletim |
-| `com 2+ respostas: todas em ate 10 s` alto | carimbo automático — a confirmação em lote precisa nascer protegida |
+| Na versão curta | Na versão completa | Quer dizer |
+|---|---|---|
+| `2 planejamento · 0 de 4` | `tabela planejamento_tarefa · NAO EXISTE` | o `sql/050` não rodou — o planejamento existe só nos celulares |
+| `4 de 4 · tarefas: a_iniciar 12, …` | `tarefas por status` preenchido | o módulo está sincronizando de verdade |
+| `plano do dia: 0` | `boletins com plano do dia seguinte · 0` | a v75 ainda não chegou aos celulares, ou ninguém salvou plano |
+| `1 plano do agronomo · 0 de 8 tabelas` | `tabela plano_safra · NAO EXISTE` | o `sql/005` nunca rodou |
+| `8 de 8 tabelas · vigentes: 0` | `plano_safra · 8 linhas` + `planos vigentes · 0` | o seed entrou mas nada foi publicado — o app não lê |
+| `sem de-para` alto | `grafias de operacao sem de-para no catalogo` alto | há registro que a cadeia não enxerga (o `sql/049` pode ser a causa) |
+| `dobrados` maior que zero | `produtos com mais de uma grafia` alto | é o caso do Sigma acontecendo aqui |
+| `RLS DESLIGADO` | `RLS DESLIGADO` em `boletins` | qualquer um com a chave pública lê e grava boletim |
+| `ate 10s 8 de 10` | `com 2+ respostas: todas em ate 10 s` alto | carimbo automático — a confirmação em lote precisa nascer protegida |
+| `sem tabela` em qualquer lugar | `NAO EXISTE` | o SQL daquele assunto ainda não rodou — não é erro da consulta |
 
 ---
 
