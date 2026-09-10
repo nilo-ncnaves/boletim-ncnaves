@@ -1665,6 +1665,25 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Investigação da cadeia de estados (10/09/2026) —
+  `docs/investigacao-cadeia-estados.md`.** Apuração de leitura (nada foi
+  alterado no banco) sobre o que a Onda 2 precisa para a cadeia Recomendado →
+  Planejado → Realizado → Saldo. Veredito: **viável parcialmente, com a maior
+  parte já construída** — Planejado, Realizado, Saldo, confirmação em um toque
+  e trilha de alteração já existem nas três atividades (v75/v77/v78). O que
+  falta, em ordem: (1) rodar os SQL pendentes desta lista — enquanto o
+  `sql/050` não rodar, o planejamento existe só no aparelho de quem digitou;
+  (2) subir o cadastro de talhões para o Supabase, porque o "executado" em
+  hectares sai da área do talhão, que hoje só existe no celular — dois
+  aparelhos com cadastros diferentes mostram números diferentes para a mesma
+  tarefa; (3) guardar o id da operação na tarefa, já que hoje o elo tarefa →
+  lançamento é casamento de texto da descrição da ata e descrição reescrita
+  deixa de somar em silêncio; (4) decidir se o plano do agrônomo (kg por setor
+  de café) vira origem de tarefas ou continua só referência — são **dois planos
+  que não se falam**. O relatório traz uma tabela com 13 lacunas e, na seção
+  10, um **bloco SQL só de leitura** para o Nilo rodar (versão curta de 6
+  linhas para o iPhone, versão completa de 46 para computador) — o resultado
+  fecha o que ainda está marcado "não apurado".
 - **Planejamento (v77) — rodar dois SQL no Supabase.** `sql/050-planejamento.sql`
   (tabelas `planejamento_rodada`, `planejamento_semana`, `planejamento_tarefa`
   e a visão `vw_planejamento_mes`) e, depois dele, `sql/051-ata-x-executado.sql`
