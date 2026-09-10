@@ -73,6 +73,13 @@ planejamento_tarefa mais a visão vw_planejamento_mes (sql/050; o app lê
 E escreve, na mesma fila offline dos boletins — o histórico de cada
 tarefa viaja dentro do payload) e o relatório mensal ata_x_executado em
 relatorios_gerados (sql/051; o app só lê, como os outros).
+Desde a v78: NENHUMA tabela nova. A foto do planejado × executado viaja
+dentro de planejamento_tarefa.payload.exec ({ha, n, meta, em}, gravada
+pelo app porque o de-para descrição → operação mora no index.html), e o
+sql/050 e o sql/051 só acrescentam LEITURA dela (area_planejada,
+area_executada, pct_area, tarefas_sem_lancamento). Rodar de novo os dois
+arquivos é seguro: eles substituem a visão e as funções, sem tocar em
+dado nenhum.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -745,6 +752,32 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
 - **Nenhuma confirmação nova** (c10, contenção): toda ação do módulo é
   reversível e registrada em `D.tarefaHistorico`; cancelar é um STATUS com
   motivo, nunca um delete.
+- **Planejado × executado × restante (desde a v78), componentes ÚNICOS.** Toda
+  tarefa mostra os TRÊS números — `planTrio(t,{attr,aberta})` — na folha do
+  gerente e nas listas da área Planejamento, com barra de progresso.
+  `planProgresso(t)` arredonda ANTES de subtrair: planejado, executado e
+  restante SEMPRE fecham na tela. A meta é a área da ata (`t.area`) ou a que o
+  escritório informar (`t.meta`, chip "Definir meta"); **sem meta não há barra
+  nem restante** — o app diz isso com todas as letras e conta os lançamentos,
+  nunca inventa denominador.
+- **O executado é RASTREÁVEL.** Um toque em "executado" abre, no lugar, a lista
+  dos lançamentos que o compuseram — data, local, área e quem lançou
+  (`planExecLista`). A soma em ha conta cada talhão UMA vez
+  (`planExecucao`), e a janela vai do começo da tarefa até hoje ou até o dia em
+  que ela foi concluída (`planJanela`) — depois disso o número congela.
+- **O lançamento diz o que abateu.** Quando um registro do boletim casa com uma
+  tarefa, ele leva a etiqueta `planTagVinculo` ("📋 abate: …") no boletim em
+  edição e no boletim enviado, nas três atividades. É ETIQUETA de leitura,
+  nunca botão nem métrica (regra c4-4).
+- **Executado FORA do plano é a outra metade da história.** O lançamento que não
+  casou com tarefa nenhuma aparece por unidade em Planejamento › Executado fora
+  do plano (`planForaDoPlano`), com % dos lançamentos e pessoas-dia, e sai em
+  texto para a próxima ata. A tela DIZ que não é cobrança — é o que apareceu no
+  dia e não estava planejado.
+- **Fechamento mensal por unidade** traz % do plano executado em ÁREA, % do
+  esforço fora do plano e as tarefas sem NENHUM lançamento casado — na tela, no
+  cartão do painel e no texto de copiar. "Sem lançamento" é ausência de
+  REGISTRO casado, nunca afirmação de que não foi feito.
 - **Vocabulário:** o módulo relata PRAZO e REGISTRO. "ATRASADO" é rótulo do
   prazo vencido, nunca julgamento de pessoa; proibidos "não fez", "não
   realizou", "pendente", "faltou", "esqueceu". Nenhuma tela expõe um

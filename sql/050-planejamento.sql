@@ -130,6 +130,10 @@ with t as (
          coalesce(array_length(
            array(select jsonb_array_elements_text(coalesce(p.payload -> 'arrastadaDe', '[]'::jsonb))), 1), 0) as arrastada_reunioes,
          (p.payload ->> 'desc')                                      as descricao,
+         -- v78: foto do planejado × executado gravada pelo app (payload -> 'exec')
+         coalesce((p.payload -> 'exec' ->> 'meta')::numeric, (p.payload ->> 'area')::numeric, 0) as meta_ha,
+         coalesce((p.payload -> 'exec' ->> 'ha')::numeric, 0)        as exec_ha,
+         coalesce((p.payload -> 'exec' ->> 'n')::int, 0)             as exec_lancamentos,
          (p.payload ->> 'tipoItem')                                  as tipo_item,
          (p.payload #>> '{bloqueio,quem}')                           as terceiro,
          (p.payload #>> '{bloqueio,desde}')::date                    as bloqueada_desde,
@@ -147,6 +151,15 @@ select t.ref,
        count(*) filter (where t.status in ('a_iniciar','em_execucao')
                           and t.prazo is not null and t.prazo < public.rel_hoje_brt()) as atrasadas,
        count(*) filter (where t.arrastada_reunioes > 0)              as arrastadas,
+       -- v78: planejado × executado em área. "Sem lançamento" = nenhum registro do boletim
+       -- casou com a tarefa; é ausência de REGISTRO, nunca afirmação de que não foi feito.
+       sum(t.meta_ha) filter (where t.status <> 'cancelado')         as area_planejada,
+       sum(least(t.exec_ha, t.meta_ha)) filter (where t.status <> 'cancelado' and t.meta_ha > 0) as area_executada,
+       case when sum(t.meta_ha) filter (where t.status <> 'cancelado') > 0
+            then round(sum(least(t.exec_ha, t.meta_ha)) filter (where t.status <> 'cancelado' and t.meta_ha > 0) * 100.0
+                       / sum(t.meta_ha) filter (where t.status <> 'cancelado'))
+       end                                                           as pct_area,
+       count(*) filter (where t.status <> 'cancelado' and t.exec_lancamentos = 0) as tarefas_sem_lancamento,
        case when count(*) filter (where t.status <> 'cancelado') > 0
             then round(count(*) filter (where t.status = 'finalizado') * 100.0
                        / count(*) filter (where t.status <> 'cancelado'))
@@ -156,7 +169,7 @@ select t.ref,
   left join public.rel_unidades u on u.id = t.unidade_id
  group by t.ref, t.unidade_id, u.nome;
 comment on view public.vw_planejamento_mes is
-  'Mês por unidade: cumprimento, atrasadas, travadas e arrastadas. Travada não conta como atrasada.';
+  'Mês por unidade: cumprimento, atrasadas, travadas, arrastadas e o planejado × executado em área (v78). Travada não conta como atrasada.';
 
 -- 6. Segurança: leitura e escrita anon, como as demais tabelas do app
 alter table public.planejamento_rodada enable row level security;
@@ -186,5 +199,8 @@ select 'tarefas', count(*)::text from public.planejamento_tarefa
 union all
 select 'tarefas travadas', count(*)::text from public.planejamento_tarefa
  where status in ('aguardando_terceiro','aguardando_clima')
+union all
+select 'tarefas com foto do executado (v78)', count(*)::text from public.planejamento_tarefa
+ where payload -> 'exec' is not null
 union all
 select 'linhas na visão do mês', count(*)::text from public.vw_planejamento_mes;

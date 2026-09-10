@@ -259,6 +259,71 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
       proj && proj.feito > 0 && proj.area === 96 && /^\d{4}-\d{2}-\d{2}$/.test(proj.fim),
       proj && ('feito ' + proj.feito + ' de ' + proj.area + ' ha · conclui em ' + proj.fim + ' (' + proj.atraso + ' dias do prazo)'));
 
+    /* ---------- v78: planejado × executado × restante, rastreabilidade e fora do plano ---------- */
+    const tri = await p2.page.evaluate(() => {
+      const t = planTarefas().find(x => Number(x.area) === 96);
+      const p = planProgresso(t), ex = planExecucao(t);
+      return { meta: p.meta, feito: p.feito, resta: p.resta, pct: p.pct, temMeta: p.temMeta,
+        n: ex.n, talhoes: ex.talhoes, soma: p.feito + p.resta,
+        itens: ex.itens.map(l => ({ data: l.data, nome: l.nome, area: l.area, por: l.por })),
+        snap: t.exec };
+    });
+    ok('Três números na tarefa: planejado + restante fecham com a meta',
+      tri.temMeta && tri.meta === 96 && tri.feito > 0 && tri.soma === tri.meta,
+      'planejado ' + tri.meta + ' · executado ' + tri.feito + ' · restante ' + tri.resta + ' (' + tri.pct + '%)');
+    ok('Executado é a soma dos talhões DISTINTOS com lançamento casado',
+      tri.talhoes === tri.itens.length && tri.feito === tri.itens.reduce((a, x) => a + x.area, 0),
+      tri.talhoes + ' talhão(ões) · ' + tri.itens.map(x => x.area).join(' + '));
+    ok('Rastreabilidade: cada lançamento traz data, talhão, área e quem lançou',
+      tri.itens.length > 0 && tri.itens.every(x => /^\d{4}-\d{2}-\d{2}$/.test(x.data) && x.nome && x.area > 0 && x.por),
+      tri.itens.map(x => x.data.slice(8) + '/' + x.data.slice(5, 7) + ' ' + x.nome + ' ' + x.area + ' ha · ' + x.por).join(' | '));
+    ok('A foto do executado fica na tarefa (é o que o relatório do Supabase lê)',
+      tri.snap && tri.snap.ha === tri.feito && tri.snap.n === tri.n && tri.snap.meta === 96, JSON.stringify(tri.snap));
+
+    /* meta definida pelo escritório liga a barra numa tarefa que a ata trouxe sem área */
+    const meta = await p2.page.evaluate(() => {
+      const t = planTarefas().find(x => /KCL/i.test(x.desc));
+      const antes = planProgresso(t).temMeta;
+      t.meta = 30; salvarDados();
+      const p = planProgresso(t);
+      return { antes, depois: p.temMeta, meta: p.meta, resta: p.resta };
+    });
+    ok('Tarefa sem área na ata: o escritório informa a meta e a barra liga',
+      meta.antes === false && meta.depois === true && meta.meta === 30, 'sem meta → ' + meta.meta + ' ha · restante ' + meta.resta);
+
+    /* lançamento que não casou com tarefa nenhuma = executado fora do plano */
+    const fora = await p2.page.evaluate(() => {
+      const tals = talhoesDa('f22c').filter(x => x.fazendaId === 'f22c' && x.tipo !== 'ESTRUTURA' && x.tipo !== 'ARRENDADO');
+      D.boletins.push({ id: 'foratest', fazendaId: 'f22c', data: diaISO(hojeBRT(), -1), responsavel: 'Maria',
+        clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '4', diaristas: '', funcoes: [] },
+        atividades: [{ id: 'xf', tipo: 'Catação', talhaoId: tals[0].id, status: 'concluida', pessoas: '4' }],
+        colheita: [], fito: [], ocorrencias: [], secoes: {} });
+      salvarDados(); planMotor(true);
+      const r = planForaDoPlano('f22c', planMesDe(hojeBRT()));
+      const dentro = planTarefaDoLancamento('f22c', 'Levantar café', tals[0].id, diaISO(hojeBRT(), -3));
+      return { total: r.total, fora: r.fora, pct: r.pct, ops: r.grupos.map(g => g.op),
+        casou: dentro ? dentro.desc.slice(0, 30) : null, texto: planTextoFora().split('\n')[0] };
+    });
+    ok('Lançamento sem tarefa casada vira "executado fora do plano"',
+      fora.fora >= 1 && fora.ops.includes('Catação') && fora.pct !== null,
+      fora.fora + ' de ' + fora.total + ' lançamentos (' + fora.pct + '%) · ' + fora.ops.join(', '));
+    ok('Lançamento que casa com tarefa NÃO entra no fora do plano', !!fora.casou, fora.casou || '');
+    ok('"Executado fora do plano" também sai em texto para a próxima ata', /fora do plano/i.test(fora.texto), fora.texto);
+
+    /* fechamento mensal: % do plano, % fora do plano e tarefas sem lançamento */
+    const fech2 = await p2.page.evaluate(() => {
+      const r = planResumoMes(planMesDe(hojeBRT()), 'f22c');
+      return { metaHa: r.metaHa, execHa: r.execHa, pctArea: r.pctArea, semLanc: r.semLancamento.length,
+        foraPct: r.fora ? r.fora.pct : null, texto: planTextoFechamento('') };
+    });
+    ok('Fechamento por unidade traz % do plano executado em área',
+      fech2.pctArea !== null && fech2.metaHa > 0 && /plano executado: \d+% da área/.test(fech2.texto),
+      'planejado ' + fech2.metaHa + ' ha · executado ' + fech2.execHa + ' ha (' + fech2.pctArea + '%)');
+    ok('Fechamento por unidade traz % do esforço fora do plano',
+      fech2.foraPct !== null && /esfor[çc]o fora do plano: \d+%/.test(fech2.texto), 'fora ' + fech2.foraPct + '%');
+    ok('Fechamento por unidade lista as tarefas sem NENHUM lançamento',
+      fech2.semLanc > 0 && /sem nenhum lan[çc]amento:/.test(fech2.texto), fech2.semLanc + ' tarefa(s)');
+
     /* 6. textos prontos, sem ferramenta externa */
     const txt = await p2.page.evaluate(() => ({ pauta: planTextoPauta(), cobranca: planTextoCobranca(''), ata: planTextoAta(), fech: planTextoFechamento('') }));
     ok('Pauta da sexta traz vencidas, vencendo em 7 dias e travadas',
@@ -269,6 +334,30 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
     ok('Rascunho da próxima ata sai no formato da reunião ("2.1 – Fazenda" + "- item … PRAZO:")',
       /^2\.1 – /m.test(txt.ata) && /^- .*PRAZO: /m.test(txt.ata), txt.ata.split('\n').slice(2, 4).join(' ⏎ ').slice(0, 140));
     ok('Fechamento do mês por unidade sai pronto', /concluídas/.test(txt.fech), txt.fech.split('\n')[2] || '');
+
+    /* a tela do módulo mostra os três números e abre a lista dos lançamentos num toque */
+    const naTela = await p2.page.evaluate(async () => {
+      planNav = [{ v: 'menu' }, { v: 'lista' }]; planLimpar(); planUI.filtroUnid = 'f22c'; ir('planejamento');
+      await new Promise(r => setTimeout(r, 250));
+      const cel = [...document.querySelectorAll('#app .plan-tres > span')].slice(0, 3).map(x => x.textContent.replace(/\s+/g, ' ').trim());
+      const bt = document.querySelector('#app .plan-exec');
+      const barra = document.querySelector('#app .plan-trio .plan-barra > span');
+      if (bt) bt.click();
+      await new Promise(r => setTimeout(r, 250));
+      /* a tela redesenha ao abrir a lista: medir DEPOIS, no elemento que ficou */
+      const alt = document.querySelector('#app .plan-tres > span');
+      const lista = document.querySelector('#app .plan-exec-lista');
+      return { cel, alvo: alt ? +alt.getBoundingClientRect().height.toFixed(1) : 0,
+        barra: barra ? barra.style.width : '', larg: document.documentElement.scrollWidth,
+        linhas: lista ? lista.querySelectorAll('.plan-exec-l').length : 0,
+        tela: telaAtual, nativos: window.__nativos || 0 };
+    });
+    ok('Na tela: os três números aparecem juntos, com barra, sem rolar de lado',
+      naTela.cel.length === 3 && /planejado/.test(naTela.cel[0]) && /executado/.test(naTela.cel[1]) && /restante/.test(naTela.cel[2])
+      && /%$/.test(naTela.barra) && naTela.larg <= 390, naTela.cel.join(' · ') + ' · barra ' + naTela.barra);
+    ok('Tocar em "executado" abre a lista dos lançamentos, no lugar e com alvo ≥ 44 px',
+      naTela.linhas > 0 && naTela.alvo >= 44 && naTela.tela === 'planejamento' && naTela.nativos === 0,
+      naTela.linhas + ' lançamento(s); alvo ' + naTela.alvo + ' px');
 
     ok('Nenhum erro de JavaScript na semana e nos textos', p2.erros.length === 0, p2.erros.join(' | '));
     estado = await lerD(p2.page);
@@ -356,6 +445,35 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
     });
     ok('Faixa aparece no topo do boletim e nada bloqueia o preenchimento',
       noForm.faixa && noForm.secoes === 0 && noForm.enviar, noForm.secoes + ' seção(ões) abertas ao abrir');
+
+    /* v78: o gerente vê o placar na faixa, os três números na folha e a etiqueta 📋 no lançamento */
+    const ger78 = await page.evaluate(async () => {
+      ir('casa'); await new Promise(r => setTimeout(r, 300));
+      const faixa = (document.getElementById('tar-faixa') || {}).textContent || '';
+      document.querySelector('#tar-faixa [data-tar]').click();
+      await new Promise(r => setTimeout(r, 250));
+      const f = document.getElementById('folha-tarefa');
+      const cel = f ? [...f.querySelectorAll('.plan-tres > span')].map(x => x.textContent.replace(/\s+/g, ' ').trim()) : [];
+      const bt = f && f.querySelector('.plan-exec');
+      if (bt) bt.click();
+      await new Promise(r => setTimeout(r, 250));
+      const linhas = f ? f.querySelectorAll('.plan-exec-l').length : 0;
+      const campos = f ? f.querySelectorAll('input, select, textarea').length : -1;
+      document.getElementById('bt-tar-fechar').click();
+      await new Promise(r => setTimeout(r, 200));
+      const b = D.boletins.filter(x => x.fazendaId === 'f22c' && (x.atividades || []).some(a => a.tipo === 'Levantar café'))[0];
+      ir('detalhe', b ? b.id : '');
+      await new Promise(r => setTimeout(r, 250));
+      const vinc = document.querySelector('#app .plan-vinc');
+      return { faixa: faixa.replace(/\s+/g, ' ').trim(), cel, linhas, campos,
+        vinc: vinc ? vinc.textContent.trim() : '', tela: telaAtual };
+    });
+    ok('Faixa do gerente traz o placar da tarefa ("N de M ha")', /\d+ de \d+ ha/.test(ger78.faixa),
+      (ger78.faixa.match(/\d+ de \d+ ha/) || [''])[0]);
+    ok('Folha do gerente traz os três números e a rastreabilidade, sem digitar',
+      ger78.cel.length === 3 && ger78.linhas > 0 && ger78.campos === 0,
+      ger78.cel.join(' · ') + ' · ' + ger78.linhas + ' lançamento(s) · ' + ger78.campos + ' campo(s)');
+    ok('O lançamento do boletim mostra que abateu a tarefa (📋)', /^📋 abate:/.test(ger78.vinc), ger78.vinc);
     ok('Nenhum erro de JavaScript na tela do gerente', erros.length === 0, erros.join(' | '));
     await ctx.close();
   }

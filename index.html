@@ -271,6 +271,27 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-fecha-l>span:first-child{flex:1;min-width:0}
 .plan-acoes .chip.mini,.plan-fecha-l .chip.mini{min-height:44px;padding:6px 10px;font-size:.8rem}
 .plan-comp{flex:none;min-height:44px;font-size:.8rem;padding:6px 10px}
+/* v78: planejado × executado × restante, com barra e rastreabilidade. Sem cor nova: verde é o
+   executado dentro do plano (mesma tinta da barra de cumprimento) e âmbar é o fora do plano —
+   a cor do "para conferir" que o app já usa, nunca do farol. */
+.plan-trio{margin-top:6px}
+.plan-tres{display:flex;gap:10px;align-items:stretch}
+.plan-tres>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;min-height:44px}
+.plan-tres i{font-style:normal;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-2)}
+.plan-tres b,.plan-tres .plan-exec{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.plan-exec{justify-content:flex-start;text-align:left;padding:0;min-height:26px;color:var(--verde);text-decoration:underline;text-underline-offset:2px}
+.plan-exec:active{color:var(--verde-esc)}
+.plan-trio-nota{font-size:.72rem;margin:4px 0 0}
+.plan-barra>span.fora{background:var(--amarelo)}
+.plan-exec-lista{border-top:1px solid var(--linha);margin-top:8px;padding-top:6px}
+.plan-exec-cab{font-size:.72rem;margin:0 0 4px}
+.plan-exec-l{display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--linha);font-size:.82rem}
+.plan-exec-l:first-of-type{border-top:none}
+.plan-exec-l>.num{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem}
+.plan-exec-l .mut{font-size:.76rem}
+.plan-exec-vazio{font-size:.8rem;margin:8px 0 0}
+.plan-num{font-size:.82rem}
+.plan-vinc{font-size:.7rem;margin-top:4px;display:inline-block}
 .plan-duas{display:grid;gap:12px}
 .plan-notif{margin:0 0 12px;font-size:.82rem}
 @media(min-width:640px){.plan-duas{grid-template-columns:1fr 1fr}}
@@ -2802,14 +2823,18 @@ function relRender(rel,ls){
     const linhas=uns.map(l=>{ const d=l.dados||{};
       const mot=Object.entries(d.motivos||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>v+" "+(rotMot[k]||k)).join(" · ");
       return {c:[esc(d.unidade_nome||relUni(l.unidade_id)), n0(d.finalizadas)+"/"+n0(d.tarefas),
-        d.cumprimento_pct==null?"—":n0(d.cumprimento_pct)+"%", n0(d.atrasadas)?conf(n0(d.atrasadas)):"0",
-        n0(d.travadas)||"0", n0(d.arrastadas)||"0", relNum(d.area_ha,0), esc(mot||"—")],
+        d.cumprimento_pct==null?"—":n0(d.cumprimento_pct)+"%",
+        relNum(d.area_planejada,0), relNum(d.area_executada,0),
+        d.pct_area==null?"—":n0(d.pct_area)+"%", n0(d.tarefas_sem_lancamento)?conf(n0(d.tarefas_sem_lancamento)):"0",
+        n0(d.atrasadas)?conf(n0(d.atrasadas)):"0",
+        n0(d.travadas)||"0", n0(d.arrastadas)||"0", esc(mot||"—")],
         k:n0(d.atrasadas)?"critico":n0(d.travadas)?"conferir":""}; });
     const gd=(g||{}).dados||{};
     return bloco("📋 Ata × executado"+(gd.cumprimento_pct!=null?` <span class="mut" style="font-weight:400;font-size:.8rem">${n0(gd.cumprimento_pct)}% no grupo</span>`:""),
-      (g?`<p style="font-size:.85rem">${n0(gd.finalizadas)} de ${n0(gd.tarefas)} tarefas concluídas em ${n0(gd.unidades)} unidades · ${n0(gd.atrasadas)} atrasada(s) · ${n0(gd.travadas)} travada(s) · ${n0(gd.arrastadas)} arrastada(s)</p>`:"")
-      +relTabela(["Unidade","#Concl./Total","#Cumpr.","#Atrasadas","#Travadas","#Arrastadas","#ha","Motivos da trava"],linhas.map(x=>x.c),linhas.map(x=>x.k)),
-      "Tarefas da reunião administrativa do mês. Tarefa parada por terceiro ou por chuva conta como TRAVADA, nunca como atrasada — a cobrança é do escritório.");
+      (g?`<p style="font-size:.85rem">${n0(gd.finalizadas)} de ${n0(gd.tarefas)} tarefas concluídas em ${n0(gd.unidades)} unidades · ${n0(gd.atrasadas)} atrasada(s) · ${n0(gd.travadas)} travada(s) · ${n0(gd.arrastadas)} arrastada(s)</p>
+        ${n0(gd.area_planejada)?`<p style="font-size:.85rem">planejado <b class="num">${relNum(gd.area_planejada,0)} ha</b> × executado <b class="num">${relNum(gd.area_executada,0)} ha</b>${gd.pct_area==null?"":` (<b class="num">${n0(gd.pct_area)}%</b>)`}${n0(gd.tarefas_sem_lancamento)?` · ${n0(gd.tarefas_sem_lancamento)} tarefa(s) sem nenhum lançamento`:""}</p>`:""}`:"")
+      +relTabela(["Unidade","#Concl./Total","#Cumpr.","#ha plan.","#ha exec.","#% área","#Sem lanç.","#Atrasadas","#Travadas","#Arrastadas","Motivos da trava"],linhas.map(x=>x.c),linhas.map(x=>x.k)),
+      "Tarefas da reunião administrativa do mês. Planejado × executado em área vem da foto que o app grava em cada tarefa. Tarefa parada por terceiro ou por chuva conta como TRAVADA, nunca como atrasada — a cobrança é do escritório. \"Sem lançamento\" é ausência de REGISTRO casado, nunca afirmação de que não foi feito.");
   }
   return `<div class="cartao"><pre style="white-space:pre-wrap;font-size:.75rem">${esc(JSON.stringify(ls.map(l=>l.dados),null,1))}</pre></div>`;
 }
@@ -3684,11 +3709,11 @@ const PLANO_ATIVIDADE={
   CAFE:{ ondeRot:"Talhão", ondeGeral:"Área geral",
     onde:fz=>talhoesDa(fz).filter(t=>t.fazendaId===fz&&t.tipo!=="ESTRUTURA"&&t.tipo!=="ARRENDADO").map(t=>({id:t.id,nome:t.nome})),
     ops:()=>LISTA_ATIV.filter(n=>n!=="Outra"),
-    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua",pessoas:n0(a.pessoas)})) },
   GRAOS:{ ondeRot:"Talhão / pivô", ondeGeral:"Área geral / sede",
     onde:fz=>talhoesAnuais(fz).map(t=>({id:t.id,nome:t.nome})),
     ops:()=>OPS_GRAOS_FASES.flatMap(([,ops])=>ops),
-    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua",pessoas:n0(a.pessoas)})) },
   PECUARIA:{ ondeRot:"Pasto / retiro", ondeGeral:"Toda a fazenda",
     onde:fz=>pastosCadastrados(fz).map(nm=>({id:nm,nome:nm})),
     ops:()=>LISTA_PECUARIA,
@@ -4259,33 +4284,174 @@ function planFarol(t){
 const planAtrasada = t => planAberta(t) && !planPausada(t) && !!t.prazo && planDiasParaPrazo(t)<0;
 const planTravadaDias = t => planPausada(t) ? planDiasEntre((t.bloqueio&&t.bloqueio.desde)||t.criadoEm, hojeBRT()) : 0;
 const planArrastaMeses = t => (t.arrastadaDe||[]).length;
-/* quanto já foi feito da área da tarefa: soma dos talhões DISTINTOS da unidade em que a operação
-   casada com a descrição foi registrada desde que a tarefa começou. Nada digitado. */
-function planFeitoHa(t){
-  if(!t.unidade || !n0(t.area)) return 0;
-  const ops=planOperacoesDe(t); if(!ops.length) return 0;
-  const ini=String(t.inicioReal||t.criadoEm||hojeBRT()).slice(0,10);
-  const cat=PLANO_ATIVIDADE[atividadeDe(t.unidade)]||PLANO_ATIVIDADE.CAFE;
-  const tals=new Set();
-  D.boletins.filter(b=>b.fazendaId===t.unidade && b.data>=ini && b.data<=hojeBRT())
-    .forEach(b=>(cat.feitos(b)||[]).forEach(f=>{ if(ops.includes(nomeAtual(f.op)) && f.onde && f.onde!=="geral") tals.add(f.onde); }));
-  let ha=0; tals.forEach(id=>{ ha+=n0(talhao(id).area); });
-  return Math.min(ha, n0(t.area));
+/* ============================================================
+   PLANEJADO × EXECUTADO (v78) — reforço do acompanhamento
+   ------------------------------------------------------------
+   Três números em toda tarefa: PLANEJADO (a meta — a área da ata, ou a que o
+   escritório informar), EXECUTADO (a soma dos lançamentos do boletim que
+   casaram com a tarefa) e RESTANTE, com barra de progresso. O executado é
+   RASTREÁVEL: um toque lista os lançamentos que o compuseram (data, talhão,
+   área e quem lançou). Nada é digitado pelo gerente e nada é inventado: sem
+   meta não há barra nem restante — o app diz isso com todas as letras.
+
+   A outra metade da história é o EXECUTADO FORA DO PLANO: o lançamento que não
+   casou com nenhuma tarefa. Não é cobrança — é o que apareceu no dia e não
+   estava na ata. Vocabulário: prazo e REGISTRO, nunca "não fez".
+   ============================================================ */
+
+/* índice dos lançamentos de uma unidade, uma passada só pelos boletins.
+   Refeito quando o dia, o número de boletins ou o de tarefas muda. */
+let planExecCache={marca:"", uni:{}};
+const planExecMarca = () => hojeBRT()+"|"+((D&&D.boletins)||[]).length+"|"+planTarefas().length;
+function planLancamentos(fz){
+  if(!fz) return [];
+  const m=planExecMarca();
+  if(planExecCache.marca!==m) planExecCache={marca:m, uni:{}};
+  if(planExecCache.uni[fz]) return planExecCache.uni[fz];
+  const cat=PLANO_ATIVIDADE[atividadeDe(fz)]||PLANO_ATIVIDADE.CAFE;
+  const out=[];
+  (D.boletins||[]).filter(b=>b.fazendaId===fz && !b.exemplo).forEach(b=>{
+    (cat.feitos(b)||[]).forEach((f,i)=>{
+      if(!f.op) return;
+      const onde=(f.onde && f.onde!=="geral") ? f.onde : "";
+      out.push({ id:b.id+":"+i, boletimId:b.id, data:b.data, op:nomeAtual(f.op), onde,
+        nome: onde?planoOndeNome(fz,onde):cat.ondeGeral, area: onde?n0(talhao(onde).area):0,
+        pessoas:n0(f.pessoas), por:String(b.responsavel||"").trim(), parcial:!!f.parcial });
+    });
+  });
+  out.sort((a,b)=>a.data<b.data?1:a.data>b.data?-1:0);
+  planExecCache.uni[fz]=out;
+  return out;
 }
+/* janela em que um lançamento conta para a tarefa: do começo dela até hoje
+   (ou até o dia em que ela foi concluída — depois disso o número congela) */
+const planJanela = t => ({ de:String(t.inicioReal||t.criadoEm||hojeBRT()).slice(0,10),
+  ate:String(t.concluidoEm||hojeBRT()).slice(0,10) });
+/* EXECUTADO: os lançamentos que casaram com a tarefa, com a soma em ha dos
+   talhões DISTINTOS (o mesmo talhão lançado duas vezes conta uma vez só). */
+function planExecucao(t){
+  const vazio={ha:0, n:0, itens:[], talhoes:0, pessoas:0, semVinculo:false};
+  if(!t || !t.unidade) return vazio;
+  const ops=planOperacoesDe(t);
+  if(!ops.length) return {...vazio, semVinculo:true};   /* descrição sem operação no catálogo */
+  const j=planJanela(t);
+  const itens=planLancamentos(t.unidade).filter(l=>ops.includes(l.op) && l.data>=j.de && l.data<=j.ate);
+  const tals=new Map();
+  itens.forEach(l=>{ if(l.onde && !tals.has(l.onde)) tals.set(l.onde, l.area); });
+  let ha=0; tals.forEach(v=>{ ha+=v; });
+  return {ha, n:itens.length, itens, talhoes:tals.size,
+    pessoas:itens.reduce((s,l)=>s+n0(l.pessoas),0), semVinculo:false};
+}
+/* PLANEJADO · EXECUTADO · RESTANTE. `meta` é a área da ata ou a informada pelo
+   escritório (t.meta); sem meta, o app conta os lançamentos e NÃO inventa barra. */
+const planMeta = t => n0(t.meta) || n0(t.area);
+function planProgresso(t){
+  const ex=planExecucao(t), meta=planMeta(t);
+  if(meta>0){
+    /* arredonda ANTES de subtrair: planejado, executado e restante têm de fechar na tela */
+    const arr=v=>Math.round(v*10)/10;
+    const feito=arr(Math.min(ex.ha, meta));
+    return { temMeta:true, un:"ha", meta:arr(meta), feito, resta:arr(Math.max(0, arr(meta)-feito)),
+      pct:Math.min(100, Math.round(feito*100/meta)), excedente:arr(Math.max(0, ex.ha-meta)), ex };
+  }
+  return { temMeta:false, un:"reg", meta:null, feito:ex.n, resta:null,
+    pct:t.status==="finalizado"?100:0, excedente:0, ex };
+}
+const planHa = v => n0(v).toLocaleString("pt-BR",{maximumFractionDigits:(n0(v)%1)?1:0});
+/* componente ÚNICO dos três números + barra. `o.attr` torna o EXECUTADO tocável
+   (abre a lista dos lançamentos que o compuseram); sem `attr` é só leitura. */
+function planTrio(t, o){
+  o=o||{};
+  const p=planProgresso(t), ex=p.ex;
+  const exec = p.temMeta ? planHa(p.feito)+" ha" : p.feito+" lançamento"+(p.feito===1?"":"s");
+  const rot = ex.n ? exec : (p.temMeta?"0 ha":"nenhum lançamento");
+  const botao = o.attr
+    ? `<button class="plan-exec" ${o.attr}="${t.id}" aria-expanded="${o.aberta?"true":"false"}"
+        aria-label="Ver os ${ex.n} lançamento(s) que compõem o executado">${esc(rot)}${ex.n?" ›":""}</button>`
+    : `<b class="num">${esc(rot)}</b>`;
+  return `<div class="plan-trio">
+    <div class="plan-tres">
+      <span><i>planejado</i><b class="num">${p.temMeta?esc(planHa(p.meta))+" ha":"—"}</b></span>
+      <span><i>executado</i>${botao}</span>
+      <span><i>restante</i><b class="num">${p.temMeta?esc(planHa(p.resta))+" ha":"—"}</b></span>
+    </div>
+    ${p.temMeta?`<div class="plan-barra" role="img" aria-label="${p.pct}% da área planejada com registro"><span style="width:${p.pct}%"></span></div>
+      <p class="plan-trio-nota mut">${p.pct}% da área planejada tem registro no boletim${p.excedente>0?` · ${esc(planHa(p.excedente))} ha lançados além da meta`:""}</p>`
+      :`<p class="plan-trio-nota mut">${ex.semVinculo?"A descrição não casa com nenhuma operação do catálogo — o app não consegue somar sozinho."
+        :"Sem meta: a ata não trouxe a área. O app conta os lançamentos casados."}${o.podeMeta?"":""}</p>`}
+    ${o.aberta?planExecLista(t):""}</div>`;
+}
+/* rastreabilidade total: o que compôs o executado, do mais recente ao mais antigo */
+function planExecLista(t){
+  const ex=planExecucao(t);
+  if(!ex.n) return `<p class="mut plan-exec-vazio">${esc(fraseVazio({que:"lançamento casado com esta tarefa", unidade:t.unidade||"", onde:t.unidade?"":"nesta unidade"}))}</p>`;
+  const j=planJanela(t);
+  return `<div class="plan-exec-lista">
+    <p class="mut plan-exec-cab">${ex.n} lançamento${ex.n>1?"s":""} em ${ex.talhoes||"—"} ${ex.talhoes===1?"local":"locais"}${ex.pessoas?" · "+ex.pessoas+" pessoas-dia":""} · de ${esc(fmtDataCurta(j.de))} a ${esc(fmtDataCurta(j.ate))}</p>
+    ${ex.itens.slice(0,20).map(l=>`<div class="plan-exec-l">
+      <span class="num">${esc(fmtDataCurta(l.data))}</span>
+      <span class="cresce">${esc(l.nome)}${l.parcial?' <span class="mut">· continua</span>':""}<br><span class="mut">${esc(nomeAtual(l.op))}${l.por?" · "+esc(l.por):""}</span></span>
+      <span class="num">${l.area?esc(planHa(l.area))+" ha":"—"}</span></div>`).join("")}
+    ${ex.n>20?`<p class="mut plan-exec-cab">mostrando 20 de ${ex.n}</p>`:""}
+    <p class="mut plan-exec-cab">Fonte: os boletins da unidade. A soma em ha conta cada talhão uma vez.</p></div>`;
+}
+/* ---- vínculo do lançamento com a tarefa (item 3): o gerente vê o que abateu ----
+   Componente ÚNICO nas três atividades. Devolve "" quando o lançamento não abate
+   tarefa nenhuma. Nunca é botão nem métrica: é uma etiqueta de leitura. */
+function planTarefaDoLancamento(fz, tipo, talhaoId, data){
+  if(!fz || !tipo) return null;
+  const op=nomeAtual(tipo), onde=(talhaoId && talhaoId!=="geral")?talhaoId:"";
+  const dia=String(data||hojeBRT()).slice(0,10);
+  const cands=planDaUnidade(fz).filter(t=>t.tipoItem==="tarefa" && t.status!=="cancelado")
+    .filter(t=>{ const j=planJanela(t); return dia>=j.de && dia<=j.ate; })
+    .filter(t=>planOperacoesDe(t).includes(op));
+  if(!cands.length) return null;
+  /* com mais de uma candidata, vence a que tem meta e ainda tem o que fazer */
+  return cands.sort((a,b)=>(planMeta(b)>0)-(planMeta(a)>0) || (planAberta(b)-planAberta(a))
+    || String(a.prazo||"9999").localeCompare(String(b.prazo||"9999")))[0] || null;
+}
+function planTagVinculo(fz, tipo, talhaoId, data){
+  const t=planTarefaDoLancamento(fz, tipo, talhaoId, data);
+  if(!t) return "";
+  return `<span class="tag verde plan-vinc" title="${esc("Abate a tarefa da reunião: "+t.desc)}">📋 abate: ${esc(t.desc.length>38?t.desc.slice(0,36)+"…":t.desc)}</span>`;
+}
+
+/* ---- executado FORA do plano (item 4): a outra metade da história ----
+   Lançamento do período que não casou com nenhuma tarefa da unidade. Não é
+   cobrança: é o que apareceu no dia e não estava na ata. */
+function planForaDoPlano(fz, ref){
+  const ini=ref+"-01", fim=planFimDoMes(ref+"-01");
+  const ls=planLancamentos(fz).filter(l=>l.data>=ini && l.data<=fim);
+  const dentro=[], fora=[];
+  ls.forEach(l=>{ (planTarefaDoLancamento(fz, l.op, l.onde, l.data) ? dentro : fora).push(l); });
+  const grupos={};
+  fora.forEach(l=>{ const g=grupos[l.op]=grupos[l.op]||{op:l.op, n:0, ha:0, pessoas:0, locais:new Set(), ultimo:""};
+    g.n++; g.pessoas+=n0(l.pessoas); if(l.onde && !g.locais.has(l.onde)){ g.locais.add(l.onde); g.ha+=l.area; }
+    if(!g.ultimo || l.data>g.ultimo) g.ultimo=l.data; });
+  const total=ls.length;
+  return { fz, ref, total, dentro:dentro.length, fora:fora.length,
+    pct: total?Math.round(fora.length*100/total):null,
+    pessoasFora: fora.reduce((s,l)=>s+n0(l.pessoas),0),
+    pessoasTotal: ls.reduce((s,l)=>s+n0(l.pessoas),0),
+    grupos: Object.values(grupos).map(g=>({...g, locais:g.locais.size})).sort((a,b)=>b.n-a.n||b.ha-a.ha) };
+}
+/* quanto já foi feito da meta (ha), limitado a ela — base da projeção de ritmo */
+const planFeitoHa = t => planMeta(t)>0 ? Math.min(planExecucao(t).ha, planMeta(t)) : 0;
 /* "feito 40 de 96 ha · no ritmo atual conclui em 24/09 (4 dias após o prazo)" */
 function planProjecao(t){
-  if(!planAberta(t) || !n0(t.area)) return null;
+  const meta=planMeta(t);
+  if(!planAberta(t) || !meta) return null;
   const feito=planFeitoHa(t);
   if(feito<=0) return null;
   const ini=String(t.inicioReal||t.criadoEm||hojeBRT()).slice(0,10);
   const uteis=Math.max(1, planDiasUteis(t.unidade, ini, hojeBRT()));
   const ritmo=feito/uteis;
-  const faltam=Math.max(0, n0(t.area)-feito);
-  if(faltam<=0) return {feito, area:n0(t.area), ritmo, fim:hojeBRT(), atraso:0};
+  const faltam=Math.max(0, meta-feito);
+  if(faltam<=0) return {feito, area:meta, ritmo, fim:hojeBRT(), atraso:0};
   const dias=Math.ceil(faltam/ritmo);
   const fim=planSomarDiasUteis(t.unidade, hojeBRT(), dias);
   const prazo=planPrazoEfetivo(t);
-  return {feito, area:n0(t.area), ritmo, fim, dias, atraso: prazo?planDiasEntre(prazo,fim):0};
+  return {feito, area:meta, ritmo, fim, dias, atraso: prazo?planDiasEntre(prazo,fim):0};
 }
 /* o motor: farol, dias de chuva, saída automática da pausa por clima e semana da sexta.
    Roda a cada abertura de tela do módulo e a cada sincronização — ninguém precisa lembrar de nada. */
@@ -4309,8 +4475,20 @@ function planMotor(forcar){
       mudou=true;
     }
   });
+  /* v78: foto do executado em cada tarefa (ha, lançamentos e meta) — é o que o relatório
+     mensal ata_x_executado lê no Supabase, já que o de-para descrição → operação mora no app. */
+  const paraFila=[];
+  planTarefas().forEach(t=>{
+    if(t.tipoItem!=="tarefa" || !t.unidade) return;
+    const ex=planExecucao(t), meta=planMeta(t);
+    const novo={ha:Math.round(ex.ha*100)/100, n:ex.n, meta, em:hojeBRT()};
+    const a=t.exec||{};
+    if(a.ha!==novo.ha || a.n!==novo.n || a.meta!==novo.meta){ t.exec=novo; mudou=true; paraFila.push(t.id); }
+  });
   if(planSemanaGarantir()) mudou=true;
   if(mudou) salvarDados();
+  paraFila.forEach(id=>{ if(!syncFila.some(x=>x.t==="tar"&&x.id===id)) syncFila.push({t:"tar",id}); });
+  if(paraFila.length) syncSalvarFila();
 }
 /* ---- semanas: a tela da sexta nasce sozinha (segunda a domingo da semana que começa) ---- */
 const planSegundaDe = iso => { const d=planDiaSemana(iso); return diaISO(iso, d===0?-6:1-d); };
@@ -4379,6 +4557,13 @@ function planResumoMes(ref, fz){
   const fim=ls.filter(t=>t.status==="finalizado").length;
   const canc=ls.filter(t=>t.status==="cancelado").length;
   const base=ls.length-canc;
+  /* v78: a metade quantitativa — área planejada × executada, tarefas sem NENHUM lançamento
+     e o esforço que aconteceu fora da ata. Tudo calculado; nada digitado. */
+  const ativas=ls.filter(t=>t.status!=="cancelado");
+  const metaHa=ativas.reduce((a,t)=>a+planMeta(t),0);
+  const execHa=ativas.reduce((a,t)=>a+(planMeta(t)?Math.min(planExecucao(t).ha,planMeta(t)):0),0);
+  const semLanc=ativas.filter(t=>planExecucao(t).n===0);
+  const fora=fz?planForaDoPlano(fz, ref||planMesDe(hojeBRT())):null;
   return { ref, n:ls.length, finalizadas:fim, canceladas:canc,
     pct: base?Math.round(fim*100/base):null,
     atrasadas: ls.filter(planAtrasada), travadas: ls.filter(planPausada),
@@ -4386,7 +4571,11 @@ function planResumoMes(ref, fz){
     vermelhas: ls.filter(t=>planFarol(t)==="vermelho").length,
     amarelas: ls.filter(t=>planFarol(t)==="amarelo").length,
     cinzas: ls.filter(t=>planFarol(t)==="cinza").length,
-    verdes: ls.filter(t=>planFarol(t)==="verde").length, lista:ls };
+    verdes: ls.filter(t=>planFarol(t)==="verde").length,
+    metaHa, execHa, restaHa:Math.max(0, metaHa-execHa),
+    pctArea: metaHa?Math.min(100, Math.round(execHa*100/metaHa)):null,
+    comMeta: ativas.filter(t=>planMeta(t)>0).length,
+    semLancamento: semLanc, fora, lista:ls };
 }
 /* pendências agrupadas por fornecedor — quem falta, desde quando e quais fazendas estão paradas */
 function planPorTerceiro(){
@@ -4530,7 +4719,10 @@ function ataImportar(rodada, itens){
 function planLinhaTexto(t){
   const f=planFarol(t);
   const partes=[];
-  if(n0(t.area)) partes.push(n0(t.area).toLocaleString("pt-BR",{maximumFractionDigits:0})+" ha");
+  /* v78: a faixa já traz o placar da tarefa — executado de planejado, na mesma linha visual */
+  const p=planProgresso(t);
+  if(p.temMeta) partes.push(planHa(p.feito)+" de "+planHa(p.meta)+" ha");
+  else if(p.ex.n) partes.push(p.ex.n+" lançamento"+(p.ex.n>1?"s":""));
   if(planPausada(t)) partes.push(((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())+((t.bloqueio&&t.bloqueio.quem)?" ("+t.bloqueio.quem+")":""));
   else if(t.prazo) partes.push((f==="vermelho"&&planDiasParaPrazo(t)<0?"ATRASADO desde ":"vence ")+fmtDataCurta(planPrazoEfetivo(t)));
   else partes.push("sem prazo");
@@ -4588,7 +4780,8 @@ function planFolhaCorpo(){
       <p class="mut" style="margin:2px 0 0">${t.prazo?`prazo ${esc(fmtData(prazo))}${n0(t.diasChuva)?` <span class="tar-ajuste">ajustado +${n0(t.diasChuva)} dia${n0(t.diasChuva)>1?"s":""} de chuva (original ${esc(fmtData(t.prazoOriginal||t.prazo))})</span>`:""}${uteis?" · "+uteis+" dia"+(uteis>1?"s":"")+" úteis pela frente":""}`:"sem prazo"}</p>
       ${t.responsavel?`<p class="mut" style="margin:2px 0 0">com ${esc(t.responsavel)}</p>`:""}
       ${t.origemRot?`<p class="mut" style="margin:2px 0 0;font-size:.78rem">origem: ${esc(t.origemRot)}${planArrastaMeses(t)?" · arrastada há "+planArrastaMeses(t)+" reuniões":""}</p>`:""}
-      ${proj?`<p class="mut tar-proj">feito <b class="num">${esc(proj.feito.toLocaleString("pt-BR",{maximumFractionDigits:0}))}</b> de <b class="num">${esc(proj.area.toLocaleString("pt-BR",{maximumFractionDigits:0}))}</b> ha · no ritmo atual conclui em ${esc(fmtDataCurta(proj.fim))}${proj.atraso>0?` (${proj.atraso} dia${proj.atraso>1?"s":""} após o prazo)`:proj.atraso<0?` (${-proj.atraso} dia${-proj.atraso<-1?"s":""} antes do prazo)`:""}</p>
+      ${planTrio(t,{attr:"data-tar-exec", aberta:!!tarUI.exec})}
+      ${proj?`<p class="mut tar-proj">no ritmo atual conclui em ${esc(fmtDataCurta(proj.fim))}${proj.atraso>0?` (${proj.atraso} dia${proj.atraso>1?"s":""} após o prazo)`:proj.atraso<0?` (${-proj.atraso} dia${-proj.atraso<-1?"s":""} antes do prazo)`:""}</p>
         <p class="mut" style="font-size:.72rem;margin:2px 0 0">Ritmo calculado dos talhões já registrados no boletim; dias úteis sem domingo e sem os dias de chuva declarados.</p>`:""}
     </div>
     <div class="cartao"><b>O que aconteceu?</b>
@@ -4627,7 +4820,7 @@ function planHistTexto(h){
 }
 function planFolhaPintar(){ const c=document.getElementById("tar-corpo"); if(c) c.innerHTML=planFolhaCorpo(); }
 function planFolhaAbrir(o){
-  tarUI={ id:o.id||"", fz:o.fz||"", trava:false, podePrazo: !!(sessao && sessao.papel!=="gerente") };
+  tarUI={ id:o.id||"", fz:o.fz||"", trava:false, exec:false, podePrazo: !!(sessao && sessao.papel!=="gerente") };
   const f=document.createElement("div"); f.className="folha"; f.id="folha-tarefa";
   f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label","Tarefas da reunião");
   f.innerHTML=`<div class="miolo">
@@ -4640,9 +4833,10 @@ function planFolhaAbrir(o){
   travarFolha();
   f.onclick=ev=>{ const bt=ev.target.closest("button"); if(!bt) return; const d=bt.dataset;
     if(bt.id==="bt-tar-fechar"||bt.id==="bt-tar-fechar2"){
-      if(tarUI.id && tarUI.fz){ tarUI.id=""; tarUI.trava=false; planFolhaPintar(); return; }
+      if(tarUI.id && tarUI.fz){ tarUI.id=""; tarUI.trava=false; tarUI.exec=false; planFolhaPintar(); return; }
       fecharFolhaTarefa(); return; }
-    if(d.tarAbrir!==undefined){ tarUI.id=d.tarAbrir; tarUI.trava=false; planFolhaPintar(); return; }
+    if(d.tarAbrir!==undefined){ tarUI.id=d.tarAbrir; tarUI.trava=false; tarUI.exec=false; planFolhaPintar(); return; }
+    if(d.tarExec!==undefined){ tarUI.exec=!tarUI.exec; planFolhaPintar(); return; }
     if(!tarUI.id) return;
     if(d.tarSt!==undefined){ const at=planTarefa(tarUI.id);
       planMudarStatus(tarUI.id, at.status===d.tarSt?"a_iniciar":d.tarSt);
@@ -5031,6 +5225,7 @@ function cardOperacao(a){
       :`<p class="mut" style="font-size:.8rem;margin-top:4px">Sem ciclo aberto — em preparo. Lance o plantio para abrir o ciclo.</p>`):""}
     ${(a.talhaoId&&!a.tipo&&ult)?`<button class="btn suave mini mt" data-rep-op="${a.id}">⚡ repetir a última operação deste talhão: ${esc(ult.tipo||"")}</button>`:""}
     ${a.talhaoId?seletorOperacaoGraos(a,rascunho.data):""}
+    ${a.tipo?planTagVinculo(fz,a.tipo,a.talhaoId,rascunho.data):""}
     ${camposDaOperacao(a,cat,t,info,ultRec)}
   </div>`;
 }
@@ -5633,6 +5828,7 @@ function cardAtividade(a){
     <label>Talhão / área</label>
     <select data-a="talhaoId">${opcoesTalhao(rascunho.fazendaId, a.talhaoId)}</select>
     ${a.talhaoId?seletorOperacao(a,{rotulo:"Atividade",grupos:gruposAtivCafe()}):""}
+    ${a.tipo?planTagVinculo(rascunho.fazendaId,a.tipo,a.talhaoId,rascunho.data):""}
     ${a.tipo?detalhesAtividade(a):""}
   </div>`;
 }
@@ -6128,11 +6324,13 @@ function vDetalhe(id){
       <dt>Horas extras</dt><dd>${n0(b.mo.horasExtras)}</dd></dl></div>
     ${(b.atividades||[]).length?`<div class="cartao"><h3>🚜 ${atividadeDe(b.fazendaId)==="GRAOS"?"Operações do dia":"Atividades"}</h3>
       ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${badgeCategoria("GRAOS",{nome:a.tipo})}${esc(nomeAtual(a.tipo))}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
+        ${(()=>{const v=planTagVinculo(b.fazendaId,a.tipo,a.talhaoId,b.data);return v?"<br>"+v:"";})()}
         ${(()=>{const ps=resumoOpPartes(b,a);return ps.length?`<br><span class="mut">${esc(ps.join(" · "))}</span>`:"";})()}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
         ${(a.maquinas||[]).filter(x=>x.nome).map(x=>`<br><span class="tag verde">${esc(x.nome)} — ${n0(x.horas)} h${n0(x.comb)?" · "+n0(x.comb)+" L comb.":""}</span>`).join("")}
       </div>`:`<div class="mt"><b>${badgeCategoria(atividadeDe(b.fazendaId),{nome:a.tipo})}${esc(nomeAtual(a.tipo))}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
         ${a.status==="concluida"?` <span class="tag verde">✔ concluída</span>`:a.status==="continua"?` <span class="tag terra">⏳ continua amanhã</span>`:""}
+        ${(()=>{const v=planTagVinculo(b.fazendaId,a.tipo,a.talhaoId,b.data);return v?"<br>"+v:"";})()}
         ${a.status==="continua"&&a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
         ${a.receita?`<br><span class="mut" style="white-space:pre-wrap">🧪 ${esc(a.receita)}</span>`:""}
@@ -6311,7 +6509,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v77";
+const APP_VERSAO="v78";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6987,7 +7185,7 @@ function cadInput(el){
    ============================================================ */
 let planNav=[], planBuscaTimer=null;
 let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", novo:null, revisao:null};
-function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; }
+function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; }
 function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
 function planVoltar(){ planLimpar();
   if(planNav.length>1){ planNav.pop(); ir("planejamento"); }
@@ -7020,16 +7218,22 @@ function planLinhaTarefa(t, o){
   return `<div class="plan-linha">
     <div class="cad-item" style="margin:0">
       <button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[f].ico}</button>
-      <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(sub)}</span></span>
+      <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(sub)}</span>
+        ${t.tipoItem==="tarefa"?planTrio(t,{attr:"data-plan-exec", aberta:planUI.exec===t.id}):""}</span>
       <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${aberta}">⋯</button>
     </div>
     ${aberta?`<div class="plan-acoes"><div class="chips">
       <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>
       <button class="chip ${t.status==="finalizado"?"on":""}" data-plan-st="${t.id}|finalizado">Concluí</button>
       <button class="chip ${planPausada(t)?"on":""}" data-plan-trava="${t.id}">Travado</button>
-      <button class="chip" data-plan-prazoab="${t.id}">Novo prazo</button></div>
+      <button class="chip" data-plan-prazoab="${t.id}">Novo prazo</button>
+      <button class="chip ${planMeta(t)?"on":""}" data-plan-metaab="${t.id}">${planMeta(t)?"Meta":"Definir meta"}</button></div>
       ${planUI.trava===t.id?`<div class="chips mt">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${((t.bloqueio||{}).motivo)===m.id?"on":""}" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
       ${planUI.prazoAb===t.id?`<div class="chips mt">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-plan-prazo="${t.id}|${p.id}">${esc(p.rot)}</button>`).join("")}</div>`:""}
+      ${planUI.metaAb===t.id?`<label class="mt">Área planejada (ha)</label>
+        <div class="linha-flex" style="gap:8px"><input inputmode="decimal" id="plan-meta-campo" value="${esc(planMeta(t)||"")}" placeholder="Ex.: 96" style="max-width:140px">
+        <button class="btn mini" data-plan-metaok="${t.id}">Gravar meta</button></div>
+        <p class="mut" style="font-size:.74rem;margin:6px 0 0">A meta liga a barra de progresso e o restante. Vem da ata quando ela traz a área; aqui o escritório completa o que faltou.</p>`:""}
     </div>`:""}
   </div>`;
 }
@@ -7053,6 +7257,11 @@ function planVMenu(){
     ["arrastadas","📌","Arrastadas",arr.length?arr.length+" tarefa(s) vindas de reuniões anteriores":"nenhuma arrastada",arr.length],
     ["assuntos","🗒️","Assuntos e investimentos",ger.length?ger.length+" item(ns) da ata":"nenhum assunto registrado",ger.length],
     ["lista","🔎","Todas as tarefas",abertas.length+" aberta(s) · filtros por status, farol, unidade e origem",planVisiveis().length],
+    ["fora","🧾","Executado fora do plano",(()=>{ const ref=planMesDe(hojeBRT());
+      const rs=unidadesPermitidas().map(f=>planForaDoPlano(f.id,ref)).filter(r=>r.total);
+      const t=rs.reduce((a,r)=>a+r.total,0), f2=rs.reduce((a,r)=>a+r.fora,0);
+      return t?f2+" de "+t+" lançamentos do mês sem tarefa casada":"nenhum lançamento no mês"; })(),
+      unidadesPermitidas().reduce((a,f)=>a+planForaDoPlano(f.id,planMesDe(hojeBRT())).fora,0)],
     ["saidas","📲","Textos prontos","pauta da sexta · cobrança · fechamento · rascunho da ata",4]
   ];
   return planTopo("Planejamento", podeCadastros()?"Escritório · administrador":"Diretoria")
@@ -7077,6 +7286,10 @@ function planVMes(){
           <span class="num plan-pct">${r.pct===null?"—":r.pct+"%"}</span></div>
         <div class="plan-barra" role="img" aria-label="${r.pct===null?"sem tarefa":r.pct+"% concluído"}"><span style="width:${r.pct||0}%"></span></div>
         <p class="mut" style="margin:6px 0 0">🔴 ${r.vermelhas} · 🟡 ${r.amarelas} · ⏸️ ${r.cinzas} · 🟢 ${r.verdes} · ✅ ${r.finalizadas}</p>
+        ${r.metaHa?`<p class="mut plan-num" style="margin:4px 0 0">planejado <b class="num">${esc(planHa(r.metaHa))} ha</b> · executado <b class="num">${esc(planHa(r.execHa))} ha</b> · restante <b class="num">${esc(planHa(r.restaHa))} ha</b> (${r.pctArea}%)</p>`
+          :`<p class="mut plan-num" style="margin:4px 0 0">sem meta em ha nas tarefas do mês — o app conta os lançamentos casados</p>`}
+        ${r.semLancamento.length?`<p class="mut plan-num" style="margin:2px 0 0">${r.semLancamento.length} tarefa${r.semLancamento.length>1?"s":""} sem nenhum lançamento casado</p>`:""}
+        ${(r.fora&&r.fora.total)?`<p class="mut plan-num" style="margin:2px 0 0">executado fora do plano: <b class="num">${r.fora.fora}</b> de <b class="num">${r.fora.total}</b> lançamentos (${r.fora.pct}%)${r.fora.fora?` <button class="btn suave mini" data-plan-fora="${esc(fz)}" style="display:inline-flex;padding:2px 8px">ver</button>`:""}</p>`:""}
         ${r.atrasadas.length?`<ul class="lista-limpa mt">${r.atrasadas.slice(0,3).map(t=>`<li><button style="width:100%;text-align:left" data-tar="${t.id}"><b>${esc(t.desc)}</b> <span class="mut">· ATRASADO desde ${esc(fmtDataCurta(planPrazoEfetivo(t)))}</span></button></li>`).join("")}</ul>
           ${r.atrasadas.length>3?`<p class="mut" style="margin:4px 0 0;font-size:.78rem">＋${r.atrasadas.length-3} atrasada(s)</p>`:""}`:""}
         ${planLinhaTempo(fz)}
@@ -7220,9 +7433,16 @@ function planVRodada(id){
         const fim=g.filter(t=>t.status==="finalizado").length, atr=g.filter(planAtrasada).length;
         const trv=g.filter(planPausada).length, arr=g.filter(t=>planArrastaMeses(t)>0).length;
         const pct=g.length?Math.round(fim*100/g.length):0;
+        const meta=g.filter(x=>x.status!=="cancelado").reduce((a,x)=>a+planMeta(x),0);
+        const exec=g.filter(x=>x.status!=="cancelado").reduce((a,x)=>a+(planMeta(x)?Math.min(planExecucao(x).ha,planMeta(x)):0),0);
+        const semL=g.filter(x=>x.status!=="cancelado" && planExecucao(x).n===0);
+        const fora=planForaDoPlano(fz, r.ref);
         return `<div class="cartao"><div class="linha-flex" style="gap:8px"><b class="cresce">${esc(fazenda(fz).nome)}</b><span class="num plan-pct">${pct}%</span></div>
           <div class="plan-barra" role="img" aria-label="${pct}% concluído"><span style="width:${pct}%"></span></div>
           <p class="mut" style="margin:6px 0 0">${fim} de ${g.length} finalizadas · ${atr} atrasada(s) · ${trv} travada(s) · ${arr} arrastada(s)</p>
+          <p class="mut plan-num" style="margin:4px 0 0">${meta?`plano executado <b class="num">${Math.min(100,Math.round(exec*100/meta))}%</b> em área (${esc(planHa(exec))} de ${esc(planHa(meta))} ha)`:"sem meta em ha nas tarefas desta rodada"}
+            ${fora.total?` · esforço fora do plano <b class="num">${fora.pct}%</b> (${fora.fora} de ${fora.total} lançamentos)`:""}</p>
+          ${semL.length?`<p class="mut plan-num" style="margin:2px 0 0">Sem nenhum lançamento casado: ${esc(semL.map(x=>x.desc).slice(0,3).join(" · "))}${semL.length>3?" · ＋"+(semL.length-3):""}</p>`:""}
           ${g.map(t=>planLinhaTarefa(t)).join("")}</div>`; }).join("")
       :planVazio("tarefa nesta rodada"))
     +cadRodape(`<button class="btn sec" data-plan-copia="fechamento|${esc(r.id)}">📲 copiar fechamento do mês</button>`);
@@ -7372,13 +7592,40 @@ function planVRitual(){
       <button class="btn" data-planv="semana">Abrir a semana</button></div>`);
 }
 
+/* ---- (item 4) executado FORA do plano: a outra metade da história ----
+   O que foi lançado no boletim e não casou com nenhuma tarefa da ata. Não é cobrança:
+   é o que apareceu no dia. Por unidade, no mês corrente. */
+function planVFora(id){
+  const ref=planMesDe(hojeBRT());
+  const uns=(id?[fazenda(id)]:unidadesPermitidas()).filter(f=>f && f.id)
+    .map(f=>({f, r:planForaDoPlano(f.id, ref)}))
+    .filter(x=>x.r.total>0)
+    .sort((a,b)=>(b.r.fora-a.r.fora)||((b.r.pct||0)-(a.r.pct||0)));
+  const tot=uns.reduce((a,x)=>a+x.r.total,0), fora=uns.reduce((a,x)=>a+x.r.fora,0);
+  return planTopo("Executado fora do plano", planMesRot(ref)+(tot?" · "+fora+" de "+tot+" lançamentos":""))
+    +`<div class="aviso">O que o boletim registrou e não casou com nenhuma tarefa da ata. <b>Não é cobrança</b> — é a outra metade da história: o que apareceu no dia e não estava planejado. Serve para a ata do mês que vem.</div>`
+    +(uns.length?uns.map(({f,r})=>`<div class="cartao">
+        <div class="linha-flex" style="gap:8px"><b class="cresce">${esc(f.nome)}</b><span class="num plan-pct">${r.pct}%</span></div>
+        <div class="plan-barra" role="img" aria-label="${r.pct}% dos lançamentos fora do plano"><span class="fora" style="width:${r.pct}%"></span></div>
+        <p class="mut plan-num" style="margin:6px 0 0">${r.fora} de ${r.total} lançamentos fora do plano${r.pessoasTotal?` · ${r.pessoasFora} de ${r.pessoasTotal} pessoas-dia`:""}</p>
+        ${r.grupos.length?`<ul class="lista-limpa mt">${r.grupos.slice(0,8).map(g=>`<li class="linha-flex">
+          <span class="cresce">${badgeCategoria(atividadeDe(f.id),{nome:g.op})}${esc(nomeAtual(g.op))}<span class="mut"> · ${g.n} lançamento${g.n>1?"s":""}${g.locais?" em "+g.locais+" "+(g.locais===1?"local":"locais"):""}${g.ha?" · "+planHa(g.ha)+" ha":""} · último ${esc(fmtDataCurta(g.ultimo))}</span></span></li>`).join("")}</ul>
+          ${r.grupos.length>8?`<p class="mut" style="font-size:.78rem;margin:4px 0 0">＋${r.grupos.length-8} operação(ões)</p>`:""}`
+          :`<p class="mut mt">Tudo o que foi lançado no mês casou com alguma tarefa da ata.</p>`}
+      </div>`).join("")
+      :planVazio("lançamento no boletim",{periodo:"em "+planMesRot(ref)}))
+    +`<p class="mut" style="font-size:.74rem;margin-top:10px">Fonte: os boletins das unidades deste código. Um lançamento é talhão × operação × dia; o de-para descrição → operação está em docs/catalogos-por-atividade.md.</p>`
+    +cadRodape(`<button class="btn sec" data-plan-copia="fora|">📲 copiar para a próxima ata</button>`);
+}
+
 /* ---- (11) saídas prontas, com botão copiar ---- */
 function planVSaidas(){
   const saidas=[
     ["pauta","🗓️","Pauta da sexta","vencidas, vencendo em 7 dias, travadas e por quem"],
     ["terceiros","🔗","Cobrança por fornecedor","o que falta, desde quando e quantas fazendas paradas"],
     ["fechamento","📅","Fechamento do mês","cumprimento por unidade, atrasadas, travadas e arrastadas"],
-    ["ata","📝","Rascunho da próxima ata","o que ficou pendente por fazenda, no formato do texto da reunião"]
+    ["ata","📝","Rascunho da próxima ata","o que ficou pendente por fazenda, no formato do texto da reunião"],
+    ["fora","🧾","Executado fora do plano","o que foi feito no mês sem estar na ata, por unidade"]
   ];
   return planTopo("Textos prontos","copiar e colar no WhatsApp")
     +saidas.map(([k,ico,nome,sub])=>`<button class="cad-menu" data-plan-copia="${k}|">
@@ -7399,6 +7646,7 @@ function cartaoPlanejamentoPainel(){
   const corpo = uns.length
     ? uns.map(({f,r})=>`<div class="plano-un"><b>${esc(f.nome)}</b>
         <p class="mut" style="margin:2px 0 0">cumprimento <b class="num">${r.pct===null?"—":r.pct+"%"}</b> (${r.finalizadas} de ${r.n-r.canceladas}) · atrasadas <b class="num">${r.atrasadas.length}</b> · travadas <b class="num">${r.travadas.length}</b> · arrastadas <b class="num">${r.arrastadas.length}</b></p>
+        <p class="mut" style="margin:2px 0 0">${r.metaHa?`planejado <b class="num">${esc(planHa(r.metaHa))} ha</b> · executado <b class="num">${esc(planHa(r.execHa))} ha</b> · restante <b class="num">${esc(planHa(r.restaHa))} ha</b> (${r.pctArea}%)`:"sem meta em ha no mês"}${r.semLancamento.length?` · <b class="num">${r.semLancamento.length}</b> sem lançamento`:""}${(r.fora&&r.fora.fora)?` · fora do plano <b class="num">${r.fora.pct}%</b>`:""}</p>
         ${r.atrasadas.length?`<p class="mut" style="margin:2px 0 0">${esc(r.atrasadas.slice(0,2).map(t=>t.desc).join(" · "))}${r.atrasadas.length>2?" · ＋"+(r.atrasadas.length-2):""}</p>`:""}</div>`).join("")
     : htmlEstado("vazio",{que:"tarefa da reunião", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
         onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:"em "+planMesRot(ref)},{classe:"mut"});
@@ -7423,6 +7671,7 @@ function vPlanejamento(){
   if(v==="importar") return planVImportar();
   if(v==="semana") return planVSemana();
   if(v==="ritual") return planVRitual();
+  if(v==="fora") return planVFora(n.id);
   if(v==="saidas") return planVSaidas();
   return planVMenu();
 }
@@ -7460,9 +7709,19 @@ function planTextoFechamento(rodadaId){
   const L=["📅 Fechamento — "+((r&&r.nome)||planMesRot(planMesDe(hojeBRT()))),""];
   uns.forEach(u=>{ const g=ts.filter(t=>planNomeUn(t)===u);
     const fim=g.filter(t=>t.status==="finalizado").length;
+    const ativas=g.filter(t=>t.status!=="cancelado");
+    const meta=ativas.reduce((a,t)=>a+planMeta(t),0);
+    const exec=ativas.reduce((a,t)=>a+(planMeta(t)?Math.min(planExecucao(t).ha,planMeta(t)):0),0);
+    const semL=ativas.filter(t=>planExecucao(t).n===0);
+    const fz=(ativas.find(t=>t.unidade)||{}).unidade;
+    const fora=fz?planForaDoPlano(fz, r?r.ref:planMesDe(hojeBRT())):null;
     L.push(u+": "+fim+" de "+g.length+" concluídas ("+Math.round(fim*100/g.length)+"%) · "
       +g.filter(planAtrasada).length+" atrasada(s) · "+g.filter(planPausada).length+" travada(s) · "
-      +g.filter(t=>planArrastaMeses(t)>0).length+" arrastada(s)"); });
+      +g.filter(t=>planArrastaMeses(t)>0).length+" arrastada(s)");
+    L.push("  plano executado: "+(meta?Math.min(100,Math.round(exec*100/meta))+"% da área ("+planHa(exec)+" de "+planHa(meta)+" ha)":"sem meta em ha"));
+    if(fora && fora.total) L.push("  esforço fora do plano: "+fora.pct+"% ("+fora.fora+" de "+fora.total+" lançamentos)");
+    if(semL.length) L.push("  sem nenhum lançamento: "+semL.map(t=>t.desc).join("; "));
+  });
   return L.join("\n");
 }
 /* rascunho da PRÓXIMA ata: o que ficou pendente por fazenda, já no formato do texto da reunião */
@@ -7483,12 +7742,27 @@ function planTextoAta(){
     gerais.forEach(t=>L.push("- "+t.desc+(t.responsavel?" ("+t.responsavel+")":""))); }
   return L.join("\n");
 }
+/* "Executado fora do plano" em texto: entra na conversa da próxima reunião */
+function planTextoFora(){
+  const ref=planMesDe(hojeBRT());
+  const uns=unidadesPermitidas().map(f=>({f, r:planForaDoPlano(f.id, ref)})).filter(x=>x.r.fora);
+  if(!uns.length) return "Nenhum lançamento fora do plano em "+planMesRot(ref)+".";
+  const L=["🧾 Executado fora do plano — "+planMesRot(ref),"",
+    "O que o boletim registrou e não estava na ata. Não é cobrança: é assunto para a próxima reunião.",""];
+  uns.sort((a,b)=>b.r.fora-a.r.fora).forEach(({f,r})=>{
+    L.push(f.nome+": "+r.fora+" de "+r.total+" lançamentos ("+r.pct+"%)");
+    r.grupos.slice(0,6).forEach(g=>L.push("  - "+nomeAtual(g.op)+" · "+g.n+" lançamento"+(g.n>1?"s":"")
+      +(g.ha?" · "+planHa(g.ha)+" ha":"")+" · último "+fmtDataCurta(g.ultimo)));
+  });
+  return L.join("\n");
+}
 function planCopiar(chave, arg){
   const txt = chave==="pauta" ? planTextoPauta()
     : chave==="terceiro" ? planTextoCobranca(arg)
     : chave==="terceiros" ? planTextoCobranca("")
     : chave==="fechamento" ? planTextoFechamento(arg)
-    : chave==="ata" ? planTextoAta() : "";
+    : chave==="ata" ? planTextoAta()
+    : chave==="fora" ? planTextoFora() : "";
   if(!txt) return;
   abrirTextoZap(txt);
 }
@@ -7629,15 +7903,24 @@ function planClique(t,d){
   if(d.planvoltar!==undefined){ planVoltar(); return true; }
   if(d.planv!==undefined){ planIr(d.planv); return true; }
   if(d.cadid!==undefined && d.cadv==="rodada"){ planIr("rodada",d.cadid); return true; }
+  if(d.planExec!==undefined){ planUI.exec = planUI.exec===d.planExec?"":d.planExec; planRender(); return true; }
+  if(d.planFora!==undefined){ planIr("fora", d.planFora); return true; }
   if(d.planAcoes!==undefined){ planUI.acoes = planUI.acoes===d.planAcoes?"":d.planAcoes;
-    planUI.trava=""; planUI.prazoAb=""; planRender(); return true; }
+    planUI.trava=""; planUI.prazoAb=""; planUI.metaAb=""; planRender(); return true; }
   if(d.planSt!==undefined){ const [id,st]=d.planSt.split("|"); const at=planTarefa(id);
     planMudarStatus(id, at&&at.status===st?"a_iniciar":st); planUI.trava=""; planRender(); return true; }
   if(d.planTrava!==undefined){ planUI.trava = planUI.trava===d.planTrava?"":d.planTrava; planUI.prazoAb=""; planRender(); return true; }
   if(d.planMot!==undefined){ const [id,mid]=d.planMot.split("|"), m=planMotivoTrava(mid);
     if(m) planMudarStatus(id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
     planUI.trava=""; planRender(); return true; }
-  if(d.planPrazoab!==undefined){ planUI.prazoAb = planUI.prazoAb===d.planPrazoab?"":d.planPrazoab; planUI.trava=""; planRender(); return true; }
+  if(d.planPrazoab!==undefined){ planUI.prazoAb = planUI.prazoAb===d.planPrazoab?"":d.planPrazoab; planUI.trava=""; planUI.metaAb=""; planRender(); return true; }
+  if(d.planMetaab!==undefined){ planUI.metaAb = planUI.metaAb===d.planMetaab?"":d.planMetaab; planUI.trava=""; planUI.prazoAb=""; planRender(); return true; }
+  if(d.planMetaok!==undefined){ const el=document.getElementById("plan-meta-campo"), t2=planTarefa(d.planMetaok);
+    if(t2){ const antes=planMeta(t2), val=n0(el?el.value:0);
+      if(val>0) t2.meta=val; else delete t2.meta;
+      planLog(t2,"meta",antes?String(antes):"",val?String(val):"","meta informada no escritório");
+      planGravar(t2); planSalvo("Meta gravada"); }
+    planUI.metaAb=""; planRender(); return true; }
   if(d.planPrazo!==undefined){ const [id,p]=d.planPrazo.split("|");
     const novo=planPrazoChip(planTarefa(id),p);
     if(novo) planNovoPrazo(id,novo,"repactuado no escritório");

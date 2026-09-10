@@ -6,6 +6,91 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 10/09/2026 · v78 · Reforço do planejado × executado: três números, rastreabilidade e o que ficou fora do plano
+
+**Entrega.** O módulo de planejamento da v77 dizia o que estava combinado e em
+que pé estava. A v78 passa a dizer QUANTO: toda tarefa mostra planejado ·
+executado · restante, com barra; o executado é rastreável até o lançamento que
+o compôs; o lançamento do boletim mostra que abateu a tarefa; e o que foi feito
+SEM estar na ata aparece como "executado fora do plano". Regra permanente em
+CLAUDE.md, item c15; catálogo em docs/catalogos-por-atividade.md
+("Planejado × executado"); checagem em docs/definicao-de-pronto.md, itens 11 a 14.
+
+**As cinco peças.**
+- *Três números sempre.* `planTrio` na folha do gerente e nas listas da área
+  Planejamento. `planProgresso` arredonda ANTES de subtrair — planejado =
+  executado + restante SEMPRE fecha na tela (era o único jeito de o número
+  merecer confiança). A meta é a área da ata ou a que o escritório informa pelo
+  chip "Definir meta"; **sem meta não há barra nem restante**, e o app diz isso
+  com todas as letras em vez de inventar denominador.
+- *Rastreabilidade total.* Um toque em "executado" abre, no lugar, a lista dos
+  lançamentos: data, local, área e quem lançou, com o cabeçalho "N lançamentos
+  em M locais · P pessoas-dia · de dd/mm a dd/mm". A soma em ha conta cada
+  talhão UMA vez; a janela vai do "Comecei" até hoje ou até o "Concluí".
+- *O lançamento diz o que abateu.* `planTagVinculo` põe "📋 abate: …" no
+  lançamento, no boletim em edição e no enviado, nas três atividades — etiqueta
+  de leitura, nunca botão (regra c4-4).
+- *Executado fora do plano.* Tela nova por unidade, no mês corrente, agrupada
+  por operação, com % dos lançamentos e pessoas-dia; sai também em texto para a
+  próxima ata. A tela DIZ que não é cobrança.
+- *Fechamento mensal.* % do plano executado em área, % do esforço fora do plano
+  e as tarefas sem NENHUM lançamento — na rodada, no Mês por unidade, no cartão
+  do painel e no texto de copiar.
+
+**O que foi verificado (como).**
+- `node scripts/teste_planejamento.cjs` — **64 ✅ · 0 ❌** (48 da v77 + 16 novos,
+  todos com o texto real da ata e relógio fixo): os três números fechando
+  (96 = 42 + 54); o executado igual à soma dos talhões distintos (16 + 23 + 3);
+  cada lançamento com data, talhão, área e autor; a foto `{ha:42, n:3, meta:96}`
+  gravada na tarefa para o Supabase ler; a meta informada pelo escritório
+  ligando a barra numa tarefa que a ata trouxe sem área; o lançamento de
+  "Catação" virando fora do plano (1 de 4, 25%) enquanto o de "Levantar café"
+  casa; o texto para a próxima ata; o fechamento com 33% de área, 25% fora do
+  plano e 4 tarefas sem lançamento; na tela, os três rótulos juntos com barra a
+  44%, o toque abrindo 3 linhas de rastreabilidade sem sair da tela e com alvo
+  de 44 px; e, no celular do gerente, o placar "42 de 96 ha" na faixa, os três
+  números na folha com **0 campos de digitação** e a etiqueta "📋 abate:" no
+  boletim enviado.
+- `node scripts/checar-poluicao.cjs` — **589 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58, comparados item a item com a saída da v77: **nenhum ❌ novo**.
+  Sete itens novos no grupo 14 e uma tela nova medida com as regras de
+  Cadastros ("Planejamento › Executado fora do plano").
+- `scripts/regressao_render.cjs` main × v78: telas do gerente e do pós-colheita
+  sem tarefa aberta continuam idênticas; a etiqueta 📋 e o placar só aparecem
+  quando há tarefa casada.
+- Sintaxe do JavaScript extraído (`node --check`), cache do service worker em
+  `boletim-lgs-v78` e rodapé em v78.
+
+**Decisões que valem registrar.**
+- *Não inventar denominador.* A tarefa sem área podia ganhar uma barra de "0% /
+  100%" pelo status. Não ganhou: barra sem meta é número inventado. Em vez
+  disso, o escritório pode informar a meta em um toque + um campo, e aí a barra
+  liga. Fica em PENDÊNCIAS para o Nilo decidir onde vale a pena.
+- *Esforço medido em lançamentos.* O "% fora do plano" usa lançamentos (talhão ×
+  operação × dia) como denominador, uniforme nas três atividades, e mostra
+  pessoas-dia ao lado quando o boletim tem o número. Trocar a medida principal
+  para pessoas-dia é uma linha — está em PENDÊNCIAS.
+- *Quem calcula é o app.* Casar "Fazer KCL e ferti" com "Adubação via lanço"
+  depende do de-para de sinônimos, que mora no index.html. Por isso o app grava
+  a foto `payload.exec` em cada tarefa e o SQL só LÊ — em vez de duplicar o
+  de-para no banco, onde ele envelheceria em silêncio.
+
+**O que depende de teste manual no iPhone (Nilo).**
+1. Rodar de novo `sql/050-planejamento.sql` e `sql/051-ata-x-executado.sql` (as
+   duas versões novas substituem a visão e as funções; nenhum dado é tocado).
+2. Numa unidade com tarefa de área, lançar a atividade no boletim e conferir a
+   etiqueta "📋 abate:" e o placar subindo na faixa.
+3. Tocar em "executado" numa tarefa e ver se a lista de lançamentos bate com o
+   que aconteceu no campo.
+4. Abrir Planejamento › Executado fora do plano e ver se as operações listadas
+   fazem sentido como pauta da próxima reunião.
+
+**O que NÃO foi tocado.** Boletim das três atividades (nenhum campo novo,
+nenhuma seção nova, nada bloqueia o envio), pós-colheita, plano do dia (v75),
+plano de safra (v52), robôs, motor de relatórios da fase 1, robô-redator,
+códigos de acesso e CSS-base. O único acréscimo fora do módulo é a etiqueta 📋
+no lançamento — leitura pura, sem alterar nada do que é gravado.
+
 ## 10/09/2026 · v77 · Módulo de planejamento: reunião mensal + planejamento semanal
 
 **Entrega.** O app passou a guardar o que a reunião administrativa do mês

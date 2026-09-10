@@ -892,12 +892,33 @@ const SEMEAR_PLAN = txt => {
   if (abertas[0]) { abertas[0].prazo = hojeBRT(); abertas[0].prazoOriginal = abertas[0].prazo; }
   if (abertas[1]) { abertas[1].prazo = diaISO(hojeBRT(), 5); abertas[1].prazoOriginal = abertas[1].prazo; }
   if (abertas[2]) { abertas[2].prazo = diaISO(hojeBRT(), 30); abertas[2].prazoOriginal = abertas[2].prazo; }
-  /* a mesma rodada também para a unidade medida na casa do gerente (f23 Vereda Romaria) */
+  /* a mesma rodada também para a unidade medida na casa do gerente (f23 Vereda Romaria),
+     com um lançamento casado no boletim — é o que liga o placar da faixa e a etiqueta 📋 */
   planTarefas().filter(t => t.unidade === 'f22c').slice(0, 4).forEach(t => {
-    const c = JSON.parse(JSON.stringify(t)); c.id = uid(); c.unidade = 'f23'; planTarefas().push(c);
+    const c = JSON.parse(JSON.stringify(t)); c.id = uid(); c.unidade = 'f23';
+    if (Number(c.area) === 96) { c.status = 'em_execucao'; c.inicioReal = diaISO(hojeBRT(), -6); }
+    planTarefas().push(c);
   });
+  const t23 = talhoesDa('f23').filter(x => x.fazendaId === 'f23' && x.tipo !== 'ESTRUTURA' && x.tipo !== 'ARRENDADO').slice(0, 2);
+  t23.forEach((tal, i) => D.boletins.push({ id: 'chk23' + i, fazendaId: 'f23', data: diaISO(hojeBRT(), -(2 - i)),
+    responsavel: i ? 'João Batista' : 'Maria', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '8', diaristas: '', funcoes: [] },
+    atividades: [{ id: 'a23' + i, tipo: 'Levantar café', talhaoId: tal.id, status: 'concluida', pessoas: '6' }],
+    colheita: [], fito: [], ocorrencias: [], secoes: {} }));
   const s = planSemanaAtual() || planSemanaCriar(planSegundaDe(hojeBRT()));
   planTarefas().filter(t => t.unidade === 'f22c' && planAberta(t)).slice(0, 3).forEach(t => planComprometer(t.id, s.id));
+  /* v78: lançamentos no boletim — dois que CASAM com a tarefa de 96 ha (executado + rastreabilidade)
+     e um que NÃO casa (executado fora do plano). Sem isso o trio nasce zerado e não há o que medir. */
+  const t96 = planTarefas().find(x => Number(x.area) === 96);
+  if (t96) { planMudarStatus(t96.id, 'em_execucao'); t96.inicioReal = diaISO(hojeBRT(), -6); }
+  const tals = talhoesDa('f22c').filter(x => x.fazendaId === 'f22c' && x.tipo !== 'ESTRUTURA' && x.tipo !== 'ARRENDADO').slice(0, 3);
+  tals.slice(0, 2).forEach((tal, i) => D.boletins.push({ id: 'chkexec' + i, fazendaId: 'f22c', data: diaISO(hojeBRT(), -(3 - i)),
+    responsavel: i ? 'João Batista' : 'Maria', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '8', diaristas: '', funcoes: [] },
+    atividades: [{ id: 'ax' + i, tipo: 'Levantar café', talhaoId: tal.id, status: 'concluida', pessoas: '6' }],
+    colheita: [], fito: [], ocorrencias: [], secoes: {} }));
+  if (tals[2]) D.boletins.push({ id: 'chkfora', fazendaId: 'f22c', data: diaISO(hojeBRT(), -1), responsavel: 'Maria',
+    clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '4', diaristas: '', funcoes: [] },
+    atividades: [{ id: 'af', tipo: 'Catação', talhaoId: tals[2].id, status: 'concluida', pessoas: '4' }],
+    colheita: [], fito: [], ocorrencias: [], secoes: {} });
   salvarDados(); planMotor(true);
   return { tarefas: planTarefas().length, ls: ls.length };
 };
@@ -917,6 +938,7 @@ async function cenarioPlanejamento(browser, base, R) {
     ['Planejamento › Arrastadas', [{ v: 'menu' }, { v: 'arrastadas' }], 'lista', 2],
     ['Planejamento › Assuntos e investimentos', [{ v: 'menu' }, { v: 'assuntos' }], 'lista', 2],
     ['Planejamento › Todas as tarefas', [{ v: 'menu' }, { v: 'lista' }], 'lista', 2],
+    ['Planejamento › Executado fora do plano', [{ v: 'menu' }, { v: 'fora' }], 'lista', 2],
     ['Planejamento › Textos prontos', [{ v: 'menu' }, { v: 'saidas' }], 'lista', 2],
     ['Planejamento › Nova tarefa', [{ v: 'menu' }, { v: 'nova' }], 'detalhe', 2],
     ['Planejamento › Importar ata', [{ v: 'menu' }, { v: 'importar' }], 'detalhe', 2],
@@ -967,6 +989,37 @@ async function cenarioPlanejamento(browser, base, R) {
       crescimento: document.documentElement.scrollHeight - antesAltura,
       pastilhasSemPendencia: (() => { const g = D.tarefas; D.tarefas = []; const n = planPastilhas().length; D.tarefas = g; return n; })() };
   });
+  /* v78: três números + barra na lista, e o toque em "executado" abrindo a rastreabilidade no lugar */
+  await page.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'lista' }]; planLimpar(); planUI.filtroUnid = 'f22c'; ir('planejamento'); });
+  await page.waitForTimeout(250);
+  R.trio = await page.evaluate(async () => {
+    const antes = telaAtual;
+    const alvo = planTarefas().find(t => t.unidade === 'f22c' && planMeta(t) > 0 && planExecucao(t).n > 0);
+    const bt = alvo && document.querySelector('#app [data-plan-exec="' + alvo.id + '"]');
+    const linha = bt && bt.closest('.plan-linha');
+    const cel = linha ? [...linha.querySelectorAll('.plan-tres > span')].slice(0, 3).map(x => x.textContent.replace(/\s+/g, ' ').trim()) : [];
+    const barra = linha && linha.querySelector('.plan-trio .plan-barra > span');
+    if (bt) bt.click();
+    await new Promise(r => setTimeout(r, 250));
+    const cel2 = document.querySelector('#app .plan-tres > span');
+    const lista = document.querySelector('#app .plan-exec-lista');
+    const linhas = lista ? [...lista.querySelectorAll('.plan-exec-l')] : [];
+    return { cel, barra: barra ? barra.style.width : '', linhas: linhas.length,
+      alvo: cel2 ? +cel2.getBoundingClientRect().height.toFixed(1) : 0,
+      texto: lista ? lista.textContent.replace(/\s+/g, ' ').trim().slice(0, 160) : '',
+      mesmaTela: telaAtual === antes, modal: !!document.querySelector('dialog[open], .folha'),
+      scrollW: document.documentElement.scrollWidth, nativos: window.__nativos };
+  });
+  /* executado fora do plano, por unidade */
+  await page.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'fora' }]; planLimpar(); ir('planejamento'); });
+  await page.waitForTimeout(250);
+  R.foraPlano = await page.evaluate(() => {
+    const r = planForaDoPlano('f22c', planMesDe(hojeBRT()));
+    const txt = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+    return { total: r.total, fora: r.fora, pct: r.pct, ops: r.grupos.map(g => g.op),
+      naTela: /fora do plano/i.test(txt), cobranca: /(não fez|não realizou|faltou|esqueceu|culpa)/i.test(txt),
+      avisa: /Não é cobrança/i.test(txt) };
+  });
   R.errosPlanejamento = erros.slice();
   await ctx.close();
   /* faixa do gerente a 360 px (a medida exigida na tarefa) */
@@ -997,7 +1050,33 @@ async function cenarioPlanejamento(browser, base, R) {
     await new Promise(x => setTimeout(x, 200));
     r.mudou = planTarefa(alvoT.id).status === st;
     r.tela = telaAtual; r.nativos = window.__nativos;
+    /* v78: os três números na folha do gerente, a rastreabilidade num toque e zero digitação.
+       O caminho é o real: voltar à lista da folha e abrir a tarefa que tem execução. */
+    const comExec = planAbertasDa('f23').find(t => planMeta(t) > 0 && planExecucao(t).n > 0);
+    if (comExec) {
+      const voltar = document.getElementById('bt-tar-fechar');
+      if (voltar && tarUI && tarUI.id) { tarUI.fz = 'f23'; voltar.click(); await new Promise(x => setTimeout(x, 200)); }
+      const item = document.querySelector('#folha-tarefa [data-tar-abrir="' + comExec.id + '"]');
+      if (item) { item.click(); await new Promise(x => setTimeout(x, 200)); }
+    }
+    const f2 = document.getElementById('folha-tarefa');
+    r.trio = f2 ? [...f2.querySelectorAll('.plan-tres > span')].map(x => x.textContent.replace(/\s+/g, ' ').trim()) : [];
+    const be = f2 && f2.querySelector('.plan-exec');
+    if (be) be.click();
+    await new Promise(x => setTimeout(x, 250));
+    const f3 = document.getElementById('folha-tarefa');
+    r.rastreio = f3 ? f3.querySelectorAll('.plan-exec-l').length : 0;
+    r.camposDepois = f3 ? f3.querySelectorAll('input, select, textarea').length : -1;
     return r;
+  });
+  /* etiqueta 📋 no lançamento do boletim enviado */
+  R.vinculo = await g.page.evaluate(async () => {
+    const b = D.boletins.filter(x => x.fazendaId === 'f23' && (x.atividades || []).some(a => a.tipo)).sort((a, c) => a.data < c.data ? 1 : -1)[0];
+    if (!b) return { existe: false };
+    ir('detalhe', b.id); await new Promise(r => setTimeout(r, 300));
+    const v = document.querySelector('#app .plan-vinc');
+    return { existe: !!v, texto: v ? v.textContent.trim() : '', botao: v ? v.tagName === 'BUTTON' : false,
+      cor: v ? getComputedStyle(v).color : '' };
   });
   R.telas.push(await medirTela(g.page, 'Gerente (casa) — com tarefas da reunião', 'gerente'));
   R.errosFaixa = g.erros.slice();
@@ -1315,6 +1394,25 @@ function avaliar(R) {
     add(G, 'Gerente — um toque abre a folha e outro muda o status, sem digitar e sem nativo',
       F.folha && F.campos === 0 && F.mudou && F.tela === 'casa' && F.nativos === 0,
       `${F.campos} campo(s) de digitação; tela ${F.tela}; ${F.nativos} nativo(s)`);
+    /* v78: planejado × executado × restante, rastreabilidade e executado fora do plano */
+    const T = R.trio || {}, F2 = R.foraPlano || {}, V = R.vinculo || {};
+    add(G, 'Área Planejamento — três números na tarefa (planejado · executado · restante) com barra',
+      (T.cel || []).length === 3 && /planejado/.test((T.cel || [])[0] || '') && /executado/.test((T.cel || [])[1] || '')
+      && /restante/.test((T.cel || [])[2] || '') && /%$/.test(T.barra || ''), (T.cel || []).join(' · ') + ' · barra ' + (T.barra || '—'));
+    add(G, 'Área Planejamento — tocar em "executado" lista os lançamentos no lugar (alvo ≥ 44 px, sem modal)',
+      T.linhas > 0 && T.alvo >= TOQUE_MIN && T.mesmaTela && !T.modal && T.nativos === 0 && T.scrollW <= VP.width,
+      `${T.linhas} lançamento(s); alvo ${T.alvo} px; página ${T.scrollW} px`);
+    add(G, 'Rastreabilidade — cada linha traz data, local, quem lançou e a área',
+      /\d{2}\/\d{2}/.test(T.texto || '') && /ha/.test(T.texto || ''), (T.texto || '').slice(0, 120));
+    add(G, 'Executado fora do plano — o lançamento sem tarefa casada aparece por unidade',
+      F2.fora >= 1 && F2.naTela && (F2.ops || []).length > 0, `${F2.fora} de ${F2.total} lançamentos (${F2.pct}%) · ${(F2.ops || []).join(', ')}`);
+    add(G, 'Executado fora do plano — texto sem cobrança e com o aviso de que não é cobrança',
+      F2.cobranca === false && F2.avisa === true, F2.cobranca ? 'termo de cobrança na tela' : 'sem termo de cobrança');
+    add(G, 'Gerente — folha com os três números e a rastreabilidade, ainda sem nenhum campo de digitação',
+      (F.trio || []).length === 3 && F.rastreio > 0 && F.camposDepois === 0,
+      (F.trio || []).join(' · ') + ' · ' + F.rastreio + ' lançamento(s) · ' + F.camposDepois + ' campo(s)');
+    add(G, 'Gerente — o lançamento do boletim mostra que abateu a tarefa (📋), como etiqueta e não como botão',
+      V.existe && /^📋 abate:/.test(V.texto || '') && V.botao === false, V.texto || 'sem etiqueta');
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosPlanejamento || []).length && !(R.errosFaixa || []).length,
       [...(R.errosPlanejamento || []), ...(R.errosFaixa || [])].join(' | '));
   }

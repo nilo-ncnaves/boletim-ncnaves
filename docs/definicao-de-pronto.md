@@ -598,3 +598,22 @@ conferir — e colar a resposta no resumo:
 10. **Tabela nova no Supabase?** `sql/050-planejamento.sql` (tabelas e a
     visão) e `sql/051-ata-x-executado.sql` (relatório mensal) precisam
     estar no repositório e avisados ao Nilo no resumo do PR.
+11. **Os três números fecham?** (desde a v78) Toda tarefa mostra planejado ·
+    executado · restante com barra; `planProgresso` arredonda ANTES de
+    subtrair, então planejado = executado + restante SEMPRE na tela. Sem
+    meta não há barra nem restante: o app conta os lançamentos e DIZ que
+    não há área — nunca inventa denominador.
+12. **O executado é rastreável?** (v78) Um toque em "executado" abre, no
+    lugar (sem tela nova, sem modal, alvo ≥ 44 px), a lista dos lançamentos
+    que o compuseram: data, local, área e quem lançou. A soma em ha conta
+    cada talhão UMA vez; a janela vai do começo da tarefa até hoje ou até o
+    dia da conclusão.
+13. **O lançamento diz o que abateu?** (v78) Registro do boletim que casa
+    com uma tarefa leva a etiqueta "📋 abate: …" — no boletim em edição e no
+    enviado, nas três atividades. Etiqueta de leitura, nunca botão nem
+    métrica (regra c4-4).
+14. **A outra metade da história está na tela?** (v78) O lançamento que não
+    casou com tarefa nenhuma aparece em Planejamento › Executado fora do
+    plano, por unidade, com % dos lançamentos — e a tela DIZ que não é
+    cobrança. O fechamento mensal por unidade traz % do plano executado em
+    área, % do esforço fora do plano e as tarefas sem NENHUM lançamento.

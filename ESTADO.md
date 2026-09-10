@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v77** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v78** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1273,6 +1273,47 @@ chuva · outro) · "💬 Falar com o Nilo" (uma linha pronta). Zero campo de
 digitação, zero diálogo, e nada bloqueia o boletim. O gerente vê só a
 unidade dele.
 
+### Planejado × executado × restante (v78)
+Toda tarefa mostra os TRÊS números, com barra de progresso, na folha do
+gerente e nas listas da área Planejamento — componente ÚNICO `planTrio`.
+- **Planejado** é a meta: a área que a ata trouxe (`t.area`) ou a que o
+  escritório informar pelo chip "Definir meta" (`t.meta`). **Sem meta não há
+  barra nem restante:** o app conta os lançamentos casados e diz que falta a
+  área — nunca inventa denominador.
+- **Executado** é a soma da área dos talhões DISTINTOS com lançamento casado
+  (o mesmo talhão lançado duas vezes conta uma vez), na janela da tarefa: do
+  começo dela até hoje, ou até o dia em que foi concluída — depois disso o
+  número congela.
+- **Restante** é planejado − executado. `planProgresso` arredonda ANTES de
+  subtrair, então os três SEMPRE fecham na tela.
+- **Rastreabilidade total:** um toque em "executado" abre, no lugar, a lista
+  dos lançamentos que o compuseram — data, local, área e quem lançou —, com o
+  cabeçalho "N lançamentos em M locais · P pessoas-dia · de dd/mm a dd/mm".
+- **O lançamento diz o que abateu:** registro do boletim que casa com uma
+  tarefa leva a etiqueta "📋 abate: …" no boletim em edição e no enviado, nas
+  três atividades. É etiqueta de leitura, nunca botão.
+- Na faixa do gerente o placar entra na mesma linha visual: "42 de 96 ha ·
+  vence 20/09".
+
+### Executado fora do plano (v78) — a outra metade da história
+Planejamento › **🧾 Executado fora do plano**: por unidade, no mês corrente, os
+lançamentos do boletim que NÃO casaram com nenhuma tarefa da ata, agrupados por
+operação (quantos, em quantos locais, quantos ha, último dia), com % dos
+lançamentos e pessoas-dia. A tela diz, em letras: **não é cobrança** — é o que
+apareceu no dia e não estava planejado, e serve para a ata do mês que vem.
+Também sai em texto pronto ("📲 copiar para a próxima ata").
+
+### Fechamento mensal por unidade (v78)
+Na rodada, no Mês por unidade, no cartão do painel e no texto de copiar:
+**% do plano executado em ÁREA** (ha executados de ha planejados), **% do
+esforço fora do plano** (lançamentos fora / lançamentos do mês) e as **tarefas
+sem NENHUM lançamento casado** — ausência de REGISTRO, nunca "não fez".
+No Supabase, o relatório `ata_x_executado` ganhou `area_planejada`,
+`area_executada`, `pct_area` e `tarefas_sem_lancamento`, lidos da foto que o
+app grava em `planejamento_tarefa.payload.exec` ({ha, n, meta, em}) — o de-para
+descrição → operação mora no app, então quem calcula é ele. O "% fora do plano"
+fica só no app, pelo mesmo motivo (documentado em docs/relatorios.md).
+
 ### Vínculo com o boletim (o app sugere, nunca conclui)
 Quando a descrição casa com uma operação do catálogo e o registro entra no
 boletim do dia, a casa do gerente mostra "Você lançou levantar café hoje —
@@ -1343,7 +1384,19 @@ ata**; "FMC Igrejinha" e "FMC Lazaro" viraram áreas de Monte Carmelo — Café
 Córrego Grande (Dr. Adilson) ficaram marcadas fora do escopo — ignoradas
 sempre, sem perguntar.
 
-**Provas rodadas nesta entrega** (sem rede, 390 px, relógio fixo):
+**Provas rodadas na v78** (sem rede, 390 px, relógio fixo):
+`node scripts/teste_planejamento.cjs` → **64 ✅ · 0 ❌** (as 48 da v77 mais 16
+do reforço: os três números fechando com a meta, o executado como soma dos
+talhões distintos, a rastreabilidade com data/talhão/área/autor, a foto que o
+Supabase lê, a meta informada pelo escritório ligando a barra, o lançamento
+fora do plano, o que casa não entrando nele, o texto para a próxima ata, o
+fechamento com % de área, % fora do plano e tarefas sem lançamento, o trio na
+tela com barra, o toque abrindo a rastreabilidade, o placar na faixa, o trio na
+folha do gerente sem nenhum campo e a etiqueta 📋 no boletim enviado);
+`scripts/checar-poluicao.cjs` → **589 ✅ · 41 ❌**, os MESMOS 41 ❌ herdados
+(nenhum novo), com 7 itens novos no grupo "14. Planejamento".
+
+**Provas rodadas na v77** (sem rede, 390 px, relógio fixo):
 `node scripts/teste_planejamento.cjs` → **48 ✅ · 0 ❌** (o texto real da ata
 da reunião de 10/09/26, a semana, o fechamento automático, a projeção dos 96
 ha, o alerta de travada, os quatro textos prontos, a faixa do gerente a 360
@@ -1359,8 +1412,18 @@ novas).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v77, 10/09/2026:
-**575 ✅ · 41 ❌** — os mesmos 41 ❌ da v58;
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v78, 10/09/2026:
+**589 ✅ · 41 ❌** — os mesmos 41 ❌ da v58;
+a v78 acrescentou 7 itens ao grupo "14. Planejamento" (três números com barra
+na tarefa; toque em "executado" abrindo a rastreabilidade no lugar, com alvo de
+44 px, sem modal e sem nativo; cada linha da rastreabilidade com data, local,
+autor e área; o lançamento sem tarefa casada aparecendo em "executado fora do
+plano" por unidade; a tela do fora do plano sem termo de cobrança e com o aviso
+de que não é cobrança; a folha do gerente com os três números e a
+rastreabilidade ainda sem NENHUM campo de digitação; e a etiqueta "📋 abate:"
+no boletim enviado, como etiqueta e não como botão) e uma tela nova
+("Planejamento › Executado fora do plano", medida com as regras de Cadastros).
+Nenhum ❌ novo.
 a v77 acrescentou o grupo "14. Planejamento" (10 itens ✅: o "⋯" abre a ação
 rápida no lugar, sem tela nova e sem modal; um toque muda o status com alvo
 de 44 px e zero diálogo nativo; travada por chuva e por terceiro em ⏸️,
@@ -1619,6 +1682,18 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   endpoint que empurre — tabela e serviço novos, tarefa própria. O iPhone
   ainda exige que o app esteja instalado na tela de início para aceitar
   notificação.
+- **Planejado × executado (v78) — para o Nilo conferir/decidir:**
+  1. **Meta das tarefas sem área.** A ata só traz área em algumas linhas. Sem
+     meta não há barra nem restante (o app conta os lançamentos e diz isso).
+     Onde fizer sentido, o escritório informa a meta pelo chip "Definir meta"
+     na área Planejamento — vale a pena fazer isso nas tarefas grandes.
+  2. **Esforço = lançamentos.** O "% fora do plano" usa lançamentos (talhão ×
+     operação × dia) como denominador, e mostra pessoas-dia ao lado quando o
+     boletim tem o número de pessoas. Se o Nilo preferir pessoas-dia como
+     medida principal, é uma linha.
+  3. **A janela da tarefa** começa em "Comecei" (ou na criação, quando o
+     gerente não marcou) e termina em "Concluí". Lançamento de antes de a
+     tarefa existir não conta — confirmar que é o desejado.
 - **Planejamento (v77) — para o Nilo conferir/decidir:**
   1. **Área de Igrejinha e Lazaro.** As duas entraram como áreas de Monte
      Carmelo — Café com **0 ha** (a ata não diz a área). Preencher em

@@ -104,7 +104,19 @@ comentado no fim do arquivo. O app lê pela vitrine de Relatórios
 `tarefas`, `finalizadas`, `canceladas`, `cumprimento_pct`, `atrasadas`,
 `travadas`, `arrastadas`, `area_ha`, `motivos` (contagem por motivo de
 trava) e `farol` (vermelho = tem atrasada; amarelo = tem travada; verde
-= o resto).
+= o resto). **Desde a v78** também `area_planejada`, `area_executada`,
+`pct_area` e `tarefas_sem_lancamento`.
+
+**Planejado × executado (v78): quem calcula é o app.** Os quatro campos
+acima saem da FOTO que o app grava em cada tarefa
+(`planejamento_tarefa.payload.exec` = `{ha, n, meta, em}`), regravada
+sozinha a cada sincronização. O motivo é simples: casar a descrição da ata
+("Fazer KCL e ferti") com a operação do boletim ("Adubação via lanço")
+depende do de-para de sinônimos, que mora no index.html e em
+docs/catalogos-por-atividade.md — não no banco. O SQL só LÊ a foto.
+Pelo mesmo motivo, o **"% do esforço fora do plano"** não entra neste
+relatório: ele fica no app (Planejamento › Executado fora do plano, no
+fechamento por unidade e no texto de copiar).
 
 **Regra que não se discute:** tarefa parada por TERCEIRO ou por CHUVA
 conta como TRAVADA, nunca como atrasada — ela tem status próprio, farol

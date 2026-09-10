@@ -12,6 +12,17 @@
 --   tarefas · finalizadas · cumprimento_pct · atrasadas · travadas ·
 --   arrastadas · area_ha · e a distribuição dos motivos de trava.
 --
+-- DESDE A v78 também o PLANEJADO × EXECUTADO em área:
+--   area_planejada · area_executada · pct_area · tarefas_sem_lancamento.
+-- Esses quatro saem da FOTO que o app grava em cada tarefa
+-- (payload -> 'exec' = {ha, n, meta, em}), porque quem sabe casar a
+-- descrição da ata com a operação do boletim é o app (o de-para de
+-- sinônimos mora no index.html, em docs/catalogos-por-atividade.md).
+-- O app regrava essa foto sozinho a cada sincronização; aqui só se lê.
+-- O "% do esforço fora do plano" NÃO entra neste relatório: ele depende
+-- do mesmo de-para e é calculado no app (Planejamento › Executado fora
+-- do plano, e no texto de fechamento do mês).
+--
 -- REGRA QUE NÃO SE DISCUTE. Tarefa parada por TERCEIRO ou por CHUVA nunca
 -- conta como atraso: ela tem status próprio e vira cobrança do escritório.
 -- Por isso `atrasadas` só olha A INICIAR e EM EXECUÇÃO com prazo vencido.
@@ -58,12 +69,16 @@ begin
              'cumprimento_pct', t.cumprimento_pct,
              'atrasadas', t.atrasadas, 'travadas', t.travadas, 'arrastadas', t.arrastadas,
              'area_ha', round(coalesce(t.area_ha, 0), 2),
+             'area_planejada', round(coalesce(t.area_planejada, 0), 2),
+             'area_executada', round(coalesce(t.area_executada, 0), 2),
+             'pct_area', t.pct_area, 'tarefas_sem_lancamento', t.tarefas_sem_lancamento,
              'motivos', coalesce(t.motivos, '{}'::jsonb),
              'farol', case when t.atrasadas > 0 then 'vermelho'
                            when t.travadas  > 0 then 'amarelo' else 'verde' end)
       from (
         select m.unidade_id, m.tarefas, m.finalizadas, m.canceladas, m.cumprimento_pct,
                m.atrasadas, m.travadas, m.arrastadas, m.area_ha,
+               m.area_planejada, m.area_executada, m.pct_area, m.tarefas_sem_lancamento,
                (select jsonb_object_agg(x.motivo, x.n) from (
                   select coalesce(nullif(p.payload #>> '{bloqueio,motivo}', ''), 'nao_informado') as motivo,
                          count(*) as n
@@ -88,6 +103,11 @@ begin
            'atrasadas', coalesce(sum(m.atrasadas), 0),
            'travadas', coalesce(sum(m.travadas), 0),
            'arrastadas', coalesce(sum(m.arrastadas), 0),
+           'area_planejada', round(coalesce(sum(m.area_planejada), 0), 2),
+           'area_executada', round(coalesce(sum(m.area_executada), 0), 2),
+           'pct_area', case when coalesce(sum(m.area_planejada), 0) > 0
+             then round(sum(m.area_executada) * 100.0 / sum(m.area_planejada)) end,
+           'tarefas_sem_lancamento', coalesce(sum(m.tarefas_sem_lancamento), 0),
            'cumprimento_pct', case when coalesce(sum(m.tarefas - m.canceladas), 0) > 0
              then round(sum(m.finalizadas) * 100.0 / sum(m.tarefas - m.canceladas)) end)
     into v_grupo

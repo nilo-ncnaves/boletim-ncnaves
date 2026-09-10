@@ -735,6 +735,22 @@ adutora, barracão, cerca, estrada, aceiro, represa, bomba, poço, rede
 elétrica, curral, laboratório, reforma, construção, montagem) NUNCA
 recebe sugestão: status só manual.
 
+### Planejado × executado (v78) — o que cada número significa
+
+| número | de onde sai | regra |
+|---|---|---|
+| **planejado** | `t.meta` (informada pelo escritório) ou `t.area` (a área que a ata trouxe) | sem nenhum dos dois não há barra nem restante — o app conta os lançamentos e diz que falta a área |
+| **executado** | soma da área dos talhões DISTINTOS com lançamento casado, na janela da tarefa | o mesmo talhão lançado duas vezes conta UMA vez; nunca passa da meta na barra (o excedente aparece à parte) |
+| **restante** | planejado − executado | arredondado depois do executado: os três SEMPRE fecham na tela |
+| **janela da tarefa** | de `inicioReal` (ou `criadoEm`) até hoje — ou até `concluidoEm` | tarefa concluída congela o número |
+| **esforço** | lançamentos (talhão × operação × dia) e, quando houver, pessoas-dia | é o denominador do "% fora do plano" |
+
+**Executado fora do plano** = lançamento do mês que não casou com nenhuma
+tarefa da unidade (qualquer status, menos cancelada). Não é cobrança: é o
+que apareceu no dia e não estava na ata — assunto para a próxima reunião.
+**Sem lançamento** = nenhum registro do boletim casou com a tarefa; é
+ausência de REGISTRO, nunca afirmação de que não foi feito.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar
