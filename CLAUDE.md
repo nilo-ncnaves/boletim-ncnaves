@@ -733,6 +733,17 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
   o prazo original nunca se perde (`prazoOriginal`).
 - **Nada bloqueia o preenchimento do boletim.** A faixa é leitura; o envio
   não olha para tarefa nenhuma.
+- **"Assumir", não "comprometer" (desde a v81).** O botão da tela da Semana que põe
+  uma tarefa na semana corrente diz **assumir**; a lista é "Parte A · tarefas
+  assumidas nesta semana" e o histórico lê "assumida na semana". A palavra
+  anterior ("comprometer") não se explicava sozinha — o próprio dono do app
+  precisou perguntar o que ela fazia. Regra que fica: **botão que muda o
+  compromisso da semana usa o verbo que o escritório fala**, e o rótulo diz a AÇÃO
+  ("assumir"), não o conceito ("compromisso").
+  A chave gravada continua `campo:"compromisso"` em `D.tarefaHistorico`: é chave
+  substituta, nunca aparece na tela, e trocá-la apagaria o sentido do histórico já
+  gravado (regra da v76, item 2 — quem traduz é a leitura: `planHistTexto` monta o
+  texto a partir do campo, então registro antigo também passa a ler "assumida").
 - **Tudo roda dentro do app.** A ata entra por colagem (`ataParsear` +
   pré-visualização editável item a item, idempotente por rodada + unidade +
   descrição); a pauta da sexta, a cobrança por fornecedor, o fechamento do

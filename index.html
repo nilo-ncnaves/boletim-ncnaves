@@ -4554,7 +4554,7 @@ function planComprometer(id, sid){
   t.semanas=t.semanas||[];
   const i=t.semanas.indexOf(sid);
   if(i>=0){ t.semanas.splice(i,1); planLog(t,"compromisso",sid,"","tirada da semana"); }
-  else { t.semanas.push(sid); planLog(t,"compromisso","",sid,"comprometida na semana"); }
+  else { t.semanas.push(sid); planLog(t,"compromisso","",sid,"assumida na semana"); }
   planGravar(t);
   return t;
 }
@@ -4566,7 +4566,7 @@ function planSugestoesSemana(sid){
       return t.destravadaEm || (d!==null && d<=7); })
     .sort(planOrdenar);
 }
-/* fechamento automático da semana que passou: comprometido × concluído × travado + placar */
+/* fechamento automático da semana que passou: assumido × concluído × travado + placar */
 function planFecharSemana(s){
   if(!s) return null;
   const ls=planComprometidas(s.id);
@@ -4849,7 +4849,7 @@ function planFolhaLista(){
 function planHistTexto(h){
   if(h.campo==="status") return "status: "+(h.de?planStatusRot(h.de).toLowerCase()+" → ":"")+planStatusRot(h.para).toLowerCase()+(h.motivo?" ("+h.motivo+")":"");
   if(h.campo==="prazo") return "prazo: "+(h.de?fmtData(h.de):"sem prazo")+" → "+fmtData(h.para)+(h.motivo?" ("+h.motivo+")":"");
-  if(h.campo==="compromisso") return h.para?"comprometida na semana":"tirada da semana";
+  if(h.campo==="compromisso") return h.para?"assumida na semana":"tirada da semana";
   if(h.campo==="criada") return "criada"+(h.motivo?" — "+h.motivo:"");
   return h.campo+(h.motivo?" — "+h.motivo:"");
 }
@@ -6544,7 +6544,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v80";
+const APP_VERSAO="v81";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -7332,7 +7332,7 @@ function planVMenu(){
   const ger=planVisiveis().filter(t=>t.tipoItem!=="tarefa");
   const abertas=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem==="tarefa");
   const itens=[
-    ["semana","🗓️","Semana",sem?planSemanaRot(sem)+" · "+semN+" comprometida"+(semN===1?"":"s"):"sem semana aberta",semN],
+    ["semana","🗓️","Semana",sem?planSemanaRot(sem)+" · "+semN+" assumida"+(semN===1?"":"s"):"sem semana aberta",semN],
     ["mes","📅","Mês por unidade",r.pct===null?"sem tarefa no mês":r.pct+"% concluído · "+r.atrasadas.length+" atrasada(s)",r.n],
     ["rodadas","📥","Rodadas da reunião",rod?("rodada de "+planMesNome(ref)+" importada"):("rodada de "+planMesNome(ref)+" não importada"),rodTot],
     ["terceiros","🔗","Pendências com terceiros",terc.length?terc.map(g=>g.quem).slice(0,2).join(" · "):"nenhuma pendência com terceiro",terc.length],
@@ -7622,19 +7622,19 @@ function planVSemana(){
   const comp=planComprometidas(s.id).sort(planOrdenar);
   const sug=planSugestoesSemana(s.id).slice(0,8);
   const novas=planTarefas().filter(t=>t.origemTipo==="semana" && t.origemId===s.id);
-  return planTopo(planSemanaRot(s), comp.length+" compromisso(s)")
+  return planTopo(planSemanaRot(s), comp.length+" tarefa"+(comp.length===1?"":"s")+" assumida"+(comp.length===1?"":"s"))
     +(fech&&fech.n?`<div class="cartao plan-fecha"><b>Como foi ${esc(planSemanaRot(ant).toLowerCase())}</b>
       <p class="mut" style="margin:2px 0 6px">${esc(fech.placar)} · ${fech.travadas.length} travada(s)</p>
       ${fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")}
       ${fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)} <span class="mut">· ${esc((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())}${(t.bloqueio&&t.bloqueio.quem)?" ("+esc(t.bloqueio.quem)+")":""}</span></p>`).join("")}
       ${fech.abertas.map(t=>`<p class="plan-fecha-l">◻ ${esc(t.desc)} <span class="mut">· ${esc(planLinhaTexto(t))}</span></p>`).join("")}</div>`:"")
-    +`<div class="cad-grupo">Parte A · compromissos da semana</div>`
+    +`<div class="cad-grupo">Parte A · tarefas assumidas nesta semana</div>`
     +(comp.length?comp.map(t=>planLinhaTarefa(t)).join("")
-      :`<p class="mut centro" style="padding:8px 0">Nenhum compromisso marcado ainda. Toque nas sugestões abaixo.</p>`)
+      :`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa assumida ainda. Toque em "assumir" nas sugestões abaixo.</p>`)
     +(sug.length?`<div class="cad-grupo">Sugestões — prazo próximo, atrasadas e recém-destravadas</div>`
         +sug.map(t=>`<div class="cad-item"><button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[planFarol(t)].ico}</button>
           <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(t.unidade?fazenda(t.unidade).nome:"Grupo")} · ${esc(planLinhaTexto(t))}${t.destravadaEm?" · destravada":""}</span></span>
-          <button class="chip plan-comp" data-plan-comp="${t.id}|${s.id}">comprometer</button></div>`).join("")
+          <button class="chip plan-comp" data-plan-comp="${t.id}|${s.id}">assumir</button></div>`).join("")
       :"")
     +`<div class="cad-grupo">Parte B · tarefas novas da semana</div>`
     +(novas.length?novas.map(t=>planLinhaTarefa(t)).join(""):`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa nova nesta semana.</p>`)
@@ -7666,10 +7666,10 @@ function planVRitual(){
             <span class="chips"><button class="chip mini" data-plan-st="${t.id}|finalizado">Concluí</button>
             <button class="chip mini" data-plan-trava="${t.id}">Travado</button></span>
             ${planUI.trava===t.id?`<span class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip mini" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</span>`:""}</div>`).join("")
-          :`<p class="mut">Nenhum compromisso na semana que passou.</p>`}</div>
+          :`<p class="mut">Nenhuma tarefa assumida na semana que passou.</p>`}</div>
       <div class="cartao"><b>Sugestões para ${esc(planSemanaRot(prox).toLowerCase())}</b>
         ${(prox?planSugestoesSemana(prox.id).slice(0,6):[]).map(t=>`<div class="plan-fecha-l"><span>${PLAN_FAROL[planFarol(t)].ico} ${esc(t.desc)}</span>
-          <button class="chip mini" data-plan-comp="${t.id}|${prox.id}">comprometer</button></div>`).join("")
+          <button class="chip mini" data-plan-comp="${t.id}|${prox.id}">assumir</button></div>`).join("")
           ||`<p class="mut">Nada com prazo próximo — a semana começa leve.</p>`}</div>
     </div>`
     +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-plan-ritual-pular">Pular por agora</button>
