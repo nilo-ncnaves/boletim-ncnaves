@@ -752,14 +752,30 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
 - **Nenhuma confirmação nova** (c10, contenção): toda ação do módulo é
   reversível e registrada em `D.tarefaHistorico`; cancelar é um STATUS com
   motivo, nunca um delete.
-- **Planejado × executado × restante (desde a v78), componentes ÚNICOS.** Toda
-  tarefa mostra os TRÊS números — `planTrio(t,{attr,aberta})` — na folha do
-  gerente e nas listas da área Planejamento, com barra de progresso.
-  `planProgresso(t)` arredonda ANTES de subtrair: planejado, executado e
-  restante SEMPRE fecham na tela. A meta é a área da ata (`t.area`) ou a que o
-  escritório informar (`t.meta`, chip "Definir meta"); **sem meta não há barra
-  nem restante** — o app diz isso com todas as letras e conta os lançamentos,
-  nunca inventa denominador.
+- **Planejado × executado × restante (desde a v78), componentes ÚNICOS.**
+  `planTrio(t,{attr,aberta})` na folha do gerente e nas listas da área
+  Planejamento. `planProgresso(t)` arredonda ANTES de subtrair: planejado,
+  executado e restante SEMPRE fecham na tela. A meta é a área da ata (`t.area`)
+  ou a que o escritório informar (`t.meta`, chip "Definir meta"); **sem meta não
+  há barra nem restante** — o app diz isso com todas as letras e conta os
+  lançamentos, nunca inventa denominador.
+- **Duas formas, decididas pelo dado, não pela tela (desde a v79).** COM meta,
+  os TRÊS números em três colunas iguais, com barra — é a forma certa para três
+  números curtos ("96 ha · 42 ha · 54 ha"). SEM meta, "planejado" e "restante"
+  não existem: o app mostra UMA linha, rótulo ao lado do valor
+  (`.plan-um`), e a nota explica por quê. **Nunca desenhar coluna cujo valor é
+  travessão** — é andaime vazio, pela mesma razão do `.sel-box:empty` da v74, e
+  espremia o valor em duas linhas num terço da largura.
+- **Rótulo no topo da coluna, nunca centrado.** Com `justify-content:center` um
+  valor de duas linhas subia o próprio rótulo e descia os outros dois: os três
+  títulos saíam de linha (10 px medidos a 390 px). Regra: numa fileira de
+  colunas rotuladas, o rótulo ancora no topo (`flex-start`), para os títulos
+  ficarem sempre na mesma linha de base qualquer que seja a altura do valor.
+- **O alvo de 44 px é do BOTÃO, não do contêiner que o embrulha.** Na v78 o
+  `.plan-tres > span` tinha 44 px e o `.plan-exec` dentro dele tinha 26 px — o
+  dedo tinha 26 px. Hoje o botão ocupa a linha inteira na forma de uma linha, e
+  no trio é esticado por pseudo-elemento (mesma técnica do × dos chips da v74 e
+  do badge da v67), sem crescer a coluna.
 - **O executado é RASTREÁVEL.** Um toque em "executado" abre, no lugar, a lista
   dos lançamentos que o compuseram — data, local, área e quem lançou
   (`planExecLista`). A soma em ha conta cada talhão UMA vez
