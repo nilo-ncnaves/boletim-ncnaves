@@ -254,6 +254,10 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .pastilha:active{background:var(--papel)}
 .plan-cab{background:var(--cartao);border:1px solid var(--linha);padding:10px 12px;margin:0 0 12px;font-size:.86rem;line-height:1.35}
 .plan-linha{margin-top:-1px}
+/* cartão de tarefa tem várias linhas: farol e "⋯" ancorados no topo (o .cad-item de
+   Cadastros centraliza, e aqui isso deixava os dois flutuando no meio do cartão) */
+.plan-linha>.cad-item{align-items:flex-start}
+.plan-linha>.cad-item>.plan-farol,.plan-linha>.cad-item>.plan-mais{margin-top:1px}
 .plan-linha.fora{opacity:.5}
 .plan-farol{flex:none;width:34px;min-height:44px;padding:0;font-size:1rem;line-height:1}
 .plan-mais{flex:none;width:44px;min-height:44px;padding:0;font-size:1.2rem;color:var(--tinta-2);line-height:1}
@@ -274,12 +278,26 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 /* v78: planejado × executado × restante, com barra e rastreabilidade. Sem cor nova: verde é o
    executado dentro do plano (mesma tinta da barra de cumprimento) e âmbar é o fora do plano —
    a cor do "para conferir" que o app já usa, nunca do farol. */
-.plan-trio{margin-top:6px}
+.plan-trio{margin-top:8px}
 .plan-tres{display:flex;gap:10px;align-items:stretch}
-.plan-tres>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;min-height:44px}
-.plan-tres i{font-style:normal;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-2)}
-.plan-tres b,.plan-tres .plan-exec{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.plan-exec{justify-content:flex-start;text-align:left;padding:0;min-height:26px;color:var(--verde);text-decoration:underline;text-underline-offset:2px}
+/* rótulo SEMPRE no topo da coluna: com "center", um valor de duas linhas subia o próprio
+   rótulo e descia os outros dois — os três títulos saíam de linha (10 px a 390 px). */
+.plan-tres>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-start;gap:3px;min-height:44px}
+.plan-tres i,.plan-um i{font-style:normal;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-2);line-height:1.25}
+.plan-tres b,.plan-tres .plan-exec,.plan-um .plan-exec{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.25}
+/* na monoespaçada o espaço tem largura de dígito e "96 ha" saía com um vão de número no meio;
+   só o par número+unidade do trio é apertado (o texto do .plan-um não leva isto) */
+.plan-tres b,.plan-tres .plan-exec{word-spacing:-.2em}
+/* sem meta não existem "planejado" e "restante": uma linha só, rótulo ao lado do valor —
+   nada de duas colunas com travessão e de um valor quebrado em duas linhas. */
+.plan-um{display:flex;align-items:stretch;gap:8px;min-height:44px}
+.plan-um i{display:flex;align-items:center}
+/* o alvo de toque tem de ser do BOTÃO, não do contêiner: aqui ele ocupa a linha inteira
+   (44 px reais); no trio, onde o botão é a 2ª linha da coluna, o alvo é esticado por
+   pseudo-elemento — sem crescer a coluna, do mesmo jeito que o × dos chips e o badge. */
+.plan-um .plan-exec{display:flex;align-items:center;min-height:44px}
+.plan-exec{justify-content:flex-start;text-align:left;padding:0;min-height:26px;color:var(--verde);text-decoration:underline;text-underline-offset:2px;position:relative}
+.plan-tres .plan-exec::after{content:"";position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px}
 .plan-exec:active{color:var(--verde-esc)}
 .plan-trio-nota{font-size:.72rem;margin:4px 0 0}
 .plan-barra>span.fora{background:var(--amarelo)}
@@ -4369,16 +4387,25 @@ function planTrio(t, o){
     ? `<button class="plan-exec" ${o.attr}="${t.id}" aria-expanded="${o.aberta?"true":"false"}"
         aria-label="Ver os ${ex.n} lançamento(s) que compõem o executado">${esc(rot)}${ex.n?" ›":""}</button>`
     : `<b class="num">${esc(rot)}</b>`;
+  const nota = p.temMeta
+    ? `${p.pct}% da área planejada tem registro no boletim${p.excedente>0?` · ${esc(planHa(p.excedente))} ha lançados além da meta`:""}`
+    : (ex.semVinculo?"A descrição não casa com nenhuma operação do catálogo — o app não consegue somar sozinho."
+       :"Sem meta: a ata não trouxe a área. O app conta os lançamentos casados.");
+  /* SEM meta não existem "planejado" nem "restante": três colunas em que duas são travessão
+     é andaime vazio (mesma regra do .sel-box da v74) e ainda espremia o valor em duas linhas.
+     Uma linha só: rótulo ao lado do valor. COM meta o trio é a forma certa e continua igual. */
+  if(!p.temMeta) return `<div class="plan-trio">
+    <div class="plan-um"><i>executado</i>${botao}</div>
+    <p class="plan-trio-nota mut">${nota}</p>
+    ${o.aberta?planExecLista(t):""}</div>`;
   return `<div class="plan-trio">
     <div class="plan-tres">
-      <span><i>planejado</i><b class="num">${p.temMeta?esc(planHa(p.meta))+" ha":"—"}</b></span>
+      <span><i>planejado</i><b class="num">${esc(planHa(p.meta))} ha</b></span>
       <span><i>executado</i>${botao}</span>
-      <span><i>restante</i><b class="num">${p.temMeta?esc(planHa(p.resta))+" ha":"—"}</b></span>
+      <span><i>restante</i><b class="num">${esc(planHa(p.resta))} ha</b></span>
     </div>
-    ${p.temMeta?`<div class="plan-barra" role="img" aria-label="${p.pct}% da área planejada com registro"><span style="width:${p.pct}%"></span></div>
-      <p class="plan-trio-nota mut">${p.pct}% da área planejada tem registro no boletim${p.excedente>0?` · ${esc(planHa(p.excedente))} ha lançados além da meta`:""}</p>`
-      :`<p class="plan-trio-nota mut">${ex.semVinculo?"A descrição não casa com nenhuma operação do catálogo — o app não consegue somar sozinho."
-        :"Sem meta: a ata não trouxe a área. O app conta os lançamentos casados."}${o.podeMeta?"":""}</p>`}
+    <div class="plan-barra" role="img" aria-label="${p.pct}% da área planejada com registro"><span style="width:${p.pct}%"></span></div>
+    <p class="plan-trio-nota mut">${nota}</p>
     ${o.aberta?planExecLista(t):""}</div>`;
 }
 /* rastreabilidade total: o que compôs o executado, do mais recente ao mais antigo */
@@ -6509,7 +6536,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v78";
+const APP_VERSAO="v79";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

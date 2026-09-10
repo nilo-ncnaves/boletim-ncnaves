@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v78** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v79** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1215,6 +1215,40 @@ gravado com o nome antigo fecha como "feito" com registro no nome novo, e
 o contrário também; regressão main × branch com grãos e pecuária
 idênticos (só o relógio do envio difere).
 
+## Layout do trio e do cartão de tarefa (v79)
+Correção de layout pedida pelo Nilo em 10/09/2026, a partir da tela real do
+iPhone dele. Nenhuma regra de negócio mudou: os números, o casamento com o
+boletim e os status são exatamente os da v78.
+
+- **Os três rótulos saíam de linha.** `.plan-tres > span` usava
+  `justify-content:center`; quando o valor do meio quebrava em duas linhas
+  ("nenhum lançamento"), o rótulo dele subia e os outros dois desciam —
+  **10 px de desalinhamento**, medidos a 390 px. Agora o rótulo ancora no topo
+  (`flex-start`): medido de novo, os três em `y = 0`.
+- **Sem meta, o trio virou uma linha.** "Planejado" e "restante" não existem
+  quando a ata não trouxe a área: eram duas colunas de travessão, e sobrava um
+  terço da largura para "nenhum lançamento", que quebrava em duas linhas
+  sublinhadas. Agora é `.plan-um` — rótulo ao lado do valor, uma linha. Com
+  meta o trio continua igual à v78 (é a forma certa para três números curtos).
+- **O alvo de toque do "executado" tinha 26 px.** Os 44 px eram do contêiner,
+  não do botão. Agora o botão ocupa a linha inteira na forma de uma linha e, no
+  trio, é esticado a 44 px por pseudo-elemento — sem crescer a coluna (mesma
+  técnica do × dos chips da v74 e do badge da v67).
+- **Farol e "⋯" ancorados no topo do cartão.** O `.cad-item` de Cadastros
+  centraliza, e num cartão de várias linhas os dois flutuavam no meio.
+- **"96 ha" saía com um vão de dígito no meio** (na monoespaçada o espaço tem
+  largura de número): `word-spacing:-.2em` só no par número+unidade do trio.
+- **Medido, main × branch, a 390 px:** rótulos de `[10, 0, 10]` para
+  `[0, 0, 0]`; três cartões sem meta de 548 px para 530 px; página em 390 px
+  (nunca rola de lado). `teste_planejamento.cjs` **64 ✅ · 0 ❌**;
+  `checar-poluicao.cjs` **589 ✅ · 41 ❌**, os MESMOS 41 herdados;
+  `teste_nomenclatura.cjs` tudo certo; regressão `regressao_render.cjs`
+  main × branch: café, grãos, pecuária e pós-colheita **idênticos** (só o
+  relógio do envio), Diretoria e Cadastros só no `v78`→`v79` do rodapé.
+- **Selo "Powered by Netlify":** continua injetado pelo Netlify, fora do
+  código (ver a pendência própria). Não dá para tratar por CSS nosso; desliga-se
+  em Netlify › projeto › Project configuration › General.
+
 ## Módulo de planejamento (v77) — reunião mensal + semana
 
 A MESMA tarefa vista em dois horizontes. Concluir num horizonte atualiza o
@@ -1273,9 +1307,13 @@ chuva · outro) · "💬 Falar com o Nilo" (uma linha pronta). Zero campo de
 digitação, zero diálogo, e nada bloqueia o boletim. O gerente vê só a
 unidade dele.
 
-### Planejado × executado × restante (v78)
-Toda tarefa mostra os TRÊS números, com barra de progresso, na folha do
-gerente e nas listas da área Planejamento — componente ÚNICO `planTrio`.
+### Planejado × executado × restante (v78, forma revista na v79)
+Na folha do gerente e nas listas da área Planejamento — componente ÚNICO
+`planTrio`. **Duas formas, decididas pelo dado (v79):** com meta, os TRÊS
+números em três colunas iguais e a barra; sem meta, UMA linha
+("executado · nenhum lançamento"), porque "planejado" e "restante" não
+existem — três colunas em que duas são travessão é andaime vazio. Ver
+"Layout do trio e do cartão de tarefa (v79)" abaixo.
 - **Planejado** é a meta: a área que a ata trouxe (`t.area`) ou a que o
   escritório informar pelo chip "Definir meta" (`t.meta`). **Sem meta não há
   barra nem restante:** o app conta os lançamentos casados e diz que falta a
