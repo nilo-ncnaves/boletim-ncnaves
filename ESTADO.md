@@ -1607,7 +1607,10 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   e a visão `vw_planejamento_mes`) e, depois dele, `sql/051-ata-x-executado.sql`
   (relatório mensal). Enquanto não rodarem, o módulo funciona inteiro NO
   APARELHO (é offline first) — só não sincroniza entre celulares e o
-  relatório não aparece na vitrine.
+  relatório não aparece na vitrine. Enquanto as tabelas não existirem, uma
+  tarefa criada fica na fila de sincronização (o mesmo comportamento de
+  qualquer registro sem rede: o aviso "N registro(s) aguardando internet"
+  aparece até o SQL rodar, e aí tudo sobe sozinho — nada se perde).
 - **Planejamento (v77) — notificação garantida no horário exige push
   server.** Hoje os avisos (sexta 7h, dia 10 7h, gerente 6h) usam a API
   `Notification` do navegador e disparam quando o app é aberto a partir da
