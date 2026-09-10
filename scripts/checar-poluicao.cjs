@@ -73,6 +73,16 @@
       entra como "clima"); salvar fecha o plano dentro do boletim, envia e guarda o
       plano de amanhã; o cartão da Diretoria ordena por desvios evitáveis, nomeia o
       recorte no vazio e não mostra nome de gerente.
+  14. Planejamento (v77): a área Planejamento (Diretoria/Escritório) é medida com as
+      MESMAS regras de Cadastros (altura, busca em lista longa, ação principal fixa no
+      rodapé, níveis, cabeçalho com voltar, padrão visual) porque usa as classes de
+      Cadastros (P10); além disso a ação rápida "⋯" abre no lugar (sem tela nova, sem
+      modal, alvo ≥ 44 px) e um toque muda o status; travada por chuva ou por terceiro
+      fica ⏸️ e NUNCA vermelha; nenhuma pastilha aparece sem pendência; e na casa do
+      gerente a faixa "Tarefas da reunião" traz no máximo 3 linhas, cada uma em UMA
+      linha visual a 360 px, na ordem 🔴 → 🟡 → ⏸️ → 🟢, sem termo de cobrança, com um
+      toque abrindo a folha e outro mudando o status — sem campo de digitação e sem
+      diálogo nativo.
   12. Chips removíveis da multi-seleção (v74): em toda multi-seleção FORA do
       apontamento em 3 passos (café: problemas da irrigação e setores
       fertirrigados; Cadastros: código combinado) a seleção vazia não desenha nada
@@ -391,6 +401,13 @@ async function novaPagina(browser, base, acesso, sessao) {
   return { page, ctx, erros };
 }
 const gerente = (fz, atv) => ({ userId: 'u1', papel: 'gerente', nome: 'Gerente', atividade: atv, fazendaId: fz });
+/* v77: do dia 10 em diante (ata) e na sexta (semana) a porta da Diretoria/Escritório é a tela curta
+   do ritual. É o comportamento esperado; aqui a pessoa pula com um toque e segue para o painel. */
+async function pularRitual(page) {
+  const bt = await page.$('#bt-plan-ritual-pular');
+  if (bt) { await bt.click(); await page.waitForTimeout(300); }
+  await page.evaluate(() => { ritualPuladoSessao = true; });
+}
 
 /* v74: chips removíveis da multi-seleção — `attr` é o data-* dos chips de opção; `opcoes` são os seletores a tocar.
    Cada toque é um passo separado com espera: a repintura roda um tique depois do toque e, em Cadastros, a tela inteira
@@ -599,6 +616,8 @@ async function medirPlano(browser, base, R, rot, fz, atv, chuva, termos) {
 async function cenarioPlanoPainel(browser, base, R) {
   const { page, ctx } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' },
     { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' });
+  await pularRitual(page);
+  await page.evaluate(() => ir('painel')); await page.waitForTimeout(300);
   const cartao = () => page.evaluate(() => {
     const h = [...document.querySelectorAll('#app .cartao h3')].find(x => /Planejado × Executado/.test(x.textContent));
     if (!h) return { existe: false };
@@ -772,7 +791,9 @@ async function cenarioPos(browser, base, R, termos) {
 
 async function cenarioDiretoria(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null);
+  await pularRitual(page);
   await page.click('[data-perfil="proprietario"]').catch(() => {}); await page.waitForTimeout(500);
+  await pularRitual(page);
   /* v64: medição de ontem (iCrop e Solinftec) + estado dos robôs, para os cartões do painel e a linha de origem entrarem na medição */
   await page.evaluate(st => {
     const ontem = ontemISO();
@@ -836,8 +857,156 @@ async function cenarioDiretoria(browser, base, R) {
   await ctx.close();
 }
 
+/* v77: área Planejamento (Diretoria/Escritório) + faixa do gerente. As telas do módulo usam as
+   classes de Cadastros (P10) e por isso entram no MESMO grupo de medida — altura, busca em lista
+   longa, ação principal fixa, níveis, cabeçalho e padrão visual valem igual. As provas próprias do
+   módulo (ação rápida no lugar, faixa de 3 linhas, travada nunca vermelha) viram o grupo 14. */
+const ATA_TESTE = [
+  '2.1 – Vereda',
+  '- Colheita varrição falta setor 4,5,8 e 9 + - 96 há, tem 12 miac 3 dias de sol voltamos a levantar e 4 dias de serviço acabamos – PRAZO: 20/09/26',
+  '- Fazer KCL e ferti PRAZO: 25/09/26',
+  '- Instalar caixa dágua no setor 8 e quadra da represa (Tirar 2 caixas do Laboratório Biológico –(Renatinho/ Renato) PRAZO: 30/09/26',
+  '- Calcario (aguardando repasse) - PRAZO: 10/10/26',
+  '- Acompanhar as Irrigações.',
+  '2.11 – Mata Preta',
+  '- Kcl em andamento - PRAZO: 15/09/26',
+  '- Montagem da irrigação Finalizado. - PRAZO: 30/09/26',
+  '- Conserto Talude Piscinão quando parar chuvas - PRAZO: 30/09/26',
+  '2.12 – Lagamar (Grupo)',
+  '- Pós colheita Ok',
+  '- Kcl falta chegar para aplicar (Cobrar Cooxupé entrega) - PRAZO: 30/09/26',
+  '- Desbrota café novo iniciar na segunda. - PRAZO: 05/10/26',
+  'Assuntos gerais',
+  '- Trânsito de caminhões na sede (Definido com Cristian)',
+  'Necessidades de investimento',
+  '- MIAC novo para a Vereda'
+].join('\n');
+/* prazos relativos a hoje, para o farol ter as quatro cores em qualquer dia em que o script rodar */
+const SEMEAR_PLAN = txt => {
+  planNav = [{ v: 'menu' }, { v: 'importar' }];
+  planUI.rodadaNome = 'Reunião de teste';
+  planUI.ata = ataParsear(txt);
+  planAtaGravar();
+  const ls = planTarefas().filter(t => t.unidade === 'f23' || t.unidade === 'f22c');
+  const abertas = planTarefas().filter(t => t.unidade === 'f22c' && planAberta(t) && !planPausada(t));
+  if (abertas[0]) { abertas[0].prazo = hojeBRT(); abertas[0].prazoOriginal = abertas[0].prazo; }
+  if (abertas[1]) { abertas[1].prazo = diaISO(hojeBRT(), 5); abertas[1].prazoOriginal = abertas[1].prazo; }
+  if (abertas[2]) { abertas[2].prazo = diaISO(hojeBRT(), 30); abertas[2].prazoOriginal = abertas[2].prazo; }
+  /* a mesma rodada também para a unidade medida na casa do gerente (f23 Vereda Romaria) */
+  planTarefas().filter(t => t.unidade === 'f22c').slice(0, 4).forEach(t => {
+    const c = JSON.parse(JSON.stringify(t)); c.id = uid(); c.unidade = 'f23'; planTarefas().push(c);
+  });
+  const s = planSemanaAtual() || planSemanaCriar(planSegundaDe(hojeBRT()));
+  planTarefas().filter(t => t.unidade === 'f22c' && planAberta(t)).slice(0, 3).forEach(t => planComprometer(t.id, s.id));
+  salvarDados(); planMotor(true);
+  return { tarefas: planTarefas().length, ls: ls.length };
+};
+async function cenarioPlanejamento(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
+  await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(300);
+  await page.evaluate(SEMEAR_PLAN, ATA_TESTE); await page.waitForTimeout(200);
+  const rodada = await page.evaluate(() => (planRodadas()[0] || {}).id || '');
+  const niveis = [
+    ['Planejamento — menu', [{ v: 'menu' }], 'lista', 1],
+    ['Planejamento › Semana', [{ v: 'menu' }, { v: 'semana' }], 'lista', 2],
+    ['Planejamento › Mês por unidade', [{ v: 'menu' }, { v: 'mes' }], 'lista', 2],
+    ['Planejamento › Rodadas da reunião', [{ v: 'menu' }, { v: 'rodadas' }], 'lista', 2],
+    ['Planejamento › Rodada › fechamento', [{ v: 'menu' }, { v: 'rodadas' }, { v: 'rodada', id: rodada }], 'lista', 3],
+    ['Planejamento › Pendências com terceiros', [{ v: 'menu' }, { v: 'terceiros' }], 'lista', 2],
+    ['Planejamento › Arrastadas', [{ v: 'menu' }, { v: 'arrastadas' }], 'lista', 2],
+    ['Planejamento › Assuntos e investimentos', [{ v: 'menu' }, { v: 'assuntos' }], 'lista', 2],
+    ['Planejamento › Todas as tarefas', [{ v: 'menu' }, { v: 'lista' }], 'lista', 2],
+    ['Planejamento › Textos prontos', [{ v: 'menu' }, { v: 'saidas' }], 'lista', 2],
+    ['Planejamento › Nova tarefa', [{ v: 'menu' }, { v: 'nova' }], 'detalhe', 2],
+    ['Planejamento › Importar ata', [{ v: 'menu' }, { v: 'importar' }], 'detalhe', 2],
+  ];
+  for (const [nome, pilha, tipo, n] of niveis) {
+    await page.evaluate(p => { planNav = p; planLimpar(); planUI.ata = null; ir('planejamento'); }, pilha);
+    await page.waitForTimeout(200);
+    R.telas.push(await medirTela(page, nome, 'cadastros', { tipo, niveis: n }));
+  }
+  /* pré-visualização da ata (a tela mais densa do módulo) */
+  await page.evaluate(txt => { planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.ata = ataParsear(txt); ir('planejamento'); }, ATA_TESTE);
+  await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Planejamento › Conferir a ata', 'cadastros', { tipo: 'lista', niveis: 3 }));
+  /* revisão das arrastadas */
+  await page.evaluate(() => { planRevisaoAbrir(); }); await page.waitForTimeout(250);
+  R.telas.push(await medirTela(page, 'Planejamento › Revisão das arrastadas', 'cadastros', { tipo: 'lista', niveis: 3 }));
+  /* rituais que se abrem sozinhos */
+  for (const [rot, tipo] of [['semana', 'Fechar a semana'], ['ata', 'Importar a ata']]) {
+    await page.evaluate(r => { planUI.ritual = r; planNav = [{ v: 'ritual' }]; ir('planejamento'); }, rot);
+    await page.waitForTimeout(200);
+    R.telas.push(await medirTela(page, 'Planejamento › Ritual (' + tipo + ')', 'cadastros', { tipo: 'lista', niveis: 1 }));
+  }
+  /* ação rápida "⋯": abre no lugar, um toque muda o status, sem tela nova e sem diálogo nativo */
+  await page.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'lista' }]; planLimpar(); ir('planejamento'); });
+  await page.waitForTimeout(250);
+  R.planejamento = await page.evaluate(async () => {
+    const antesTela = telaAtual, antesAltura = document.documentElement.scrollHeight;
+    const bt = document.querySelector('#app [data-plan-acoes]');
+    const id = bt ? bt.dataset.planAcoes : '';
+    const de = id ? planTarefa(id).status : '';
+    if (bt) bt.click();
+    await new Promise(r => setTimeout(r, 200));
+    const caixa = document.querySelector('#app .plan-acoes');
+    const acoes = caixa ? [...caixa.querySelectorAll('.chip')].map(c => c.textContent.trim()) : [];
+    const alvo = caixa ? Math.min(...[...caixa.querySelectorAll('.chip')].map(c => c.getBoundingClientRect().height)) : 0;
+    const alvoSt = de === 'em_execucao' ? 'finalizado' : 'em_execucao';
+    const b2 = document.querySelector('#app [data-plan-st="' + id + '|' + alvoSt + '"]');
+    if (b2) b2.click();
+    await new Promise(r => setTimeout(r, 200));
+    /* travar por chuva: status próprio, nunca vermelho */
+    const t2 = planTarefas().filter(t => planAberta(t))[0];
+    planMudarStatus(t2.id, 'aguardando_clima', { motivo: 'chuva', texto: 'aguardando o tempo firmar' });
+    const b3 = planTarefas().filter(t => planAberta(t)).find(t => t.status === 'aguardando_terceiro');
+    return { telaDepois: telaAtual, mesmaTela: telaAtual === antesTela, acoes, alvo: +alvo.toFixed(1),
+      de, para: id ? planTarefa(id).status : '', esperado: alvoSt,
+      modal: !!document.querySelector('dialog[open], .folha'), nativos: window.__nativos,
+      farolClima: planFarol(planTarefa(t2.id)), farolTerceiro: b3 ? planFarol(b3) : '',
+      crescimento: document.documentElement.scrollHeight - antesAltura,
+      pastilhasSemPendencia: (() => { const g = D.tarefas; D.tarefas = []; const n = planPastilhas().length; D.tarefas = g; return n; })() };
+  });
+  R.errosPlanejamento = erros.slice();
+  await ctx.close();
+  /* faixa do gerente a 360 px (a medida exigida na tarefa) */
+  const g = await novaPagina(browser, base, { codigo: CODIGOS.f23, chave: 'f23' }, gerente('f23', 'CAFE'));
+  await g.page.evaluate(SEMEAR_PLAN, ATA_TESTE);
+  await g.page.setViewportSize({ width: 360, height: 844 });
+  await g.page.evaluate(() => ir('casa')); await g.page.waitForTimeout(350);
+  R.faixaTarefas = await g.page.evaluate(async () => {
+    const box = document.getElementById('tar-faixa');
+    if (!box) return { existe: false };
+    const itens = [...box.querySelectorAll('.tar-item')];
+    const r = { existe: true, itens: itens.length,
+      linhas: new Set(itens.map(i => Math.round(i.getBoundingClientRect().top))).size,
+      alvo: itens.length ? +Math.min(...itens.map(i => i.getBoundingClientRect().height)).toFixed(1) : 0,
+      farois: itens.map(i => (i.querySelector('.tar-farol') || {}).textContent.trim() || ''),
+      texto: box.textContent.replace(/\s+/g, ' ').trim(), scrollW: document.documentElement.scrollWidth,
+      altura: +box.getBoundingClientRect().height.toFixed(1), mais: !!box.querySelector('[data-tar-todas]') };
+    /* um toque abre a folha e um toque muda o status: nenhum campo de digitação, nada nativo */
+    box.querySelector('[data-tar]').click();
+    await new Promise(x => setTimeout(x, 200));
+    const folha = document.getElementById('folha-tarefa');
+    r.folha = !!folha;
+    r.campos = folha ? folha.querySelectorAll('input, select, textarea').length : -1;
+    const alvoT = planAbertasDa('f23')[0];
+    const st = alvoT.status === 'em_execucao' ? 'finalizado' : 'em_execucao';
+    const bt = folha && folha.querySelector('[data-tar-st="' + st + '"]');
+    if (bt) bt.click();
+    await new Promise(x => setTimeout(x, 200));
+    r.mudou = planTarefa(alvoT.id).status === st;
+    r.tela = telaAtual; r.nativos = window.__nativos;
+    return r;
+  });
+  R.telas.push(await medirTela(g.page, 'Gerente (casa) — com tarefas da reunião', 'gerente'));
+  R.errosFaixa = g.erros.slice();
+  await g.ctx.close();
+}
+
 async function cenarioCadastros(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
   await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(400);
   /* v63: estado dos robôs (vw_status_integracoes) para o bloco de leitura de Integrações e robôs aparecer preenchido */
   await page.evaluate(st => { statusIntegracoes = st; }, statusIntegracoesExemplo());
@@ -1119,6 +1288,37 @@ function avaliar(R) {
     }
   }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */
+  /* 14. Planejamento (v77): ação em um toque, no lugar; faixa de 3 linhas; travada nunca vermelha */
+  {
+    const G = '14. Planejamento: um toque, no lugar, sem cobrar o campo';
+    const P = R.planejamento || {}, F = R.faixaTarefas || {};
+    add(G, 'Área Planejamento — "⋯" abre a ação rápida no lugar, sem tela nova e sem modal',
+      P.mesmaTela && P.acoes && P.acoes.length >= 4 && !P.modal, (P.acoes || []).join(' · ') || 'não abriu');
+    add(G, 'Área Planejamento — um toque muda o status (alvo ≥ 44 px, nenhum diálogo nativo)',
+      P.para === P.esperado && P.alvo >= TOQUE_MIN && P.nativos === 0,
+      `${P.de} → ${P.para}; alvo ${P.alvo} px; ${P.nativos} nativo(s)`);
+    add(G, 'Área Planejamento — travada por chuva e por terceiro ficam ⏸️ (nunca vermelho)',
+      P.farolClima === 'cinza' && (!P.farolTerceiro || P.farolTerceiro === 'cinza'),
+      `clima: ${P.farolClima || '—'}; terceiro: ${P.farolTerceiro || '—'}`);
+    add(G, 'Nenhuma pastilha aparece sem pendência', P.pastilhasSemPendencia === 0, (P.pastilhasSemPendencia || 0) + ' pastilha(s)');
+    add(G, 'Gerente — faixa "Tarefas da reunião" com no máximo 3 linhas a 360 px',
+      F.existe && F.itens >= 1 && F.itens <= 3 && F.linhas === F.itens && F.scrollW <= 360,
+      F.existe ? `${F.itens} item(ns) em ${F.linhas} linha(s); página ${F.scrollW} px; faixa ${F.altura} px` : 'faixa não apareceu');
+    add(G, 'Gerente — alvo de toque da linha ≥ 44 px e "＋N tarefas" para o resto', F.alvo >= TOQUE_MIN && (F.mais || F.itens < 3), `alvo ${F.alvo} px`);
+    const ordem = { '🔴': 0, '🟡': 1, '⏸️': 2, '🟢': 3 };
+    const seq = (F.farois || []).map(x => ordem[x]);
+    add(G, 'Gerente — ordem 🔴 → 🟡 → ⏸️ → 🟢', seq.length > 0 && seq.every((x, i) => i === 0 || seq[i - 1] <= x), (F.farois || []).join(' '));
+    /* "ATRASADO" é permitido de propósito: é o rótulo do PRAZO vencido, exigido na tarefa da v77 e
+       documentado em CLAUDE.md, c15 — descreve a data, nunca a pessoa. Cobrança é que não entra. */
+    add(G, 'Gerente — faixa sem termo de cobrança ("não fez", "pendente", "faltou", "esqueceu")',
+      F.texto !== undefined && !/não fez|não realizou|pendente|atrasad[oa]s? há|faltou|esqueceu/i.test(F.texto), (F.texto || '').slice(0, 100));
+    add(G, 'Gerente — um toque abre a folha e outro muda o status, sem digitar e sem nativo',
+      F.folha && F.campos === 0 && F.mudou && F.tela === 'casa' && F.nativos === 0,
+      `${F.campos} campo(s) de digitação; tela ${F.tela}; ${F.nativos} nativo(s)`);
+    add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosPlanejamento || []).length && !(R.errosFaixa || []).length,
+      [...(R.errosPlanejamento || []), ...(R.errosFaixa || [])].join(' | '));
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -1154,6 +1354,7 @@ function relatorio(itens, R) {
     await medirPlano(browser, base, R, 'Pecuária (f26 Água Santa)', 'f26', 'PECUARIA', false, termos);
     await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
     await cenarioPlanoPainel(browser, base, R);
+    await cenarioPlanejamento(browser, base, R);
   } finally { await browser.close(); srv.close(); }
   const itens = avaliar(R);
   const md = relatorio(itens, R);

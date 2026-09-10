@@ -238,6 +238,42 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plano-un{padding:8px 0;border-top:1px solid var(--linha)}
 .plano-un:first-of-type{border-top:none;padding-top:0}
 .plano-item-ed{gap:8px;padding:8px 0;border-top:1px solid var(--linha)}
+/* v77: módulo de planejamento — faixa do gerente, pastilhas da porta de entrada e listas da área
+   Planejamento. Sem cor nova: o farol usa os mesmos ícones do catálogo (a cor é canal do farol,
+   regra 4 do plano de safra) e o resto é neutro. Sem gradiente, sem sombra, sem canto arredondado. */
+.tar-faixa{background:var(--verde-claro);border-color:#cfe0c8}
+.tar-faixa .tar-conta{font-size:.78rem;font-weight:700}
+.tar-item{display:block;width:100%;text-align:left;margin-top:5px;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:44px;padding:2px 0}
+.tar-item .tar-farol{margin-right:6px}
+.tar-item .mut{font-size:.85rem}
+.tar-sug{border-color:var(--verde)}
+.tar-ajuste{font-size:.76rem}
+.tar-proj{margin:6px 0 0;font-size:.84rem}
+.pastilhas{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.pastilha{background:var(--cartao);border:1.5px solid var(--linha);border-radius:0;box-shadow:none;padding:8px 12px;min-height:44px;font-size:.84rem;font-weight:600;text-align:left}
+.pastilha:active{background:var(--papel)}
+.plan-cab{background:var(--cartao);border:1px solid var(--linha);padding:10px 12px;margin:0 0 12px;font-size:.86rem;line-height:1.35}
+.plan-linha{margin-top:-1px}
+.plan-linha.fora{opacity:.5}
+.plan-farol{flex:none;width:34px;min-height:44px;padding:0;font-size:1rem;line-height:1}
+.plan-mais{flex:none;width:44px;min-height:44px;padding:0;font-size:1.2rem;color:var(--tinta-2);line-height:1}
+.plan-acoes{background:var(--papel);border:1px solid var(--linha);border-top:none;padding:10px 12px}
+.plan-acoes .chip{min-height:44px;font-size:.84rem}
+.plan-pct{font-weight:700;font-size:.95rem}
+.plan-barra{height:8px;background:var(--linha);margin-top:6px}
+.plan-barra>span{display:block;height:100%;background:var(--verde)}
+.plan-tempo{display:flex;flex-wrap:wrap;gap:2px;margin-top:8px}
+.plan-dia{flex:none;width:20px;height:16px;border:1px solid var(--linha);background:var(--cartao);font-size:.6rem;line-height:14px;text-align:center;font-variant-numeric:tabular-nums;color:var(--tinta-2)}
+.plan-dia.tem{background:var(--verde-claro);color:var(--verde-esc);font-weight:700}
+.plan-dia.cheio{background:var(--amarelo-claro);color:#8a5f10}
+.plan-arr-tag{margin:10px 0 4px;font-size:.78rem}
+.plan-fecha-l{margin:3px 0;font-size:.85rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.plan-fecha-l>span:first-child{flex:1;min-width:0}
+.plan-acoes .chip.mini,.plan-fecha-l .chip.mini{min-height:44px;padding:6px 10px;font-size:.8rem}
+.plan-comp{flex:none;min-height:44px;font-size:.8rem;padding:6px 10px}
+.plan-duas{display:grid;gap:12px}
+.plan-notif{margin:0 0 12px;font-size:.82rem}
+@media(min-width:640px){.plan-duas{grid-template-columns:1fr 1fr}}
 .sel-box:empty{display:none}
 .sel-box{margin:0 0 10px}
 .cad-item>.sel-box{width:100%}
@@ -433,6 +469,11 @@ function dadosSemente(){
       {id:"t054", fazendaId:"f14c", nome:"Café Talhão 2", area:44.84},
       {id:"t055", fazendaId:"f14c", nome:"José Eustáquio — Arrendamento", area:25.0},
       {id:"t056", fazendaId:"f14c", nome:"Ernane — Área geral", area:100.0, tipo:"ESTRUTURA"},
+      /* v77 (de-para da ata, confirmado pelo Nilo): "FMC Igrejinha" e "FMC Lazaro" são áreas de
+         Monte Carmelo — Café, no mesmo padrão de Caxico, Ernane e José Eustáquio. Área a confirmar
+         em Cadastros; com 0 ha não mexem no cabeçalho contextual nem em nenhuma soma. */
+      {id:"t057", fazendaId:"f14c", nome:"Igrejinha — Área geral", area:0},
+      {id:"t058", fazendaId:"f14c", nome:"Lazaro — Área geral", area:0},
       {id:"t061", fazendaId:"f03c", nome:"Área do Lico", area:10.0},
       {id:"t062", fazendaId:"f03g", nome:"Área 200 — Gleba 1", area:176.0},
       {id:"t063", fazendaId:"f03c", nome:"Cascalho", area:48.0},
@@ -1103,6 +1144,10 @@ async function carregarTudo(){
     if(f.entidade===undefined) f.entidade="";
     if(!Array.isArray(f.perfil)||!f.perfil.length) f.perfil = PERFIS_PADRAO[f.id]||["CAFE"];
   });
+  /* v77: áreas do de-para da ata (Igrejinha e Lazaro) chegam nos aparelhos que já tinham dados,
+     uma vez só, sem migração geral. Removidas em Cadastros, não voltam (D.talhoesRemovidos). */
+  ["t057","t058"].forEach(id=>{ const semente=dadosSemente().talhoes.find(t=>t.id===id);
+    if(semente && !(D.talhoes||[]).some(t=>t.id===id) && !((D.talhoesRemovidos||[]).includes(id))) D.talhoes.push({...semente}); });
   (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=tipoPeloPerfil(t.nome, perfilDe(t.fazendaId)); });
   D.ciclos = D.ciclos||[];
   /* milho semente = área arrendada a sementeira: o talhão vira ARRENDADO e o ciclo não se aplica */
@@ -1270,6 +1315,7 @@ const ACOES_PERFIL={
   pos_colheita:         {pode:()=>!soLeitura() && unidadesPermitidas().some(f=>perfilDe(f.id).includes("CAFE")), visivel:()=>false},
   painel_diretoria:     {pode:()=>podePainel(), visivel:()=>false},
   relatorios_diretoria: {pode:()=>podePainel(), visivel:()=>false},
+  planejamento:         {pode:()=>podePainel(), visivel:()=>false},
   escritorio:           {pode:()=>podeCadastros(), visivel:()=>false},
   cadastros_painel:     {pode:()=>!!sessao && sessao.papel==="admin", visivel:()=>!!sessao && sessao.papel==="proprietario", papel:"Ação do escritório (administrador)"},
   corrigir_boletim:     {pode:c=>!!sessao && sessao.papel==="gerente" && !!c.prazo, visivel:()=>!!sessao && sessao.papel!=="gerente", papel:"Ação do gerente (até 48 h após o envio)"},
@@ -2062,6 +2108,7 @@ const REL_CATALOGO={
   rebanho_mes:{nome:"Rebanho — mês", per:"mes"},
   plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"},
   plano_x_executado_diario:{nome:"Planejado × executado (plano do dia) — mês", per:"mes"},
+  ata_x_executado:{nome:"Ata × executado (planejamento do mês) — mês", per:"mes"},
   /* fase 2 (v57): relatórios narrativos redigidos pelo robô-redator (sql/030) — texto acima dos números,
      marcado "gerado automaticamente — revisar antes de enviar"; só Diretoria/ADMIN, nunca o gerente */
   devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", per:"semana", texto:true},
@@ -2090,7 +2137,9 @@ async function baixarRelatorios(){
     const pedidos=[
       ["farol_7,farol_30", dAtras(8)],
       [["dito_medido_icrop_dia","dito_medido_solinftec_dia","balanco_hidrico_dia","alerta_divergencia"].filter(soNum).join(","), dAtras(14)],
-      [["dito_medido_icrop_semana","dito_medido_solinftec_semana","irrigacao_rec_exec_semana","custo_fisico_talhao_mes","rebanho_mes","plano_executado_mes","devolutiva_semanal","painel_executivo"].filter(soNum).join(","), dAtras(60)]
+      /* v77: ata_x_executado entra aqui; plano_x_executado_diario estava no catálogo desde a v75 mas
+         nunca era baixado (por isso nunca aparecia na tela Relatórios) — entrou junto */
+      [["dito_medido_icrop_semana","dito_medido_solinftec_semana","irrigacao_rec_exec_semana","custo_fisico_talhao_mes","rebanho_mes","plano_executado_mes","plano_x_executado_diario","ata_x_executado","devolutiva_semanal","painel_executivo"].filter(soNum).join(","), dAtras(60)]
     ];
     let novas=[];
     for(const [rels,de] of pedidos){
@@ -2745,6 +2794,23 @@ function relRender(rel,ls){
         +((d.gantt||[]).length?`<p class="mut" style="font-size:.78rem;margin-top:8px"><b>Janelas do mês (Gantt)</b></p>`+relTabela(["Atividade","#Registros","1º registro","Situação"],(d.gantt||[]).map(g=>[esc(String(g.atividade).replace(/_/g," ")),n0(g.registros),g.primeiro?fmtDataCurta(g.primeiro):"—",`<span class="linha-flex" style="gap:6px"><span class="farol ${relFarolCor(g.farol)}"></span>${esc(g.situacao||"")}</span>`]),(d.gantt||[]).map(g=>g.farol==="vermelho"?"critico":g.farol==="amarelo"?"conferir":"")):""),
         "Plano é referência, nunca receituário: aqui só previsto × registrado. Vermelho só depois de a janela fechar; cinza = unidade sem talhão ligado no app."); }).join("");
   }
+  /* v77: ata × executado — o que a reunião do mês combinou × o que já foi respondido.
+     Travada por terceiro ou por chuva NUNCA entra em "atrasadas" (regra 2 do módulo). */
+  if(rel==="ata_x_executado"){
+    const g=ls.find(l=>!l.unidade_id), uns=ls.filter(l=>l.unidade_id);
+    const rotMot={insumo:"falta insumo",peca:"falta peça",gente:"falta gente",maquina:"falta máquina",chuva:"chuva",outro:"outro",nao_informado:"não informado"};
+    const linhas=uns.map(l=>{ const d=l.dados||{};
+      const mot=Object.entries(d.motivos||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>v+" "+(rotMot[k]||k)).join(" · ");
+      return {c:[esc(d.unidade_nome||relUni(l.unidade_id)), n0(d.finalizadas)+"/"+n0(d.tarefas),
+        d.cumprimento_pct==null?"—":n0(d.cumprimento_pct)+"%", n0(d.atrasadas)?conf(n0(d.atrasadas)):"0",
+        n0(d.travadas)||"0", n0(d.arrastadas)||"0", relNum(d.area_ha,0), esc(mot||"—")],
+        k:n0(d.atrasadas)?"critico":n0(d.travadas)?"conferir":""}; });
+    const gd=(g||{}).dados||{};
+    return bloco("📋 Ata × executado"+(gd.cumprimento_pct!=null?` <span class="mut" style="font-weight:400;font-size:.8rem">${n0(gd.cumprimento_pct)}% no grupo</span>`:""),
+      (g?`<p style="font-size:.85rem">${n0(gd.finalizadas)} de ${n0(gd.tarefas)} tarefas concluídas em ${n0(gd.unidades)} unidades · ${n0(gd.atrasadas)} atrasada(s) · ${n0(gd.travadas)} travada(s) · ${n0(gd.arrastadas)} arrastada(s)</p>`:"")
+      +relTabela(["Unidade","#Concl./Total","#Cumpr.","#Atrasadas","#Travadas","#Arrastadas","#ha","Motivos da trava"],linhas.map(x=>x.c),linhas.map(x=>x.k)),
+      "Tarefas da reunião administrativa do mês. Tarefa parada por terceiro ou por chuva conta como TRAVADA, nunca como atrasada — a cobrança é do escritório.");
+  }
   return `<div class="cartao"><pre style="white-space:pre-wrap;font-size:.75rem">${esc(JSON.stringify(ls.map(l=>l.dados),null,1))}</pre></div>`;
 }
 /* texto limpo para WhatsApp (o mesmo conteúdo, sem tabela) */
@@ -3302,7 +3368,12 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","relatorio","historico","relatorios","farois","farol"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","relatorio","historico","relatorios","farois","farol","planejamento"].includes(tela) && !podePainel()) tela="entrada";
+  /* v77: ritual que se abre sozinho — na sexta (fechar a semana) e do dia 10 em diante (ata da
+     reunião), a porta da Diretoria/Escritório é a tela curta do ritual. Pulável; o "pulado" vale
+     só para esta sessão, então volta no próximo acesso do MESMO dia (item 9 da tarefa). */
+  if(tela==="painel" && !ritualPuladoSessao){ const rit=planRitualPendente();
+    if(rit){ planUI.ritual=rit; planNav=[{v:"ritual"}]; tela="planejamento"; } }
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
   const app = $("#app");
@@ -3320,6 +3391,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="cadastros") app.innerHTML = vCadastros();
   else if(tela==="importar") app.innerHTML = vImportar();
   else if(tela==="unidplano") app.innerHTML = vUnidPlano();
+  else if(tela==="planejamento") app.innerHTML = vPlanejamento();
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="relat") app.innerHTML = vRelat();
   else if(tela==="relatorios") app.innerHTML = vRelatorios();
@@ -3363,6 +3435,7 @@ function vEntrada(){
     <div class="marca"><div class="grao">☕</div><h1>Boletim Diário das Fazendas</h1>
       <p class="mut">Grupo LGS · informativo diário de campo</p></div>
     ${avisoMem}
+    ${planPastilhasHtml()}
     <p class="mut mb centro">Qual é a sua atividade?</p>
     ${temAtv("CAFE")?`<button class="perfil-btn" data-atividade="CAFE" style="border-left:4px solid var(--cereja)"><span class="ava">☕</span>
       <span><b>Café</b><span class="mut">Boletim das lavouras de café</span></span></button>`:""}
@@ -3376,6 +3449,8 @@ function vEntrada(){
       <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
     ${acaoOk("relatorios_diretoria")?`<button class="perfil-btn" data-perfil="relatorios"><span class="ava">📊</span>
       <span><b>Relatórios</b><span class="mut">Textos para revisar e números prontos</span></span></button>`:""}
+    ${acaoOk("planejamento")?`<button class="perfil-btn" data-perfil="planejamento"><span class="ava">📋</span>
+      <span><b>Planejamento</b><span class="mut">Reunião do mês e planejamento da semana</span></span></button>`:""}
     ${acaoOk("escritorio")?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
@@ -3406,6 +3481,8 @@ function vCasaGerente(){
   return cabecalhoContexto(fz,{sub:"Gerente"})
   +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`
   +reguaDias(fz, dia)
+  +faixaTarefas(fz)                                     /* v77: tarefas da reunião; sem tarefa aberta, nada aparece */
+  +planSugestaoBoletim(fz, dia)                         /* v77: o app SUGERE concluir, nunca conclui sozinho */
   +linhaPlanoCasa(fz, dia)+linhaPlanoSemana(fz, dia)   /* v75: espelho do plano; sem plano, nada aparece */
   +`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
@@ -3935,6 +4012,678 @@ function fecharFolhaPlano(salvar){
   if(f){ planoLerCampos(); f.remove(); destravarFolha(); }
   const res=planoResolve; planoResolve=null; planoUI=null;
   if(res) res(u ? {salvar:!!salvar, itens:u.itens, obs:u.obs, motivo:u.motivo, alvo:u.alvo, fz:u.fz, replan:!!u.replan} : null);
+}
+
+
+/* ============================================================
+   MÓDULO DE PLANEJAMENTO (v77) — reunião mensal + planejamento semanal
+   ------------------------------------------------------------
+   A mesma TAREFA vista em dois horizontes: a rodada mensal (a ata da reunião
+   administrativa, por volta do dia 10) e a semana (toda sexta, sem reunião).
+   Concluir num horizonte atualiza o outro — não existe cópia.
+
+   Princípios que não se discutem (decisão do Nilo, 10/09/2026):
+   1. O gerente muda status com UM toque e nunca digita.
+   2. Tarefa travada por terceiro ou por chuva NUNCA fica vermelha para o campo:
+      tem status próprio (⏸️) e vira cobrança do escritório.
+   3. O que importa se vê ao abrir — faixa no topo do boletim e da casa, e
+      pastilhas na porta de entrada.
+   4. Nada bloqueia o preenchimento do boletim.
+   5. Tudo roda dentro do app: colar a ata, ler, cobrar e redigir a próxima ata.
+
+   Isolamento (CLAUDE.md, c4): componentes ÚNICOS nas três atividades. O que muda
+   por atividade é o CATÁLOGO (PLAN_VINCULO / PLAN_SINONIMOS), nunca a tela.
+   ============================================================ */
+
+/* ---- status, farol e motivos (catálogo único; docs/catalogos-por-atividade.md) ---- */
+const PLAN_STATUS=[
+  {id:"a_iniciar",           rot:"A iniciar"},
+  {id:"em_execucao",         rot:"Em execução"},
+  {id:"finalizado",          rot:"Finalizado"},
+  {id:"aguardando_terceiro", rot:"Aguardando terceiro", pausa:true},
+  {id:"aguardando_clima",    rot:"Aguardando clima",    pausa:true},
+  {id:"cancelado",           rot:"Cancelado"}
+];
+const planStatus = id => PLAN_STATUS.find(s=>s.id===id) || PLAN_STATUS[0];
+const planStatusRot = id => planStatus(id).rot;
+const PLAN_ABERTOS=["a_iniciar","em_execucao","aguardando_terceiro","aguardando_clima"];
+const planAberta = t => PLAN_ABERTOS.includes(t.status);
+const planPausada = t => t.status==="aguardando_terceiro" || t.status==="aguardando_clima";
+/* FAROL só existe para A INICIAR e EM EXECUÇÃO. Os dois "aguardando" e a tarefa sem prazo ficam
+   em cinza (⏸️) — nunca vermelho: quem está parado por terceiro ou por chuva não é cobrado no campo. */
+const PLAN_FAROL={ vermelho:{ico:"🔴"}, amarelo:{ico:"🟡"}, cinza:{ico:"⏸️"}, verde:{ico:"🟢"}, feito:{ico:"✅"}, cancelado:{ico:"—"} };
+const PLAN_FAROL_ORDEM={vermelho:0, amarelo:1, cinza:2, verde:3, feito:4, cancelado:5};
+/* chips de "Travado" — um toque, sem digitar. `tipo` decide o status: clima tem status próprio,
+   os demais entram como pausa de terceiro/apoio e viram cobrança do escritório. */
+const PLAN_MOTIVOS_TRAVA=[
+  {id:"insumo",  rot:"falta insumo",  tipo:"terceiro", texto:"aguardando insumo"},
+  {id:"peca",    rot:"falta peça",    tipo:"terceiro", texto:"aguardando peça"},
+  {id:"gente",   rot:"falta gente",   tipo:"terceiro", texto:"aguardando gente"},
+  {id:"maquina", rot:"falta máquina", tipo:"terceiro", texto:"aguardando máquina"},
+  {id:"chuva",   rot:"chuva",         tipo:"clima",    texto:"aguardando o tempo firmar"},
+  {id:"outro",   rot:"outro",         tipo:"terceiro", texto:"aguardando"}
+];
+const planMotivoTrava = id => PLAN_MOTIVOS_TRAVA.find(m=>m.id===id) || null;
+/* novo prazo em UM toque: nada de teclado nem calendário para quem está no campo */
+const PLAN_NOVOS_PRAZOS=[
+  {id:"d7",  rot:"+7 dias",  dias:7},
+  {id:"d15", rot:"+15 dias", dias:15},
+  {id:"mes", rot:"fim do mês"},
+  {id:"reuniao", rot:"próxima reunião"}
+];
+const PLAN_ORIGENS={mensal:"rodada mensal", semana:"semana", avulsa:"avulsa"};
+const PLAN_TIPOS_ITEM={tarefa:"tarefa", assunto:"assunto geral", investimento:"necessidade de investimento"};
+
+/* dia da reunião administrativa (por volta do dia 10) e limites do motor */
+const PLAN_DIA_REUNIAO=10;
+const PLAN_DIAS_SOL=2;        /* dias firmes seguidos para a pausa por chuva cair sozinha */
+const PLAN_TRAVA_COBRANCA=7;  /* travada há mais de N dias vira cobrança do escritório */
+const PLAN_ARRASTA_ALERTA=2;  /* arrastada por N rodadas ou mais: alerta na Diretoria */
+const PLAN_FAIXA_MAX=3;       /* linhas da faixa do gerente */
+
+/* ---- de-para da ata: nome que a ata usa → unidade do cadastro (por id, nunca por pedaço de nome) ----
+   Confirmado pelo Nilo em 10/09/2026. `area` é o prefixo da área dentro da unidade (mesmo padrão de
+   Caxico, Ernane e José Eustáquio); `fora:true` é fazenda de terceiro que NUNCA entra e nunca é
+   perguntada de novo. Editável em Cadastros › Catálogos › De-para da ata; o que a pessoa muda vive em
+   D.deparaAta e vence o padrão. Nome que não está aqui não é adivinhado: entra na pré-visualização
+   como "unidade não reconhecida" e a pessoa escolhe (regra 3 do plano de safra). */
+const DEPARA_ATA_PADRAO=[
+  {ata:"FMC Igrejinha",  unidade:"f14c", area:"Igrejinha"},
+  {ata:"FMC Lazaro",     unidade:"f14c", area:"Lazaro"},
+  {ata:"FMC Caxico",     unidade:"f14c", area:"Caxico"},
+  {ata:"FMC Ernane",     unidade:"f14c", area:"Ernane"},
+  {ata:"FMC Arrendo",    unidade:"f14c", area:"José Eustáquio"},
+  {ata:"Lagamar (Rodrigo)", unidade:"f20"},
+  {ata:"Lagamar (Grupo)",   unidade:"f03c"},
+  {ata:"Café 5º",        unidade:"f24"},
+  {ata:"Café 6º",        unidade:"f24"},
+  {ata:"Romaria",        unidade:"f23"},
+  {ata:"Vereda",         unidade:"f22c"},
+  {ata:"Mata Preta",     unidade:"f13c"},
+  {ata:"Água Limpa",     unidade:"f01"},
+  {ata:"São Félix",      unidade:"f21"},
+  {ata:"Marimbondo",           fora:true},
+  {ata:"Cristo Redentor",      fora:true},
+  {ata:"Córrego Grande (Dr. Adilson)", fora:true}
+];
+const deparaAta = () => (D.deparaAta && D.deparaAta.length) ? D.deparaAta : DEPARA_ATA_PADRAO;
+const planChaveAta = s => normTxt(s).replace(/[^a-z0-9]/g,"");
+function deparaAtaDe(nome){
+  const k=planChaveAta(nome);
+  if(!k) return null;
+  return deparaAta().find(x=>planChaveAta(x.ata)===k)
+    || deparaAta().find(x=>k.length>3 && planChaveAta(x.ata).length>3 && (k.includes(planChaveAta(x.ata))||planChaveAta(x.ata).includes(k)))
+    || null;
+}
+
+/* ---- vínculo com o boletim: descrição da ata ↔ operação do catálogo da atividade ----
+   Só SUGERE (item 10 da tarefa) — nunca conclui sozinho. Tarefa de estrutura (caixa d'água,
+   piscinão, talude, adutora…) não tem operação no boletim: status só manual. */
+const PLAN_SINONIMOS={
+  CAFE:{ kcl:"Adubação via lanço", ferti:"Adubação via fertirrigação", fertirrigacao:"Adubação via fertirrigação",
+    esqueletar:"Poda mecanizada esqueletamento", esqueletamento:"Poda mecanizada esqueletamento",
+    varricao:"Colheita", levantar:"Levantar café", calcario:"Calagem / gessagem", gesso:"Calagem / gessagem",
+    herbicida:"Capina química manual", rocada:"Capina mecânica com roçadeira", adubacao:"Adubação manual",
+    desbrota:"Desbrota manual", pulverizacao:"Pulverização manual", irrigacao:"Irrigação automática" },
+  GRAOS:{ kcl:"Adubação de cobertura", cobertura:"Adubação de cobertura", calcario:"Calagem", gesso:"Gessagem",
+    dessecacao:"Dessecação de pré-plantio", plantio:"Plantio / semeadura", colheita:"Colheita mecanizada",
+    herbicida:"Herbicida pós-emergente", fungicida:"Fungicida", inseticida:"Inseticida" },
+  PECUARIA:{ vacina:"Vacinação (especificar)", vacinacao:"Vacinação (especificar)", vermifugacao:"Vermifugação",
+    rocada:"Roçada", cerca:"Manutenção de cerca / cocho / bebedouro", cocho:"Manutenção de cerca / cocho / bebedouro",
+    pesagem:"Pesagem", desmama:"Desmama", formiga:"Controle de formiga" }
+};
+const PLAN_ESTRUTURA=["caixa dagua","caixa d agua","piscinao","talude","adutora","barracao","galpao","cerca","estrada",
+  "aceiro","represa","bomba","poco","rede eletrica","energia","curral","laboratorio","reforma","construcao","montagem"];
+const planEhEstrutura = desc => { const n=normTxt(desc); return PLAN_ESTRUTURA.some(k=>n.includes(k)); };
+const planOpsDaAtividade = atv => atv==="GRAOS" ? OPS_GRAOS_FASES.flatMap(([,o])=>o)
+  : atv==="PECUARIA" ? LISTA_PECUARIA : LISTA_ATIV.filter(n=>n!=="Outra");
+/* operações do catálogo que casam com a descrição (sinônimo primeiro, depois palavra inteira com 5+ letras) */
+function planOperacoesDe(t){
+  const atv=t.unidade?atividadeDe(t.unidade):"CAFE";
+  const n=" "+normTxt(t.desc).replace(/[^a-z0-9]+/g," ")+" ";
+  const ops=planOpsDaAtividade(atv), achadas=[];
+  Object.entries(PLAN_SINONIMOS[atv]||{}).forEach(([k,op])=>{ if(n.includes(" "+k) && ops.includes(op) && !achadas.includes(op)) achadas.push(op); });
+  ops.forEach(op=>{ if(achadas.includes(op)) return;
+    const toks=normTxt(op).replace(/[^a-z0-9]+/g," ").split(" ").filter(w=>w.length>=5);
+    if(toks.length && toks.some(w=>n.includes(" "+w))) achadas.push(op); });
+  return achadas;
+}
+
+/* ---- coleções ---- */
+const planTarefas  = () => (D.tarefas = D.tarefas || []);
+const planRodadas  = () => (D.rodadas = D.rodadas || []);
+const planSemanas  = () => (D.semanas = D.semanas || []);
+const planHist     = () => (D.tarefaHistorico = D.tarefaHistorico || []);
+const planTarefa   = id => planTarefas().find(t=>t.id===id) || null;
+const planHistDe   = id => planHist().filter(h=>h.tarefaId===id).sort((a,b)=>a.em<b.em?1:-1);
+const planQuem     = () => (sessao && sessao.nome) || "";
+const planAgora    = () => hojeBRT()+" "+agoraHM();
+function planLog(t, campo, de, para, motivo){
+  planHist().push({id:uid(), tarefaId:t.id, campo, de:de||"", para:para||"", motivo:motivo||"", em:planAgora(), por:planQuem()});
+  t.atualizadoEm=planAgora();
+}
+/* uma tarefa nova (da ata, da semana ou avulsa). `o` já vem normalizado por quem chama. */
+function planNovaTarefa(o){
+  const t={ id:uid(), origemTipo:o.origemTipo||"avulsa", origemId:o.origemId||"", origemRot:o.origemRot||"",
+    unidade:o.unidade||"", unidadeTexto:o.unidadeTexto||"", area:o.area||"", desc:String(o.desc||"").trim(),
+    prazo:o.prazo||"", prazoOriginal:o.prazo||"", responsavel:o.responsavel||"",
+    status:o.status||"a_iniciar", tipoItem:o.tipoItem||"tarefa", semanas:[], arrastadaDe:[],
+    criadoEm:hojeBRT(), atualizadoEm:planAgora(), por:planQuem() };
+  if(o.bloqueio) t.bloqueio={...o.bloqueio, desde:o.bloqueio.desde||hojeBRT()};
+  if(o.bloqueio) t.statusAntes=o.statusAntes||"a_iniciar";
+  planTarefas().push(t);
+  planLog(t,"criada","",t.status,o.origemRot||"");
+  return t;
+}
+/* UM toque muda o status. Reversível e registrada: nada some, nada é apagado — por isso não há
+   diálogo de confirmação nenhum neste módulo (CLAUDE.md, c10: entrega nova não aumenta a conta). */
+function planMudarStatus(id, novo, o){
+  o=o||{};
+  const t=planTarefa(id); if(!t) return null;
+  const de=t.status;
+  t.status=novo;
+  if(novo==="aguardando_terceiro"||novo==="aguardando_clima"){
+    if(de!=="aguardando_terceiro" && de!=="aguardando_clima") t.statusAntes=de;
+    t.bloqueio={ tipo: novo==="aguardando_clima"?"clima":"terceiro", quem:o.quem||"",
+      motivo:o.motivo||"", texto:o.texto||"", desde:o.desde||hojeBRT() };
+  }else{
+    delete t.bloqueio; delete t.statusAntes; delete t.destravadaEm;
+  }
+  if(novo==="em_execucao" && !t.inicioReal) t.inicioReal=hojeBRT();
+  if(novo==="finalizado") t.concluidoEm=hojeBRT(); else delete t.concluidoEm;
+  if(novo==="cancelado") t.cancelMotivo=o.motivo||o.texto||"";
+  planLog(t,"status",de,novo,o.texto||o.motivo||"");
+  planGravar(t);
+  return t;
+}
+function planNovoPrazo(id, prazo, motivo){
+  const t=planTarefa(id); if(!t||!prazo) return null;
+  const de=t.prazo;
+  if(!t.prazoOriginal) t.prazoOriginal=de;
+  t.prazo=prazo; t.repactuada=true;
+  planLog(t,"prazo",de,prazo,motivo||"");
+  planGravar(t);
+  return t;
+}
+function planGravar(t){ salvarDados(); if(t) syncEnfileirar("tar", t.id); }
+
+/* ---- motor de calendário: roda a cada abertura e a cada sincronização, sozinho ---- */
+const planDiaSemana = iso => new Date(String(iso).slice(0,10)+"T12:00:00").getDay();
+const planDiasEntre = (a,b) => Math.round((new Date(String(b).slice(0,10)+"T12:00:00")-new Date(String(a).slice(0,10)+"T12:00:00"))/864e5);
+const planFimDoMes = iso => { const d=new Date(String(iso).slice(0,10)+"T12:00:00"); const f=new Date(d.getFullYear(), d.getMonth()+1, 0);
+  return f.getFullYear()+"-"+String(f.getMonth()+1).padStart(2,"0")+"-"+String(f.getDate()).padStart(2,"0"); };
+const planMesDe = iso => String(iso||"").slice(0,7);
+const planMesRot = ref => { const [a,m]=String(ref||"").split("-"); return m?(MESES_REL[parseInt(m,10)-1]||"").replace(/^./,c=>c.toUpperCase())+"/"+a.slice(2):"—"; };
+const planMesNome = ref => { const NOMES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const [,m]=String(ref||"").split("-"); return m?NOMES[parseInt(m,10)-1]||"":""; };
+/* dia impedido pelo clima DECLARADO no boletim da unidade (mesma fonte do plano do dia, v75) */
+const planBoletimDe = (fz,dia) => D.boletins.find(b=>b.fazendaId===fz && b.data===dia) || null;
+function planClima(fz, de, ate){
+  const out={n:0, dias:[], firmes:0, comBoletim:0};
+  if(!fz || !de) return out;
+  const ini=String(de).slice(0,10), fim=String(ate||hojeBRT()).slice(0,10);
+  const ls=D.boletins.filter(b=>b.fazendaId===fz && b.data>=ini && b.data<=fim).sort((a,b)=>a.data<b.data?-1:1);
+  ls.forEach(b=>{ out.comBoletim++; if(diaImpedido(b)){ out.n++; out.dias.push(b.data); } });
+  for(let i=ls.length-1;i>=0;i--){ if(diaImpedido(ls[i])) break; out.firmes++; }
+  return out;
+}
+/* prazo que vale hoje = prazo original + os dias de chuva que pararam o serviço (o original nunca se perde) */
+const planPrazoEfetivo = t => (!t.prazo || !n0(t.diasChuva)) ? (t.prazo||"") : diaISO(t.prazo, n0(t.diasChuva));
+const planDiasParaPrazo = t => { const p=planPrazoEfetivo(t); return p ? planDiasEntre(hojeBRT(), p) : null; };
+/* dias úteis: fora domingos e fora dias impedidos pelo clima declarado (fonte no rodapé da tela) */
+function planDiasUteis(fz, de, ate){
+  if(!de||!ate) return 0;
+  const ini=String(de).slice(0,10), fim=String(ate).slice(0,10);
+  if(ini>fim) return 0;
+  const imped=new Set(planClima(fz, ini, fim).dias);
+  let n=0;
+  for(let d=ini; d<=fim; d=diaISO(d,1)){ if(planDiaSemana(d)===0) continue; if(imped.has(d)) continue; n++; }
+  return n;
+}
+function planSomarDiasUteis(fz, de, dias){
+  let d=String(de).slice(0,10), faltam=Math.max(0,dias);
+  let guarda=0;
+  while(faltam>0 && guarda++<400){ d=diaISO(d,1); if(planDiaSemana(d)!==0) faltam--; }
+  return d;
+}
+function planFarol(t){
+  if(t.status==="cancelado") return "cancelado";
+  if(t.status==="finalizado") return "feito";
+  if(planPausada(t)) return "cinza";      /* regra 2: aguardando nunca fica vermelho */
+  if(!t.prazo) return "cinza";
+  const d=planDiasParaPrazo(t);
+  if(d<=2) return "vermelho";
+  if(d<=7) return "amarelo";
+  return "verde";
+}
+const planAtrasada = t => planAberta(t) && !planPausada(t) && !!t.prazo && planDiasParaPrazo(t)<0;
+const planTravadaDias = t => planPausada(t) ? planDiasEntre((t.bloqueio&&t.bloqueio.desde)||t.criadoEm, hojeBRT()) : 0;
+const planArrastaMeses = t => (t.arrastadaDe||[]).length;
+/* quanto já foi feito da área da tarefa: soma dos talhões DISTINTOS da unidade em que a operação
+   casada com a descrição foi registrada desde que a tarefa começou. Nada digitado. */
+function planFeitoHa(t){
+  if(!t.unidade || !n0(t.area)) return 0;
+  const ops=planOperacoesDe(t); if(!ops.length) return 0;
+  const ini=String(t.inicioReal||t.criadoEm||hojeBRT()).slice(0,10);
+  const cat=PLANO_ATIVIDADE[atividadeDe(t.unidade)]||PLANO_ATIVIDADE.CAFE;
+  const tals=new Set();
+  D.boletins.filter(b=>b.fazendaId===t.unidade && b.data>=ini && b.data<=hojeBRT())
+    .forEach(b=>(cat.feitos(b)||[]).forEach(f=>{ if(ops.includes(nomeAtual(f.op)) && f.onde && f.onde!=="geral") tals.add(f.onde); }));
+  let ha=0; tals.forEach(id=>{ ha+=n0(talhao(id).area); });
+  return Math.min(ha, n0(t.area));
+}
+/* "feito 40 de 96 ha · no ritmo atual conclui em 24/09 (4 dias após o prazo)" */
+function planProjecao(t){
+  if(!planAberta(t) || !n0(t.area)) return null;
+  const feito=planFeitoHa(t);
+  if(feito<=0) return null;
+  const ini=String(t.inicioReal||t.criadoEm||hojeBRT()).slice(0,10);
+  const uteis=Math.max(1, planDiasUteis(t.unidade, ini, hojeBRT()));
+  const ritmo=feito/uteis;
+  const faltam=Math.max(0, n0(t.area)-feito);
+  if(faltam<=0) return {feito, area:n0(t.area), ritmo, fim:hojeBRT(), atraso:0};
+  const dias=Math.ceil(faltam/ritmo);
+  const fim=planSomarDiasUteis(t.unidade, hojeBRT(), dias);
+  const prazo=planPrazoEfetivo(t);
+  return {feito, area:n0(t.area), ritmo, fim, dias, atraso: prazo?planDiasEntre(prazo,fim):0};
+}
+/* o motor: farol, dias de chuva, saída automática da pausa por clima e semana da sexta.
+   Roda a cada abertura de tela do módulo e a cada sincronização — ninguém precisa lembrar de nada. */
+let planMotorEm="";
+function planMotor(forcar){
+  if(!D) return;
+  const marca=hojeBRT()+"|"+planTarefas().length+"|"+(D.boletins||[]).length;
+  if(!forcar && marca===planMotorEm) return;
+  planMotorEm=marca;
+  let mudou=false;
+  planTarefas().forEach(t=>{
+    if(t.status!=="aguardando_clima") return;
+    const desde=(t.bloqueio&&t.bloqueio.desde)||t.criadoEm||hojeBRT();
+    const c=planClima(t.unidade, desde, hojeBRT());
+    if(n0(t.diasChuva)!==c.n){ t.diasChuva=c.n; mudou=true; }
+    if(c.firmes>=PLAN_DIAS_SOL){
+      const volta=t.statusAntes||"a_iniciar";
+      t.status=volta; delete t.bloqueio; delete t.statusAntes;
+      t.destravadaEm=hojeBRT();
+      planLog(t,"status","aguardando_clima",volta,"o tempo firmou ("+c.firmes+" dias sem chuva impeditiva no boletim)");
+      mudou=true;
+    }
+  });
+  if(planSemanaGarantir()) mudou=true;
+  if(mudou) salvarDados();
+}
+/* ---- semanas: a tela da sexta nasce sozinha (segunda a domingo da semana que começa) ---- */
+const planSegundaDe = iso => { const d=planDiaSemana(iso); return diaISO(iso, d===0?-6:1-d); };
+const planSemanaDe = ini => planSemanas().find(s=>s.ini===ini) || null;
+const planSemanaAtual = () => planSemanaDe(planSegundaDe(hojeBRT()));
+const planSemanaRot = s => s ? ("Semana "+fmtDataCurta(s.ini)+" a "+fmtDataCurta(s.fim)) : "";
+function planSemanaCriar(ini){
+  const s={ id:uid(), ini, fim:diaISO(ini,6), criadoEm:hojeBRT(), fechada:false, fechadoEm:"", placar:null };
+  planSemanas().push(s);
+  return s;
+}
+/* garante a semana corrente e, na sexta (ou depois), a semana seguinte — a tela existe antes de alguém pedir */
+function planSemanaGarantir(){
+  let mudou=false;
+  const seg=planSegundaDe(hojeBRT());
+  if(!planSemanaDe(seg)){ planSemanaCriar(seg); mudou=true; }
+  if(planDiaSemana(hojeBRT())>=5 || planDiaSemana(hojeBRT())===0){
+    const prox=diaISO(seg,7);
+    if(!planSemanaDe(prox)){ planSemanaCriar(prox); mudou=true; }
+  }
+  return mudou;
+}
+const planSemanaProxima = () => planSemanaDe(diaISO(planSegundaDe(hojeBRT()),7));
+const planSemanaAnterior = () => planSemanaDe(diaISO(planSegundaDe(hojeBRT()),-7));
+const planComprometidas = sid => planTarefas().filter(t=>(t.semanas||[]).includes(sid));
+function planComprometer(id, sid){
+  const t=planTarefa(id); if(!t||!sid) return null;
+  t.semanas=t.semanas||[];
+  const i=t.semanas.indexOf(sid);
+  if(i>=0){ t.semanas.splice(i,1); planLog(t,"compromisso",sid,"","tirada da semana"); }
+  else { t.semanas.push(sid); planLog(t,"compromisso","",sid,"comprometida na semana"); }
+  planGravar(t);
+  return t;
+}
+/* sugestões da semana: prazo próximo (≤7 dias), atrasadas e recém-destravadas — sem nada digitado */
+function planSugestoesSemana(sid){
+  return planTarefas().filter(t=>planAberta(t) && t.tipoItem==="tarefa" && podeVer(t.unidade)
+      && !(t.semanas||[]).includes(sid))
+    .filter(t=>{ const d=planDiasParaPrazo(t);
+      return t.destravadaEm || (d!==null && d<=7); })
+    .sort(planOrdenar);
+}
+/* fechamento automático da semana que passou: comprometido × concluído × travado + placar */
+function planFecharSemana(s){
+  if(!s) return null;
+  const ls=planComprometidas(s.id);
+  const conc=ls.filter(t=>t.status==="finalizado" && (!t.concluidoEm || t.concluidoEm<=s.fim));
+  const trav=ls.filter(planPausada);
+  const abertas=ls.filter(t=>planAberta(t) && !planPausada(t));
+  return { n:ls.length, concluidas:conc, travadas:trav, abertas, placar: ls.length?("cumprimos "+conc.length+" de "+ls.length):"" };
+}
+const planOrdenar = (a,b) => (PLAN_FAROL_ORDEM[planFarol(a)]-PLAN_FAROL_ORDEM[planFarol(b)])
+  || ((a.prazo||"9999")<(b.prazo||"9999")?-1:(a.prazo||"9999")>(b.prazo||"9999")?1:0)
+  || String(a.desc).localeCompare(String(b.desc),"pt-BR");
+
+/* ---- recortes de leitura ---- */
+const planVisiveis = () => planTarefas().filter(t=>!t.unidade || podeVer(t.unidade));
+const planDaUnidade = fz => planTarefas().filter(t=>t.unidade===fz);
+const planAbertasDa = fz => planDaUnidade(fz).filter(t=>planAberta(t) && t.tipoItem==="tarefa").sort(planOrdenar);
+const planRodadaAtual = () => planRodadas().slice().sort((a,b)=>a.ref<b.ref?1:-1)[0] || null;
+const planRodadaDoMes = ref => planRodadas().find(r=>r.ref===ref) || null;
+/* resumo do mês (cabeçalho permanente da área Planejamento e cartão do painel) */
+function planResumoMes(ref, fz){
+  const ls=planVisiveis().filter(t=>t.tipoItem==="tarefa" && (!fz||t.unidade===fz)
+    && (!ref || planMesDe(t.prazo||t.criadoEm)===ref || (t.origemTipo==="mensal" && planMesDe((planRodadaDoMes(ref)||{}).data||"")===ref && t.origemId===(planRodadaDoMes(ref)||{}).id)));
+  const fim=ls.filter(t=>t.status==="finalizado").length;
+  const canc=ls.filter(t=>t.status==="cancelado").length;
+  const base=ls.length-canc;
+  return { ref, n:ls.length, finalizadas:fim, canceladas:canc,
+    pct: base?Math.round(fim*100/base):null,
+    atrasadas: ls.filter(planAtrasada), travadas: ls.filter(planPausada),
+    arrastadas: ls.filter(t=>planArrastaMeses(t)>0),
+    vermelhas: ls.filter(t=>planFarol(t)==="vermelho").length,
+    amarelas: ls.filter(t=>planFarol(t)==="amarelo").length,
+    cinzas: ls.filter(t=>planFarol(t)==="cinza").length,
+    verdes: ls.filter(t=>planFarol(t)==="verde").length, lista:ls };
+}
+/* pendências agrupadas por fornecedor — quem falta, desde quando e quais fazendas estão paradas */
+function planPorTerceiro(){
+  const mapa={};
+  planVisiveis().filter(t=>t.status==="aguardando_terceiro").forEach(t=>{
+    const quem=((t.bloqueio&&t.bloqueio.quem)||"").trim() || "sem fornecedor identificado";
+    const g=mapa[quem]=mapa[quem]||{quem, tarefas:[], desde:"", unidades:new Set()};
+    g.tarefas.push(t);
+    const d=(t.bloqueio&&t.bloqueio.desde)||t.criadoEm;
+    if(!g.desde || d<g.desde) g.desde=d;
+    if(t.unidade) g.unidades.add(t.unidade);
+  });
+  return Object.values(mapa).map(g=>({...g, unidades:[...g.unidades]}))
+    .sort((a,b)=>(b.tarefas.length-a.tarefas.length)||(a.desde<b.desde?-1:1));
+}
+/* alertas automáticos do motor — nenhum depende de alguém abrir uma tela */
+function planAlertas(){
+  const out=[];
+  planVisiveis().filter(t=>t.tipoItem==="tarefa").forEach(t=>{
+    const f=planFarol(t);
+    if(planAtrasada(t)) out.push({tipo:"vencida", t, txt:"vencida em "+fmtData(planPrazoEfetivo(t))});
+    else if(f==="vermelho") out.push({tipo:"2dias", t, txt:"vence em "+planDiasParaPrazo(t)+" dia(s)"});
+    else if(f==="amarelo") out.push({tipo:"7dias", t, txt:"vence em "+planDiasParaPrazo(t)+" dias"});
+    if(planPausada(t) && planTravadaDias(t)>PLAN_TRAVA_COBRANCA) out.push({tipo:"cobranca", t, txt:"travada há "+planTravadaDias(t)+" dias"});
+    if(t.destravadaEm===hojeBRT()) out.push({tipo:"destravada", t, txt:"voltou ao radar do gerente"});
+    if(planArrastaMeses(t)>=PLAN_ARRASTA_ALERTA) out.push({tipo:"arrastada", t, txt:"arrastada há "+planArrastaMeses(t)+" reuniões"});
+  });
+  return out;
+}
+
+/* ---- leitura da ata colada (item 4): texto inteiro → itens, com pré-visualização editável ----
+   Nada é gravado antes de a pessoa conferir item a item. Reimportar a mesma ata não duplica
+   (chave: rodada + unidade + descrição normalizada). */
+const ATA_CAB_GERAIS=/^\s*(?:\d+(?:\.\d+)*\s*[–—-]\s*)?(assuntos?\s+gerais|necessidades?\s+de\s+investimento|investimentos?)\s*:?\s*$/i;
+const ATA_BLOCO=/^\s*(\d+(?:\.\d+)*)\s*[–—-]\s*(.+?)\s*$/;
+const ATA_ITEM=/^\s*[-–—•*]\s*(.+?)\s*$/;
+const ATA_PRAZO=/PRAZO\s*:?\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{2,4})/i;
+/* "96 há", "22 ha", "40 hectares": \b não serve depois de "á" (fora do \w) — a fronteira é a letra seguinte */
+const ATA_AREA=/(\d+(?:[.,]\d+)?)\s*(?:h[aá]s?|hectares?)(?![A-Za-zÀ-ÿ0-9])/i;
+const ATA_CLIMA=/(aguardando\s+sol|quando\s+parar\s+(?:as\s+)?chuvas?|\d+\s*dias?\s+de\s+sol|esperando\s+(?:o\s+)?tempo|parar\s+de\s+chover|dep(?:o|ó)is\s+das\s+chuvas)/i;
+const ATA_TERCEIRO=/(aguardando\s+repasse|aguardando\s+aprova\w*|aguardando\s+[a-zà-ú]+|falta\s+chegar|falta\s+entregar|falta\s+pe[çc]as?|cobrar\s+[A-ZÀ-Ú][\wÀ-ÿ]*)/i;
+const ATA_FIM=/\b(ok|finalizad[oa]s?|conclu[ií]d[oa]s?|pronto|feito)\b/i;
+const ATA_EXEC=/\b(em\s+andamento|andamento|iniciou|iniciad[oa]s?|finalizando|em\s+execu\w*|come[çc]ou)\b/i;
+const ATA_TERCEIROS_CONHECIDOS=["Cooxupé","Diferpan","Cemig","Sicoob","Bayer","Yara","Mosaic","Copercampos","Netafim","John Deere","Jacto"];
+const ataData = (d,m,a) => { const ano=a.length===2?("20"+a):a;
+  return ano+"-"+String(parseInt(m,10)).padStart(2,"0")+"-"+String(parseInt(d,10)).padStart(2,"0"); };
+function ataTerceiroDe(txt){
+  const conh=ATA_TERCEIROS_CONHECIDOS.find(n=>normTxt(txt).includes(normTxt(n)));
+  if(conh) return conh;
+  const m=/(?:cobrar|aguardando|falta\s+(?:chegar|entregar)\s+(?:d[aeo]\s+)?)\s+([A-ZÀ-Ú][\wÀ-ÿ]{2,})/.exec(txt);
+  return m ? m[1] : "";
+}
+function ataResponsavelDe(txt){
+  const dc=/definid[oa]\s+com\s+([A-ZÀ-Ú][\wÀ-ÿ\/\s]{2,30}?)(?:[.,)]|$)/i.exec(txt);
+  if(dc) return dc[1].trim();
+  const parens=[...txt.matchAll(/\(([^()]*)\)/g)].map(m=>m[1].trim()).filter(Boolean);
+  const cand=parens.filter(p=>!ATA_CLIMA.test(p) && !ATA_TERCEIRO.test(p) && !/\d/.test(p) && p.split(/\s+/).length<=5 && /[A-ZÀ-Ú]/.test(p[0]||""));
+  return cand.length ? cand[cand.length-1].replace(/\s*\/\s*/g,"/").trim() : "";
+}
+function ataLerItem(linha, ctx){
+  const bruto=linha.trim();
+  const it={ desc:"", prazo:"", area:"", responsavel:"", status:"a_iniciar", bloqueio:null,
+    unidade:ctx.unidade||"", unidadeTexto:ctx.unidadeTexto||"", tipoItem:ctx.tipoItem||"tarefa", bruto, avisos:[] };
+  let txt=bruto;
+  const p=ATA_PRAZO.exec(txt);
+  if(p){ it.prazo=ataData(p[1],p[2],p[3]); txt=txt.replace(p[0],""); }
+  const a=ATA_AREA.exec(txt);
+  if(a) it.area=String(a[1]).replace(",",".");
+  it.responsavel=ataResponsavelDe(bruto);
+  const clima=ATA_CLIMA.test(bruto), terc=ATA_TERCEIRO.test(bruto);
+  if(ATA_FIM.test(bruto)) it.status="finalizado";
+  else if(clima){ it.status="aguardando_clima"; it.bloqueio={tipo:"clima", quem:"", texto:"aguardando o tempo firmar"}; }
+  else if(terc){ const quem=ataTerceiroDe(bruto);
+    it.status="aguardando_terceiro";
+    it.bloqueio={tipo:"terceiro", quem, texto:(ATA_TERCEIRO.exec(bruto)||[])[1]||"aguardando"}; }
+  else if(ATA_EXEC.test(bruto)) it.status="em_execucao";
+  /* descrição limpa: sem o PRAZO e sem sobra de pontuação nas pontas */
+  it.desc=txt.replace(/\s*[-–—:.,;]+\s*$/,"").replace(/\s{2,}/g," ").trim();
+  if(!it.desc) it.desc=bruto;
+  if(it.tipoItem!=="tarefa"){ it.prazo=""; it.unidade=""; }
+  if(it.tipoItem==="tarefa" && !it.unidade) it.avisos.push("unidade não reconhecida");
+  return it;
+}
+function ataParsear(texto){
+  const linhas=String(texto||"").split(/\r?\n/);
+  const out={itens:[], gerais:[], fora:[], blocos:[]};
+  let ctx={unidade:"", unidadeTexto:"", tipoItem:"tarefa"}, ignorando=false;
+  linhas.forEach(l=>{
+    const linha=l.replace(/ /g," ").trimEnd();
+    if(!linha.trim()) return;
+    if(ATA_CAB_GERAIS.test(linha)){
+      const g=ATA_CAB_GERAIS.exec(linha)[1];
+      ctx={unidade:"", unidadeTexto:"", tipoItem:/investimento/i.test(g)?"investimento":"assunto"};
+      ignorando=false; return;
+    }
+    const b=ATA_BLOCO.exec(linha);
+    if(b && !ATA_ITEM.test(linha)){
+      const nome=b[2].replace(/[:.]\s*$/,"").trim();
+      const dp=deparaAtaDe(nome);
+      if(dp && dp.fora){ ignorando=true; ctx={unidade:"", unidadeTexto:nome, tipoItem:"tarefa"};
+        if(!out.fora.includes(nome)) out.fora.push(nome); return; }
+      ignorando=false;
+      ctx={unidade:(dp&&dp.unidade)||"", unidadeTexto:nome, tipoItem:"tarefa", area:(dp&&dp.area)||""};
+      out.blocos.push({nome, unidade:ctx.unidade, area:ctx.area||""});
+      return;
+    }
+    const i=ATA_ITEM.exec(linha);
+    if(!i) return;
+    if(ignorando) return;                                   /* fazenda fora do escopo: some sem perguntar */
+    const it=ataLerItem(i[1], ctx);
+    if(ctx.area) it.areaNome=ctx.area;                      /* "FMC Igrejinha" → área dentro de Monte Carmelo — Café */
+    it.incluir=true;
+    if(it.tipoItem==="tarefa") out.itens.push(it); else out.gerais.push(it);
+  });
+  return out;
+}
+const ataChave = (rodadaId, unidade, desc) => [rodadaId, unidade||"", normTxt(desc).replace(/[^a-z0-9]/g,"")].join("|");
+const ataJaTem = (rodadaId, it) => planTarefas().some(t=>ataChave(t.origemId, t.unidade, t.desc)===ataChave(rodadaId, it.unidade, it.desc));
+/* grava a pré-visualização já conferida. Devolve {novas, repetidas}. */
+function ataImportar(rodada, itens){
+  let novas=0, repetidas=0;
+  itens.filter(it=>it.incluir!==false && String(it.desc||"").trim()).forEach(it=>{
+    if(ataJaTem(rodada.id, it)){ repetidas++; return; }
+    planNovaTarefa({ origemTipo:"mensal", origemId:rodada.id, origemRot:rodada.nome,
+      unidade:it.unidade, unidadeTexto:it.unidadeTexto, area:it.area, desc:(it.areaNome?it.areaNome+" — ":"")+it.desc,
+      prazo:it.prazo, responsavel:it.responsavel, status:it.status, tipoItem:it.tipoItem,
+      bloqueio:it.bloqueio, statusAntes:"a_iniciar" });
+    novas++;
+  });
+  salvarDados();
+  planTarefas().filter(t=>t.origemId===rodada.id).forEach(t=>syncEnfileirar("tar",t.id));
+  syncEnfileirar("rod", rodada.id);
+  return {novas, repetidas};
+}
+
+/* ---- faixa "📋 Tarefas da reunião" (item 7) — topo da casa do gerente e do boletim ----
+   Componente ÚNICO nas três atividades. Sem tarefa aberta na unidade, devolve "" (nada aparece).
+   No máximo PLAN_FAIXA_MAX linhas, ordem 🔴 → 🟡 → ⏸️ → 🟢, com "＋N tarefas". Tudo em dia vira
+   uma linha só. Relata prazo e registro — nunca "não fez", "atrasado" no campo é o rótulo do
+   próprio prazo vencido (ATRASADO), nunca julgamento de pessoa. */
+function planLinhaTexto(t){
+  const f=planFarol(t);
+  const partes=[];
+  if(n0(t.area)) partes.push(n0(t.area).toLocaleString("pt-BR",{maximumFractionDigits:0})+" ha");
+  if(planPausada(t)) partes.push(((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())+((t.bloqueio&&t.bloqueio.quem)?" ("+t.bloqueio.quem+")":""));
+  else if(t.prazo) partes.push((f==="vermelho"&&planDiasParaPrazo(t)<0?"ATRASADO desde ":"vence ")+fmtDataCurta(planPrazoEfetivo(t)));
+  else partes.push("sem prazo");
+  return partes.join(" · ");
+}
+function faixaTarefas(fz){
+  if(!fz) return "";
+  const ls=planAbertasDa(fz);
+  if(!ls.length) return "";
+  const urgentes=ls.filter(t=>planFarol(t)!=="verde");
+  if(!urgentes.length){
+    const prox=ls.filter(t=>t.prazo).sort((a,b)=>a.prazo<b.prazo?-1:1)[0];
+    return `<div class="aviso tar-faixa" id="tar-faixa"><div class="linha-flex" style="gap:8px">
+      <b class="cresce">📋 Tarefas em dia${prox?` <span class="mut tar-conta">próxima vence ${esc(fmtDataCurta(planPrazoEfetivo(prox)))}</span>`:""}</b>
+      <button class="btn suave mini" data-tar-todas="${esc(fz)}">ver</button></div></div>`;
+  }
+  const mostra=ls.slice(0,PLAN_FAIXA_MAX), resto=ls.length-mostra.length;
+  return `<div class="aviso tar-faixa" id="tar-faixa"><div class="linha-flex" style="gap:8px">
+      <b class="cresce">📋 Tarefas da reunião <span class="mut tar-conta">${ls.length} aberta${ls.length>1?"s":""}</span></b></div>
+    ${mostra.map(t=>`<button class="tar-item" data-tar="${t.id}" aria-label="${esc(t.desc)} — ${esc(planLinhaTexto(t))}">
+      <span class="tar-farol" aria-hidden="true">${PLAN_FAROL[planFarol(t)].ico}</span>
+      <b>${esc(t.desc)}</b><span class="mut"> · ${esc(planLinhaTexto(t))}</span></button>`).join("")}
+    ${resto>0?`<button class="btn suave mini mt" data-tar-todas="${esc(fz)}">＋${resto} tarefa${resto>1?"s":""}</button>`:""}</div>`;
+}
+/* sugestão do vínculo com o boletim (item 10): o app SUGERE, nunca conclui sozinho. Um toque em
+   "Concluí" fecha; um toque em "ainda não" some pelo resto do dia. Sem diálogo, sem modal. */
+function planSugestaoBoletim(fz, dia){
+  const b=planBoletimDe(fz,dia); if(!b) return "";
+  const cat=PLANO_ATIVIDADE[atividadeDe(fz)]||PLANO_ATIVIDADE.CAFE;
+  const feitas=(cat.feitos(b)||[]).map(f=>nomeAtual(f.op));
+  if(!feitas.length) return "";
+  const ls=planAbertasDa(fz).filter(t=>!planEhEstrutura(t.desc) && !(planSugestaoAdiada[t.id]===dia))
+    .filter(t=>planOperacoesDe(t).some(op=>feitas.includes(op)));
+  if(!ls.length) return "";
+  const t=ls[0];
+  const op=planOperacoesDe(t).find(o=>feitas.includes(o))||"";
+  return `<div class="cartao tar-sug"><b>Você lançou ${esc(nomeAtual(op).toLowerCase())} ${dia===hojeBRT()?"hoje":"em "+fmtDataCurta(dia)} — concluir a tarefa?</b>
+    <p class="mut" style="margin:2px 0 8px;font-size:.85rem">${esc(t.desc)}${t.prazo?" · vence "+esc(fmtDataCurta(planPrazoEfetivo(t))):""}</p>
+    <div class="chips"><button class="chip" data-tar-ok="${t.id}">Concluí</button>
+      <button class="chip" data-tar-adiar="${t.id}">ainda não</button></div></div>`;
+}
+let planSugestaoAdiada={};
+
+/* ---- folha da tarefa (gerente e escritório): ações de UM TOQUE, nada digitado ---- */
+let tarUI=null;
+function planFolhaCorpo(){
+  if(!tarUI.id) return planFolhaLista();
+  const t=planTarefa(tarUI.id); if(!t) return `<p class="mut">Tarefa não encontrada.</p>`;
+  const f=planFarol(t), proj=planProjecao(t), hist=planHistDe(t.id).slice(0,4);
+  const prazo=planPrazoEfetivo(t);
+  const uteis=t.prazo?planDiasUteis(t.unidade, hojeBRT(), prazo):0;
+  return `<div class="cartao">
+      <b>${PLAN_FAROL[f].ico} ${esc(t.desc)}</b>
+      <p class="mut" style="margin:4px 0 0">${esc(t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||"Grupo"))}${n0(t.area)?" · "+esc(n0(t.area).toLocaleString("pt-BR",{maximumFractionDigits:0}))+" ha":""} · ${esc(planStatusRot(t.status).toLowerCase())}</p>
+      <p class="mut" style="margin:2px 0 0">${t.prazo?`prazo ${esc(fmtData(prazo))}${n0(t.diasChuva)?` <span class="tar-ajuste">ajustado +${n0(t.diasChuva)} dia${n0(t.diasChuva)>1?"s":""} de chuva (original ${esc(fmtData(t.prazoOriginal||t.prazo))})</span>`:""}${uteis?" · "+uteis+" dia"+(uteis>1?"s":"")+" úteis pela frente":""}`:"sem prazo"}</p>
+      ${t.responsavel?`<p class="mut" style="margin:2px 0 0">com ${esc(t.responsavel)}</p>`:""}
+      ${t.origemRot?`<p class="mut" style="margin:2px 0 0;font-size:.78rem">origem: ${esc(t.origemRot)}${planArrastaMeses(t)?" · arrastada há "+planArrastaMeses(t)+" reuniões":""}</p>`:""}
+      ${proj?`<p class="mut tar-proj">feito <b class="num">${esc(proj.feito.toLocaleString("pt-BR",{maximumFractionDigits:0}))}</b> de <b class="num">${esc(proj.area.toLocaleString("pt-BR",{maximumFractionDigits:0}))}</b> ha · no ritmo atual conclui em ${esc(fmtDataCurta(proj.fim))}${proj.atraso>0?` (${proj.atraso} dia${proj.atraso>1?"s":""} após o prazo)`:proj.atraso<0?` (${-proj.atraso} dia${-proj.atraso<-1?"s":""} antes do prazo)`:""}</p>
+        <p class="mut" style="font-size:.72rem;margin:2px 0 0">Ritmo calculado dos talhões já registrados no boletim; dias úteis sem domingo e sem os dias de chuva declarados.</p>`:""}
+    </div>
+    <div class="cartao"><b>O que aconteceu?</b>
+      <p class="mut" style="font-size:.78rem;margin:2px 0 8px">Um toque responde. Dá para mudar de novo depois.</p>
+      <div class="chips">
+        <button class="chip ${t.status==="em_execucao"?"on":""}" data-tar-st="em_execucao">Comecei</button>
+        <button class="chip ${t.status==="finalizado"?"on":""}" data-tar-st="finalizado">Concluí</button>
+        <button class="chip ${planPausada(t)?"on":""}" data-tar-trava="1">Travado</button>
+      </div>
+      ${tarUI.trava?`<label class="mt">O que travou?</label>
+        <div class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${((t.bloqueio||{}).motivo)===m.id?"on":""}" data-tar-mot="${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+    </div>
+    ${tarUI.podePrazo?`<div class="cartao"><b>Novo prazo</b>
+      <p class="mut" style="font-size:.78rem;margin:2px 0 8px">Repactuar fica registrado no histórico, com quem e quando.</p>
+      <div class="chips">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-tar-prazo="${p.id}">${esc(p.rot)}</button>`).join("")}</div></div>`:""}
+    <button class="btn sec" data-tar-zap="${t.id}">💬 Falar com o Nilo</button>
+    ${hist.length?`<div class="cartao mt"><b>Histórico</b>
+      <ul class="lista-limpa">${hist.map(h=>`<li><span class="mut" style="font-size:.8rem">${esc(h.em)}${h.por?" · "+esc(h.por):""}</span><br>${esc(planHistTexto(h))}</li>`).join("")}</ul></div>`:""}`;
+}
+/* modo lista da mesma folha: todas as tarefas abertas da unidade do gerente (o "＋N tarefas") */
+function planFolhaLista(){
+  const ls=planAbertasDa(tarUI.fz);
+  if(!ls.length) return htmlEstado("vazio",{que:"tarefa da reunião", unidade:tarUI.fz},{classe:"mut centro mt"});
+  return `<p class="mut" style="margin:0 0 8px">${ls.length} tarefa${ls.length>1?"s":""} aberta${ls.length>1?"s":""} nesta unidade. Toque para responder num toque.</p>`
+    +ls.map(t=>`<button class="cad-item" data-tar-abrir="${t.id}" style="text-align:left">
+      <span class="plan-farol" aria-hidden="true">${PLAN_FAROL[planFarol(t)].ico}</span>
+      <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(planLinhaTexto(t))}</span></span>
+      <span class="seta">›</span></button>`).join("");
+}
+function planHistTexto(h){
+  if(h.campo==="status") return "status: "+(h.de?planStatusRot(h.de).toLowerCase()+" → ":"")+planStatusRot(h.para).toLowerCase()+(h.motivo?" ("+h.motivo+")":"");
+  if(h.campo==="prazo") return "prazo: "+(h.de?fmtData(h.de):"sem prazo")+" → "+fmtData(h.para)+(h.motivo?" ("+h.motivo+")":"");
+  if(h.campo==="compromisso") return h.para?"comprometida na semana":"tirada da semana";
+  if(h.campo==="criada") return "criada"+(h.motivo?" — "+h.motivo:"");
+  return h.campo+(h.motivo?" — "+h.motivo:"");
+}
+function planFolhaPintar(){ const c=document.getElementById("tar-corpo"); if(c) c.innerHTML=planFolhaCorpo(); }
+function planFolhaAbrir(o){
+  tarUI={ id:o.id||"", fz:o.fz||"", trava:false, podePrazo: !!(sessao && sessao.papel!=="gerente") };
+  const f=document.createElement("div"); f.className="folha"; f.id="folha-tarefa";
+  f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label","Tarefas da reunião");
+  f.innerHTML=`<div class="miolo">
+      <div class="topo"><button class="btn-topo" id="bt-tar-fechar">‹ Fechar</button><h1>📋 Tarefas da reunião</h1></div>
+      <div id="tar-corpo">${planFolhaCorpo()}</div>
+    </div>
+    <div class="rodape no-print"><div class="linha-flex" style="gap:8px;max-width:640px;margin:0 auto">
+      <button class="btn sec" id="bt-tar-fechar2">Fechar</button></div></div>`;
+  document.body.appendChild(f);
+  travarFolha();
+  f.onclick=ev=>{ const bt=ev.target.closest("button"); if(!bt) return; const d=bt.dataset;
+    if(bt.id==="bt-tar-fechar"||bt.id==="bt-tar-fechar2"){
+      if(tarUI.id && tarUI.fz){ tarUI.id=""; tarUI.trava=false; planFolhaPintar(); return; }
+      fecharFolhaTarefa(); return; }
+    if(d.tarAbrir!==undefined){ tarUI.id=d.tarAbrir; tarUI.trava=false; planFolhaPintar(); return; }
+    if(!tarUI.id) return;
+    if(d.tarSt!==undefined){ const at=planTarefa(tarUI.id);
+      planMudarStatus(tarUI.id, at.status===d.tarSt?"a_iniciar":d.tarSt);
+      tarUI.trava=false; planFolhaPintar(); return; }
+    if(d.tarTrava!==undefined){ tarUI.trava=!tarUI.trava; planFolhaPintar(); return; }
+    if(d.tarMot!==undefined){ const m=planMotivoTrava(d.tarMot); if(!m) return;
+      planMudarStatus(tarUI.id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
+      tarUI.trava=false; planFolhaPintar(); return; }
+    if(d.tarPrazo!==undefined){ const novo=planPrazoChip(planTarefa(tarUI.id), d.tarPrazo);
+      if(novo) planNovoPrazo(tarUI.id, novo, "repactuado no escritório");
+      planFolhaPintar(); return; }
+    if(d.tarZap!==undefined){ planFalarComNilo(d.tarZap); return; }
+  };
+}
+const abrirFolhaTarefa  = id => { if(planTarefa(id)) planFolhaAbrir({id}); };
+const abrirFolhaTarefas = fz => planFolhaAbrir({fz});
+function fecharFolhaTarefa(){
+  const f=document.getElementById("folha-tarefa");
+  if(f){ f.remove(); destravarFolha(); }
+  tarUI=null;
+  if(telaAtual==="planejamento") ir("planejamento",null,true);
+  else if(telaAtual==="casa") ir("casa",null,true);
+  else if(telaAtual==="form"){ const box=document.getElementById("tar-faixa");
+    if(box && rascunho){ const novo=faixaTarefas(rascunho.fazendaId);
+      if(novo) box.outerHTML=novo; else box.remove(); } }
+}
+function planPrazoChip(t, id){
+  const base=t.prazo||hojeBRT();
+  if(id==="d7") return diaISO(base,7);
+  if(id==="d15") return diaISO(base,15);
+  if(id==="mes") return planFimDoMes(hojeBRT());
+  if(id==="reuniao"){ const d=new Date(hojeBRT()+"T12:00:00");
+    const alvo=new Date(d.getFullYear(), d.getMonth()+(d.getDate()>=PLAN_DIA_REUNIAO?1:0), PLAN_DIA_REUNIAO);
+    return alvo.getFullYear()+"-"+String(alvo.getMonth()+1).padStart(2,"0")+"-"+String(alvo.getDate()).padStart(2,"0"); }
+  return "";
+}
+/* "Falar com o Nilo": UMA linha pronta, sem sair do app para escrever nada */
+function planFalarComNilo(id){
+  const t=planTarefa(id); if(!t) return;
+  const linha=[fazenda(t.unidade).nome||t.unidadeTexto, t.desc, planLinhaTexto(t)].filter(Boolean).join(" · ");
+  abrirTextoZap(linha);
 }
 
 /* ---------- Seções multicultura do formulário ---------- */
@@ -4682,6 +5431,7 @@ function vForm(){
   const atForm=atividadeDe(r.fazendaId);
   return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), emojiAtividade(atForm)+" "+rotuloAtividade(atForm)+" · "+(r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente"), true)
   +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`
+  +faixaTarefas(r.fazendaId)   /* v77: tarefas da reunião no topo do boletim; nunca bloqueia o preenchimento */
   +faixaPlanoHoje(r)   /* v75: o encontro — o plano de ontem para hoje, com status que o app preenche sozinho */
   +`
   <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>
@@ -5151,7 +5901,12 @@ function vPainel(){
       return `<button class="btn mb no-print" id="bt-relatorios-tela">📊 Relatórios${relCache.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nt?nt+" texto"+(nt>1?"s":"")+" para revisar":""}${nt&&nn?" · ":""}${nn?"números prontos":""}</span>`:""}</button>`; })()}
     ${(()=>{ const uns=farolPorUnidade(), nf=uns.filter(u=>u.n.vermelho).length, na=uns.filter(u=>!u.n.vermelho&&u.n.amarelo).length;
       return `<button class="btn sec mb no-print" id="bt-farois-tela" style="box-shadow:none;border-radius:0;">Faróis de registro${uns.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nf?nf+" com janela fechada":""}${nf&&na?" · ":""}${na?na+" com janela aberta":""}${!nf&&!na?"tudo em dia":""}</span>`:""}</button>`; })()}
+    ${planPastilhasHtml()}
+    ${planNotifOferta()}
+    <button class="btn sec mb no-print" id="bt-planejamento" style="box-shadow:none;border-radius:0;">📋 Planejamento${(()=>{const r=planResumoMes(planMesDe(hojeBRT()));
+      return r.n?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${r.pct===null?"":r.pct+"% concluído · "}${r.atrasadas.length} atrasada(s)</span>`:"";})()}</button>
     ${cartaoFarolBoletins()}
+    ${cartaoPlanejamentoPainel()}
     ${cartaoPlanoPainel()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
@@ -5556,7 +6311,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v76";
+const APP_VERSAO="v77";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5676,6 +6431,7 @@ function cadVMenu(){
     ["plano","📅","Plano do mês",planos?planos+" fazendas com plano vigente baixado":"nenhum plano vigente baixado",planos],
     ["codigos","🔐","Códigos de acesso",cods+" códigos · gerar novo · combinados",cods],
     ["catalogos","📚","Catálogos","funções, operações, pragas, insumos, máquinas",termos],
+    ["deparaata","📋","De-para da ata",deparaAta().filter(x=>!x.fora).length+" nomes ligados · "+deparaAta().filter(x=>x.fora).length+" fora do escopo",deparaAta().length],
     ["integracoes","🔌","Integrações e robôs","Supabase · iCrop · Solinftec · plano de safra",robos+"/3"],
     ["importacoes","📡","Importações manuais","planilha Solinftec / iCrop (plano B do robô)",(D.telemetria||[]).length],
     ["sync","🔄","Sincronização e dados",syncAtivo()?(syncFila.length?syncFila.length+" registro(s) na fila":"em dia"):"desligada",syncFila.length],
@@ -5885,6 +6641,36 @@ function cadVPlanoFz(fz){
     ||htmlEstado("vazio",{que:"unidade do plano",unidade:fz,filtro:q},{classe:"mut centro mt"})}`;
 }
 
+/* ================= 5B. DE-PARA DA ATA (v77) =================
+   Nome que a ata da reunião usa → unidade do cadastro (por id). "Fora do escopo" é fazenda de
+   terceiro que nunca entra e nunca volta a ser perguntada. Nome que não está aqui NÃO é adivinhado:
+   a importação mostra "unidade não reconhecida" e a pessoa escolhe (regra 3 do plano de safra). */
+function cadDeparaGravar(){
+  if(!D.deparaAta || !D.deparaAta.length) D.deparaAta=DEPARA_ATA_PADRAO.map(x=>({...x}));
+  salvarDados();
+}
+function cadVDeparaAta(){
+  const q=cadUI.filtro, ls=deparaAta().filter(x=>cadBate(q,x.ata,x.unidade?fazenda(x.unidade).nome:""));
+  const uns=D.fazendas;
+  const novo=cadUI.novo==="depara";
+  return cadTopo("De-para da ata",deparaAta().length+" nomes")+
+    `<p class="mut" style="font-size:.78rem">Como cada nome da ata é lido pelo app. O que estiver "fora do escopo" é ignorado na importação, sem perguntar.</p>`+
+    cadBusca("cad-da-busca","Buscar nome da ata ou unidade…")+
+    (ls.length?ls.map(x=>{ const i=deparaAta().indexOf(x);
+      return `<div class="cad-item" style="flex-wrap:wrap">
+        <span class="cresce"><b>${esc(x.ata)}</b><span class="mut">${x.fora?"fora do escopo — ignorada sempre":(x.unidade?fazenda(x.unidade).nome+(x.area?" · área "+esc(x.area):""):"sem unidade ligada")}</span></span>
+        <select data-cadc="depara:${i}" style="max-width:190px;min-height:44px;padding:8px">
+          <option value="" ${!x.unidade&&!x.fora?"selected":""}>— sem ligação —</option>
+          <option value="FORA" ${x.fora?"selected":""}>fora do escopo (ignorar sempre)</option>
+          ${uns.map(f=>`<option value="${f.id}" ${x.unidade===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}
+        </select></div>`; }).join("")
+      :htmlEstado("vazio",{que:"nome da ata",filtro:q},{classe:"mut centro mt"}))+
+    (novo?`<div class="cartao">${cadCampo("Nome como aparece na ata","deparaNovo","",'placeholder="Ex.: FMC Fundão"')}
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="depara-novo" data-cadid="">Acrescentar nome</button>
+      <button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+    cadRodape(novo?`<button class="btn sec" data-cadcancel="1">Cancelar</button>`:`<button class="btn" data-cadnovo="depara">＋ nome da ata</button>`);
+}
+
 /* ================= 6. CÓDIGOS DE ACESSO ================= */
 function cadVCodigos(){
   const q=cadUI.filtro;
@@ -6079,6 +6865,7 @@ function vCadastros(){
     case "codigo": return cadVCodigo(a.id);
     case "codigonovo": return cadVCodigoNovo();
     case "catalogos": return cadVCatalogos();
+    case "deparaata": return cadVDeparaAta();
     case "catalogo": return cadVCatalogo(a.id);
     case "maquinas": return cadVMaquinas();
     case "insumos": return cadVInsumos();
@@ -6146,6 +6933,11 @@ function cadAcao(acao,id){
   if(acao==="salvar-pivo"){ const [fz,pid]=id.split(":"), p=pivosLocaisDa(fz).find(x=>x.id===pid); if(!p) return; const nome=cadVal("nome"); if(!nome) return; p.nome=nome; salvarDados(); cadSalvo("pivo:"+id); cadVoltar(); return; }
   if(acao==="novo-ciclo"){ const fm=cadUI.form||{}; const cult=fm.cultura, dt=cadVal("plantio"); if(!cult){ cadUI.msg="Escolha a cultura do plantio."; cadRender(); return; }
     D.ciclos=D.ciclos||[]; D.ciclos.push({id:uid(), talhaoId:id, cultura:cult, plantio:dataNorm(dt)||hojeISO()}); salvarDados(); cadSalvo("ciclo:"+id,"Plantio registrado"); cadVoltar(); return; }
+  if(acao==="depara-novo"){ const nome=cadVal("deparaNovo");
+    if(!nome){ cadUI.msg="Escreva o nome como ele aparece na ata."; cadRender(); return; }
+    cadDeparaGravar();
+    if(!D.deparaAta.some(x=>planChaveAta(x.ata)===planChaveAta(nome))) D.deparaAta.push({ata:nome});
+    salvarDados(); cadUI.novo=""; cadSalvo("","Nome acrescentado"); cadRender(); return; }
   if(acao==="inv-inicial"){ const cats={}; CATEGORIAS_ANIMAIS.forEach(c=>{ cats[c]=n0(cadVal("inv:"+c)); }); cadInvGravar(id,cats,"inicial",""); cadUI.novo=""; cadUI.zona=false; cadSalvo("","Inventário gravado"); cadRender(); return; }
   if(acao==="inv-ajuste"){ const cat=cadVal("ajCat"), qtd=cadVal("ajQtd"), mot=cadVal("ajMotivo"); if(!cat||qtd===""||!mot){ cadUI.msg="Preencha categoria, novo total e motivo."; cadUI.zona=true; cadRender(); return; }
     const cats={}; cats[cat]=n0(qtd); cadInvGravar(id,cats,"ajuste",mot); cadUI.novo=""; cadUI.zona=false; cadSalvo("","Ajuste gravado"); cadRender(); return; }
@@ -6168,6 +6960,14 @@ function cadAcao(acao,id){
 }
 /* digitação nas buscas de Cadastros — devolve true quando tratou */
 function cadInput(el){
+  /* v77: de-para da ata — o seletor de unidade grava na hora (uma tela, um propósito) */
+  if(el.dataset && String(el.dataset.cadc||"").indexOf("depara:")===0){
+    cadDeparaGravar();
+    const i=parseInt(el.dataset.cadc.split(":")[1],10), x=D.deparaAta[i];
+    if(x){ if(el.value==="FORA"){ x.fora=true; delete x.unidade; }
+      else { delete x.fora; if(el.value) x.unidade=el.value; else delete x.unidade; }
+      salvarDados(); cadSalvo("","Ligação gravada"); cadRender(); }
+    return true; }
   if(!el.classList||!el.classList.contains("cad-busca")) return false;
   if(el.id==="cad-busca-global") cadUI.busca=el.value; else cadUI.filtro=el.value;
   clearTimeout(filtroTimer);
@@ -6177,6 +6977,775 @@ function cadInput(el){
 
 
 /* ---------- Ajuda ao gerente ---------- */
+
+/* ============================================================
+   ÁREA PLANEJAMENTO (v77) — Diretoria / Escritório
+   Item de PRIMEIRO NÍVEL, ao lado do Painel (nunca dentro de Cadastros).
+   Navegação menu → lista → detalhe (P2), no máximo 2 toques até qualquer função.
+   Usa as classes de Cadastros (cad-menu, cad-item, cad-busca, cad-rodape, cad-bloco),
+   que já cumprem os padrões P1–P10.
+   ============================================================ */
+let planNav=[], planBuscaTimer=null;
+let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", novo:null, revisao:null};
+function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; }
+function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
+function planVoltar(){ planLimpar();
+  if(planNav.length>1){ planNav.pop(); ir("planejamento"); }
+  else { planNav=[]; ir(podeCadastros()?"entrada":"painel"); } }
+function planRender(){ ir("planejamento",null,true); }
+function planSalvo(msg){ planUI.flash=msg||"Salvo"; }
+function planTopo(titulo,sub){
+  return `<div class="topo"><button class="btn-topo" data-planvoltar="1">‹ Voltar</button>
+    <h1>${esc(titulo)}<br><span class="sub">${esc(sub||"Planejamento")}</span></h1>
+    <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button></div>
+    ${planUI.flash?`<div class="aviso verde" id="plan-flash">✔ ${esc(planUI.flash)}</div>`:""}
+    ${planUI.msg?`<div class="aviso">${planUI.msg}</div>`:""}`;
+}
+/* (a) cabeçalho permanente: mês, cumprimento, atrasadas, travadas e a próxima cobrança */
+function planCabecalho(){
+  const ref=planMesDe(hojeBRT()), r=planResumoMes(ref), terc=planPorTerceiro()[0];
+  const partes=[planMesNome(ref).replace(/^./,c=>c.toUpperCase()),
+    r.pct===null?"sem tarefa no mês":r.pct+"% concluído",
+    r.atrasadas.length+" atrasada"+(r.atrasadas.length===1?"":"s"),
+    r.travadas.length+" travada"+(r.travadas.length===1?"":"s")];
+  if(terc) partes.push("próxima cobrança: "+terc.quem);
+  return `<div class="plan-cab"><b>${esc(partes.join(" · "))}</b></div>`;
+}
+/* linha de tarefa nas listas, com a ação rápida "⋯" (item 8h) — abre no lugar, sem tela nova */
+function planLinhaTarefa(t, o){
+  o=o||{};
+  const f=planFarol(t), aberta=planUI.acoes===t.id;
+  const sub=[t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||"Grupo"), planLinhaTexto(t),
+    t.responsavel?"com "+t.responsavel:"", o.origem&&t.origemRot?t.origemRot:""].filter(Boolean).join(" · ");
+  return `<div class="plan-linha">
+    <div class="cad-item" style="margin:0">
+      <button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[f].ico}</button>
+      <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(sub)}</span></span>
+      <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${aberta}">⋯</button>
+    </div>
+    ${aberta?`<div class="plan-acoes"><div class="chips">
+      <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>
+      <button class="chip ${t.status==="finalizado"?"on":""}" data-plan-st="${t.id}|finalizado">Concluí</button>
+      <button class="chip ${planPausada(t)?"on":""}" data-plan-trava="${t.id}">Travado</button>
+      <button class="chip" data-plan-prazoab="${t.id}">Novo prazo</button></div>
+      ${planUI.trava===t.id?`<div class="chips mt">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${((t.bloqueio||{}).motivo)===m.id?"on":""}" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+      ${planUI.prazoAb===t.id?`<div class="chips mt">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-plan-prazo="${t.id}|${p.id}">${esc(p.rot)}</button>`).join("")}</div>`:""}
+    </div>`:""}
+  </div>`;
+}
+const planBusca=ph=>`<input class="cad-busca" id="plan-busca" placeholder="${esc(ph)}" value="${esc(planUI.busca||"")}" autocomplete="off" autocapitalize="off">`;
+const planBate=(t)=>cadBate(planUI.busca, t.desc, t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||""), t.responsavel, t.origemRot);
+const planVazio=(que,extra)=>htmlEstado("vazio",Object.assign({que, onde:"nas unidades deste código"},extra||{}),{classe:"mut centro mt"});
+
+/* ---- menu (home da área) ---- */
+function planVMenu(){
+  const ref=planMesDe(hojeBRT()), r=planResumoMes(ref);
+  const sem=planSemanaAtual(), semN=sem?planComprometidas(sem.id).length:0;
+  const rod=planRodadaDoMes(ref), rodTot=planRodadas().length;
+  const terc=planPorTerceiro(), arr=planVisiveis().filter(t=>planAberta(t)&&planArrastaMeses(t)>0);
+  const ger=planVisiveis().filter(t=>t.tipoItem!=="tarefa");
+  const abertas=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem==="tarefa");
+  const itens=[
+    ["semana","🗓️","Semana",sem?planSemanaRot(sem)+" · "+semN+" comprometida"+(semN===1?"":"s"):"sem semana aberta",semN],
+    ["mes","📅","Mês por unidade",r.pct===null?"sem tarefa no mês":r.pct+"% concluído · "+r.atrasadas.length+" atrasada(s)",r.n],
+    ["rodadas","📥","Rodadas da reunião",rod?("rodada de "+planMesNome(ref)+" importada"):("rodada de "+planMesNome(ref)+" não importada"),rodTot],
+    ["terceiros","🔗","Pendências com terceiros",terc.length?terc.map(g=>g.quem).slice(0,2).join(" · "):"nenhuma pendência com terceiro",terc.length],
+    ["arrastadas","📌","Arrastadas",arr.length?arr.length+" tarefa(s) vindas de reuniões anteriores":"nenhuma arrastada",arr.length],
+    ["assuntos","🗒️","Assuntos e investimentos",ger.length?ger.length+" item(ns) da ata":"nenhum assunto registrado",ger.length],
+    ["lista","🔎","Todas as tarefas",abertas.length+" aberta(s) · filtros por status, farol, unidade e origem",planVisiveis().length],
+    ["saidas","📲","Textos prontos","pauta da sexta · cobrança · fechamento · rascunho da ata",4]
+  ];
+  return planTopo("Planejamento", podeCadastros()?"Escritório · administrador":"Diretoria")
+    +planCabecalho()
+    +planPastilhasHtml()
+    +itens.map(([v,ico,nome,sub,n])=>`<button class="cad-menu" data-planv="${v}">
+      <span class="ico">${ico}</span><span class="txt"><b>${nome}</b><span class="mut">${esc(sub)}</span></span><span class="num">${n}</span></button>`).join("")
+    +cadRodape(`<button class="btn" data-planv="nova">＋ tarefa</button>`);
+}
+
+/* ---- (b) visão do mês por unidade ---- */
+function planVMes(){
+  const ref=planMesDe(hojeBRT());
+  const uns=[...new Set(planVisiveis().filter(t=>t.tipoItem==="tarefa"&&t.unidade).map(t=>t.unidade))]
+    .map(fz=>({fz, r:planResumoMes(ref,fz)}))
+    .filter(x=>x.r.n>0)
+    .sort((a,b)=>(b.r.atrasadas.length-a.r.atrasadas.length)||((a.r.pct??101)-(b.r.pct??101)));
+  return planTopo("Mês por unidade", planMesRot(ref))
+    +planCabecalho()
+    +(uns.length?uns.map(({fz,r})=>`<div class="cartao plan-un">
+        <div class="linha-flex" style="gap:8px"><b class="cresce">${esc(fazenda(fz).nome)}</b>
+          <span class="num plan-pct">${r.pct===null?"—":r.pct+"%"}</span></div>
+        <div class="plan-barra" role="img" aria-label="${r.pct===null?"sem tarefa":r.pct+"% concluído"}"><span style="width:${r.pct||0}%"></span></div>
+        <p class="mut" style="margin:6px 0 0">🔴 ${r.vermelhas} · 🟡 ${r.amarelas} · ⏸️ ${r.cinzas} · 🟢 ${r.verdes} · ✅ ${r.finalizadas}</p>
+        ${r.atrasadas.length?`<ul class="lista-limpa mt">${r.atrasadas.slice(0,3).map(t=>`<li><button style="width:100%;text-align:left" data-tar="${t.id}"><b>${esc(t.desc)}</b> <span class="mut">· ATRASADO desde ${esc(fmtDataCurta(planPrazoEfetivo(t)))}</span></button></li>`).join("")}</ul>
+          ${r.atrasadas.length>3?`<p class="mut" style="margin:4px 0 0;font-size:.78rem">＋${r.atrasadas.length-3} atrasada(s)</p>`:""}`:""}
+        ${planLinhaTempo(fz)}
+      </div>`).join("")
+      :planVazio("tarefa da reunião",{periodo:"em "+planMesRot(ref)}))
+    +cadRodape(`<button class="btn" data-planv="lista">Ver todas as tarefas</button>`);
+}
+/* linha do tempo: calendário do mês com os prazos marcados — enxerga semana congestionada */
+function planLinhaTempo(fz){
+  const ref=planMesDe(hojeBRT()), [ano,mes]=ref.split("-").map(Number);
+  const dias=new Date(ano,mes,0).getDate();
+  const conta={};
+  planVisiveis().filter(t=>t.unidade===fz && planAberta(t) && planMesDe(planPrazoEfetivo(t))===ref)
+    .forEach(t=>{ const d=parseInt(planPrazoEfetivo(t).slice(8),10); conta[d]=(conta[d]||0)+1; });
+  const chaves=Object.keys(conta);
+  if(!chaves.length) return "";
+  const pico=chaves.map(Number).sort((a,b)=>conta[b]-conta[a])[0];
+  return `<div class="plan-tempo" role="img" aria-label="Prazos de ${esc(planMesNome(ref))} nesta unidade">
+      ${Array.from({length:dias},(_,i)=>i+1).map(d=>`<span class="plan-dia${conta[d]?" tem":""}${conta[d]>=3?" cheio":""}" title="${d}/${String(mes).padStart(2,"0")}${conta[d]?" · "+conta[d]+" prazo(s)":""}">${conta[d]||""}</span>`).join("")}
+    </div>
+    ${conta[pico]>=3?`<p class="mut" style="margin:4px 0 0;font-size:.8rem">${conta[pico]} tarefas vencendo em ${pico}/${String(mes).padStart(2,"0")}</p>`:""}`;
+}
+
+/* ---- (c) todas as tarefas: filtros e busca ---- */
+function planFiltrar(){
+  const q=planUI.busca;
+  return planVisiveis().filter(t=>t.tipoItem==="tarefa")
+    .filter(t=>!planUI.filtroStatus || t.status===planUI.filtroStatus)
+    .filter(t=>!planUI.filtroFarol || planFarol(t)===planUI.filtroFarol)
+    .filter(t=>!planUI.filtroUnid || t.unidade===planUI.filtroUnid)
+    .filter(t=>!planUI.filtroOrigem || t.origemTipo===planUI.filtroOrigem)
+    .filter(t=>cadBate(q, t.desc, t.unidade?fazenda(t.unidade).nome:"", t.responsavel, t.origemRot))
+    .sort(planOrdenar);
+}
+function planVLista(){
+  const ls=planFiltrar();
+  const uns=[...new Set(planVisiveis().map(t=>t.unidade).filter(Boolean))];
+  return planTopo("Todas as tarefas", ls.length+" de "+planVisiveis().filter(t=>t.tipoItem==="tarefa").length)
+    +planBusca("Buscar tarefa, unidade ou responsável…")
+    +`<div class="cad-saltos"><button class="chip ${!planUI.filtroFarol&&!planUI.filtroStatus?"on":""}" data-plan-f="limpar|">todos</button>
+        ${["vermelho","amarelo","cinza","verde"].map(f=>`<button class="chip ${planUI.filtroFarol===f?"on":""}" data-plan-f="farol|${f}">${PLAN_FAROL[f].ico}</button>`).join("")}
+        ${PLAN_STATUS.map(s=>`<button class="chip ${planUI.filtroStatus===s.id?"on":""}" data-plan-f="status|${s.id}">${esc(s.rot)}</button>`).join("")}</div>
+      <div class="cad-saltos"><button class="chip ${!planUI.filtroUnid?"on":""}" data-plan-f="unid|">todas as unidades</button>
+        ${uns.map(fz=>`<button class="chip ${planUI.filtroUnid===fz?"on":""}" data-plan-f="unid|${fz}">${esc(fazenda(fz).nome)}</button>`).join("")}
+        ${Object.entries(PLAN_ORIGENS).map(([k,r])=>`<button class="chip ${planUI.filtroOrigem===k?"on":""}" data-plan-f="origem|${k}">${esc(r)}</button>`).join("")}</div>`
+    +(ls.length?ls.map(t=>planLinhaTarefa(t,{origem:true})).join("")
+      :planVazio("tarefa", {filtro:planUI.busca||"", unidade:planUI.filtroUnid||"",
+        onde:planUI.filtroUnid?"":"nas unidades deste código"}))
+    +cadRodape(`<button class="btn" data-planv="nova">＋ tarefa</button>`);
+}
+
+/* ---- (d) pendências com terceiros ---- */
+function planVTerceiros(){
+  const gs=planPorTerceiro();
+  return planTopo("Pendências com terceiros", gs.length+" fornecedor(es)")
+    +(gs.length?gs.map(g=>`<div class="cartao">
+        <div class="linha-flex" style="gap:8px"><b class="cresce">🔗 ${esc(g.quem)}</b>
+          <span class="mut num">${g.tarefas.length}</span></div>
+        <p class="mut" style="margin:2px 0 6px">desde ${esc(fmtData(g.desde))} · ${g.unidades.length} fazenda${g.unidades.length===1?"":"s"} parada${g.unidades.length===1?"":"s"}${planDiasEntre(g.desde,hojeBRT())>PLAN_TRAVA_COBRANCA?" · passou de "+PLAN_TRAVA_COBRANCA+" dias":""}</p>
+        ${g.tarefas.map(t=>planLinhaTarefa(t)).join("")}
+        <button class="btn sec mt" data-plan-copia="terceiro|${esc(g.quem)}">📲 copiar cobrança</button>
+      </div>`).join("")
+      :planVazio("pendência com terceiro"))
+    +cadRodape(`<button class="btn" data-plan-copia="terceiros|">📲 copiar todas as cobranças</button>`);
+}
+
+/* ---- (e) arrastadas ---- */
+function planVArrastadas(){
+  const ls=planVisiveis().filter(t=>planAberta(t) && planArrastaMeses(t)>0).sort((a,b)=>planArrastaMeses(b)-planArrastaMeses(a));
+  return planTopo("Arrastadas", ls.length+" tarefa(s)")
+    +(ls.length?ls.map(t=>`<div class="plan-arr">
+        <p class="mut plan-arr-tag">📌 arrastada há ${planArrastaMeses(t)} reuni${planArrastaMeses(t)===1?"ão":"ões"}${planArrastaMeses(t)>=PLAN_ARRASTA_ALERTA?" — alerta da Diretoria":""}</p>
+        ${planLinhaTarefa(t,{origem:true})}</div>`).join("")
+      :planVazio("tarefa arrastada"))
+    +cadRodape(`<button class="btn sec" data-planv="lista">Ver todas as tarefas</button>`);
+}
+
+/* ---- (f) assuntos gerais e necessidades de investimento ---- */
+function planVAssuntos(){
+  const ls=planVisiveis().filter(t=>t.tipoItem!=="tarefa");
+  const grupos=[["assunto","🗒️ Assuntos gerais"],["investimento","💰 Necessidades de investimento"]];
+  return planTopo("Assuntos e investimentos", ls.length+" item(ns)")
+    +(ls.length?grupos.map(([k,rot])=>{ const g=ls.filter(t=>t.tipoItem===k);
+        return g.length?`<div class="cad-grupo">${rot} · ${g.length}</div>`+g.map(t=>`<div class="cad-item">
+          <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(planStatusRot(t.status).toLowerCase())}${t.responsavel?" · com "+esc(t.responsavel):""}${t.origemRot?" · "+esc(t.origemRot):""}</span></span>
+          <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${planUI.acoes===t.id}">⋯</button>
+        </div>${planUI.acoes===t.id?`<div class="plan-acoes"><div class="chips">
+          <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>
+          <button class="chip ${t.status==="finalizado"?"on":""}" data-plan-st="${t.id}|finalizado">Concluí</button>
+          <button class="chip ${planPausada(t)?"on":""}" data-plan-trava="${t.id}">Travado</button></div>
+          ${planUI.trava===t.id?`<div class="chips mt">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}</div>`:""}`).join(""):""; }).join("")
+      :planVazio("assunto ou investimento da ata"))
+    +cadRodape(`<button class="btn sec" data-planv="rodadas">Importar ata da reunião</button>`);
+}
+
+/* ---- (g) ＋ tarefa: 4 campos; o resto em "Mais opções" ---- */
+function planVNova(){
+  const n=planUI.novo=planUI.novo||{unidade:(planUI.filtroUnid||""), desc:"", prazo:"", area:"", responsavel:"", status:"a_iniciar", tipoItem:"tarefa"};
+  const uns=unidadesPermitidas();
+  return planTopo("Nova tarefa","avulsa · entra no mês e na semana")
+    +`<div class="cartao">
+      <label>Unidade</label>
+      <select data-planc="unidade"><option value="">— sem unidade (assunto do grupo) —</option>
+        ${uns.map(f=>`<option value="${f.id}" ${n.unidade===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}</select>
+      <label>O que precisa ser feito</label>
+      <input data-planc="desc" value="${esc(n.desc)}" placeholder="Ex.: Levantar café setor 4, 5, 8 e 9">
+      <label>Prazo</label>
+      <input type="date" data-planc="prazo" value="${esc(n.prazo)}">
+      <label>Área (ha) <span class="mut">— quando houver</span></label>
+      <input inputmode="decimal" data-planc="area" value="${esc(n.area)}" placeholder="Ex.: 96">
+    </div>
+    ${cadMais(`<label>Responsável</label><input data-planc="responsavel" value="${esc(n.responsavel)}" placeholder="Ex.: Renatinho">
+      <label>Status inicial</label>
+      <div class="chips">${PLAN_STATUS.filter(s=>s.id!=="cancelado").map(s=>`<button class="chip ${n.status===s.id?"on":""}" data-plan-novost="${s.id}">${esc(s.rot)}</button>`).join("")}</div>
+      <label>Tipo</label>
+      <div class="chips">${Object.entries(PLAN_TIPOS_ITEM).map(([k,r])=>`<button class="chip ${n.tipoItem===k?"on":""}" data-plan-novotipo="${k}">${esc(r)}</button>`).join("")}</div>`)}
+    ${cadRodape(botaoAvanco("bt-plan-salvar",{rotulo:"Criar tarefa", falta: String(n.desc||"").trim()?"":"Escreva o que precisa ser feito"}))}`;
+}
+
+/* ---- rodadas da reunião (3.1) ---- */
+function planVRodadas(){
+  const ls=planRodadas().slice().sort((a,b)=>a.ref<b.ref?1:-1);
+  const ref=planMesDe(hojeBRT()), falta=!planRodadaDoMes(ref) && parseInt(hojeBRT().slice(8),10)>=PLAN_DIA_REUNIAO;
+  return planTopo("Rodadas da reunião", ls.length+" rodada(s)")
+    +(falta?`<div class="aviso">A rodada de ${esc(planMesNome(ref))} ainda não foi importada. A ata da reunião entra colando o texto — o app mostra item a item antes de gravar.</div>`:"")
+    +(ls.length?ls.map(r=>{ const ts=planTarefas().filter(t=>t.origemId===r.id);
+        const fim=ts.filter(t=>t.status==="finalizado").length;
+        return cadItem("rodada",r.id,esc(r.nome), ts.length+" tarefa(s) · "+fim+" finalizada(s)"+(r.importadoEm?" · importada em "+esc(fmtData(r.importadoEm)):""), planMesRot(r.ref)); }).join("")
+      :planVazio("rodada da reunião"))
+    +cadRodape(`<button class="btn" data-planv="importar">📥 Importar ata</button>`);
+}
+function planVRodada(id){
+  const r=planRodadas().find(x=>x.id===id);
+  if(!r) return planTopo("Rodada")+`<p class="mut">Rodada não encontrada.</p>`;
+  const ts=planTarefas().filter(t=>t.origemId===r.id && t.tipoItem==="tarefa" && (!t.unidade||podeVer(t.unidade)));
+  const uns=[...new Set(ts.map(t=>t.unidade).filter(Boolean))];
+  return planTopo(r.nome, planMesRot(r.ref)+" · fechamento por unidade")
+    +planBusca("Buscar tarefa ou unidade…")
+    +(uns.length?uns.map(fz=>{ const g=ts.filter(t=>t.unidade===fz && planBate(t));
+        if(!g.length) return "";
+        const fim=g.filter(t=>t.status==="finalizado").length, atr=g.filter(planAtrasada).length;
+        const trv=g.filter(planPausada).length, arr=g.filter(t=>planArrastaMeses(t)>0).length;
+        const pct=g.length?Math.round(fim*100/g.length):0;
+        return `<div class="cartao"><div class="linha-flex" style="gap:8px"><b class="cresce">${esc(fazenda(fz).nome)}</b><span class="num plan-pct">${pct}%</span></div>
+          <div class="plan-barra" role="img" aria-label="${pct}% concluído"><span style="width:${pct}%"></span></div>
+          <p class="mut" style="margin:6px 0 0">${fim} de ${g.length} finalizadas · ${atr} atrasada(s) · ${trv} travada(s) · ${arr} arrastada(s)</p>
+          ${g.map(t=>planLinhaTarefa(t)).join("")}</div>`; }).join("")
+      :planVazio("tarefa nesta rodada"))
+    +cadRodape(`<button class="btn sec" data-plan-copia="fechamento|${esc(r.id)}">📲 copiar fechamento do mês</button>`);
+}
+
+/* ---- revisão das arrastadas: primeira tela de toda rodada nova ---- */
+function planVRevisao(){
+  const rv=planUI.revisao;
+  if(!rv) return planVRodadas();
+  const ls=rv.ids.map(planTarefa).filter(Boolean);
+  const pend=ls.filter(t=>!rv.decidido[t.id]).length;
+  return planTopo("Revisão das arrastadas", ls.length+" tarefa(s) da rodada anterior")
+    +`<div class="aviso">Antes de importar a ata nova, o que ficou aberto na rodada anterior chega marcado como <b>arrastada</b>. Manter, repactuar ou cancelar — um toque em cada.${pend?" Faltam "+pend+".":""}</div>`
+    +planBusca("Buscar tarefa ou unidade…")
+    +ls.filter(planBate).map(t=>{ const dec=rv.decidido[t.id]||"";
+      return `<div class="cartao">
+        <b>${PLAN_FAROL[planFarol(t)].ico} ${esc(t.desc)}</b>
+        <p class="mut" style="margin:2px 0 8px">${esc(t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||"Grupo"))} · ${esc(planLinhaTexto(t))} · arrastada há ${planArrastaMeses(t)+1} reuni${planArrastaMeses(t)+1===1?"ão":"ões"}</p>
+        <div class="chips">
+          <button class="chip ${dec==="manter"?"on":""}" data-plan-rev="${t.id}|manter">Manter</button>
+          <button class="chip ${dec==="repactuar"?"on":""}" data-plan-rev="${t.id}|repactuar">Repactuar</button>
+          <button class="chip ${dec==="cancelar"?"on":""}" data-plan-rev="${t.id}|cancelar">Cancelar</button></div>
+        ${dec==="repactuar"?`<label class="mt">Novo prazo</label>
+          <div class="chips">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip ${(rv.prazo[t.id]===p.id)?"on":""}" data-plan-revprazo="${t.id}|${p.id}">${esc(p.rot)}</button>`).join("")}</div>
+          <label class="mt">Motivo</label>
+          <div class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${(rv.motivo[t.id]===m.id)?"on":""}" data-plan-revmot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+        ${dec==="cancelar"?`<label class="mt">Motivo do cancelamento</label>
+          <div class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${(rv.motivo[t.id]===m.id)?"on":""}" data-plan-revmot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+      </div>`; }).join("")
+    +cadRodape(botaoAvanco("bt-plan-revok",{rotulo:"Aplicar e ir para a ata", falta: pend?("Responda as "+pend+" tarefa(s) que faltam"):""}));
+}
+
+/* ---- (4) importar ata por colagem, com pré-visualização editável ---- */
+function planVImportar(){
+  const a=planUI.ata;
+  if(!a) return planTopo("Importar ata","cole o texto da reunião")
+    +`<div class="cartao">
+      <label>Nome da rodada</label>
+      <input data-planc="rodadaNome" value="${esc(planUI.rodadaNome||("Reunião "+fmtData(hojeBRT()).slice(0,5)+"/"+hojeBRT().slice(2,4)))}">
+      <label>Texto da ata</label>
+      <textarea id="plan-ata" rows="10" placeholder="Cole aqui o texto inteiro da ata da reunião."></textarea>
+      <p class="mut" style="font-size:.78rem;margin-top:6px">O app lê os blocos por fazenda ("2.1 – Vereda"), cada linha iniciada por "-" vira uma tarefa, e mostra tudo para conferir antes de gravar. Fazenda fora do escopo é ignorada sem perguntar.</p>
+    </div>`
+    +cadRodape(`<button class="btn" id="bt-plan-ler">Ler a ata</button>`);
+  const naoRec=a.itens.filter(it=>it.incluir!==false && it.tipoItem==="tarefa" && !it.unidade).length;
+  const vao=a.itens.filter(it=>it.incluir!==false).length + a.gerais.filter(it=>it.incluir!==false).length;
+  const bate=it=>cadBate(planUI.busca, it.desc, it.unidadeTexto, it.responsavel);
+  return planTopo("Conferir a ata", vao+" item(ns) para gravar")
+    +planBusca("Buscar item da ata…")
+    +(a.fora.length?`<div class="aviso">Fora do escopo, ignoradas sem perguntar: ${esc(a.fora.join(" · "))}.</div>`:"")
+    +(naoRec?`<div class="aviso">${naoRec} item(ns) sem unidade reconhecida. Escolha a unidade ou deixe de fora.</div>`:"")
+    +a.blocos.map(b=>{ const its=a.itens.filter(it=>it.unidadeTexto===b.nome && bate(it));
+        if(!its.length) return "";
+        return `<div class="cad-grupo">${esc(b.nome)}${b.unidade?" › "+esc(fazenda(b.unidade).nome):" · unidade não reconhecida"} · ${its.length}</div>`
+          +its.map(it=>planAtaLinha(a.itens.indexOf(it),it,"itens")).join(""); }).join("")
+    +(a.gerais.filter(bate).length?`<div class="cad-grupo">🗒️ Assuntos gerais e investimentos · ${a.gerais.filter(bate).length}</div>`
+        +a.gerais.filter(bate).map(it=>planAtaLinha(a.gerais.indexOf(it),it,"gerais")).join(""):"")
+    +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-plan-ata-limpar">Recomeçar</button>
+      ${botaoAvanco("bt-plan-ata-ok",{rotulo:"Gravar "+vao+" item(ns)", falta: vao?"":"Deixe pelo menos um item marcado"})}</div>`);
+}
+function planAtaLinha(i,it,lista){
+  const aberta=planUI.ataEdit===lista+":"+i, fora=it.incluir===false;
+  const uns=unidadesPermitidas();
+  const sub=[it.unidade?fazenda(it.unidade).nome:(it.tipoItem==="tarefa"?"unidade não reconhecida":PLAN_TIPOS_ITEM[it.tipoItem]),
+    it.prazo?"prazo "+fmtDataCurta(it.prazo):"sem prazo", n0(it.area)?n0(it.area)+" ha":"",
+    planStatusRot(it.status).toLowerCase(), it.responsavel?"com "+it.responsavel:"",
+    (it.bloqueio&&it.bloqueio.quem)?"cobrar "+it.bloqueio.quem:""].filter(Boolean).join(" · ");
+  return `<div class="plan-linha${fora?" fora":""}">
+    <div class="cad-item" style="margin:0">
+      <button class="plan-farol" data-plan-ataincl="${lista}|${i}" aria-label="${fora?"Incluir":"Deixar de fora"} ${esc(it.desc)}">${fora?"○":"●"}</button>
+      <span class="cresce"><b>${esc(it.desc)}</b><span class="mut">${esc(sub)}</span></span>
+      <button class="plan-mais" data-plan-ataedit="${lista}|${i}" aria-label="Editar ${esc(it.desc)}" aria-expanded="${aberta}">⋯</button>
+    </div>
+    ${aberta?`<div class="plan-acoes">
+      <label>Descrição</label><input data-planata="${lista}|${i}|desc" value="${esc(it.desc)}">
+      ${it.tipoItem==="tarefa"?`<label>Unidade</label>
+        <select data-planata="${lista}|${i}|unidade"><option value="">— escolher —</option>
+          ${uns.map(f=>`<option value="${f.id}" ${it.unidade===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}</select>
+        ${!it.unidade&&it.unidadeTexto?`<button class="btn suave mini mt" data-plan-atafora="${esc(it.unidadeTexto)}">Nunca mais perguntar por "${esc(it.unidadeTexto)}"</button>`:""}
+        <label>Prazo</label><input type="date" data-planata="${lista}|${i}|prazo" value="${esc(it.prazo)}">
+        <label>Área (ha)</label><input inputmode="decimal" data-planata="${lista}|${i}|area" value="${esc(it.area)}">`:""}
+      <label>Responsável</label><input data-planata="${lista}|${i}|responsavel" value="${esc(it.responsavel)}">
+      <label>Status</label><div class="chips">${PLAN_STATUS.filter(s=>s.id!=="cancelado").map(s=>`<button class="chip ${it.status===s.id?"on":""}" data-plan-atast="${lista}|${i}|${s.id}">${esc(s.rot)}</button>`).join("")}</div>
+      <p class="mut" style="font-size:.74rem;margin-top:8px">Linha da ata: ${esc(it.bruto)}</p>
+    </div>`:""}
+  </div>`;
+}
+
+/* ---- (3.2) semana ---- */
+function planVSemana(){
+  const s=planSemanaAtual() || planSemanaCriar(planSegundaDe(hojeBRT()));
+  const ant=planSemanaAnterior(), fech=ant?planFecharSemana(ant):null;
+  const comp=planComprometidas(s.id).sort(planOrdenar);
+  const sug=planSugestoesSemana(s.id).slice(0,8);
+  const novas=planTarefas().filter(t=>t.origemTipo==="semana" && t.origemId===s.id);
+  return planTopo(planSemanaRot(s), comp.length+" compromisso(s)")
+    +(fech&&fech.n?`<div class="cartao plan-fecha"><b>Como foi ${esc(planSemanaRot(ant).toLowerCase())}</b>
+      <p class="mut" style="margin:2px 0 6px">${esc(fech.placar)} · ${fech.travadas.length} travada(s)</p>
+      ${fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")}
+      ${fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)} <span class="mut">· ${esc((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())}${(t.bloqueio&&t.bloqueio.quem)?" ("+esc(t.bloqueio.quem)+")":""}</span></p>`).join("")}
+      ${fech.abertas.map(t=>`<p class="plan-fecha-l">◻ ${esc(t.desc)} <span class="mut">· ${esc(planLinhaTexto(t))}</span></p>`).join("")}</div>`:"")
+    +`<div class="cad-grupo">Parte A · compromissos da semana</div>`
+    +(comp.length?comp.map(t=>planLinhaTarefa(t)).join("")
+      :`<p class="mut centro" style="padding:8px 0">Nenhum compromisso marcado ainda. Toque nas sugestões abaixo.</p>`)
+    +(sug.length?`<div class="cad-grupo">Sugestões — prazo próximo, atrasadas e recém-destravadas</div>`
+        +sug.map(t=>`<div class="cad-item"><button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[planFarol(t)].ico}</button>
+          <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(t.unidade?fazenda(t.unidade).nome:"Grupo")} · ${esc(planLinhaTexto(t))}${t.destravadaEm?" · destravada":""}</span></span>
+          <button class="chip plan-comp" data-plan-comp="${t.id}|${s.id}">comprometer</button></div>`).join("")
+      :"")
+    +`<div class="cad-grupo">Parte B · tarefas novas da semana</div>`
+    +(novas.length?novas.map(t=>planLinhaTarefa(t)).join(""):`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa nova nesta semana.</p>`)
+    +`<button class="btn suave mt" data-plan-novasem="${s.id}">＋ tarefa da semana</button>`
+    +cadRodape(`<button class="btn sec" data-plan-copia="pauta|">📲 copiar pauta da sexta</button>`);
+}
+
+/* ---- rituais que se abrem sozinhos (item 9) ---- */
+function planVRitual(){
+  const tipo=planUI.ritual||"semana";
+  if(tipo==="ata"){
+    const ref=planMesDe(hojeBRT());
+    return planTopo("Importar a ata da reunião", planMesNome(ref).replace(/^./,c=>c.toUpperCase())+" · rodada não importada")
+      +`<div class="cartao"><b>A rodada de ${esc(planMesNome(ref))} ainda não entrou.</b>
+        <p class="mut" style="margin:4px 0 0">Comece pela revisão do que ficou aberto na rodada anterior; depois cole o texto da ata nova. Dois toques resolvem.</p></div>`
+      +`<button class="btn" data-plan-revisar="1">Revisar as arrastadas</button>
+        <button class="btn sec mt" data-planv="importar">Colar a ata direto</button>`
+      +cadRodape(`<button class="btn sec" id="bt-plan-ritual-pular">Pular por agora</button>`);
+  }
+  const s=planSemanaAtual(), prox=planSemanaProxima()||planSemanaAtual();
+  const ant=planSemanaAnterior(), fech=ant?planFecharSemana(ant):(s?planFecharSemana(s):null);
+  return planTopo("Fechar a semana e planejar a próxima","sexta-feira · dois toques resolvem")
+    +`<div class="plan-duas">
+      <div class="cartao"><b>O que ficou combinado</b>
+        ${fech&&fech.n?`<p class="mut" style="margin:2px 0 6px">${esc(fech.placar)}</p>`
+          +fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")
+          +fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)}</p>`).join("")
+          +fech.abertas.map(t=>`<div class="plan-fecha-l"><span>◻ ${esc(t.desc)}</span>
+            <span class="chips"><button class="chip mini" data-plan-st="${t.id}|finalizado">Concluí</button>
+            <button class="chip mini" data-plan-trava="${t.id}">Travado</button></span>
+            ${planUI.trava===t.id?`<span class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip mini" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</span>`:""}</div>`).join("")
+          :`<p class="mut">Nenhum compromisso na semana que passou.</p>`}</div>
+      <div class="cartao"><b>Sugestões para ${esc(planSemanaRot(prox).toLowerCase())}</b>
+        ${(prox?planSugestoesSemana(prox.id).slice(0,6):[]).map(t=>`<div class="plan-fecha-l"><span>${PLAN_FAROL[planFarol(t)].ico} ${esc(t.desc)}</span>
+          <button class="chip mini" data-plan-comp="${t.id}|${prox.id}">comprometer</button></div>`).join("")
+          ||`<p class="mut">Nada com prazo próximo — a semana começa leve.</p>`}</div>
+    </div>`
+    +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-plan-ritual-pular">Pular por agora</button>
+      <button class="btn" data-planv="semana">Abrir a semana</button></div>`);
+}
+
+/* ---- (11) saídas prontas, com botão copiar ---- */
+function planVSaidas(){
+  const saidas=[
+    ["pauta","🗓️","Pauta da sexta","vencidas, vencendo em 7 dias, travadas e por quem"],
+    ["terceiros","🔗","Cobrança por fornecedor","o que falta, desde quando e quantas fazendas paradas"],
+    ["fechamento","📅","Fechamento do mês","cumprimento por unidade, atrasadas, travadas e arrastadas"],
+    ["ata","📝","Rascunho da próxima ata","o que ficou pendente por fazenda, no formato do texto da reunião"]
+  ];
+  return planTopo("Textos prontos","copiar e colar no WhatsApp")
+    +saidas.map(([k,ico,nome,sub])=>`<button class="cad-menu" data-plan-copia="${k}|">
+      <span class="ico">${ico}</span><span class="txt"><b>${nome}</b><span class="mut">${esc(sub)}</span></span><span class="num">📲</span></button>`).join("")
+    +`<p class="mut" style="font-size:.76rem;margin-top:10px">Os textos saem do que já está no app — nenhuma planilha, nenhum programa de fora.</p>`;
+}
+
+/* ---- (12) cartão "📋 Planejamento do mês" no painel da Diretoria ----
+   Componente ÚNICO; lista UNIDADES, nunca pessoas (mesma regra de justiça do plano do dia, v75). */
+function cartaoPlanejamentoPainel(){
+  planMotor();
+  const ref=planMesDe(hojeBRT());
+  const uns=D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
+      && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
+    .map(f=>({f, r:planResumoMes(ref,f.id)}))
+    .filter(x=>x.r.n>0)
+    .sort((a,b)=>(b.r.atrasadas.length-a.r.atrasadas.length)||((a.r.pct??101)-(b.r.pct??101)));
+  const corpo = uns.length
+    ? uns.map(({f,r})=>`<div class="plano-un"><b>${esc(f.nome)}</b>
+        <p class="mut" style="margin:2px 0 0">cumprimento <b class="num">${r.pct===null?"—":r.pct+"%"}</b> (${r.finalizadas} de ${r.n-r.canceladas}) · atrasadas <b class="num">${r.atrasadas.length}</b> · travadas <b class="num">${r.travadas.length}</b> · arrastadas <b class="num">${r.arrastadas.length}</b></p>
+        ${r.atrasadas.length?`<p class="mut" style="margin:2px 0 0">${esc(r.atrasadas.slice(0,2).map(t=>t.desc).join(" · "))}${r.atrasadas.length>2?" · ＋"+(r.atrasadas.length-2):""}</p>`:""}</div>`).join("")
+    : htmlEstado("vazio",{que:"tarefa da reunião", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
+        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:"em "+planMesRot(ref)},{classe:"mut"});
+  return `<div class="cartao"><h3>📋 Planejamento do mês</h3>
+    <p class="mut" style="font-size:.78rem;margin:0 0 8px">O que a reunião combinou × o que já foi respondido. Ordem: unidades com mais tarefas atrasadas. Travada por terceiro ou por chuva não conta como atraso.</p>
+    ${corpo}
+    <button class="btn sec mt no-print" id="bt-planejamento2" style="box-shadow:none;border-radius:0;">Abrir Planejamento</button></div>`;
+}
+function vPlanejamento(){
+  planMotor();
+  const n=planNav[planNav.length-1]||{v:"menu"};
+  const v=n.v;
+  if(v==="mes") return planVMes();
+  if(v==="lista") return planVLista();
+  if(v==="terceiros") return planVTerceiros();
+  if(v==="arrastadas") return planVArrastadas();
+  if(v==="assuntos") return planVAssuntos();
+  if(v==="nova") return planVNova();
+  if(v==="rodadas") return planVRodadas();
+  if(v==="rodada") return planVRodada(n.id);
+  if(v==="revisao") return planVRevisao();
+  if(v==="importar") return planVImportar();
+  if(v==="semana") return planVSemana();
+  if(v==="ritual") return planVRitual();
+  if(v==="saidas") return planVSaidas();
+  return planVMenu();
+}
+
+/* ---- (11) saídas prontas: texto montado do que já está no app, sem ferramenta externa ---- */
+const planNomeUn = t => t.unidade ? fazenda(t.unidade).nome : (t.unidadeTexto||"Grupo");
+function planTextoPauta(){
+  const ls=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem==="tarefa");
+  const venc=ls.filter(planAtrasada), sete=ls.filter(t=>!planAtrasada(t)&&["vermelho","amarelo"].includes(planFarol(t))), trav=ls.filter(planPausada);
+  const porFaz=lista=>{ const m={};
+    lista.forEach(t=>{ const k=planNomeUn(t); (m[k]=m[k]||[]).push(t); });
+    return Object.keys(m).sort((a,b)=>a.localeCompare(b,"pt-BR")).map(k=>k+":\n"+m[k].map(t=>"  - "+t.desc+" ("+planLinhaTexto(t)+(t.responsavel?" · "+t.responsavel:"")+")").join("\n")).join("\n"); };
+  const L=["📋 Pauta da sexta — "+fmtData(hojeBRT()),""];
+  L.push("VENCIDAS ("+venc.length+")"); L.push(venc.length?porFaz(venc):"  nenhuma");
+  L.push(""); L.push("VENCENDO EM ATÉ 7 DIAS ("+sete.length+")"); L.push(sete.length?porFaz(sete):"  nenhuma");
+  L.push(""); L.push("TRAVADAS ("+trav.length+")");
+  L.push(trav.length?trav.map(t=>"  - "+planNomeUn(t)+" · "+t.desc+" — "+((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())+((t.bloqueio&&t.bloqueio.quem)?" ("+t.bloqueio.quem+")":"")+" há "+planTravadaDias(t)+" dias").join("\n"):"  nenhuma");
+  return L.join("\n");
+}
+function planTextoCobranca(quem){
+  const gs=planPorTerceiro().filter(g=>!quem||g.quem===quem);
+  if(!gs.length) return "Nenhuma pendência com terceiro registrada hoje.";
+  return gs.map(g=>{
+    const itens=[...new Set(g.tarefas.map(t=>t.desc))].join(", ");
+    const faz=[...new Set(g.tarefas.map(planNomeUn))];
+    return g.quem+": "+itens+" pendente"+(g.tarefas.length>1?"s":"")+" para "+faz.join(" e ")
+      +" desde "+fmtDataCurta(g.desde)+" — "+faz.length+" fazenda"+(faz.length>1?"s":"")+" parada"+(faz.length>1?"s":"")+".";
+  }).join("\n");
+}
+function planTextoFechamento(rodadaId){
+  const r=rodadaId?planRodadas().find(x=>x.id===rodadaId):planRodadaAtual();
+  const ts=planTarefas().filter(t=>t.tipoItem==="tarefa" && (!t.unidade||podeVer(t.unidade)) && (!r||t.origemId===r.id));
+  if(!ts.length) return "Nenhuma tarefa na rodada para fechar.";
+  const uns=[...new Set(ts.map(planNomeUn))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const L=["📅 Fechamento — "+((r&&r.nome)||planMesRot(planMesDe(hojeBRT()))),""];
+  uns.forEach(u=>{ const g=ts.filter(t=>planNomeUn(t)===u);
+    const fim=g.filter(t=>t.status==="finalizado").length;
+    L.push(u+": "+fim+" de "+g.length+" concluídas ("+Math.round(fim*100/g.length)+"%) · "
+      +g.filter(planAtrasada).length+" atrasada(s) · "+g.filter(planPausada).length+" travada(s) · "
+      +g.filter(t=>planArrastaMeses(t)>0).length+" arrastada(s)"); });
+  return L.join("\n");
+}
+/* rascunho da PRÓXIMA ata: o que ficou pendente por fazenda, já no formato do texto da reunião */
+function planTextoAta(){
+  const ts=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem==="tarefa");
+  const gerais=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem!=="tarefa");
+  const uns=[...new Set(ts.map(planNomeUn))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const L=["Rascunho da ata — reunião de "+fmtData(planPrazoChip({prazo:""},"reuniao")),""];
+  uns.forEach((u,i)=>{ L.push("2."+(i+1)+" – "+u);
+    ts.filter(t=>planNomeUn(t)===u).sort(planOrdenar).forEach(t=>{
+      /* o texto da ata já costuma dizer o estado ("Kcl em andamento") — não repetir */
+      const jaDiz=x=>normTxt(t.desc).includes(normTxt(x));
+      const st=t.status==="em_execucao"?(jaDiz("em andamento")?"":" em andamento")
+        :planPausada(t)?(jaDiz("aguardando")||jaDiz("cobrar")?"":" ("+((t.bloqueio&&t.bloqueio.texto)||"aguardando")+((t.bloqueio&&t.bloqueio.quem)?" "+t.bloqueio.quem:"")+")"):"";
+      L.push("- "+t.desc+(n0(t.area)?" - "+n0(t.area)+" há":"")+st+(t.prazo?" – PRAZO: "+fmtData(planPrazoEfetivo(t)).replace(/(\d{2})\/(\d{2})\/\d{2}(\d{2})/,"$1/$2/$3"):"")); });
+    L.push(""); });
+  if(gerais.length){ L.push("Assuntos gerais e necessidades de investimento");
+    gerais.forEach(t=>L.push("- "+t.desc+(t.responsavel?" ("+t.responsavel+")":""))); }
+  return L.join("\n");
+}
+function planCopiar(chave, arg){
+  const txt = chave==="pauta" ? planTextoPauta()
+    : chave==="terceiro" ? planTextoCobranca(arg)
+    : chave==="terceiros" ? planTextoCobranca("")
+    : chave==="fechamento" ? planTextoFechamento(arg)
+    : chave==="ata" ? planTextoAta() : "";
+  if(!txt) return;
+  abrirTextoZap(txt);
+}
+
+/* ---- (9) pastilhas na porta de entrada: nenhuma aparece sem pendência ---- */
+function planPastilhas(){
+  const out=[];
+  if(!D) return out;
+  planMotor();
+  if(podePainel()){
+    const abertas=planVisiveis().filter(t=>planAberta(t)&&t.tipoItem==="tarefa");
+    const atr=abertas.filter(planAtrasada).length;
+    if(atr) out.push({txt:"🔴 "+atr+" tarefa"+(atr>1?"s":"")+" atrasada"+(atr>1?"s":""), v:"lista", filtro:"atrasadas"});
+    const trv=abertas.filter(t=>planPausada(t)&&planTravadaDias(t)>PLAN_TRAVA_COBRANCA).length;
+    if(trv) out.push({txt:"📌 "+trv+" travada"+(trv>1?"s":"")+" há +"+PLAN_TRAVA_COBRANCA+" dias", v:"terceiros"});
+    const s=planSemanaAtual();
+    if(planDiaSemana(hojeBRT())>=5 && s && !planComprometidas((planSemanaProxima()||s).id).length)
+      out.push({txt:"🗓️ Planejamento da semana pendente", v:"ritual", arg:"semana"});
+    const ref=planMesDe(hojeBRT());
+    if(parseInt(hojeBRT().slice(8),10)>=PLAN_DIA_REUNIAO && !planRodadaDoMes(ref))
+      out.push({txt:"📅 Rodada de "+planMesNome(ref)+" não importada", v:"ritual", arg:"ata"});
+  }
+  if(sessao && sessao.papel==="gerente" && sessao.fazendaId){
+    const ls=planAbertasDa(sessao.fazendaId).filter(t=>{ const d=planDiasParaPrazo(t); return d!==null && d<=7; });
+    if(ls.length) out.push({txt:"📋 "+ls.length+" tarefa"+(ls.length>1?"s":"")+" vencendo esta semana", v:"faixa", arg:sessao.fazendaId});
+  }
+  return out;
+}
+function planPastilhasHtml(){
+  const ps=planPastilhas();
+  if(!ps.length) return "";
+  return `<div class="pastilhas no-print">${ps.map((p,i)=>`<button class="pastilha" data-past="${i}">${esc(p.txt)}</button>`).join("")}</div>`;
+}
+function planPastilhaTocar(i){
+  const p=planPastilhas()[parseInt(i,10)];
+  if(!p) return;
+  if(p.v==="faixa"){ abrirFolhaTarefas(p.arg); return; }
+  if(p.v==="ritual"){ planUI.ritual=p.arg; planNav=[{v:"ritual"}]; ir("planejamento"); return; }
+  if(p.filtro==="atrasadas"){ planUI.filtroStatus=""; planUI.filtroFarol="vermelho"; }
+  planNav=[{v:"menu"},{v:p.v}]; ir("planejamento");
+}
+/* ---- rituais que se abrem sozinhos: sexta (fechar a semana) e do dia 10 em diante (ata) ----
+   Pulável; o "pulado" vale só para esta sessão, então volta no próximo acesso do MESMO dia. */
+let ritualPuladoSessao=false;
+function planRitualPendente(){
+  if(!D || !podePainel()) return "";
+  planMotor();
+  const ref=planMesDe(hojeBRT());
+  if(parseInt(hojeBRT().slice(8),10)>=PLAN_DIA_REUNIAO && !planRodadaDoMes(ref)) return "ata";
+  const s=planSemanaProxima()||planSemanaAtual();
+  if(planDiaSemana(hojeBRT())>=5 && s && !planComprometidas(s.id).length) return "semana";
+  return "";
+}
+
+/* ---- (9) notificações do navegador, oferecidas UMA vez, sem insistir ----
+   O app não tem servidor de push: os avisos são agendados enquanto o app está aberto e, ao abrir,
+   dispara o que venceu no dia e ainda não foi avisado. Limitação registrada no ESTADO.md. */
+const PLAN_AVISOS=[
+  {id:"semana", hora:7, dia:5, papel:"painel", txt:"Planejamento da semana", corpo:"Fechar a semana e planejar a próxima."},
+  {id:"ata", hora:7, diaMes:PLAN_DIA_REUNIAO, papel:"painel", txt:"Ata da reunião", corpo:"Importar a ata da reunião administrativa."},
+  {id:"gerente", hora:6, papel:"gerente", txt:"Tarefas da reunião", corpo:""}
+];
+const planNotifOk = () => typeof Notification!=="undefined" && Notification.permission==="granted";
+function planNotifOferta(){
+  if(typeof Notification==="undefined") return "";
+  if(Notification.permission!=="default") return "";
+  if(D && D.planNotifOferecido) return "";
+  return `<p class="mut plan-notif"><button class="btn suave mini" id="bt-plan-notif" style="display:inline-flex">Ativar avisos do planejamento</button>
+    <span> sexta de manhã, dia ${PLAN_DIA_REUNIAO} e tarefa vencendo.</span></p>`;
+}
+async function planNotifPedir(){
+  D.planNotifOferecido=true; salvarDados();
+  try{ await Notification.requestPermission(); }catch(e){}
+  planNotifDisparar();
+  ir(telaAtual,null,true);
+}
+function planNotifCorpoGerente(){
+  const fz=sessao&&sessao.fazendaId; if(!fz) return "";
+  const ls=planAbertasDa(fz).filter(t=>{ const d=planDiasParaPrazo(t); return d!==null && d<=2; });
+  return ls.length ? ls.slice(0,3).map(t=>t.desc+" · "+planLinhaTexto(t)).join(" — ") : "";
+}
+/* dispara o que venceu hoje e ainda não foi avisado (uma vez por aviso por dia, por aparelho) */
+function planNotifDisparar(){
+  if(!planNotifOk() || !D) return;
+  const hoje=hojeBRT(), h=new Date().getHours();
+  D.planNotifFeitos=D.planNotifFeitos||{};
+  PLAN_AVISOS.forEach(a=>{
+    if(D.planNotifFeitos[a.id]===hoje) return;
+    if(h<a.hora) return;
+    if(a.papel==="painel" && !podePainel()) return;
+    if(a.papel==="gerente" && !(sessao&&sessao.papel==="gerente")) return;
+    if(a.dia!==undefined && planDiaSemana(hoje)!==a.dia) return;
+    if(a.diaMes!==undefined && parseInt(hoje.slice(8),10)<a.diaMes) return;
+    let corpo=a.corpo;
+    if(a.id==="gerente"){ corpo=planNotifCorpoGerente(); if(!corpo) return; }
+    if(a.id==="ata" && planRodadaDoMes(planMesDe(hoje))) return;
+    if(a.id==="semana" && planComprometidas((planSemanaProxima()||planSemanaAtual()||{}).id||"").length) return;
+    try{ new Notification("📋 "+a.txt, {body:corpo, tag:"plan-"+a.id}); }catch(e){ return; }
+    D.planNotifFeitos[a.id]=hoje;
+  });
+  salvarDados();
+}
+
+/* ---- entrada de dados das telas do módulo ---- */
+function planInput(el){
+  const d=el.dataset;
+  if(el.id==="plan-busca"){ planUI.busca=el.value;
+    clearTimeout(planBuscaTimer);
+    planBuscaTimer=setTimeout(()=>{ const pos=el.selectionStart; planRender();
+      const n=document.getElementById("plan-busca"); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } },220);
+    return true; }
+  if(el.id==="plan-ata"){ planUI.ataTexto=el.value; return true; }
+  if(d.planc!==undefined){
+    if(d.planc==="rodadaNome"){ planUI.rodadaNome=el.value; return true; }
+    planUI.novo=planUI.novo||{};
+    planUI.novo[d.planc]=el.value;
+    atualizarAvanco("bt-plan-salvar", String(planUI.novo.desc||"").trim()?"":"Escreva o que precisa ser feito");
+    return true; }
+  if(d.planata!==undefined){
+    const [lista,i,campo]=d.planata.split("|");
+    const it=(planUI.ata||{})[lista] && planUI.ata[lista][parseInt(i,10)];
+    if(it){ it[campo]=el.value; if(campo==="unidade") planRender(); }
+    return true; }
+  return false;
+}
+/* ---- cliques do módulo (chamado pelo tratador único de ligarEventos) ---- */
+function planClique(t,d){
+  if(d.past!==undefined){ planPastilhaTocar(d.past); return true; }
+  if(d.tar!==undefined){ abrirFolhaTarefa(d.tar); return true; }
+  if(d.tarTodas!==undefined){ abrirFolhaTarefas(d.tarTodas); return true; }
+  if(d.tarOk!==undefined){ planMudarStatus(d.tarOk,"finalizado"); planSalvo("Tarefa concluída");
+    ir(telaAtual,null,true); return true; }
+  if(d.tarAdiar!==undefined){ planSugestaoAdiada[d.tarAdiar]=hojeBRT(); ir(telaAtual,null,true); return true; }
+  if(t.id==="bt-plan-notif"){ planNotifPedir(); return true; }
+  if(t.id==="bt-plan-ritual-pular"){ ritualPuladoSessao=true; planNav=[]; ir(podeCadastros()?"entrada":"painel"); return true; }
+  if(d.planRevisar!==undefined){ planRevisaoAbrir(); return true; }
+  if(telaAtual!=="planejamento") return false;
+  if(d.planvoltar!==undefined){ planVoltar(); return true; }
+  if(d.planv!==undefined){ planIr(d.planv); return true; }
+  if(d.cadid!==undefined && d.cadv==="rodada"){ planIr("rodada",d.cadid); return true; }
+  if(d.planAcoes!==undefined){ planUI.acoes = planUI.acoes===d.planAcoes?"":d.planAcoes;
+    planUI.trava=""; planUI.prazoAb=""; planRender(); return true; }
+  if(d.planSt!==undefined){ const [id,st]=d.planSt.split("|"); const at=planTarefa(id);
+    planMudarStatus(id, at&&at.status===st?"a_iniciar":st); planUI.trava=""; planRender(); return true; }
+  if(d.planTrava!==undefined){ planUI.trava = planUI.trava===d.planTrava?"":d.planTrava; planUI.prazoAb=""; planRender(); return true; }
+  if(d.planMot!==undefined){ const [id,mid]=d.planMot.split("|"), m=planMotivoTrava(mid);
+    if(m) planMudarStatus(id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
+    planUI.trava=""; planRender(); return true; }
+  if(d.planPrazoab!==undefined){ planUI.prazoAb = planUI.prazoAb===d.planPrazoab?"":d.planPrazoab; planUI.trava=""; planRender(); return true; }
+  if(d.planPrazo!==undefined){ const [id,p]=d.planPrazo.split("|");
+    const novo=planPrazoChip(planTarefa(id),p);
+    if(novo) planNovoPrazo(id,novo,"repactuado no escritório");
+    planUI.prazoAb=""; planSalvo("Novo prazo gravado"); planRender(); return true; }
+  if(d.planF!==undefined){ const [k,v]=d.planF.split("|");
+    if(k==="limpar"){ planUI.filtroFarol=""; planUI.filtroStatus=""; }
+    if(k==="farol") planUI.filtroFarol = planUI.filtroFarol===v?"":v;
+    if(k==="status") planUI.filtroStatus = planUI.filtroStatus===v?"":v;
+    if(k==="unid") planUI.filtroUnid = planUI.filtroUnid===v?"":v;
+    if(k==="origem") planUI.filtroOrigem = planUI.filtroOrigem===v?"":v;
+    planRender(); return true; }
+  if(d.planComp!==undefined){ const [id,sid]=d.planComp.split("|"); planComprometer(id,sid); planRender(); return true; }
+  if(d.planNovasem!==undefined){ planUI.novo={unidade:"", desc:"", prazo:"", area:"", responsavel:"", status:"a_iniciar",
+      tipoItem:"tarefa", origemTipo:"semana", origemId:d.planNovasem}; planIr("nova"); return true; }
+  if(d.planNovost!==undefined){ planUI.novo=planUI.novo||{}; planUI.novo.status=d.planNovost; planRender(); return true; }
+  if(d.planNovotipo!==undefined){ planUI.novo=planUI.novo||{}; planUI.novo.tipoItem=d.planNovotipo; planRender(); return true; }
+  if(t.id==="bt-plan-salvar"){ planSalvarNova(); return true; }
+  if(d.planCopia!==undefined){ const [k,arg]=d.planCopia.split("|"); planCopiar(k,arg); return true; }
+  /* revisão das arrastadas */
+  if(d.planRev!==undefined){ const [id,dec]=d.planRev.split("|"); const rv=planUI.revisao;
+    if(rv){ rv.decidido[id] = rv.decidido[id]===dec?"":dec; } planRender(); return true; }
+  if(d.planRevprazo!==undefined){ const [id,p]=d.planRevprazo.split("|"); if(planUI.revisao) planUI.revisao.prazo[id]=p; planRender(); return true; }
+  if(d.planRevmot!==undefined){ const [id,m]=d.planRevmot.split("|"); if(planUI.revisao) planUI.revisao.motivo[id]=m; planRender(); return true; }
+  if(t.id==="bt-plan-revok"){ planRevisaoAplicar(); return true; }
+  /* importação da ata */
+  if(t.id==="bt-plan-ler"){ const el=document.getElementById("plan-ata");
+    const txt=el?el.value:(planUI.ataTexto||"");
+    if(!String(txt).trim()){ avisoInline("#bt-plan-ler","Cole o texto da ata para o app ler."); return true; }
+    planUI.ata=ataParsear(txt); planUI.ataEdit=""; planRender(); return true; }
+  if(t.id==="bt-plan-ata-limpar"){ planUI.ata=null; planUI.ataTexto=""; planRender(); return true; }
+  if(d.planAtaincl!==undefined){ const [lista,i]=d.planAtaincl.split("|");
+    const it=planUI.ata[lista][parseInt(i,10)]; it.incluir = it.incluir===false; planRender(); return true; }
+  if(d.planAtaedit!==undefined){ planUI.ataEdit = planUI.ataEdit===d.planAtaedit?"":d.planAtaedit; planRender(); return true; }
+  if(d.planAtast!==undefined){ const [lista,i,st]=d.planAtast.split("|");
+    const it=planUI.ata[lista][parseInt(i,10)]; it.status=st;
+    if(st!=="aguardando_terceiro"&&st!=="aguardando_clima") it.bloqueio=null;
+    else if(!it.bloqueio) it.bloqueio={tipo:st==="aguardando_clima"?"clima":"terceiro", quem:"", texto:"aguardando"};
+    planRender(); return true; }
+  if(d.planAtafora!==undefined){ planForaDoEscopo(d.planAtafora); planRender(); return true; }
+  if(t.id==="bt-plan-ata-ok"){ planAtaGravar(); return true; }
+  return false;
+}
+function planSalvarNova(){
+  const n=planUI.novo||{};
+  if(!String(n.desc||"").trim()){ atualizarAvanco("bt-plan-salvar","Escreva o que precisa ser feito"); return; }
+  const t=planNovaTarefa({ origemTipo:n.origemTipo||"avulsa", origemId:n.origemId||"",
+    origemRot: n.origemTipo==="semana" ? planSemanaRot(planSemanaDe((planSemanas().find(s=>s.id===n.origemId)||{}).ini)) : "avulsa",
+    unidade:n.unidade||"", desc:n.desc, prazo:n.prazo||"", area:n.area||"",
+    responsavel:n.responsavel||"", status:n.status||"a_iniciar", tipoItem:n.tipoItem||"tarefa" });
+  if(n.origemTipo==="semana" && n.origemId) planComprometer(t.id, n.origemId);
+  planGravar(t);
+  planUI.novo=null; planSalvo("Tarefa criada");
+  planNav.pop(); ir("planejamento");
+}
+function planForaDoEscopo(nome){
+  D.deparaAta = (D.deparaAta && D.deparaAta.length) ? D.deparaAta : DEPARA_ATA_PADRAO.map(x=>({...x}));
+  if(!D.deparaAta.some(x=>planChaveAta(x.ata)===planChaveAta(nome))) D.deparaAta.push({ata:nome, fora:true});
+  salvarDados();
+  if(planUI.ata){ planUI.ata.itens=planUI.ata.itens.filter(it=>planChaveAta(it.unidadeTexto)!==planChaveAta(nome));
+    if(!planUI.ata.fora.includes(nome)) planUI.ata.fora.push(nome); }
+}
+/* revisão das arrastadas → cria a rodada nova e leva para a importação da ata */
+function planRevisaoAbrir(){
+  const ant=planRodadaAtual();
+  const ids=ant?planTarefas().filter(t=>t.origemId===ant.id && planAberta(t) && (!t.unidade||podeVer(t.unidade))).map(t=>t.id):[];
+  planUI.revisao={anterior:ant?ant.id:"", ids, decidido:{}, prazo:{}, motivo:{}};
+  if(!ids.length){ planIr("importar"); return; }
+  planIr("revisao");
+}
+function planRevisaoAplicar(){
+  const rv=planUI.revisao; if(!rv) return;
+  const falta=rv.ids.filter(id=>!rv.decidido[id]).length;
+  if(falta){ atualizarAvanco("bt-plan-revok","Responda as "+falta+" tarefa(s) que faltam"); return; }
+  rv.ids.forEach(id=>{
+    const t=planTarefa(id); if(!t) return;
+    t.arrastadaDe=[...new Set([...(t.arrastadaDe||[]), rv.anterior].filter(Boolean))];
+    const dec=rv.decidido[id];
+    if(dec==="repactuar"){
+      const novo=planPrazoChip(t, rv.prazo[id]||"reuniao");
+      const m=planMotivoTrava(rv.motivo[id]||"");
+      planNovoPrazo(id, novo, m?m.rot:"repactuada na revisão das arrastadas");
+    } else if(dec==="cancelar"){
+      const m=planMotivoTrava(rv.motivo[id]||"");
+      planMudarStatus(id,"cancelado",{motivo:m?m.rot:"cancelada na revisão das arrastadas"});
+    } else {
+      planLog(t,"arrastada","", "mantida","mantida na revisão da rodada nova");
+    }
+  });
+  salvarDados();
+  planUI.revisao=null;
+  planIr("importar");
+}
+function planAtaGravar(){
+  const a=planUI.ata; if(!a) return;
+  const vao=[...a.itens, ...a.gerais].filter(it=>it.incluir!==false && String(it.desc||"").trim());
+  if(!vao.length){ atualizarAvanco("bt-plan-ata-ok","Deixe pelo menos um item marcado"); return; }
+  const ref=planMesDe(hojeBRT());
+  let r=planRodadaDoMes(ref);
+  if(!r){ r={id:uid(), ref, nome:(planUI.rodadaNome||("Reunião "+fmtData(hojeBRT()))).trim(),
+      data:hojeBRT(), criadoEm:hojeBRT(), por:planQuem()}; planRodadas().push(r); }
+  r.importadoEm=hojeBRT();
+  const res=ataImportar(r, vao);
+  planUI.ata=null; planUI.ataTexto="";
+  planSalvo(res.novas+" tarefa(s) gravada(s)"+(res.repetidas?" · "+res.repetidas+" já existia(m)":""));
+  planNav=[{v:"menu"},{v:"rodadas"},{v:"rodada",id:r.id}];
+  ir("planejamento");
+}
+
 function vAjuda(){
   return topo("Como preencher","Passo a passo",true)+`
   <div class="cartao"><ol style="padding-left:18px;display:grid;gap:10px">
@@ -6364,7 +7933,11 @@ function linhasWhatsIrg(b){
 }
 function resumoWhats(b){
   const L=[];
-  L.push("📋 *BOLETIM "+fazenda(b.fazendaId).nome.toUpperCase()+"* — "+fmtData(b.data));
+  L.push("📋 *BOLETIM "+fazenda(b.fazendaId).nome.toUpperCase()+"* — "+fmtData(b.data)
+    + (()=>{ const ls=planAbertasDa(b.fazendaId); if(!ls.length) return "";   /* v77: farol de tarefas na 1ª linha */
+        const c={vermelho:0,amarelo:0,cinza:0,verde:0}; ls.forEach(t=>c[planFarol(t)]++);
+        const p=["vermelho","amarelo","cinza","verde"].filter(k=>c[k]).map(k=>PLAN_FAROL[k].ico+" "+c[k]);
+        return p.length?" · tarefas "+p.join(" "):""; })());
   L.push("Por: "+(b.responsavel||"—"));
   const c=b.clima||{};
   if(c.cond||c.chuvaMm||c.obs) L.push("🌤️ "+[(c.cond||""),(n0(c.chuvaMm)?"chuva "+n0(c.chuvaMm)+" mm":""),(c.obs||"")].filter(Boolean).join(" · "));
@@ -6546,6 +8119,24 @@ async function syncEnviar(){
       if(!cod) continue;
       corpo={ chave:item.id, codigo:cod, atualizado_em:new Date().toISOString() };
       conflito="chave";
+    }else if(item.t==="tar"){
+      /* v77: tarefa do planejamento. O histórico viaja DENTRO do payload — a coleção do app
+         (D.tarefaHistorico) continua sendo a fonte, e o banco guarda a foto completa da tarefa. */
+      col="planejamento_tarefa"; reg=(D.tarefas||[]).find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, unidade_id:reg.unidade||null, prazo:reg.prazo||null, status:reg.status,
+        payload:{...reg, historico:planHistDe(reg.id)} };
+      conflito="id";
+    }else if(item.t==="rod"){
+      col="planejamento_rodada"; reg=(D.rodadas||[]).find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, ref:reg.ref, payload:reg };
+      conflito="id";
+    }else if(item.t==="sem"){
+      col="planejamento_semana"; reg=(D.semanas||[]).find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, ini:reg.ini, payload:reg };
+      conflito="id";
     }else if(item.t==="pec"){
       /* espelho da pecuária do boletim em tabela própria (ERP/consultas);
          o payload completo do boletim continua indo para "boletins" */
@@ -6576,6 +8167,7 @@ async function syncBaixar(){
   const esc0=escopoAtual();
   const soFz = (esc0 && !esc0.tudo) ? unidadesPermitidas().map(f=>f.id) : null;
   const idsFz = soFz ? soFz.concat(Object.keys(FZ_LEGADO).filter(k=>soFz.includes(FZ_LEGADO[k]))) : null;
+  await baixarPlanejamento();
   for(const [col,alvo] of [["boletins","boletins"],["pos_colheitas","posColheitas"],["remessas","remessas"],["telemetria","telemetria"]]){
     try{
       let url=syncCfg.url+"/rest/v1/"+col+"?select=payload&order=data.desc&limit=2000";
@@ -6612,6 +8204,36 @@ async function syncBaixar(){
   if(ok){ syncUltima=new Date(); await salvarDados(); }
   return ok;
 }
+/* v77: planejamento (sql/050). O app lê e escreve; o histórico de cada tarefa viaja dentro do
+   payload da tarefa e volta para a coleção D.tarefaHistorico. Edição local ainda na fila vence. */
+async function baixarPlanejamento(){
+  if(!syncAtivo()) return false;
+  let ok=false;
+  for(const [col,alvo] of [["planejamento_rodada","rodadas"],["planejamento_semana","semanas"],["planejamento_tarefa","tarefas"]]){
+    try{
+      const r=await fetch(syncCfg.url+"/rest/v1/"+col+"?select=payload&limit=4000",
+        { headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } });
+      if(!r.ok) continue;
+      const linhas=await r.json(); if(!Array.isArray(linhas)) continue;
+      ok=true;
+      const lista=D[alvo]=D[alvo]||[];
+      linhas.forEach(l=>{
+        const o=l.payload; if(!o||!o.id) return;
+        if(syncFila.some(x=>x.id===o.id)) return;
+        if(o.unidade) o.unidade=fzAtual(o.unidade);
+        if(alvo==="tarefas" && Array.isArray(o.historico)){
+          const h=planHist();
+          o.historico.forEach(x=>{ if(x&&x.id&&!h.some(y=>y.id===x.id)) h.push(x); });
+          delete o.historico;
+        }
+        const i=lista.findIndex(x=>x.id===o.id);
+        if(i>=0) lista[i]=o; else lista.push(o);
+      });
+    }catch(e){}
+  }
+  if(ok) await salvarDados();
+  return ok;
+}
 /* Códigos de acesso atuais (tabela codigos_acesso). Sem internet vale o que o
    aparelho já tem (CODIGOS_PADRAO + últimos baixados). */
 async function baixarCodigos(){
@@ -6632,7 +8254,8 @@ async function baixarCodigos(){
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
   try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes(); } } finally { syncOcupado=false; }
-  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol"].includes(telaAtual))
+  planMotor(true); planNotifDisparar();   /* v77: farol, dias de chuva e saída da pausa por clima rodam sozinhos */
+  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol","planejamento"].includes(telaAtual))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
 function syncStatus(){
@@ -7024,6 +8647,7 @@ async function concluirEnvio(){
 function ligarEventos(tela){
   const app=$("#app");
   if(tela==="cadastros") cadPosRender();
+  if(tela==="planejamento") planUI.flash="";
   if(tela==="farois"){ const b=$("#farol-busca"); if(b) b.oninput=()=>{ farolVista.q=b.value;
       app.querySelectorAll("[data-farolun]").forEach(el=>{ el.style.display=cadBate(farolVista.q, el.dataset.nome)?"":"none"; }); }; }
   if(tela==="codigo"){ const cod=$("#cod-acesso");
@@ -7058,6 +8682,9 @@ function ligarEventos(tela){
     const t = ev.target.closest("button"); if(!t) return;
     const d = t.dataset;
     if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
+    /* v77: módulo de planejamento — pastilhas, faixa do gerente e a área da Diretoria/Escritório */
+    if(planClique(t,d)) return;
+    if(t.id==="bt-planejamento"||t.id==="bt-planejamento2"){ if(!podePainel()) return; planNav=[{v:"menu"}]; ir("planejamento"); return; }
     /* código de acesso */
     if(t.id==="bt-cod-entrar"){
       const el=$("#cod-acesso"), cod=el?el.value:"";
@@ -7092,6 +8719,10 @@ function ligarEventos(tela){
       if(!unidadesPermitidas().some(f=>atividadeDe(f.id)===d.atividade)) return;
       sessao={userId:u.id, papel:"gerente", nome:u.nome, atividade:d.atividade, fazendaId:null};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
+    if(d.perfil==="planejamento"){ if(!podePainel()) return;
+      const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
+      sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null;
+      planNav=[{v:"menu"}]; ir("planejamento"); return; }
     if(d.perfil==="relatorios"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("relatorios"); return; }
@@ -7626,6 +9257,7 @@ function ligarEventos(tela){
   app.oninput = ev=>{
     const el=ev.target, d=el.dataset;
     if(telaAtual==="cadastros" && cadInput(el)) return;
+    if(telaAtual==="planejamento" && planInput(el)) return;   /* v77 */
     if(el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }   /* v72: colar a tabela ativa "1 · Ler" */
     if(d.r!==undefined && rascunho){ rascunho[d.r]=el.value; salvarRascunho(); return; }
     if(d.pr!==undefined && rascunhoPos){ rascunhoPos[d.pr]=el.value; salvarRascPos(); return; }
@@ -7871,6 +9503,8 @@ function vHistorico(){ return vPainel(); }
      em trocar fazenda/atividade) */
   ir(!acesso ? "codigo"
     : sessao ? (((sessao.papel==="gerente"||sessao.papel==="pos") && !sessao.fazendaId) ? "entrada" : "casa") : "entrada");
+  /* v77: o motor de calendário e os avisos rodam na abertura — nada depende de alguém abrir uma tela */
+  try{ planMotor(true); planNotifDisparar(); }catch(e){}
   /* v73: virou o dia com o app aberto? ao voltar ao primeiro plano a régua recalcula "hoje" (Brasília) e a casa redesenha */
   document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && reguaVista.hoje && reguaVista.hoje!==hojeBRT() && telaAtual==="casa") ir("casa",null,true); });
 })();

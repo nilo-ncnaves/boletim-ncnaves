@@ -64,6 +64,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | **NÍVEL 6 — DIREÇÃO** | | | | | | |
 | 23 | Painel executivo mensal | 1 página: produção, custo, água, máquinas, rebanho, adesão, 3 decisões | todos | dia 8 | robô-redator (`painel_executivo`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase; custo por saca AGUARDA ERP) — prompt `docs/relatorios/23-painel-executivo.md` |
 | 24 | Fechamento de safra por cultura | produtividade, custo, margem, decisões (renovar/arrancar/rotação/vender lote) | todos | anual | Cowork | AGUARDA fechamento da safra (e ERP para custo/margem) |
+| 25 | Ata × executado | o que a reunião do mês combinou × o que já foi respondido, por unidade (cumprimento, atrasadas, travadas, arrastadas, motivos) | app (planejamento_tarefa, v77) | mensal (dia 9) | motor (`ata_x_executado`) + painel/Planejamento | EXISTE (v77 — precisa de `sql/050` e `sql/051` rodados) |
 
 **Planejado × executado do plano do DIA (v75).** Não confundir com o
 item 4 acima: aquele compara o plano de safra do agrônomo (adubo,
@@ -79,6 +80,43 @@ lê pela vitrine de Relatórios (`REL_CATALOGO`, "Planejado × executado
 (plano do dia) — mês"). Vocabulário: `nao_feito` é SEM REGISTRO — nunca
 "não fez". Regra completa em CLAUDE.md, item c13.
 
+## Ata × executado — `planejamento_tarefa` + `vw_planejamento_mes` (v77)
+
+**O que responde:** o que a reunião administrativa do mês combinou, por
+fazenda, × o que já foi respondido — cumprimento, atrasadas, travadas,
+arrastadas e os motivos da trava.
+
+**De onde vem:** o módulo de planejamento do app (sql/050). Toda reunião
+(por volta do dia 10) vira uma RODADA; a ata entra por colagem e cada
+linha iniciada por "-" vira uma tarefa da unidade. Toda sexta há
+planejamento semanal, sem reunião: é a MESMA tarefa, comprometida na
+semana. O gerente responde no celular com um toque (Comecei · Concluí ·
+Travado), e a resposta sobe pela fila offline de sempre.
+
+**Relatório mensal:** `sql/051-ata-x-executado.sql` grava
+`relatorio = 'ata_x_executado'` em `relatorios_gerados` — uma linha por
+unidade e uma linha do grupo (unidade_id nulo). Mês corrente na hora
+pela `rel_rodar_ata()`; agendamento (dia 9, véspera da reunião)
+comentado no fim do arquivo. O app lê pela vitrine de Relatórios
+(`REL_CATALOGO`, "Ata × executado (planejamento do mês) — mês").
+
+**Colunas de `dados` (por unidade):** `unidade`, `unidade_nome`,
+`tarefas`, `finalizadas`, `canceladas`, `cumprimento_pct`, `atrasadas`,
+`travadas`, `arrastadas`, `area_ha`, `motivos` (contagem por motivo de
+trava) e `farol` (vermelho = tem atrasada; amarelo = tem travada; verde
+= o resto).
+
+**Regra que não se discute:** tarefa parada por TERCEIRO ou por CHUVA
+conta como TRAVADA, nunca como atrasada — ela tem status próprio, farol
+⏸️ e vira cobrança do escritório ("🔗 Pendências com terceiros" no app,
+com o texto de cobrança pronto para copiar). `atrasadas` só olha A
+INICIAR e EM EXECUÇÃO com prazo vencido. Vocabulário: o relatório relata
+PRAZO e REGISTRO — nunca "não fez". Regra completa em CLAUDE.md, item c15.
+
+**Saídas prontas dentro do app (botão copiar, sem ferramenta externa):**
+pauta da sexta por fazenda · cobrança por fornecedor · fechamento mensal
+por unidade · rascunho da próxima ata, já no formato do texto da reunião.
+
 ## Calendário resumido (para a vistoria de segunda)
 
 | Quando | Relatórios previstos |
@@ -88,7 +126,7 @@ lê pela vitrine de Relatórios (`REL_CATALOGO`, "Planejado × executado
 | Sexta | 2 (devolutiva semanal); 5, 6 e 7 da semana (motor, 05:10) |
 | Dia 1 (motor, 05:20) | 9 (custo físico), 14 (rebanho) e 4 (plano) do mês fechado |
 | Toda semana (dia livre) | 8, 10, 16, 19 (painel) |
-| Todo mês (até dia 10) | 5 (mensal, prompt), 10 (mensal), 12*, 13*, 18, 23 |
+| Todo mês (até dia 10) | 5 (mensal, prompt), 10 (mensal), 12*, 13*, 18, 23; **25 (ata × executado, motor no dia 9)** |
 | Trimestral | 20*, 21 |
 | Por ciclo/safra ou censo | 11, 17*, 22, 24* |
 

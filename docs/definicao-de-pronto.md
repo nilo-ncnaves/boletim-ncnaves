@@ -545,3 +545,56 @@ TEXTO de um termo que o app já gravou em algum boletim.
    termo novo é "o funcionário reconhece nesta lista a palavra que ele
    usa?". Termo que só o escritório entende continua existindo em
    Cadastros › Catálogos, nunca no lugar do termo de campo.
+
+## 18. Planejamento: um toque no campo, cobrança no escritório (desde a v77)
+
+O módulo de planejamento (reunião mensal + planejamento semanal) é a
+MESMA tarefa vista em dois horizontes. Antes de abrir PR que mexa nele,
+conferir — e colar a resposta no resumo:
+
+1. **`node scripts/teste_planejamento.cjs` passa inteiro?** É a validação
+   escrita na tarefa da v77: importa o texto REAL da ata (Vereda, Mata
+   Preta e Lagamar (Grupo)), confere item a item (96 ha, aguardando clima,
+   aguardando terceiro por repasse e por Cooxupé, responsável entre
+   parênteses, tarefa sem prazo), prova a idempotência, cria a semana,
+   compromete 3 tarefas, conclui 1, trava 1 por falta de insumo, fecha a
+   semana sozinha, projeta o ritmo dos 96 ha, dispara o alerta de travada
+   há mais de 7 dias, gera pauta, cobrança, fechamento e rascunho da
+   próxima ata, e prova a sexta abrindo o ritual e a pastilha do dia 11.
+   Roda sem rede, a 390 px, com relógio fixo. Sai com código 1 se falhar.
+2. **`scripts/checar-poluicao.cjs`, grupo "14. Planejamento", todo ✅?**
+   As telas do módulo entram no MESMO grupo de medida de Cadastros
+   (altura ≤ 2 telas ou busca, busca em lista > 12 itens, ação principal
+   fixa no rodapé, no máximo 3 níveis, cabeçalho fixo com "‹ Voltar",
+   "Mais opções" fechado, padrão visual) porque usam as classes `cad-*`
+   (P10). Tela nova do módulo entra na lista `niveis` do cenário.
+3. **O gerente muda status em UM toque e nunca digita?** A folha da tarefa
+   não pode ter `input`, `select` nem `textarea`. Novo prazo é chip, nunca
+   calendário. Nenhum `confirm`/`alert`/`prompt` dispara.
+4. **Tarefa travada fica vermelha para o campo?** Não pode. Os dois
+   "aguardando" e a tarefa sem prazo são ⏸️ cinza; vermelho só em A
+   INICIAR / EM EXECUÇÃO com 2 dias, hoje ou vencido. A prova está no
+   grupo 14 e no teste (farol da travada por chuva e por insumo).
+5. **A faixa do gerente cabe em 3 linhas a 360 px?** Uma linha visual por
+   item, alvo de toque ≥ 44 px, "＋N tarefas" para o resto, ordem
+   🔴 → 🟡 → ⏸️ → 🟢 e nenhum termo de cobrança ("não fez", "pendente",
+   "faltou", "esqueceu"). Sem tarefa aberta na unidade, a faixa não
+   aparece — e a regressão prova que a tela do gerente fica idêntica.
+6. **Alguém precisa lembrar de abrir alguma tela?** Não pode. `planMotor()`
+   roda na abertura do app, a cada sincronização e ao entrar no módulo;
+   as pastilhas nascem na porta de entrada e somem sem pendência; sexta e
+   dia 10 abrem o ritual sozinhos, pulável só para a sessão.
+7. **A cobrança e o rascunho da ata saem sem ferramenta externa?** Os
+   quatro textos (pauta da sexta, cobrança por fornecedor, fechamento do
+   mês, rascunho da próxima ata) saem por botão copiar, montados do que já
+   está no app.
+8. **Nome novo de fazenda na ata foi adivinhado?** Não pode. Sem linha no
+   de-para, o item entra como "unidade não reconhecida" e a pessoa
+   escolhe; `fora:true` é ignorado sempre, sem perguntar. Catálogo
+   vigente em docs/catalogos-por-atividade.md, "Planejamento (v77)".
+9. **A entrega aumentou o número de confirmações do app?** Não pode
+   (item 13). O módulo tem ZERO diálogo: toda ação é reversível e fica
+   registrada em `D.tarefaHistorico`; cancelar é STATUS com motivo.
+10. **Tabela nova no Supabase?** `sql/050-planejamento.sql` (tabelas e a
+    visão) e `sql/051-ata-x-executado.sql` (relatório mensal) precisam
+    estar no repositório e avisados ao Nilo no resumo do PR.

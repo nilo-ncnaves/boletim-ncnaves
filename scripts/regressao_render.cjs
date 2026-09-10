@@ -65,6 +65,11 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   await page.goto(base + '/index.html');
   await page.evaluate(([a, s]) => { localStorage.clear(); localStorage.setItem('bdf:acesso', JSON.stringify(a)); if (s) localStorage.setItem('bdf:sessao', JSON.stringify(s)); }, [acesso, sessao]);
   await page.reload(); await pausa(page, 1500);
+  /* v77: do dia 10 em diante (e na sexta) a porta da Diretoria/Escritório é a tela curta do ritual
+     do planejamento. É o comportamento esperado — e é provado em scripts/teste_planejamento.cjs e
+     no grupo 14 de scripts/checar-poluicao.cjs. Aqui a pessoa pula, para o roteiro de sempre seguir
+     igual entre as duas versões (na versão antiga a variável nem existe). */
+  await page.evaluate(() => { try { ritualPuladoSessao = true; } catch (e) {} });
   const dumps = {};
   dumps['00-inicio'] = await html(page);
   for (const [rot, fn] of passos) {
@@ -181,6 +186,12 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   ]);
 
   /* ⚙️ admin — entrada, painel, cadastros, unidades e plano (v52) */
+  /* v77: área Planejamento do Escritório — na versão antiga o passo cai em FALHOU (tela nova) */
+  const PASSOS_PLANEJAMENTO = [
+    ['70-planejamento-menu', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }]; ir('planejamento'); }); await pausa(p, 300); }],
+    ['72-planejamento-importar', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.ata = null; ir('planejamento'); }); await pausa(p, 300); }],
+    ['74-planejamento-semana', async p => { await p.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'semana' }]; ir('planejamento'); }); await pausa(p, 300); }],
+  ];
   await cenario(browser, 'admin', { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null, [
     ['10-painel', async p => { await p.click('[data-perfil="admin"]'); }],
     ['20-cadastros', async p => { await clique(p, '#bt-cad'); }],
@@ -188,6 +199,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['40-unidplano-fz2', async p => { const chip = await p.$('[data-up="fz"][data-upv="Água Limpa"]'); if (chip) { await chip.click(); await pausa(p, 300); } else { const chips = await p.$$('[data-up="fz"]'); if (chips.length > 1) { await chips[1].click(); await pausa(p, 300); } } }],
     ['50-editar', async p => { const b = await p.$('[data-up="editar"]'); if (b) { await b.click(); await pausa(p, 300); } }],
     ['60-auditar', async p => { const b = await p.$('[data-up="auditar"]'); if (b) { await b.click(); await pausa(p, 1500); } }],
+    ...PASSOS_PLANEJAMENTO,
   ]);
 
   await browser.close();

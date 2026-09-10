@@ -617,6 +617,124 @@ Sem ação em massa, sem modal, sem campo novo de digitação. Desde a v70
 (decisão do Nilo) o envio exige resposta em toda seção eventual:
 registro ou "Nada a registrar hoje"; seção esperada fica fora.
 
+## Planejamento — reunião mensal e semana (v77)
+
+Fonte oficial do vocabulário do módulo de planejamento. Componentes
+ÚNICOS nas três atividades: o que muda por atividade é o de-para de
+descrição → operação do boletim (sinônimos abaixo), nunca a tela.
+
+### Status da tarefa (`PLAN_STATUS`)
+
+| id | rótulo | farol |
+|---|---|---|
+| `a_iniciar` | A iniciar | por prazo (🟢 🟡 🔴) |
+| `em_execucao` | Em execução | por prazo (🟢 🟡 🔴) |
+| `finalizado` | Finalizado | ✅ |
+| `aguardando_terceiro` | Aguardando terceiro | ⏸️ cinza — **nunca vermelho** |
+| `aguardando_clima` | Aguardando clima | ⏸️ cinza — **nunca vermelho** |
+| `cancelado` | Cancelado (com motivo) | — |
+
+Tarefa **sem prazo** também é ⏸️ cinza. Vermelho é só 2 dias, hoje ou
+vencido (rótulo ATRASADO, que descreve o PRAZO, nunca a pessoa);
+amarelo é de 3 a 7 dias; verde é mais de 7 dias.
+
+### Motivos de trava (`PLAN_MOTIVOS_TRAVA`) — chips de um toque
+
+| id | chip | vira o status |
+|---|---|---|
+| `insumo` | falta insumo | aguardando terceiro ("aguardando insumo") |
+| `peca` | falta peça | aguardando terceiro ("aguardando peça") |
+| `gente` | falta gente | aguardando terceiro ("aguardando gente") |
+| `maquina` | falta máquina | aguardando terceiro ("aguardando máquina") |
+| `chuva` | chuva | aguardando clima ("aguardando o tempo firmar") |
+| `outro` | outro | aguardando terceiro ("aguardando") |
+
+### Novo prazo em um toque (`PLAN_NOVOS_PRAZOS`)
+`+7 dias` · `+15 dias` · `fim do mês` · `próxima reunião` (dia 10).
+Nunca calendário nem teclado: quem está no campo não digita.
+
+### Origem da tarefa (`PLAN_ORIGENS`)
+`mensal` = rodada da reunião · `semana` = tarefa nova da semana ·
+`avulsa` = criada no escritório fora dos dois ritos.
+
+### Tipo do item (`PLAN_TIPOS_ITEM`)
+`tarefa` (tem unidade e prazo) · `assunto` (assuntos gerais da ata) ·
+`investimento` (necessidades de investimento). Assunto e investimento
+não têm fazenda nem prazo, por desenho.
+
+### De-para da ata (`DEPARA_ATA_PADRAO`, editável em Cadastros)
+
+| nome na ata | unidade do app | observação |
+|---|---|---|
+| FMC Igrejinha | f14c Monte Carmelo — Café | área "Igrejinha" |
+| FMC Lazaro | f14c Monte Carmelo — Café | área "Lazaro" |
+| FMC Caxico | f14c Monte Carmelo — Café | área "Caxico" |
+| FMC Ernane | f14c Monte Carmelo — Café | área "Ernane" |
+| FMC Arrendo | f14c Monte Carmelo — Café | área "José Eustáquio" |
+| Lagamar (Rodrigo) | f20 Lagamar Café (Rodrigo) | |
+| Lagamar (Grupo) | f03c Rio Preto-Lagamar — Café | |
+| Café 5º · Café 6º | f24 Vereda Café 5º e 6º | |
+| Romaria | f23 Vereda Romaria | |
+| Vereda | f22c Vereda — Café | |
+| Mata Preta | f13c Mata Preta — Café | |
+| Água Limpa | f01 Água Limpa | |
+| São Félix | f21 São Félix — Arrendamento | |
+| Marimbondo · Cristo Redentor · Córrego Grande (Dr. Adilson) | — | **fora do escopo**: ignoradas sempre, sem perguntar |
+
+Identidade pelo **id** da unidade, nunca por pedaço de nome. Nome que
+não está aqui NÃO é adivinhado: entra na pré-visualização como
+"unidade não reconhecida" e a pessoa escolhe (regra 3 do plano de
+safra). Igrejinha e Lazaro entraram como áreas de Monte Carmelo — Café
+(talhões `t057` e `t058`, área a confirmar em Cadastros), no mesmo
+padrão de Caxico, Ernane e José Eustáquio.
+
+### Leitura da ata pela linguagem
+
+| o que aparece na linha | vira |
+|---|---|
+| `PRAZO: DD/MM/AA` | prazo (sem isso, tarefa sem prazo → farol cinza) |
+| `96 há`, `22 ha`, `40 hectares` | área em ha |
+| "Ok", "Finalizado", "Concluído", "Pronto", "Feito" | FINALIZADO |
+| "em andamento", "iniciou", "iniciado", "finalizando", "começou" | EM EXECUÇÃO |
+| "falta", "fazer", "aplicar", "programar", "iniciar" | A INICIAR (é também o padrão) |
+| "aguardando…", "falta chegar", "falta entregar", "falta peças", "cobrar <fornecedor>", "aguardando repasse", "aguardando aprovar" | AGUARDANDO TERCEIRO (captura o terceiro: Cooxupé, Diferpan, Cemig…) |
+| "aguardando sol", "quando parar as chuvas", "N dias de sol", "parar de chover" | AGUARDANDO CLIMA |
+| `(Renatinho/ Renato)`, "Definido com Cristian" | responsável |
+| "Assuntos gerais", "Necessidades de investimento" | lista separada, sem fazenda e sem prazo |
+
+Ordem de decisão: FINALIZADO vence tudo; depois clima; depois terceiro;
+depois a linguagem de execução. Reimportar a mesma ata não duplica
+(chave: rodada + unidade + descrição normalizada).
+
+### Vínculo com o boletim (`PLAN_SINONIMOS`) — o app SUGERE, nunca conclui
+
+Descrição da tarefa → operação do catálogo da atividade da unidade. Só
+para SUGERIR a conclusão quando o registro correspondente entra no
+boletim do dia; a conclusão continua sendo um toque da pessoa.
+
+- **Café:** kcl → Adubação via lanço · ferti/fertirrigação → Adubação
+  via fertirrigação · esqueletar/esqueletamento → Poda mecanizada
+  esqueletamento · varrição → Colheita · levantar → Levantar café ·
+  calcário/gesso → Calagem / gessagem · herbicida → Capina química
+  manual · roçada → Capina mecânica com roçadeira · adubação → Adubação
+  manual · desbrota → Desbrota manual · pulverização → Pulverização
+  manual · irrigação → Irrigação automática.
+- **Grãos:** kcl/cobertura → Adubação de cobertura · calcário → Calagem ·
+  gesso → Gessagem · dessecação → Dessecação de pré-plantio · plantio →
+  Plantio / semeadura · colheita → Colheita mecanizada · herbicida →
+  Herbicida pós-emergente · fungicida → Fungicida · inseticida →
+  Inseticida.
+- **Pecuária:** vacina/vacinação → Vacinação (especificar) ·
+  vermifugação → Vermifugação · roçada → Roçada · cerca/cocho →
+  Manutenção de cerca / cocho / bebedouro · pesagem → Pesagem · desmama
+  → Desmama · formiga → Controle de formiga.
+
+Além dos sinônimos, casa por palavra inteira de 5+ letras do nome da
+operação. **Tarefa de estrutura** (caixa d'água, piscinão, talude,
+adutora, barracão, cerca, estrada, aceiro, represa, bomba, poço, rede
+elétrica, curral, laboratório, reforma, construção, montagem) NUNCA
+recebe sugestão: status só manual.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar

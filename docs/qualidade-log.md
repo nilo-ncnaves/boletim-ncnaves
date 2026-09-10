@@ -6,6 +6,102 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 10/09/2026 · v77 · Módulo de planejamento: reunião mensal + planejamento semanal
+
+**Entrega.** O app passou a guardar o que a reunião administrativa do mês
+combina e o que a sexta-feira repactua — a MESMA tarefa vista em dois
+horizontes, com acompanhamento automático de prazos e uma interface que não
+deixa esquecer. A ata entra por colagem (nada de planilha), o gerente
+responde com UM toque no topo do boletim, e o escritório recebe a cobrança
+pronta. Regra permanente em CLAUDE.md, item c15; catálogo em
+docs/catalogos-por-atividade.md ("Planejamento — reunião mensal e semana");
+checagem em docs/definicao-de-pronto.md, item 18.
+
+**O que foi verificado (como).**
+- `node scripts/teste_planejamento.cjs` — script novo, sem rede, 390 px,
+  relógio fixo: **48 ✅ · 0 ❌**. Importa o texto REAL da ata da reunião de
+  10/09/26 e confere o resultado esperado item a item: Vereda com 5 tarefas
+  (uma de 96 ha em AGUARDANDO CLIMA e farol cinza; uma com responsável
+  "Renatinho/ Renato"; uma AGUARDANDO TERCEIRO por repasse; uma sem prazo);
+  Mata Preta com 1 em execução, 1 finalizada e 1 aguardando clima; Lagamar
+  (Grupo) com 1 finalizada, 1 aguardando Cooxupé e 1 a iniciar. Depois:
+  reimportar a mesma ata não duplica (15 → 15); a semana é criada, 3 tarefas
+  são comprometidas, 1 concluída, 1 travada por falta de insumo e 1 fica sem
+  ação — o fechamento da sexta seguinte devolve `{n:3, concluídas:1,
+  travadas:1, abertas:1}` e o placar "cumprimos 1 de 3"; a projeção dos 96 ha
+  sai "feito 42 de 96 ha · conclui em 30/09 (10 dias do prazo)"; o alerta de
+  travada há mais de 7 dias dispara; a pauta da sexta, a cobrança por
+  fornecedor ("Cooxupé: … desde 10/09 — 1 fazenda parada."), o fechamento do
+  mês e o rascunho da próxima ata saem no formato certo.
+- `node scripts/checar-poluicao.cjs` — **575 ✅ · 41 ❌**, exatamente os
+  mesmos 41 ❌ herdados da v58 (comparação item a item com a saída da v76):
+  **nenhum ❌ novo**. Grupo novo "14. Planejamento" (10 itens ✅) e 16 telas
+  do módulo medidas com as MESMAS regras de Cadastros (altura, busca em
+  lista longa, ação principal fixa, níveis, cabeçalho, padrão visual).
+  Durante a construção três ❌ apareceram e foram zerados antes do PR: o
+  fechamento da rodada (2,75 telas e 15 itens), a revisão das arrastadas
+  (3,7 telas) e a conferência da ata (13 itens) nasceram sem busca — as três
+  ganharam busca (P3).
+- `scripts/regressao_render.cjs` main × v77: as telas do **gerente nas três
+  atividades e do pós-colheita ficaram IDÊNTICAS** (só o `localStorage`
+  difere, pelas coleções novas) — a prova de que sem tarefa aberta o módulo
+  não desenha nada. Diferenças, todas intencionais: porta de entrada e
+  painel (pastilhas + botão e cartão do Planejamento), menu de Cadastros
+  (item "De-para da ata", 2 talhões novos, versão v77) e as três telas novas
+  do Escritório. Nenhum erro de JavaScript novo; os 3 pedidos de rede a mais
+  são as 3 tabelas novas do Supabase, abortadas offline como todas as outras.
+- Sintaxe do JavaScript extraído do index.html (`node --check`) e do
+  `sw.js`; cache do service worker trocado para `boletim-lgs-v77` junto com
+  o rodapé.
+
+**Autorrevisão por escrito (as quatro perguntas da tarefa).**
+1. *O gerente muda status em um toque?* **Sim.** A faixa do topo abre a
+   folha e Comecei · Concluí · Travado (chips) resolvem no toque seguinte. O
+   teste prova `0 campo(s) de digitação` na folha, `0 diálogo nativo` e que
+   a pessoa não sai da tela. Novo prazo, quando aparece, é chip (+7 · +15 ·
+   fim do mês · próxima reunião) — nunca calendário.
+2. *Tarefa travada por terceiro fica vermelha para o campo?* **Não.** Os
+   dois "aguardando" e a tarefa sem prazo têm farol ⏸️ cinza por construção
+   (`planFarol` devolve "cinza" antes de olhar o prazo). Provado duas vezes:
+   no teste (travada por insumo → cinza; a de 96 ha por clima → cinza) e no
+   grupo 14 da checagem de poluição.
+3. *A cobrança de fornecedor e o rascunho da ata saem prontos sem ferramenta
+   externa?* **Sim.** Os quatro textos são montados no próprio aparelho e
+   copiados por botão (`abrirTextoZap`), do que já está no app. Nenhuma
+   planilha, nenhuma exportação, nenhum programa de fora.
+4. *Alguém precisa lembrar de abrir alguma tela para o sistema funcionar?*
+   **Não.** `planMotor()` roda na abertura do app, a cada sincronização e ao
+   entrar no módulo (farol, dias de chuva, saída automática da pausa por
+   clima, criação da semana). As pastilhas nascem na porta de entrada e somem
+   sem pendência; na sexta e do dia 10 em diante a porta da Diretoria é a
+   tela do ritual, pulável só para a sessão. **A única exceção honesta são as
+   notificações**: sem servidor de push, elas disparam quando o app é aberto
+   a partir da hora marcada — está no ESTADO.md, em PENDÊNCIAS, como
+   limitação e como tarefa própria.
+
+**O que depende de teste manual no iPhone (Nilo).**
+1. Rodar `sql/050-planejamento.sql` e, depois, `sql/051-ata-x-executado.sql`
+   no SQL Editor. Sem eles o módulo funciona inteiro no aparelho, mas não
+   sincroniza entre celulares.
+2. Colar a ata de verdade da próxima reunião em Planejamento › Importar ata
+   e conferir a pré-visualização item a item antes de gravar — é ali que
+   aparece um nome de fazenda que o de-para ainda não conhece.
+3. Na sexta, conferir que a tela "Fechar a semana e planejar a próxima" abre
+   sozinha; e no dia 10, a de "Importar a ata".
+4. No celular de um gerente, conferir a faixa "📋 Tarefas da reunião" no topo
+   da casa e do boletim (no máximo 3 linhas) e responder com um toque.
+5. Tocar uma vez em "Ativar avisos do planejamento" no painel e ver se o
+   iPhone aceita (exige o app instalado na tela de início).
+
+**O que NÃO foi tocado.** O boletim das três atividades (nenhum campo novo,
+nenhuma seção nova, nada bloqueia o envio), o pós-colheita, o plano do dia
+(v75), o plano de safra (v52), os robôs iCrop/Solinftec, o motor de
+relatórios da fase 1, o robô-redator, os códigos de acesso e o CSS-base. O
+único acréscimo fora do módulo foi o farol de tarefas na primeira linha do
+resumo do WhatsApp (pedido no item 12 da tarefa) e a inclusão de
+`plano_x_executado_diario` na lista de relatórios baixados — ele estava no
+catálogo desde a v75 mas nunca era baixado, então nunca chegava à tela.
+
 ## 10/09/2026 · v76 · Nomenclatura das atividades e funções do café na palavra da lavoura
 
 **Entrega.** As listas de atividade por talhão e de função de mão de obra

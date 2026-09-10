@@ -68,6 +68,11 @@ de boletins.payload.plano (o app grava e lê) e o sql/048 só acrescenta
 leitura ao motor de relatórios: a visão vw_plano_x_executado e o
 relatório mensal plano_x_executado_diario em relatorios_gerados (o app
 só lê, como os outros).
+Desde a v77: planejamento_rodada, planejamento_semana e
+planejamento_tarefa mais a visão vw_planejamento_mes (sql/050; o app lê
+E escreve, na mesma fila offline dos boletins — o histórico de cada
+tarefa viaja dentro do payload) e o relatório mensal ata_x_executado em
+relatorios_gerados (sql/051; o app só lê, como os outros).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -697,6 +702,56 @@ natureza do serviço) e o rótulo do passo ("Operação" · "Atividade").
   três atividades, e sai numa tarefa própria (mexeria nas três).
 - Conferência: `scripts/checar-poluicao.cjs`, item 4 (depois do "＋", só
   o ONDE; nenhum campo e nenhum chip antes da escolha).
+
+### c15) Planejamento: um toque no campo, cobrança no escritório (desde a v77)
+O módulo de planejamento (reunião mensal + planejamento semanal) é a MESMA
+tarefa vista em dois horizontes: a rodada da ata (por volta do dia 10) e a
+semana (toda sexta, sem reunião). Concluir num horizonte atualiza o outro —
+não existe cópia. Componentes ÚNICOS nas três atividades; o que muda por
+atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
+- **O gerente muda status com UM toque e nunca digita.** A faixa
+  `faixaTarefas(fz)` fica no topo da casa e do boletim (no máximo 3 linhas,
+  ordem 🔴 → 🟡 → ⏸️ → 🟢, "＋N tarefas" para o resto); o toque abre a folha
+  `planFolhaAbrir`, com Comecei · Concluí · Travado (chips) · Falar com o
+  Nilo. Zero campo de digitação, zero diálogo. Novo prazo, quando existe, é
+  chip (`PLAN_NOVOS_PRAZOS`), nunca calendário.
+- **Tarefa travada por terceiro ou por chuva NUNCA fica vermelha para o
+  campo.** Tem status próprio (AGUARDANDO TERCEIRO · AGUARDANDO CLIMA),
+  farol ⏸️ cinza, e vira cobrança do escritório em "🔗 Pendências com
+  terceiros". Tarefa sem prazo também é cinza. Vermelho é só prazo de 2
+  dias, hoje ou vencido, e só em A INICIAR / EM EXECUÇÃO.
+- **AGUARDANDO CLIMA sai da pausa sozinha** quando o boletim da unidade
+  registra `PLAN_DIAS_SOL` dias seguidos sem clima impeditivo (a mesma
+  fonte do plano do dia, v75). O prazo mostra "ajustado +N dias de chuva" e
+  o prazo original nunca se perde (`prazoOriginal`).
+- **Nada bloqueia o preenchimento do boletim.** A faixa é leitura; o envio
+  não olha para tarefa nenhuma.
+- **Tudo roda dentro do app.** A ata entra por colagem (`ataParsear` +
+  pré-visualização editável item a item, idempotente por rodada + unidade +
+  descrição); a pauta da sexta, a cobrança por fornecedor, o fechamento do
+  mês e o RASCUNHO DA PRÓXIMA ATA saem por botão copiar. Nenhuma planilha,
+  nenhuma exportação.
+- **Nada depende de alguém lembrar de abrir uma tela.** `planMotor()` roda
+  na abertura do app, a cada sincronização e ao entrar no módulo; as
+  pastilhas aparecem na porta de entrada (e somem sem pendência); na sexta e
+  do dia 10 em diante a porta da Diretoria/Escritório é a tela curta do
+  ritual, pulável — e o "pulado" vale só para a sessão, então volta no
+  próximo acesso do mesmo dia.
+- **De-para da ata por id, nunca por pedaço de nome** (`DEPARA_ATA_PADRAO`,
+  editável em Cadastros › De-para da ata). Nome que não está no de-para NÃO
+  é adivinhado: entra na pré-visualização como "unidade não reconhecida" e
+  a pessoa escolhe (mesma regra 3 do plano de safra). Fazenda marcada
+  `fora:true` é ignorada sempre, sem perguntar.
+- **Nenhuma confirmação nova** (c10, contenção): toda ação do módulo é
+  reversível e registrada em `D.tarefaHistorico`; cancelar é um STATUS com
+  motivo, nunca um delete.
+- **Vocabulário:** o módulo relata PRAZO e REGISTRO. "ATRASADO" é rótulo do
+  prazo vencido, nunca julgamento de pessoa; proibidos "não fez", "não
+  realizou", "pendente", "faltou", "esqueceu". Nenhuma tela expõe um
+  gerente para outro: as listas da Diretoria são de UNIDADES.
+- Conferência: `node scripts/teste_planejamento.cjs` (a validação da tarefa,
+  com o texto real da ata) e `scripts/checar-poluicao.cjs`, grupo "14.
+  Planejamento"; detalhe em docs/definicao-de-pronto.md, item 18.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
