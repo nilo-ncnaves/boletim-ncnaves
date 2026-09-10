@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v79** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v80** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1214,6 +1214,35 @@ bruto no armazenamento segue `["Desbrota","Pulverização"]`; plano
 gravado com o nome antigo fecha como "feito" com registro no nome novo, e
 o contrário também; regressão main × branch com grãos e pecuária
 idênticos (só o relógio do envio difere).
+
+## Filtros de Planejamento sem rolagem lateral (v80)
+Correção pedida pelo Nilo em 10/09/2026: em Planejamento › Todas as tarefas, as seis
+opções de SITUAÇÃO ("A iniciar", "Em execução", "Finalizado", "Aguardando terceiro",
+"Aguardando clima", "Cancelado") ficavam depois da borda direita e só apareciam
+arrastando a fileira para o lado. Regra permanente em CLAUDE.md, item c15.
+- **A fileira quebra em linhas** (`.cad-saltos` com `flex-wrap`), nunca rola de lado —
+  a mesma razão pela qual a rolagem lateral já era proibida nos chips removíveis da
+  v74. Vale também para os saltos de Cadastros, que usam a mesma classe.
+- **Só quebrar não bastava:** com tudo aberto os filtros passaram a ocupar 634 px e a
+  1ª tarefa só começava a 788 px — abaixo da dobra. Por isso o painel **nasce fechado**
+  (`planBarraFiltros`, P5) e abre num toque.
+- **Filtro ligado nunca fica invisível:** com o painel fechado, a linha mostra
+  "Filtrar · N", nomeia o que está ligado ("Em execução") e traz "limpar".
+- **Quatro grupos com rótulo:** Prazo (os 4 faróis) · Situação (as 6) · Unidade ·
+  Origem. Fileira com mais de 8 chips mostra os primeiros e um "＋N" que abre o resto
+  no lugar; a fileira do filtro escolhido abre sozinha.
+- **Medido a 390 px:** fechado, a 1ª tarefa começa a **193 px** (era 590 px com as
+  fileiras que rolavam); aberto, **22 chips visíveis, zero escondidos, nenhuma fileira
+  rolando**; página em 390 px.
+- **Cadastros tinha o mesmo defeito, pior.** A classe `.cad-saltos` também serve os
+  atalhos por fazenda de Cadastros (`cadSaltos`): em Fazendas e unidades, **18 dos 21
+  chips estavam fora da tela**, alcançáveis só arrastando. Agora quebram em linhas,
+  com teto `CAD_SALTOS_MAX = 4` + "＋N"; o atalho escolhido entra sempre entre os
+  visíveis. Medido: de 50 px com 18 escondidos para 142 px com **zero escondidos**.
+  A expansão volta a fechar ao trocar de tela (`cadLimpar`).
+- **Cobertura das provas:** a regressão compara HTML, então ela não enxerga mudança
+  só de CSS — a fileira de Cadastros foi conferida por medição direta no navegador
+  (chips, escondidos, rolagem e altura), nas duas versões.
 
 ## Layout do trio e do cartão de tarefa (v79)
 Correção de layout pedida pelo Nilo em 10/09/2026, a partir da tela real do

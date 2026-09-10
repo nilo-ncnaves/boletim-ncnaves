@@ -208,8 +208,16 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .cad-menu .txt .mut{font-size:.78rem}
 .cad-menu .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:var(--verde);flex:none}
 .cad-item{display:flex;align-items:center;gap:10px;width:100%;background:var(--cartao);border:1px solid var(--linha);margin-top:-1px;padding:7px 12px;text-align:left;min-height:46px;line-height:1.3}
-.cad-saltos{display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;margin:0 -14px 2px;padding-left:14px;-webkit-overflow-scrolling:touch}
+/* v79: quebra em linhas, NUNCA rola de lado — rolagem lateral esconde item, que é o
+   mesmo motivo pelo qual ela já era proibida nos chips removíveis da v74 (regra c12). */
+.cad-saltos{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 10px;margin:0 0 2px}
 .cad-saltos .chip{flex:none;min-height:40px;padding:8px 12px;font-size:.84rem;border-radius:0}
+.cad-saltos .chip.sal-mais{color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.cad-filtro-rot{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--tinta-2);margin:2px 0 4px;width:100%}
+.plan-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}
+.plan-filtros .chip{min-height:40px;padding:8px 12px;font-size:.84rem;border-radius:0}
+.plan-filtros-at{font-size:.78rem;flex:1 1 100%;margin:-2px 0 0}
 .cad-item .cresce{display:flex;flex-direction:column;min-width:0}
 .cad-item .cresce .mut{font-size:.78rem;white-space:normal}
 .cad-item .seta{color:var(--tinta-2);flex:none}
@@ -6536,11 +6544,11 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v79";
+const APP_VERSAO="v80";
 let cadNav=[];
-let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
+let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
-function cadLimpar(){ cadUI.confirma=""; cadUI.form=null; cadUI.novo=""; cadUI.mais=false; cadUI.zona=false; cadUI.filtro=""; cadUI.msg=""; }
+function cadLimpar(){ cadUI.confirma=""; cadUI.form=null; cadUI.novo=""; cadUI.mais=false; cadUI.zona=false; cadUI.filtro=""; cadUI.msg=""; cadUI.saltos=false; }
 function cadIr(tela){ cadLimpar(); cadNav.push(tela); ir("cadastros"); }
 function cadVoltar(){ cadLimpar(); if(cadNav.length>1){ cadNav.pop(); ir("cadastros"); } else { cadNav=[]; ir("painel"); } }
 function cadRender(){ ir("cadastros",null,true); }
@@ -6574,7 +6582,21 @@ function cadListaAgrupada(grupos){
 const cadBusca=(id,ph)=>`<input class="cad-busca" id="${id}" placeholder="${ph}" value="${esc(cadUI.filtro||"")}" autocomplete="off" autocapitalize="off">`;
 const cadRodape=h=>`<div class="cad-rodape">${h}</div>`;
 /* chips de salto: filtram a lista pelo grupo (mesmo campo da busca) — evita rolar listas longas */
-const cadSaltos=nomes=>nomes.length>1?`<div class="cad-saltos"><button class="chip ${cadUI.filtro?"":"on"}" data-cadsalto="">todos</button>${nomes.map(n=>`<button class="chip ${cadUI.filtro===n?"on":""}" data-cadsalto="${esc(n)}">${esc(n)}</button>`).join("")}</div>`:"";
+/* v80: a fileira quebra em linhas (nunca rola de lado). Lista longa mostra os primeiros
+   e um "＋N" que abre o resto no lugar — senão 21 fazendas viravam uma parede de 464 px
+   acima da lista. O salto escolhido entra sempre entre os visíveis. */
+const CAD_SALTOS_MAX=4;
+const cadSaltos=nomes=>{
+  if(nomes.length<=1) return "";
+  const aberta = cadUI.saltos || nomes.length<=CAD_SALTOS_MAX;
+  let vis = aberta ? nomes : nomes.slice(0, CAD_SALTOS_MAX);
+  if(!aberta && cadUI.filtro && !vis.includes(cadUI.filtro) && nomes.includes(cadUI.filtro)) vis=[cadUI.filtro].concat(vis.slice(0,CAD_SALTOS_MAX-1));
+  const resto = nomes.length - vis.length;
+  return `<div class="cad-saltos"><button class="chip ${cadUI.filtro?"":"on"}" data-cadsalto="">todos</button>`
+    + vis.map(n=>`<button class="chip ${cadUI.filtro===n?"on":""}" data-cadsalto="${esc(n)}">${esc(n)}</button>`).join("")
+    + (resto>0?`<button class="chip sal-mais" data-cadsaltos="1" aria-label="Mostrar mais ${resto} atalho(s)">＋${resto}</button>`:"")
+    + `</div>`;
+};
 const cadMais=(h,rot)=>`<details class="cad-bloco"${cadUI.mais?" open":""}><summary>${rot||"Mais opções"}</summary><div class="corpo">${h}</div></details>`;
 const cadZona=h=>`<details class="cad-bloco zona"${cadUI.zona?" open":""}><summary>Zona de cuidado</summary><div class="corpo">${h}</div></details>`;
 const cadCampo=(rot,k,val,attrs)=>`<label>${rot}</label><input data-cadc="${k}" value="${esc(val==null?"":val)}" ${attrs||""}>`;
@@ -7113,6 +7135,7 @@ function cadClique(t,d){
     if(v==="codigonovo"){ novoCombo={ativs:[],unis:[]}; cadIr({v}); return true; }
     cadIr(id?{v,id}:{v}); return true;
   }
+  if(d.cadsaltos!==undefined){ cadUI.saltos=true; cadRender(); return true; }
   if(d.cadsalto!==undefined){ cadUI.filtro=d.cadsalto; cadRender(); return true; }
   if(d.cadnovo!==undefined){ cadUI.novo=d.cadnovo; cadUI.confirma=""; if(cadAtual().v==="lote") cadUI.zona=true; cadRender(); return true; }
   if(d.cadcancel!==undefined){ cadUI.novo=""; cadUI.confirma=""; cadRender(); return true; }
@@ -7211,7 +7234,39 @@ function cadInput(el){
    que já cumprem os padrões P1–P10.
    ============================================================ */
 let planNav=[], planBuscaTimer=null;
-let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", novo:null, revisao:null};
+let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", novo:null, revisao:null, filaAberta:{}, filtros:false};
+/* v79: fileira de filtros em linhas, com rótulo. Nada rola de lado: fila longa mostra os
+   PRIMEIROS e um chip "＋N" que abre o resto no lugar (mesmo mecanismo do "+K" da v74).
+   A fila com o filtro escolhido abre sozinha, para a escolha nunca ficar escondida. */
+const PLAN_FILA_MAX=8;
+/* v79: os filtros nascem FECHADOS (P5) — a lista é o que a pessoa veio ver. A linha fechada
+   nomeia o que está ligado e traz "limpar", para filtro ativo nunca ficar invisível. */
+function planFiltrosAtivos(){
+  const out=[];
+  if(planUI.filtroFarol) out.push("prazo "+(PLAN_FAROL[planUI.filtroFarol]||{}).ico);
+  if(planUI.filtroStatus) out.push(planStatusRot(planUI.filtroStatus));
+  if(planUI.filtroUnid) out.push(fazenda(planUI.filtroUnid).nome);
+  if(planUI.filtroOrigem) out.push(PLAN_ORIGENS[planUI.filtroOrigem]||"");
+  return out.filter(Boolean);
+}
+function planBarraFiltros(filas){
+  const at=planFiltrosAtivos(), ab=planUI.filtros;
+  return `<div class="plan-filtros">
+      <button class="chip ${at.length?"on":""}" data-plan-filtros="1" aria-expanded="${ab?"true":"false"}"
+        aria-label="${ab?"Fechar":"Abrir"} os filtros">Filtrar${at.length?" · "+at.length:""} ${ab?"▴":"▾"}</button>
+      ${at.length?`<span class="plan-filtros-at mut">${esc(at.join(" · "))}</span>
+        <button class="chip sal-mais" data-plan-f="tudo|" aria-label="Limpar todos os filtros">limpar</button>`:""}
+    </div>${ab?filas:""}`;
+}
+function planFiltroFila(rot, chips, chave, escolhido){
+  if(!chips.length) return "";
+  const aberta = planUI.filaAberta[chave] || escolhido || chips.length<=PLAN_FILA_MAX;
+  const vis = aberta ? chips : chips.slice(0, PLAN_FILA_MAX);
+  const resto = chips.length - vis.length;
+  return `<div class="cad-saltos"><span class="cad-filtro-rot">${esc(rot)}</span>${vis.join("")}`
+    + (resto>0?`<button class="chip sal-mais" data-plan-fila="${esc(chave)}" aria-label="Mostrar mais ${resto} filtro(s) de ${esc(rot)}">＋${resto}</button>`:"")
+    + `</div>`;
+}
 function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; }
 function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
 function planVoltar(){ planLimpar();
@@ -7356,12 +7411,14 @@ function planVLista(){
   const uns=[...new Set(planVisiveis().map(t=>t.unidade).filter(Boolean))];
   return planTopo("Todas as tarefas", ls.length+" de "+planVisiveis().filter(t=>t.tipoItem==="tarefa").length)
     +planBusca("Buscar tarefa, unidade ou responsável…")
-    +`<div class="cad-saltos"><button class="chip ${!planUI.filtroFarol&&!planUI.filtroStatus?"on":""}" data-plan-f="limpar|">todos</button>
-        ${["vermelho","amarelo","cinza","verde"].map(f=>`<button class="chip ${planUI.filtroFarol===f?"on":""}" data-plan-f="farol|${f}">${PLAN_FAROL[f].ico}</button>`).join("")}
-        ${PLAN_STATUS.map(s=>`<button class="chip ${planUI.filtroStatus===s.id?"on":""}" data-plan-f="status|${s.id}">${esc(s.rot)}</button>`).join("")}</div>
-      <div class="cad-saltos"><button class="chip ${!planUI.filtroUnid?"on":""}" data-plan-f="unid|">todas as unidades</button>
-        ${uns.map(fz=>`<button class="chip ${planUI.filtroUnid===fz?"on":""}" data-plan-f="unid|${fz}">${esc(fazenda(fz).nome)}</button>`).join("")}
-        ${Object.entries(PLAN_ORIGENS).map(([k,r])=>`<button class="chip ${planUI.filtroOrigem===k?"on":""}" data-plan-f="origem|${k}">${esc(r)}</button>`).join("")}</div>`
+    +planBarraFiltros(
+      planFiltroFila("Prazo", ["vermelho","amarelo","cinza","verde"].map(f=>`<button class="chip ${planUI.filtroFarol===f?"on":""}" data-plan-f="farol|${f}">${PLAN_FAROL[f].ico}</button>`), "farol", true)
+      +planFiltroFila("Situação", PLAN_STATUS.map(s=>`<button class="chip ${planUI.filtroStatus===s.id?"on":""}" data-plan-f="status|${s.id}">${esc(s.rot)}</button>`),
+          "status", !!planUI.filtroStatus)
+      +planFiltroFila("Unidade", uns.map(fz=>`<button class="chip ${planUI.filtroUnid===fz?"on":""}" data-plan-f="unid|${fz}">${esc(fazenda(fz).nome)}</button>`),
+          "unid", !!planUI.filtroUnid)
+      +planFiltroFila("Origem", Object.entries(PLAN_ORIGENS).map(([k,r])=>`<button class="chip ${planUI.filtroOrigem===k?"on":""}" data-plan-f="origem|${k}">${esc(r)}</button>`),
+          "origem", !!planUI.filtroOrigem))
     +(ls.length?ls.map(t=>planLinhaTarefa(t,{origem:true})).join("")
       :planVazio("tarefa", {filtro:planUI.busca||"", unidade:planUI.filtroUnid||"",
         onde:planUI.filtroUnid?"":"nas unidades deste código"}))
@@ -7952,8 +8009,12 @@ function planClique(t,d){
     const novo=planPrazoChip(planTarefa(id),p);
     if(novo) planNovoPrazo(id,novo,"repactuado no escritório");
     planUI.prazoAb=""; planSalvo("Novo prazo gravado"); planRender(); return true; }
+  /* v79: "＋N" abre o resto da fileira de filtros, no lugar (só na memória) */
+  if(d.planFila!==undefined){ planUI.filaAberta[d.planFila]=true; planRender(); return true; }
+  if(d.planFiltros!==undefined){ planUI.filtros=!planUI.filtros; planRender(); return true; }
   if(d.planF!==undefined){ const [k,v]=d.planF.split("|");
     if(k==="limpar"){ planUI.filtroFarol=""; planUI.filtroStatus=""; }
+    if(k==="tudo"){ planUI.filtroFarol=""; planUI.filtroStatus=""; planUI.filtroUnid=""; planUI.filtroOrigem=""; }
     if(k==="farol") planUI.filtroFarol = planUI.filtroFarol===v?"":v;
     if(k==="status") planUI.filtroStatus = planUI.filtroStatus===v?"":v;
     if(k==="unid") planUI.filtroUnid = planUI.filtroUnid===v?"":v;
