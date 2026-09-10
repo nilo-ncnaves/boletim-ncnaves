@@ -268,7 +268,14 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-linha>.cad-item>.plan-farol,.plan-linha>.cad-item>.plan-mais{margin-top:1px}
 .plan-linha.fora{opacity:.5}
 .plan-farol{flex:none;width:34px;min-height:44px;padding:0;font-size:1rem;line-height:1}
-.plan-mais{flex:none;width:44px;min-height:44px;padding:0;font-size:1.2rem;color:var(--tinta-2);line-height:1}
+/* v82: o "⋯" não dizia nada — ninguém adivinha que ali moram Comecei/Concluí/Travado.
+   Vira PALAVRA, com cara de BOTÃO (borda, sem sublinhado): o "executado" logo abaixo é um
+   link verde sublinhado, e dois comportamentos diferentes não podem ter a mesma aparência.
+   Retângulo, sem raio e sem sombra — não acrescenta pílula nova (P10). Alvo de 44 px. */
+.plan-mais{flex:none;min-height:44px;padding:0 10px;font-size:.8rem;font-weight:700;
+  color:var(--tinta);background:var(--papel);border:1.5px solid var(--linha);
+  line-height:1.2;white-space:nowrap;max-width:96px}
+.plan-mais:active{background:var(--linha)}
 .plan-acoes{background:var(--papel);border:1px solid var(--linha);border-top:none;padding:10px 12px}
 .plan-acoes .chip{min-height:44px;font-size:.84rem}
 .plan-pct{font-weight:700;font-size:.95rem}
@@ -6544,7 +6551,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v81";
+const APP_VERSAO="v82";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -7302,7 +7309,7 @@ function planLinhaTarefa(t, o){
       <button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[f].ico}</button>
       <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(sub)}</span>
         ${t.tipoItem==="tarefa"?planTrio(t,{attr:"data-plan-exec", aberta:planUI.exec===t.id}):""}</span>
-      <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${aberta}">⋯</button>
+      <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Atualizar ${esc(t.desc)}" aria-expanded="${aberta}">${aberta?"fechar":"atualizar"}</button>
     </div>
     ${aberta?`<div class="plan-acoes"><div class="chips">
       <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>

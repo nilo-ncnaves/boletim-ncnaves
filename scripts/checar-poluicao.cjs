@@ -76,7 +76,7 @@
   14. Planejamento (v77): a área Planejamento (Diretoria/Escritório) é medida com as
       MESMAS regras de Cadastros (altura, busca em lista longa, ação principal fixa no
       rodapé, níveis, cabeçalho com voltar, padrão visual) porque usa as classes de
-      Cadastros (P10); além disso a ação rápida "⋯" abre no lugar (sem tela nova, sem
+      Cadastros (P10); além disso a ação rápida "atualizar" abre no lugar (sem tela nova, sem
       modal, alvo ≥ 44 px) e um toque muda o status; travada por chuva ou por terceiro
       fica ⏸️ e NUNCA vermelha; nenhuma pastilha aparece sem pendência; e na casa do
       gerente a faixa "Tarefas da reunião" traz no máximo 3 linhas, cada uma em UMA
@@ -961,7 +961,8 @@ async function cenarioPlanejamento(browser, base, R) {
     await page.waitForTimeout(200);
     R.telas.push(await medirTela(page, 'Planejamento › Ritual (' + tipo + ')', 'cadastros', { tipo: 'lista', niveis: 1 }));
   }
-  /* ação rápida "⋯": abre no lugar, um toque muda o status, sem tela nova e sem diálogo nativo */
+  /* ação rápida "atualizar" (era "⋯" até a v81): abre no lugar, um toque muda o status,
+     sem tela nova e sem diálogo nativo */
   await page.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'lista' }]; planLimpar(); ir('planejamento'); });
   await page.waitForTimeout(250);
   R.planejamento = await page.evaluate(async () => {
@@ -1371,7 +1372,7 @@ function avaliar(R) {
   {
     const G = '14. Planejamento: um toque, no lugar, sem cobrar o campo';
     const P = R.planejamento || {}, F = R.faixaTarefas || {};
-    add(G, 'Área Planejamento — "⋯" abre a ação rápida no lugar, sem tela nova e sem modal',
+    add(G, 'Área Planejamento — "atualizar" abre a ação rápida no lugar, sem tela nova e sem modal',
       P.mesmaTela && P.acoes && P.acoes.length >= 4 && !P.modal, (P.acoes || []).join(' · ') || 'não abriu');
     add(G, 'Área Planejamento — um toque muda o status (alvo ≥ 44 px, nenhum diálogo nativo)',
       P.para === P.esperado && P.alvo >= TOQUE_MIN && P.nativos === 0,
