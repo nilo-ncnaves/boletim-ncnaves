@@ -61,6 +61,18 @@
       da função única (nomeia unidade e dia, sem termo proibido); cabeçalho
       contextual + régua abaixo de 25 % da altura útil; nenhum
       input type=date na tela.
+  13. Plano do dia (v75): nas três atividades, sem plano nada aparece (nem linha
+      na casa, nem faixa no boletim); com plano, a faixa do topo traz até 3 linhas,
+      cada uma em UMA linha visual a 360 px, com a caixinha de status que o app
+      troca de ⚪ para ✅ sozinho quando o registro entra (sem redesenhar) e sem
+      termo de cobrança; ao enviar, a folha "Amanhã" abre depois do cinto de
+      segurança, com dois botões de verbo e "Pular", sem régua, chip removível,
+      ação por perfil, botão de avanço, badge nem seletor de data, e o apontamento
+      revela ONDE → O QUÊ → DETALHES um passo por vez; a pergunta do motivo aparece
+      uma vez por chips e NÃO aparece em dia impedido pelo clima declarado (o desvio
+      entra como "clima"); salvar fecha o plano dentro do boletim, envia e guarda o
+      plano de amanhã; o cartão da Diretoria ordena por desvios evitáveis, nomeia o
+      recorte no vazio e não mostra nome de gerente.
   12. Chips removíveis da multi-seleção (v74): em toda multi-seleção FORA do
       apontamento em 3 passos (café: problemas da irrigação e setores
       fertirrigados; Cadastros: código combinado) a seleção vazia não desenha nada
@@ -455,6 +467,173 @@ async function medirDecisao(page, btSel, gatilhoSel, descartarSel) {
   }
   return r;
 }
+/* ---------- 13. Planejamento do dia seguinte × executado (v75) ----------
+   Um cenário por atividade: sem plano nada aparece; com plano de hoje semeado (feito "ontem"), a
+   faixa do topo do boletim, o status automático, a folha "Amanhã" com os 3 passos e a pergunta do
+   motivo, o fechamento dentro do boletim e a regra do dia impedido pelo clima declarado. */
+const PLANO_PROIBIDO = /n[ãa]o fez|n[ãa]o realizou|pendente|atrasad|faltou(?! gente| insumo)|esqueceu/i;
+NA_PAGINA.planoSemeia = fz => {
+  const hoje = hojeBRT();
+  D.boletins = D.boletins.filter(b => !(b.fazendaId === fz && b.data === hoje));
+  const ondes = planoCat(fz).onde(fz).slice(0, 3).map(o => o.id), ops = planoCat(fz).ops(fz);
+  const oq = [ops[0], ops[Math.min(5, ops.length - 1)], ops[Math.min(9, ops.length - 1)]];
+  D.planoDia = [{ id: 'chk', fazendaId: fz, data: hoje, criadoEm: diaISO(hoje, -1), por: 'Gerente',
+    itens: oq.map((op, i) => ({ op, ondes: [ondes[i] || 'geral'], pessoas: String(8 - i * 2) })), obs: '' }];
+  salvarDados(); ir('casa');
+  return { ondes, ops: oq };
+};
+/* a faixa como ela abre: itens, linhas visuais, status e vocabulário */
+NA_PAGINA.planoFaixa = () => {
+  const f = document.getElementById('plano-faixa');
+  if (!f) return { existe: false, scrollW: document.documentElement.scrollWidth };
+  const it = [...f.querySelectorAll('.plano-item')];
+  return { existe: true, itens: it.length,
+    linhas: new Set(it.map(x => Math.round(x.getBoundingClientRect().top))).size,
+    altura: +f.getBoundingClientRect().height.toFixed(1), pct: +(f.getBoundingClientRect().height * 100 / innerHeight).toFixed(1),
+    conta: ((f.querySelector('.plano-conta') || {}).textContent || '').trim(),
+    status: it.map(x => (x.querySelector('.plano-ler') || {}).textContent || ''),
+    badges: f.querySelectorAll('.op-cat').length,
+    ajustar: !!document.getElementById('bt-plano-ajustar'),
+    scrollW: document.documentElement.scrollWidth,
+    inputs: f.querySelectorAll('input,select,textarea').length,
+    texto: f.textContent.replace(/\s+/g, ' ').trim() };
+};
+/* estado da folha "Amanhã": botões, motivo, 3 passos e ausências obrigatórias */
+NA_PAGINA.planoFolha = () => {
+  const f = document.getElementById('folha-plano');
+  if (!f) return { existe: false };
+  const nv = document.getElementById('plano-novo');
+  return { existe: true, titulo: (f.querySelector('.topo h1') || {}).textContent || '',
+    rodape: [...f.querySelectorAll('.rodape button')].map(b => b.textContent.trim()),
+    pular: !!document.getElementById('bt-plano-pular'),
+    motivos: [...f.querySelectorAll('[data-plano-motivo]')].map(b => b.textContent.trim()),
+    motivoTxt: !!document.getElementById('plano-motivo-txt'),
+    itens: [...f.querySelectorAll('[data-plano-item]')].map(x => x.textContent.replace(/\s+/g, ' ').trim()),
+    add: !!document.getElementById('bt-plano-add'),
+    novo: nv ? { rotulos: [...nv.querySelectorAll('label')].map(l => l.textContent.trim()),
+      chips: nv.querySelectorAll('.chip').length, campos: nv.querySelectorAll('input,textarea').length,
+      seletores: nv.querySelectorAll('select').length, ok: !!document.getElementById('bt-plano-ok') } : null,
+    /* nada de régua, chip removível, ação por perfil, botão de avanço nem badge no apontamento */
+    regua: f.querySelectorAll('.regua').length, selBox: f.querySelectorAll('.sel-box').length,
+    acaoOff: f.querySelectorAll('.acao-off').length, falta: f.querySelectorAll('[data-falta]').length,
+    badge: f.querySelectorAll('.op-cat').length, dataDate: f.querySelectorAll('input[type=date]').length,
+    corpoTravado: document.body.classList.contains('folha-aberta'),
+    nativos: window.__nativos, tela: telaAtual,
+    texto: f.textContent.replace(/\s+/g, ' ').trim() };
+};
+async function medirPlano(browser, base, R, rot, fz, atv, chuva, termos) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS[fz], chave: fz }, gerente(fz, atv));
+  const P = { nome: rot + (chuva ? ' — plano (dia de chuva)' : ' — plano do dia'), atividade: atv, chuva: !!chuva };
+  /* a) sem plano: nem linha na casa, nem faixa no boletim */
+  P.semPlano = await page.evaluate(() => { D.planoDia = []; salvarDados(); ir('casa');
+    return { linha: !!document.querySelector('.plano-linha-casa') }; });
+  await page.click('#bt-preencher'); await page.waitForTimeout(400);
+  P.semPlano.faixa = await page.evaluate(() => !!document.getElementById('plano-faixa'));
+  /* b) plano de hoje semeado (feito "ontem") */
+  const semente = await page.evaluate(NA_PAGINA.planoSemeia, fz);
+  await page.waitForTimeout(300);
+  P.casa = await page.evaluate(() => { const p = document.querySelector('.plano-linha-casa');
+    return { existe: !!p, texto: p ? p.textContent.replace(/\s+/g, ' ').trim() : '' }; });
+  await page.click('#bt-preencher'); await page.waitForTimeout(400);
+  P.faixa = await page.evaluate(NA_PAGINA.planoFaixa);
+  /* a mesma faixa a 360 px: cada item tem de caber em UMA linha visual */
+  await page.setViewportSize({ width: 360, height: VP.height }); await page.waitForTimeout(250);
+  P.faixa360 = await page.evaluate(NA_PAGINA.planoFaixa);
+  await page.setViewportSize(VP); await page.waitForTimeout(250);
+  /* c) um lançamento que casa com a 1ª linha do plano → o app troca ⚪ por ✅ sozinho, no lugar */
+  P.depoisLancamento = await page.evaluate(([onde, op, ch]) => {
+    const r = rascunho;
+    r.responsavel = 'Gerente'; r.mo.proprios = '10';
+    r.clima.cond = ch ? 'Chuva forte' : 'Ensolarado'; if (ch) r.clima.chuvaMm = '40';
+    if (atividadeDe(r.fazendaId) === 'PECUARIA') { r.pecuaria = r.pecuaria || pecVazia();
+      r.pecuaria.eventos = [{ tipo: op, talhaoId: onde, qtd: '10' }]; }
+    else r.atividades = [{ id: uid(), talhaoId: onde, tipo: op, pessoas: '8', status: 'concluida', obs: '', maquinas: [] }];
+    salvarRascunho(); ir('form', null, true);
+    const f = document.getElementById('plano-faixa');
+    return { conta: ((f.querySelector('.plano-conta') || {}).textContent || '').trim(),
+      status: [...f.querySelectorAll('.plano-item .plano-ler')].map(x => x.textContent) };
+  }, [semente.ondes[0] || 'geral', semente.ops[0], !!chuva]);
+  await page.waitForTimeout(250);
+  /* d) responde as seções eventuais (v70) e envia: cinto de segurança e depois a folha "Amanhã" */
+  await page.evaluate(() => { const r = rascunho; r.secoes = r.secoes || {};
+    secoesEventuaisDa(atividadeDe(r.fazendaId)).forEach(s => { if (!secaoRegistros(r, s)) r.secoes[s.id] = { resposta: 'sem_ocorrencia', por: 'Gerente', em: '12:00' }; });
+    salvarRascunho(); ir('form', null, true); });
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { const b = document.getElementById('bt-enviar'); if (b) b.click(); });
+  await page.waitForTimeout(400);
+  const cx = await page.$('#bt-dialogo-sim'); if (cx) { await cx.click(); await page.waitForTimeout(400); }
+  P.folha = await page.evaluate(NA_PAGINA.planoFolha);
+  /* e) 3 passos: ONDE em chips (só ele) → O QUÊ → DETALHES → linha compacta */
+  if (await page.$('#bt-plano-add')) {
+    await page.click('#bt-plano-add'); await page.waitForTimeout(220);
+    P.passo1 = (await page.evaluate(NA_PAGINA.planoFolha)).novo;
+    await page.evaluate(() => { const c = document.querySelector('[data-plano-onde]'); if (c) c.click(); }); await page.waitForTimeout(220);
+    P.passo2 = (await page.evaluate(NA_PAGINA.planoFolha)).novo;
+    await page.evaluate(() => { const c = document.querySelector('[data-plano-op]'); if (c) c.click(); }); await page.waitForTimeout(220);
+    P.passo3 = (await page.evaluate(NA_PAGINA.planoFolha)).novo;
+    await page.fill('#plano-pessoas', '6'); await page.click('#bt-plano-ok'); await page.waitForTimeout(250);
+    P.compacto = await page.evaluate(NA_PAGINA.planoFolha);
+  }
+  /* f) salvar: grava o plano de amanhã, fecha o de hoje dentro do boletim e envia */
+  await page.click('#bt-plano-salvar'); await page.waitForTimeout(700);
+  P.fim = await page.evaluate(() => { const b = boletimDoDia(hojeBRT(), sessao.fazendaId);
+    const zap = b ? resumoWhats(b) : '';
+    return { tela: telaAtual, enviado: !!b, folha: !!document.getElementById('folha-plano'),
+      corpoTravado: document.body.classList.contains('folha-aberta'),
+      plano: b ? b.plano : null, amanha: (D.planoDia || []).map(p => ({ data: p.data, n: p.itens.length, replan: p.replanejado })),
+      zapPlano: zap.split('\n').filter(l => /^📋 Plano/.test(l)), nativos: window.__nativos,
+      casa: (document.querySelector('.plano-linha-casa') || {}).textContent || '' }; });
+  P.erros = erros.slice();
+  /* regra c: nenhum termo de outra atividade na faixa nem na folha do plano */
+  {
+    const txt = [P.faixa.texto || '', P.folha.texto || ''].join(' ');
+    const outras = { CAFE: ['GRAOS', 'PECUARIA'], GRAOS: ['CAFE', 'PECUARIA'], PECUARIA: ['CAFE', 'GRAOS'] }[atv];
+    P.termosAlheios = {}; outras.forEach(o => { P.termosAlheios[o] = acharTermos(txt, termos[o]); });
+    P.termosProprios = acharTermos(txt, termos[atv]).length;
+  }
+  R.planos.push(P);
+  await ctx.close();
+}
+
+/* cartão "📋 Planejado × Executado" da Diretoria: vazio, conteúdo, ordem e privacidade */
+async function cenarioPlanoPainel(browser, base, R) {
+  const { page, ctx } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' },
+    { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' });
+  const cartao = () => page.evaluate(() => {
+    const h = [...document.querySelectorAll('#app .cartao h3')].find(x => /Planejado × Executado/.test(x.textContent));
+    if (!h) return { existe: false };
+    const c = h.closest('.cartao');
+    return { existe: true, unidades: [...c.querySelectorAll('.plano-un > b')].map(b => b.textContent.trim()),
+      vazio: ((c.querySelector('.plano-un') ? null : c.querySelector('p.mut:not([style])')) || {}).textContent || '',
+      texto: c.textContent.replace(/\s+/g, ' ').trim() };
+  });
+  R.planoPainel = await cartao();                                  /* sem plano nenhum: só o vazio */
+  const semeado = await page.evaluate(() => {
+    const hoje = hojeBRT();
+    const it = (a, b, c) => [{ op: 'Colheita', ondes: ['t101'], pessoas: '5', status: a },
+      { op: 'Capina manual', ondes: ['t102'], pessoas: '5', status: b }, { op: 'Desbrota', ondes: ['t103'], pessoas: '5', status: c }];
+    const mk = (fz, d, itens, motivo, clima) => ({ id: 'chk' + fz + d, fazendaId: fz, data: d, responsavel: 'Gerente',
+      clima: clima || { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '10', diaristas: '', funcoes: [] },
+      atividades: [], colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {},
+      plano: { data: d, criadoEm: diaISO(d, -1), por: 'Gerente', obs: '', replanejado: false, itens,
+        clima: { cond: (clima || {}).cond || 'Ensolarado', chuvaMm: (clima || {}).chuvaMm || '', impedido: !!(clima && clima.cond === 'Chuva forte') },
+        motivo, pessoasPrev: 15, pessoasReal: 10 } });
+    D.boletins = D.boletins.filter(b => !['f23', 'f33'].includes(b.fazendaId));
+    D.boletins.push(mk('f23', diaISO(hoje, -1), it('feito', 'feito', 'nao_feito'), { id: 'maquina' }));
+    D.boletins.push(mk('f23', diaISO(hoje, -2), it('feito', 'parcial', 'nao_feito'), { id: 'clima', auto: true, texto: 'Chuva forte' }, { cond: 'Chuva forte', chuvaMm: '40' }));
+    D.boletins.push(mk('f33', diaISO(hoje, -1), it('nao_feito', 'nao_feito', 'nao_feito'), { id: 'insumo' }));
+    salvarDados(); ir('painel');
+    return { r23: planoResumo('f23', 7), r33: planoResumo('f33', 7) };
+  });
+  await page.waitForTimeout(400);
+  const cheio = await cartao();
+  R.planoPainel = Object.assign(cheio, { vazio: R.planoPainel.vazio,
+    ordemOk: cheio.unidades[0] === 'Floramill',                    /* 1 evitável × 1 evitável: empate desfeito pela aderência (17 % × 67 %) */
+    evitaveis: semeado.r23.evitaveis, clima: semeado.r23.clima,
+    nomes: /Gerente|João|Jo[aã]o Batista/.test(cheio.texto) });
+  await ctx.close();
+}
+
 async function medirTela(page, nome, grupo, extra) {
   const m = await page.evaluate(NA_PAGINA.medir);
   const v = await page.evaluate(NA_PAGINA.visual);
@@ -870,6 +1049,75 @@ function avaliar(R) {
       });
     });
   }
+  /* 13. planejamento do dia seguinte × executado (v75) */
+  {
+    const g = '13. Plano do dia: faixa de 3 linhas, status automático, folha "Amanhã" em 3 passos, motivo sem bloquear';
+    (R.planos || []).forEach(P => {
+      const nome = P.nome;
+      add(g, `${nome} — sem plano, nem linha na casa nem faixa no boletim (unidade sem plano não mostra nada)`,
+        !P.semPlano.linha && !P.semPlano.faixa, `linha ${P.semPlano.linha}; faixa ${P.semPlano.faixa}`);
+      add(g, `${nome} — linha única na casa, em tom de espelho e sem termo proibido`,
+        P.casa.existe && /^📋 Plano de /.test(P.casa.texto) && !PLANO_PROIBIDO.test(P.casa.texto), `"${P.casa.texto.slice(0, 90)}"`);
+      const F = P.faixa, F3 = P.faixa360;
+      add(g, `${nome} — faixa no topo do boletim com as linhas planejadas (até 3), sem campo de digitação`,
+        F.existe && F.itens === 3 && F.itens <= 3 && F.inputs === 0 && F.ajustar, F.existe ? `${F.itens} linha(s); ${F.inputs} campo(s)` : 'sem faixa');
+      add(g, `${nome} — a 360 px cada linha do plano ocupa UMA linha visual, no máximo 3, sem rolar de lado`,
+        F3.existe && F3.itens <= 3 && F3.linhas === F3.itens && F3.scrollW <= 360, F3.existe ? `${F3.itens} item(ns) em ${F3.linhas} linha(s) visuais; página ${F3.scrollW} px; faixa ${F3.altura} px = ${F3.pct} %` : '');
+      add(g, `${nome} — caixinha de status começa em ⚪ e vira ✅ sozinha quando o registro entra, sem redesenhar`,
+        F.conta === '0 de 3 ✅' && F.status.every(x => x === 'não feito') && P.depoisLancamento.conta === '1 de 3 ✅' && P.depoisLancamento.status[0] === 'feito',
+        `ao abrir "${F.conta}" → depois de 1 lançamento "${P.depoisLancamento.conta}"`);
+      add(g, `${nome} — status relata REGISTRO: sem "não fez", "pendente", "atrasado", "faltou", "esqueceu"`,
+        !PLANO_PROIBIDO.test(F.texto), F.texto.slice(0, 110));
+      const H = P.folha;
+      add(g, `${nome} — a folha "Amanhã" abre depois do cinto de segurança, sem sair do formulário e sem nativo`,
+        H.existe && H.titulo === '📋 Amanhã' && H.tela === 'form' && H.nativos === 0 && H.corpoTravado, H.existe ? `título "${H.titulo}"; tela ${H.tela}; ${H.nativos} nativo(s)` : 'não abriu');
+      if (!H.existe) return;
+      add(g, `${nome} — pulável com um toque: dois botões no rodapé, com verbo, e "Pular" entre eles`,
+        H.rodape.length === 2 && H.pular && /^(Pular|Voltar)$/.test(H.rodape[0]) && /^Salvar plano$/.test(H.rodape[1]), H.rodape.join(' · '));
+      add(g, `${nome} — nada de régua, chip removível, ação por perfil, botão de avanço, badge ou seletor de data na folha`,
+        H.regua === 0 && H.selBox === 0 && H.acaoOff === 0 && H.falta === 0 && H.badge === 0 && H.dataDate === 0,
+        `régua ${H.regua} · sel-box ${H.selBox} · acao-off ${H.acaoOff} · data-falta ${H.falta} · badge ${H.badge} · input date ${H.dataDate}`);
+      if (P.chuva) add(g, `${nome} — dia impedido pelo clima declarado não pergunta motivo (o desvio já é "clima")`,
+        H.motivos.length === 0, `${H.motivos.length} chip(s) de motivo`);
+      else add(g, `${nome} — com ⚪/◐ pergunta o motivo UMA vez, por chips, sem campo aberto por padrão`,
+        H.motivos.length === 6 && !H.motivoTxt && H.motivos[0] === 'Choveu', `${H.motivos.length} chip(s): ${H.motivos.join(' · ')}`);
+      const p1 = P.passo1, p2 = P.passo2, p3 = P.passo3;
+      add(g, `${nome} — 1º passo depois do ＋: só os chips do ONDE, nenhum campo e nenhum seletor`,
+        !!p1 && p1.chips > 0 && p1.campos === 0 && p1.seletores === 0 && p1.rotulos.length === 1, p1 ? `${p1.chips} chip(s), ${p1.campos} campo(s), ${p1.seletores} seletor(es) — rótulo: ${p1.rotulos.join(' / ')}` : 'sem ＋');
+      add(g, `${nome} — 2º passo só depois do ONDE: chips do O QUÊ, ainda sem campo`,
+        !!p2 && p2.rotulos.length === 2 && p2.campos === 0 && p2.chips > p1.chips, p2 ? `rótulos: ${p2.rotulos.join(' / ')}; ${p2.campos} campo(s)` : '');
+      add(g, `${nome} — 3º passo só depois do O QUÊ: um campo (pessoas previstas) e a ação de adicionar`,
+        !!p3 && p3.rotulos.length === 3 && p3.campos === 1 && p3.ok, p3 ? `rótulos: ${p3.rotulos.join(' / ')}; ${p3.campos} campo(s)` : '');
+      add(g, `${nome} — depois de adicionar, a linha fica compacta e o cartão de lançamento fecha`,
+        !!P.compacto && P.compacto.novo === null && P.compacto.itens.length === 1, P.compacto ? `${P.compacto.itens.length} linha(s): "${P.compacto.itens[0] || ''}"` : '');
+      const Z = P.fim;
+      add(g, `${nome} — salvar fecha a folha, devolve o corpo e envia o boletim (nunca bloqueia)`,
+        !Z.folha && !Z.corpoTravado && Z.enviado && Z.tela === 'casa' && Z.nativos === 0, `tela ${Z.tela}; enviado ${Z.enviado}; ${Z.nativos} nativo(s)`);
+      add(g, `${nome} — o plano de hoje fecha DENTRO do boletim, com status calculado (nada digitado)`,
+        !!Z.plano && Z.plano.itens.length === 3 && Z.plano.itens[0].status === 'feito' && Z.plano.itens.filter(i => i.status === 'nao_feito').length === 2,
+        Z.plano ? Z.plano.itens.map(i => i.status).join(' · ') : 'sem b.plano');
+      add(g, P.chuva ? `${nome} — desvio de dia de chuva entra como "clima", nunca como evitável` : `${nome} — motivo respondido fica gravado; sem resposta grava "não informado" e não bloqueia`,
+        P.chuva ? !!(Z.plano && Z.plano.motivo && Z.plano.motivo.id === 'clima' && Z.plano.clima.impedido)
+                : !!(Z.plano && Z.plano.motivo && Z.plano.motivo.id === ''),
+        Z.plano ? `motivo ${JSON.stringify(Z.plano.motivo)}; impedido ${Z.plano.clima.impedido}` : '');
+      add(g, `${nome} — o plano de amanhã fica guardado para o dia seguinte`,
+        Z.amanha.length === 1 && Z.amanha[0].n === 1, JSON.stringify(Z.amanha));
+      add(g, `${nome} — a aderência não entra no resumo do WhatsApp fora de sexta`,
+        (new Date().getDay() === 5) ? Z.zapPlano.length === 1 : Z.zapPlano.length === 0, `${Z.zapPlano.length} linha(s) 📋 Plano (hoje é dia ${new Date().getDay()})`);
+      add(g, `${nome} — nenhum erro de página no cenário do plano`, !P.erros.length, P.erros[0] || 'sem erro');
+      Object.keys(P.termosAlheios || {}).forEach(o => add(g, `${nome} — zero termos de ${o.toLowerCase()} na faixa e na folha`,
+        !P.termosAlheios[o].length, P.termosAlheios[o].length ? P.termosAlheios[o].join(', ') : `nenhum (detector ativo: ${P.termosProprios} termo(s) da própria atividade)`));
+    });
+    /* cartão da Diretoria */
+    if (R.planoPainel) {
+      const C = R.planoPainel;
+      add(g, 'Diretoria — cartão "📋 Planejado × Executado" com aderência 7 e 30 dias por unidade', C.existe && C.unidades.length === 2 && /aderência/.test(C.texto), `${C.unidades.length} unidade(s): ${C.unidades.join(', ')}`);
+      add(g, 'Diretoria — ordem por unidades com mais desvios evitáveis (apoio, não ranking de gerente)', C.ordemOk && /desvios evitáveis/.test(C.texto) && !/pior|ranking|gerente [A-Z]/.test(C.texto), C.unidades.join(' → '));
+      add(g, 'Diretoria — desvio de dia de chuva conta como clima, não como evitável', C.evitaveis === 1 && C.clima === 1, `evitáveis ${C.evitaveis} · clima ${C.clima}`);
+      add(g, 'Diretoria — sem plano no período, o vazio nomeia o recorte pela função única', /^Sem plano do dia registrado/.test(C.vazio) && !PLANO_PROIBIDO.test(C.vazio), `"${C.vazio.slice(0, 100)}"`);
+      add(g, 'Diretoria — o cartão não mostra um gerente para outro (nenhum nome de pessoa)', !C.nomes, C.nomes ? 'achou nome de pessoa' : 'só nome de unidade');
+    }
+  }
   /* agrupa por item, mantendo a ordem de chegada dentro de cada um */
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
@@ -892,7 +1140,7 @@ function relatorio(itens, R) {
   const termos = lerTermos();
   const { srv, base } = await servir(RAIZ);
   const browser = await pw.chromium.launch();
-  const R = { telas: [] };
+  const R = { telas: [], planos: [] };
   try {
     await cenarioBoletim(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', termos);
     await cenarioBoletim(browser, base, R, 'Grãos (f33 Floramill)', 'f33', 'GRAOS', termos);
@@ -900,6 +1148,12 @@ function relatorio(itens, R) {
     await cenarioPos(browser, base, R, termos);
     await cenarioDiretoria(browser, base, R);
     await cenarioCadastros(browser, base, R);
+    /* v75: plano do dia nas três atividades + a variante do dia impedido pelo clima (café) */
+    await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', false, termos);
+    await medirPlano(browser, base, R, 'Grãos (f33 Floramill)', 'f33', 'GRAOS', false, termos);
+    await medirPlano(browser, base, R, 'Pecuária (f26 Água Santa)', 'f26', 'PECUARIA', false, termos);
+    await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
+    await cenarioPlanoPainel(browser, base, R);
   } finally { await browser.close(); srv.close(); }
   const itens = avaliar(R);
   const md = relatorio(itens, R);

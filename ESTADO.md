@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v74** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v75** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -918,6 +918,90 @@ português, sem datepicker nativo, sem rolagem de lado.
   passos `05-regua-ontem`/`06-regua-hoje` em
   `scripts/regressao_render.cjs`.
 
+## Plano do dia seguinte × executado (v75) — três atividades
+Regra permanente em CLAUDE.md, item c13; checagem em
+docs/definicao-de-pronto.md, item 16; vocabulário e de-para em
+docs/catalogos-por-atividade.md, "Plano do dia seguinte".
+- **Problema resolvido:** o boletim registrava o que ACONTECEU, e a única
+  forma de dizer o que ia acontecer era um campo de texto livre
+  ("Pendente / programado para amanhã") que ninguém conseguia comparar
+  depois. Agora o gerente planeja o dia seguinte em chips (uns 20 s, ao
+  fechar o boletim) e o app confere sozinho, no dia seguinte, o que foi
+  registrado — sem digitar status e sem tela nova de acompanhamento.
+- **Onde mora o dado (nenhuma tabela nova):** `D.planoDia` guarda os
+  planos cujo dia-alvo ainda não fechou; ao enviar o boletim do dia-alvo,
+  `gravarPlanoNoBoletim` fecha o plano DENTRO do boletim, em `b.plano`
+  (itens com status, motivo, clima declarado do dia, pessoas previstas ×
+  lançadas), e o tira do `D.planoDia`. Como `b.plano` vive no payload de
+  `boletins`, ele sincroniza pelo caminho que já existia e a Diretoria o
+  lê nos boletins que já baixa. Plano pendente vence `b.plano` (é o
+  replanejamento do próprio dia).
+- **Componentes únicos:** `abrirFolhaPlano(r, {alvo, replan})` (folha
+  "📋 Amanhã", classe `.folha` compartilhada com a folha de leitura da
+  v68 por `travarFolha`/`destravarFolha`), `planoGuardar`,
+  `faixaPlanoHoje` / `htmlPlanoFaixaCorpo` / `pintarPlanoHoje` (faixa do
+  topo do boletim), `linhaPlanoCasa` e `linhaPlanoSemana` (casa do
+  gerente), `cartaoPlanoPainel` (Diretoria), `avaliarPlano` (status),
+  `planoResumo` + `planoMotivosTexto` (todas as correlações),
+  `planoDiaDe` / `planoPendente` (leitura). Catálogos: `PLANO_ATIVIDADE`
+  (ONDE, O QUÊ e onde procurar o registro, por atividade),
+  `PLANO_PEC_DEPARA` (espelho de `operacao_alias` do sql/040),
+  `PLANO_MOTIVOS`, `PLANO_ST`, `CLIMA_IMPEDITIVO`, `PLANO_CHUVA_MM`
+  (25 mm), `PLANO_MAX_ITENS` (3).
+- **Fluxo do gerente.** (1) Ao enviar, depois do cinto de segurança e
+  antes de gravar, abre a folha "📋 Amanhã": se o plano de hoje ficou com
+  ⚪ ou ◐ e o dia NÃO foi impedido pelo clima declarado, o primeiro bloco
+  pergunta uma vez "O que atrapalhou hoje?" por chips; abaixo, o plano de
+  amanhã em até 3 linhas, no padrão de 3 passos (ONDE em chips → O QUÊ em
+  chips → pessoas previstas), com o que ficou "continua amanhã" já
+  sugerido. Dois botões: "Pular" · "Salvar plano" — nos dois casos o
+  boletim é enviado. (2) No dia seguinte, a faixa "📋 O plano de ontem
+  para hoje" fica no topo do boletim, e a caixinha de cada linha vai de
+  ⚪ para ◐/✅ sozinha conforme os lançamentos, no lugar. (3) O botão
+  "ajustar" da faixa reabre a folha para o próprio dia: fica
+  "replanejado", nunca falha. (4) Na casa, uma linha: "📋 Plano de hoje:
+  2 de 3 ✅ · 1 não feito (máquina quebrou)"; de sexta a domingo, também
+  "📋 Você cumpriu 78% do que planejou nesta semana."
+- **Status (`avaliarPlano`), sempre sobre REGISTRO:** ✅ todos os "onde"
+  do item com registro daquela operação; ◐ parte deles, ou registro
+  marcado "continua amanhã"; ⚪ nenhum. Registro sem talhão/pasto cobre o
+  item inteiro (na dúvida, a favor de quem registrou).
+- **Correlações calculadas (`planoResumo(fz, dias)`), nada digitado:**
+  aderência (itens ✅ / planejados) em 7 e 30 dias; distribuição dos
+  motivos; desvios evitáveis × de clima; dias trabalháveis × dias
+  impedidos (fonte: o clima declarado no boletim); precisão de esforço
+  (pessoas previstas × pessoas lançadas na mão de obra); dias
+  replanejados.
+- **Diretoria:** cartão "📋 Planejado × Executado" no painel, uma linha
+  por unidade com plano nos últimos 30 dias, ordenada por **unidades com
+  mais desvios evitáveis** (empate desfeito pela aderência) — rótulo de
+  apoio, nunca ranking; só nome de UNIDADE, nunca de pessoa. Sem plano no
+  período, cai no vazio da função única, nomeando o recorte.
+- **WhatsApp:** primeira linha do resumo intocada; a aderência da semana
+  entra só no resumo de sexta. O campo de texto do boletim virou "O que
+  ficou para terminar" (era "Pendente / programado para amanhã") e a
+  linha do resumo virou "📌 Ficou para terminar:" — o plano de amanhã tem
+  lugar próprio, então nada é digitado duas vezes.
+- **Justiça:** dia impedido pelo clima declarado nunca conta como desvio
+  evitável (o motivo entra automático como "clima" e nem é perguntado);
+  nenhuma tela expõe um gerente para outro; replanejar não é falha.
+- **Supabase:** `sql/048-plano-x-executado-diario.sql` (testado num
+  PostgreSQL 16 local com boletins semeados — números, idempotência e
+  permissão do papel `anon` conferidos; falta rodar no SQL Editor) —
+  visão `vw_plano_x_executado` (um item de plano por linha) e o
+  relatório mensal `plano_x_executado_diario` em `relatorios_gerados`,
+  que o app já lê pela vitrine (`REL_CATALOGO`). Sem o SQL rodado, tudo
+  no app funciona igual; só o relatório mensal não existe.
+- Sem campo novo de digitação para o gerente além do plano (chips +
+  pessoas previstas), sem texto prescritivo, **apontamento em 3 passos do
+  boletim intocado**. Medição nova em `scripts/checar-poluicao.cjs`,
+  grupo "13. Plano do dia" (93 ✅: um cenário por atividade, a variante
+  do dia de chuva no café e o cartão da Diretoria).
+- **Fica para o módulo de programação/metas** (que o app ainda não tem):
+  a pré-marcação das atividades das metas em risco e o cruzamento META ×
+  RITMO (quanto do avanço de cada meta veio de dia planejado). Ver
+  PENDÊNCIAS.
+
 ## Chips removíveis da multi-seleção (v74) — três atividades e Cadastros
 Regra permanente em CLAUDE.md, item c12; checagem em
 docs/definicao-de-pronto.md, item 15; vocabulário do contador por tela
@@ -1060,8 +1144,23 @@ e sql/001-002, listadas nas PENDÊNCIAS).
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v74, 09/09/2026:
-**361 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v74 acrescentou o grupo
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v75, 10/09/2026:
+**454 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v75 acrescentou o grupo
+"13. Plano do dia" (93 itens ✅: um cenário por atividade — sem plano nada
+aparece; com plano de hoje semeado, faixa de 3 linhas no topo do boletim,
+cada item em UMA linha visual a 360 px (faixa de 154,3 px = 18,3 %), "0 de
+3 ✅" que vira "1 de 3 ✅" no lugar quando o registro entra, folha
+"Amanhã" com "Pular" · "Salvar plano" e zero régua/chip removível/ação de
+perfil/botão de avanço/badge/`input type=date`, 3 passos revelados um a um
+(ONDE 9/14/11 chips e zero campo → O QUÊ → 1 campo), plano de hoje fechado
+dentro do boletim com status calculado, plano de amanhã guardado, zero
+termo de outra atividade; a variante do dia de chuva no café não pergunta
+motivo e grava "clima"; o cartão da Diretoria ordena por desvios
+evitáveis, separa clima de evitável, nomeia o recorte no vazio e não mostra
+nome de pessoa). Nenhum ❌ novo: as duas linhas ❌ de P10 em "Diretoria"
+listam um exemplo a mais (o `.cartao` novo, do CSS-base); a faixa reusa
+`.aviso` e a folha reusa `.folha`/`.chip`, todas classes já existentes.
+A v74 acrescentou o grupo
 "12. Chips removíveis" (27 itens ✅: café — problemas da irrigação 2 de 8
 e setores fertirrigados 8 de 8 → 6 + "+2"; Cadastros › Códigos › novo
 combinado — 9 unidades → 6 + "+3"; grãos prova a AUSÊNCIA no cartão do
@@ -1232,6 +1331,28 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   de cuidado" fechados ✅ em todas.
 - Escritório › Importar telemetria: formulário sem ação principal fixa
   no rodapé ❌ ("1 · Ler o arquivo" dentro do cartão).
+- Diretoria › painel › cartão "📋 Planejado × Executado" (v75, medido
+  com três boletins de exemplo em duas unidades): P1 um propósito ✅ ·
+  só leitura, sem campo ✅ · uma linha por unidade com plano, ordenada
+  por desvios evitáveis ✅ · vazio pela função única nomeando o recorte
+  ✅ · nenhum nome de pessoa ✅ · P10 ❌ herdado (usa `.cartao`, com raio
+  e sombra do CSS-base).
+- Boletim do gerente › faixa "📋 O plano de ontem para hoje" (v75, três
+  atividades, medida com plano de hoje semeado): até 3 linhas, cada uma
+  em UMA linha visual a 360 px ✅ · 154,3 px = 18,3 % da tela no caso
+  comum e 202 px = 23,9 % no pior caso (observação de amanhã escrita +
+  dia replanejado), abaixo do teto de ~25 % ✅ · zero
+  campo de digitação ✅ · status ⚪→✅ trocado pelo app no lugar ✅ · zero
+  termo de cobrança ✅ · P10 ❌ herdado (usa `.aviso`, raio 10 px do
+  CSS-base).
+- Folha "📋 Amanhã" (v75, três atividades + variante de dia de chuva):
+  padrão a em 3 passos ✅ (ONDE só em chips, zero campo e zero seletor;
+  O QUÊ só depois; DETALHES só depois; depois de adicionar volta ao
+  compacto) · pulável com um toque, dois botões com verbo ✅ · nenhum
+  nativo ✅ · zero régua, chip removível, ação de perfil, botão de
+  avanço, badge e `input type=date` ✅ · termos de outra atividade ✅
+  zero · P10 ❌ herdado (`.chip` é pílula de 24 px, `.btn.suave.mini`
+  tem 40 px — o mesmo CSS-base de todas as telas).
 - Escritório › Unidades e Plano: precisa de rede — fora da medição
   offline (conferir à mão quando for tocada).
 
@@ -1246,6 +1367,49 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **MÓDULO DE PROGRAMAÇÃO/METAS — não existe no app (bloqueia parte da
+  v75).** A tarefa da v75 tinha como pré-requisito um módulo de
+  programação/metas do mês (metas por unidade, semáforo de metas, fonte
+  declarada de dias impedidos F1..F5). Nada disso existe no repositório
+  — não há tabela, catálogo, tela nem coluna de meta. O que foi entregue
+  é o nível do gerente (plano do dia seguinte) e todas as correlações que
+  se calculam sem meta. **Ficou de fora, por dependência:** (a) a
+  pré-marcação automática das "atividades das metas em risco e os
+  talhões pendentes delas" na folha "Amanhã" — no lugar dela, a sugestão
+  vem do que o gerente marcou como "continua amanhã" no próprio boletim;
+  (b) o cruzamento META × RITMO (quanto do avanço de cada meta veio de
+  dia planejado × não planejado) e, no cartão da Diretoria, "quais metas
+  atrasaram por motivo evitável vs clima"; (c) a faixa do plano não fica
+  "junto ao semáforo de metas" (não há semáforo): fica no topo do
+  boletim, que é onde o boletim abre. **Para o Nilo decidir:** se o
+  módulo de metas vira tarefa própria (é o caminho recomendado — mexe em
+  Diretoria/Escritório, tabela nova e versionamento) ou se as metas
+  entram como leitura do plano de safra que já existe.
+- **Plano do dia (v75) — parâmetro para o Nilo confirmar com o
+  agrônomo:** o dia só é considerado "impedido pelo clima" quando o
+  gerente declara "Chuva forte", "Granizo" ou "Geada", ou chuva ≥ 25 mm
+  (`CLIMA_IMPEDITIVO` e `PLANO_CHUVA_MM`). O número muda quem entra em
+  "desvio de clima" e quem entra em "evitável" nos números da Diretoria
+  — confirmar 25 mm, e se "Geada" deve mesmo impedir o dia nas três
+  atividades. Trocar é uma linha do catálogo.
+- **Plano do dia (v75) — para o Nilo testar no iPhone:** numa unidade de
+  cada atividade, (1) preencher e enviar um boletim: depois dos avisos,
+  a tela "📋 Amanhã" — tocar em "Pular" (o boletim vai igual) e, no dia
+  seguinte, repetir salvando 2 ou 3 linhas (ONDE → O QUÊ → pessoas);
+  (2) no dia seguinte, ver a faixa no topo do boletim e lançar uma das
+  operações planejadas: a caixinha vira ✅ na hora; (3) enviar com uma
+  linha ⚪: a pergunta "O que atrapalhou hoje?" — responder e conferir a
+  linha da casa ("📋 Plano de ontem: 2 de 3 ✅ · 1 não feito (…)"); (4)
+  num dia de chuva forte, conferir que a pergunta NÃO aparece e o desvio
+  sai como clima; (5) com código DIRETORIA, o cartão "📋 Planejado ×
+  Executado" no painel. **Decisões que ficaram com o Nilo:** (a) o campo
+  "Pendente / programado para amanhã" passou a se chamar "O que ficou
+  pendente hoje", para não pedir o plano duas vezes — manter?; (b) a
+  pergunta do motivo e o plano de amanhã ficaram na MESMA folha (uma tela
+  só antes do envio, em vez de duas) — manter?; (c) o limite de 3 linhas
+  por plano; (d) rodar `sql/048-plano-x-executado-diario.sql` no SQL
+  Editor quando quiser o consolidado mensal na vitrine de Relatórios (sem
+  ele o app funciona igual).
 - **Chips removíveis (v74) — para o Nilo testar no iPhone:** café ›
   Irrigação › "Rodou com problema" › tocar 2 problemas (aparece "2
   problemas selecionados" + 2 chips com ×; o × tira na hora); "Sim, fez

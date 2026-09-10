@@ -65,6 +65,20 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | 23 | Painel executivo mensal | 1 página: produção, custo, água, máquinas, rebanho, adesão, 3 decisões | todos | dia 8 | robô-redator (`painel_executivo`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase; custo por saca AGUARDA ERP) — prompt `docs/relatorios/23-painel-executivo.md` |
 | 24 | Fechamento de safra por cultura | produtividade, custo, margem, decisões (renovar/arrancar/rotação/vender lote) | todos | anual | Cowork | AGUARDA fechamento da safra (e ERP para custo/margem) |
 
+**Planejado × executado do plano do DIA (v75).** Não confundir com o
+item 4 acima: aquele compara o plano de safra do agrônomo (adubo,
+calagem, fito do ano) com o boletim; este compara o que o GERENTE
+planejou para o dia seguinte, ao fechar o boletim, com o que o boletim
+do dia seguinte registrou. Fonte: `boletins.payload -> 'plano'` (nenhuma
+tabela nova). Objetos em `sql/048-plano-x-executado-diario.sql`: visão
+`vw_plano_x_executado` (um item de plano por linha) e função
+`rel_plano_x_executado_diario(ini, fim)` → `relatorios_gerados` com
+`relatorio = 'plano_x_executado_diario'` (mês corrente pela
+`rel_rodar_plano_dia()`; agendamento comentado no fim do arquivo). O app
+lê pela vitrine de Relatórios (`REL_CATALOGO`, "Planejado × executado
+(plano do dia) — mês"). Vocabulário: `nao_feito` é SEM REGISTRO — nunca
+"não fez". Regra completa em CLAUDE.md, item c13.
+
 ## Calendário resumido (para a vistoria de segunda)
 
 | Quando | Relatórios previstos |
@@ -119,6 +133,7 @@ de cada hora).
 | `balanco_hidrico_dia` | `icrop_manejo` (eto, etc, irrigacao_mm, precipitacao_mm e `bruto->>` deficit_consolidado, deficit_previsto, umidade, capacidade_de_campo, umidade_de_seguranca, dias_em_atraso, fase_atual, gd_dia_acumulado, acumulado_irrigacao, acumulado_precipitacao, problemas_irrigacao). Alerta: atraso ≥ 3 dias ou umidade abaixo da segurança. |
 | `custo_fisico_talhao_mes` | `boletins.payload`: atividades[] (talhaoId, tipo, pessoas, maquinas[] nome/horas/comb, insumos[] nome/dose/qtd, produtos[] nome/dose/un, receita, areaHa, produtoAdb/produtoTipo/formulacao/produtoInoc, doseKgHa/doseTHa/doseInoc), irg[] (k, nome, quimiProdutos[]), irr (fert, fertSetores, fertReceita), mo (proprios, diaristas, faltas, horasExtras, funcoes[] nome/prop/pessoas/diar/hx); `icrop_manejo` (irrigacao_mm, `bruto->>` reais_mm_ha, reais_por_irrigacao_realizada/necessaria, area_da_parcela) casada ao talhão pelo número do pivô de irg; `solinftec_diario` por talhão (nome da Solinftec). `custo_rs` fica nulo até o ERP. |
 | `rebanho_mes` | `boletins.payload.pecuaria` das unidades PECUARIA: mov[] (tipo, categoria, qtd, modo, sexo, parto, causa, brinco, pastoDe/Para, contraparte), lotes[] (talhaoId, lote, cabecas — última contagem), rep (dgPrenhes, dgVazias, coberturas, iatfEtapa, iatfQtd, ocorTouro), san[], massa[], nut[] (talhaoId, insumo, qtd, un, cocho, agua), pasto.condicao, cocho/sal/agua, eventos[] (tipo, lote, qtd, pesoMedio, valor, contraparte). GMD só com duas pesagens do mesmo lote; lotação pendente (área do pasto não está no Supabase). |
+| `plano_x_executado_diario` (v75) | `vw_plano_x_executado` (sql/048) sobre `boletins.payload -> 'plano'`: itens[] (op, ondes[], pessoas, status feito/parcial/nao_feito calculado pelo APP a partir dos registros do próprio boletim), clima (cond, chuvaMm, impedido), motivo (id clima/chuva/maquina/gente/insumo/prioridade/outro; vazio = não informado), replanejado, pessoasPrev × pessoasReal; nomes de unidade em `rel_unidades`. Uma linha por unidade + a linha do grupo. Métricas: aderência = itens `feito` / itens; dias com plano; replanejados; dias impedidos; desvios de clima × evitáveis (dia impedido NUNCA entra em evitável); precisão de esforço = pessoas lançadas / previstas; distribuição de motivos por dia com desvio. Nada é recalculado no SQL: o status vem do app. |
 | `plano_executado_mes` | `plano_safra` (vigente por fazenda_app — mapa em `rel_unidades.fazenda_app` = PLANO_FAZENDA_APP), `plano_unidade`, `unidade_manejo`, `unidade_alias` (sistema app → talhaoId), `plano_adubo_mes`, `plano_calagem` (janela), `plano_fito_mes`/`plano_fito_excecao`, `plano_gantt`, `plano_parametros` × `boletins.payload`: atividades[].tipo por talhaoId (adubo = "Adubação via lanço"/"Adubação orgânica"/irr.fert Sim + fertSetores; calagem = "Calagem / gessagem"; fito = "Pulverização"/"Aplicação via drench / via solo"/"Monitoramento de pragas (MIP)" + fito[]), colheita[]. Faróis: verde registrado, branco em andamento, amarelo sem registro (após o dia `adubo_dia_limite_cadencia` / `gantt_pct_janela_amarelo` % da janela / `fito_dias_sem_monitoramento` dias), vermelho só com a janela fechada, cinza sem apelido app. Produtos só como "previsto pelo agrônomo". |
 
 Formato de `dados`: JSON por unidade com `resumo` (contagens para o farol

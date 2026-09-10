@@ -314,6 +314,74 @@ campo escolhe um valor); mesma regra. Rótulos dos chips: os do chip de
 opção (nome do talhão/unidade/fazenda pelo cadastro por id; opções fixas
 pelo catálogo). Limite visível: 6 + "+K".
 
+## Plano do dia seguinte — vocabulário por atividade (v75)
+
+Componente único `abrirFolhaPlano` / `faixaPlanoHoje` / `avaliarPlano`
+(CLAUDE.md, item c13). O que muda por atividade vem do catálogo
+`PLANO_ATIVIDADE` do index.html, por chave — nunca de `if(atividade===…)`
+nas telas. Tabela vigente:
+
+| Atividade | Rótulo do ONDE (1º passo) | Opção "área toda" | Catálogo do O QUÊ (2º passo) | Onde o app procura o registro do dia |
+|---|---|---|---|---|
+| ☕ Café | Talhão | Área geral | `LISTA_ATIV` (sem "Outra") | `atividades[].tipo` + `talhaoId`; "continua amanhã" → ◐ parcial |
+| 🌾 Grãos | Talhão / pivô | Área geral / sede | `OPS_GRAOS_FASES` (todas as fases) | `atividades[].tipo` + `talhaoId`; "continua amanhã" → ◐ parcial |
+| 🐂 Pecuária | Pasto / retiro | Toda a fazenda | `LISTA_PECUARIA` (`OPS_PECUARIA_FASES`) | `pecuaria.eventos[].tipo` + o de-para `PLANO_PEC_DEPARA` (abaixo) |
+
+O 3º passo (DETALHES) é igual nas três: "Quantas pessoas você prevê" —
+um campo, sem obrigatoriedade. Nenhum termo exclusivo de uma atividade
+aparece na tela de outra: "pivô" só nos grãos, "pasto/retiro" só na
+pecuária, "talhão" (que não é exclusivo) no café e nos grãos.
+
+**De-para da pecuária (`PLANO_PEC_DEPARA`).** Espelho exato de
+`operacao_alias` (sql/040-dias-sem-registro.sql): o plano conta como
+feito o que o gerente registrou na seção própria, não só em "Outros
+manejos".
+
+| Bloco do payload | Valor registrado | Operação do catálogo |
+|---|---|---|
+| `pecuaria.mov[].tipo` | Nascimento | Parto / nascimento |
+| `pecuaria.mov[].tipo` | Morte | Mortalidade (com causa) |
+| `pecuaria.mov[].tipo` | Desmama | Desmama |
+| `pecuaria.mov[].tipo` | Mudança de pasto | Rotação de pasto — entrada de lote |
+| `pecuaria.mov[].tipo` | Entrada | Compra / entrada de animais |
+| `pecuaria.mov[].tipo` | Saída | Embarque / venda |
+| `pecuaria.massa[].tipo` | Vacinação | Vacinação (especificar) |
+| `pecuaria.massa[].tipo` | Vermifugação | Vermifugação |
+| `pecuaria.san[].problema` | Bicheira | Cura de bicheira |
+| `pecuaria.san[].problema` | Carrapato / mosca em excesso | Controle de carrapato / mosca-do-chifre |
+| `pecuaria.lotes[]` (cabeças > 0) | — | Contagem |
+| `pecuaria.nut[]` (repôs no cocho) | — | Suplementação (sal mineral / proteinado / ração) |
+| `pecuaria.rep.iatfEtapa` | — | IATF |
+| `pecuaria.rep.dgPrenhes/dgVazias` | — | Diagnóstico de gestação |
+
+**Motivos do desvio (`PLANO_MOTIVOS`).** Iguais nas três atividades — o
+motivo é de gestão, não de agronomia. "Clima" não é chip: só o app o usa,
+quando o dia foi impedido pelo clima declarado no boletim.
+
+| id | Rótulo no chip | Conta como |
+|---|---|---|
+| `clima` | *(não aparece — automático)* | clima |
+| `chuva` | Choveu | clima |
+| `maquina` | Máquina quebrou | evitável |
+| `gente` | Faltou gente | evitável |
+| `insumo` | Faltou insumo | evitável |
+| `prioridade` | Mudou a prioridade | evitável |
+| `outro` | Outro *(revela uma linha de texto)* | evitável |
+| *(sem resposta)* | — | evitável, como "não informado" |
+
+**Clima que impede o dia (`CLIMA_IMPEDITIVO`, `PLANO_CHUVA_MM`).** Só o
+clima DECLARADO pelo gerente na seção Clima — nada é inferido de estação
+nem de fora do boletim: condição "Chuva forte", "Granizo" ou "Geada", ou
+chuva declarada ≥ 25 mm no dia. Vale igual nas três atividades e serve às
+duas contas: o desvio do dia vira "clima" e o dia sai dos trabalháveis.
+A lista e o limite são parâmetros do catálogo — mudar é decisão do Nilo
+com o agrônomo, na mesma tarefa que atualizar esta tabela.
+
+**Status do item.** ✅ feito · ◐ parcial · ⚪ não feito, sempre no
+sentido de REGISTRO. O rótulo visível é a palavra ao lado do ícone
+("feito", "parcial", "não feito"); a cor não é usada como sinal (canal
+reservado ao farol, regra 4 do plano de safra).
+
 ## Categorias de operação — badge de uma letra (v67)
 
 Fonte oficial das categorias (natureza da operação) e das letras que o

@@ -6,6 +6,147 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 10/09/2026 · v75 · Planejamento do dia seguinte no boletim + correlação planejado × executado
+
+**Entrega.** O gerente planeja SÓ o dia seguinte, ao fechar o boletim
+(folha "📋 Amanhã", pulável, até 3 linhas em 3 passos), e o app confere
+sozinho no boletim do dia seguinte o que foi registrado (✅ / ◐ / ⚪),
+pergunta uma vez o motivo do desvio, e calcula aderência 7/30 dias,
+motivos, desvios evitáveis × de clima, dias trabalháveis × impedidos e
+precisão de esforço. Componentes únicos nas três atividades; vocabulário
+por catálogo (`PLANO_ATIVIDADE`). Nenhuma tabela nova: o plano fecha
+dentro de `boletins.payload.plano` e sincroniza pelo caminho que já
+existia. Regra em CLAUDE.md, item c13; checagem em
+docs/definicao-de-pronto.md, item 16.
+
+**Escopo NÃO entregue, por dependência declarada.** A tarefa tinha como
+pré-requisito um módulo de programação/metas do mês. Ele NÃO existe no
+repositório (busca por meta/programação/semáforo/F1..F5 em index.html,
+docs e sql: zero). Por isso ficaram de fora, e estão registrados em
+ESTADO.md › PENDÊNCIAS: (a) a pré-marcação das atividades das metas em
+risco na folha "Amanhã" — no lugar dela, a sugestão vem do que o gerente
+marcou como "continua amanhã"; (b) META × RITMO (item 3c) e "quais metas
+atrasaram por motivo evitável vs clima" no cartão da Diretoria; (c) a
+faixa não fica "junto ao semáforo de metas" (não há semáforo) — fica no
+topo do boletim. Item 3e (dias efetivos) foi entregue usando a única
+fonte declarada que existe, o clima do próprio boletim: a taxonomia
+F1..F5 citada na tarefa também não existe no repositório.
+
+**Verificado (automático, sem rede, 390 × 844 px e 360 px).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: **454 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58 (**nenhum ❌ novo**; a única mudança nos herdados é um
+  exemplo a mais nas duas linhas de P10 da Diretoria — o `.cartao` novo,
+  com o raio e a sombra do CSS-base). Grupo novo **"13. Plano do dia"**
+  com 93 itens, todos ✅: um cenário por atividade (café f23, grãos f33,
+  pecuária f26), a variante do dia de chuva no café e o cartão da
+  Diretoria com três boletins de exemplo. Em cada cenário:
+  - sem plano, nem linha na casa nem faixa no boletim;
+  - linha única na casa em tom de espelho, sem termo proibido;
+  - faixa com 3 linhas e zero campo; a 360 px, 3 itens em 3 linhas
+    visuais, página com 360 px de largura, faixa de 154,3 px = 18,3 % (e
+    202 px = 23,9 % no pior caso medido à mão: observação de amanhã
+    escrita + dia replanejado, com as duas linhas extras);
+  - "0 de 3 ✅" ao abrir → "1 de 3 ✅" depois de UM lançamento que casa
+    com a 1ª linha, trocado no lugar (sem redesenhar o formulário);
+  - a folha "Amanhã" abre depois do cinto de segurança, sem sair do
+    formulário, com "Pular" · "Salvar plano" e zero nativo;
+  - zero régua, `.sel-box`, `.acao-off`, `data-falta`, `.op-cat` e
+    `input type=date` na folha;
+  - 3 passos revelados um a um: ONDE com 9 (café) / 14 (grãos) / 11
+    (pecuária) chips e ZERO campo e ZERO seletor → O QUÊ em chips, ainda
+    sem campo → 1 campo (pessoas previstas) + "Adicionar linha"; depois
+    de adicionar, a linha fica compacta e o cartão fecha;
+  - o plano de hoje fecha dentro do boletim com `feito · nao_feito ·
+    nao_feito` calculado, o de amanhã fica guardado, o boletim é enviado
+    e a tela volta para a casa;
+  - dia de chuva forte (40 mm): a pergunta do motivo NÃO aparece e o
+    motivo gravado é `{"id":"clima","auto":true,"texto":"Chuva forte"}`;
+  - zero termo de outra atividade na faixa e na folha (detector ativo).
+  - Diretoria: 2 unidades no cartão, ordem Floramill → Vereda Romaria
+    (mais desvios evitáveis / menor aderência), evitáveis 1 × clima 1,
+    vazio "Sem plano do dia registrado nas unidades deste código de
+    12/08 a 10/09/2026.", nenhum nome de pessoa.
+- `scripts/regressao_render.cjs` main × branch: **80 telas, 41
+  diferentes** (café 18 de 22, grãos 10 de 15, pecuária 10 de 16,
+  pós-colheita 0 de 6, Diretoria 2 de 13, Escritório 1 de 8), comparadas
+  normalizando o rodapé de versão, horários e ids. Com plano semeado só
+  no café (passo novo `02-plano-semeado`), as diferenças são exatamente
+  as esperadas:
+  - **🌾 grãos e 🐂 pecuária:** só o rótulo do campo de pendências
+    ("Pendente / programado para amanhã" → "O que ficou para terminar")
+    e o `bdf:dados` do localStorage (que passou a ter `planoDia: []`).
+    Nenhuma seção, chip, campo ou comportamento novo; o cartão de
+    apontamento em 3 passos ficou byte a byte igual.
+  - **🏭 pós-colheita:** 0 telas diferentes.
+  - **Diretoria / Escritório:** só o cartão novo "📋 Planejado ×
+    Executado", com o vazio nomeando o recorte ("… em Vereda Romaria de
+    12/08 a 10/09/2026." quando há unidade filtrada).
+  - **☕ café:** a faixa do plano no topo do boletim (com o badge de
+    categoria de cada operação), a linha na casa e, no envio, a folha
+    "Amanhã" (pulada pelo roteiro, para o resto seguir igual).
+- Testes de mesa fora do checklist, no mesmo Chromium offline: 3 linhas
+  planejadas + 1 lançada → ✅/⚪/⚪ automáticos; replanejar pelo botão
+  "ajustar" (remover a 3ª linha) → faixa "0 de 2 ✅" + "Plano replanejado
+  hoje." e `replanejado:true` com hora; `planoResumo` com boletins
+  semeados → aderência 67 % (7 e 30 dias) em f23 e 17 % em f33, motivos
+  "50% máquina quebrou · 50% choveu", dias trabalháveis 2 de 3, precisão
+  de esforço 100 %; pecuária pelo de-para (`massa.tipo` "Vacinação" →
+  "Vacinação (especificar)", `lotes` → "Contagem") → três itens ✅;
+  resumo de sexta com a linha "📋 Plano da semana: 50% do que foi
+  planejado saiu (1 de 2 linhas em 1 dia) · 100% máquina quebrou" e,
+  fora de sexta, nenhuma linha de plano no resumo.
+- Vocabulário: `git grep` por "não fez", "não realizou", "atrasad",
+  "pendente", "faltou", "esqueceu" no diff do index.html — as únicas
+  ocorrências são intencionais e não são cobrança de registro: os chips
+  de motivo "Faltou gente" e "Faltou insumo" (nomeados na própria
+  tarefa; é a explicação que o gerente dá de uma causa, não um juízo
+  sobre ele) e o identificador interno `planoPendente`. Por isso o
+  rótulo do campo de texto ficou "O que ficou para terminar", sem a
+  palavra "pendente" que o rótulo antigo tinha. O "Boletim de hoje
+  pendente" da casa continua como estava, aguardando a decisão da v61.
+
+**Teste manual (Nilo) — PENDENTE.** Roteiro em ESTADO.md › PENDÊNCIAS
+("Plano do dia (v75) — para o Nilo testar no iPhone"): planejar e pular,
+planejar e salvar, ver a caixinha virar ✅ na hora, responder o motivo,
+conferir o dia de chuva e o cartão da Diretoria. Duas decisões de texto
+e uma de escopo ficaram com ele (rótulo do campo de pendências; motivo e
+plano na mesma folha; limite de 3 linhas), além de confirmar com o
+agrônomo os 25 mm de `PLANO_CHUVA_MM` e a inclusão de "Geada" em
+`CLIMA_IMPEDITIVO`.
+
+**SQL — testado localmente, a rodar no Supabase.**
+`sql/048-plano-x-executado-diario.sql` (visão `vw_plano_x_executado` e
+relatório mensal `plano_x_executado_diario` em `relatorios_gerados`) foi
+executado num PostgreSQL 16 local, sobre stubs mínimos das dependências
+do sql/020 (`boletins`, `rel_unidades`, `relatorios_gerados`,
+`relatorios_execucoes`, `rel_gravar`, `rel_executar`, `rel_hoje_brt`) e
+com cinco boletins semeados no formato que o app grava. Conferido:
+- carrega sem erro (visão + 2 funções + os 2 `revoke`);
+- a visão devolve 8 linhas (um item de plano por linha) — o boletim SEM
+  plano e o boletim marcado `exemplo` ficam de fora, como deve;
+- `rel_rodar_plano_dia()` grava 3 linhas (f23, f33 e a linha do grupo) e
+  o diário de bordo registra `ok = true`, sem erro; rodar de novo
+  mantém 3 linhas (idempotente pelo índice único);
+- números conferidos à mão em f23: 6 itens, 3 feitos → aderência 50 %,
+  1 parcial, 2 sem registro, 2 dias com plano, 1 replanejado, 1 dia
+  impedido, desvios **1 de clima + 1 evitável** (a máquina), 30 pessoas
+  previstas × 14 lançadas = 47 %; f33 0 % com 1 evitável (insumo);
+  grupo 8 itens, 3 feitos → 38 %;
+- segurança: com `set role anon`, a visão é legível (8 linhas) e a função
+  `rel_plano_x_executado_diario` dá "permission denied".
+Falta rodar no Supabase (só o Nilo tem o SQL Editor). Sem ele o app
+funciona igual — só o consolidado mensal não aparece na vitrine de
+Relatórios. Nenhuma tabela nova; nenhuma tabela existente alterada.
+
+**Não tocado.** A tela de apontamento em 3 passos do boletim (nenhuma
+etapa, ordem ou elemento novo), nenhuma seção de lançamento existente,
+a régua de 7 dias, o cabeçalho contextual, os chips de resposta de
+ausência, os chips removíveis, o diálogo único, o pós-colheita, o plano
+de safra (v52) e seus faróis, Cadastros, `syncTudo` e o formato de
+sincronização (o plano viaja no payload que já subia), todas as tabelas
+e visões do Supabase que já existiam.
+
 ## 09/09/2026 · v74 · Chips removíveis na multi-seleção (#42) + auditoria de #11 (v72), #14 (v67) e #9 (v68)
 
 **Entrega.** Lote de quatro itens num PR. Três já estavam no main

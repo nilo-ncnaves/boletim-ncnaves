@@ -423,3 +423,66 @@ do PR, conferir:
     "+2"), Cadastros › Códigos › novo combinado (9 unidades → 6 + "+3");
     grãos prova a AUSÊNCIA no cartão do pivô (dois problemas escolhidos,
     zero contêiner); pecuária registra "sem multi-seleção".
+
+## 16. Plano do dia seguinte × executado (desde a v75)
+Regra em CLAUDE.md, item c13. Toda entrega que mexer no plano do dia (a
+folha "📋 Amanhã", a faixa do topo do boletim, a linha da casa, o cartão
+da Diretoria, o status automático ou as correlações) precisa conferir,
+antes do PR:
+1. **Unidade sem plano não mostra nada.** Sem `D.planoDia` e sem
+   `b.plano`: nenhuma linha na casa do gerente, nenhuma faixa no boletim,
+   nenhuma linha no cartão da Diretoria (que cai no vazio da função única
+   `htmlEstado`, nomeando o recorte).
+2. **A faixa cabe em 3 linhas.** No máximo `PLANO_MAX_ITENS` (3) itens e
+   cada item em UMA linha visual a 360 px (`nowrap` + reticências), sem
+   rolagem lateral e sem campo de digitação. Medir a altura da faixa e
+   guardá-la no ESTADO.md: hoje 154,3 px (18,3 % de 844) no caso comum e
+   202 px (23,9 %) no pior caso — com observação de amanhã escrita E o dia
+   replanejado —, abaixo do teto de ~25 % da casa. Linha nova na faixa
+   exige medir de novo os dois casos.
+3. **O status é do app, nunca do gerente.** Ao abrir, "0 de 3 ✅"; ao
+   lançar um registro que casa com uma linha, a caixinha vira ✅ NO LUGAR
+   (`pintarPlanoHoje` chamado por `salvarRascunho`), sem redesenhar o
+   formulário e sem nenhum campo novo. Nenhum status é digitado.
+4. **Vocabulário de espelho.** Nem na faixa, nem na casa, nem na folha,
+   nem no cartão da Diretoria pode aparecer "não fez", "não realizou",
+   "pendente", "atrasado", "faltou", "esqueceu"; sem exclamação e sem
+   emoji novo. ⚪ é "não feito" no sentido de SEM REGISTRO.
+5. **A folha "Amanhã" é pulável e não bloqueia.** Abre depois do cinto de
+   segurança e antes de gravar, só quando o boletim que fecha é de hoje;
+   dois botões no rodapé, com verbo ("Pular" · "Salvar plano"); Escape
+   vale como pular; nenhum `confirm()`/`alert()`/`prompt()` nativo
+   dispara; ao fechar, o corpo destrava e a rolagem volta.
+6. **3 passos dentro da folha.** Ao tocar em ＋ aparecem SÓ os chips do
+   ONDE (zero campo, zero `<select>`); escolhido o ONDE, só os chips do
+   O QUÊ; escolhido o O QUÊ, só o campo de pessoas previstas e a ação de
+   adicionar. Depois de adicionar, a linha fica compacta e o cartão fecha.
+7. **A folha não recebe nada de fora do apontamento:** zero `.regua`
+   (c11), zero `.sel-box` (c12), zero `.acao-off` (c9), zero `data-falta`
+   (c10), zero `.op-cat` (c6), zero `input type=date`, zero métrica (c4).
+8. **Motivo: uma pergunta, por chips, uma vez.** Só quando há ⚪ ou ◐;
+   sem campo aberto por padrão ("Outro" revela uma linha); sem resposta
+   grava "não informado" e o envio segue. **Dia impedido pelo clima
+   declarado no boletim não pergunta nada:** o motivo entra automático
+   como "clima" (`{id:"clima", auto:true, texto:<condição declarada>}`) e
+   não conta como desvio evitável em lugar nenhum.
+9. **Replanejar não é falha.** O botão "ajustar" da faixa reabre a folha
+   para o próprio dia; salvar marca `replanejado` e a faixa passa a dizer
+   "Plano replanejado hoje.". Em nenhuma tela isso vira desvio.
+10. **Privacidade e tom na Diretoria.** O cartão lista UNIDADES (nunca
+    nome de pessoa), ordenado por "unidades com mais desvios evitáveis";
+    o desvio de dia de clima aparece separado dos evitáveis.
+11. **Nada digitado duas vezes.** O plano é a única entrada de "amanhã"
+    no boletim; o campo de texto é "O que ficou para terminar". As pessoas
+    previstas são comparadas com as que a mão de obra já registra — sem
+    campo novo.
+12. **As três atividades pelo mesmo componente,** com o vocabulário do
+    catálogo `PLANO_ATIVIDADE` (café "Talhão", grãos "Talhão / pivô",
+    pecuária "Pasto / retiro"); zero termo de outra atividade na faixa e
+    na folha.
+13. **Medição:** `scripts/checar-poluicao.cjs`, grupo "13. Plano do dia"
+    — um cenário por atividade, mais a variante do dia de chuva no café e
+    o cartão da Diretoria. Regressão (`scripts/regressao_render.cjs`): com
+    plano semeado no café e sem plano em grãos e pecuária, a única
+    diferença fora do café é o rótulo do campo de pendências e o cartão
+    novo da Diretoria.

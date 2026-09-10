@@ -57,6 +57,11 @@ esperada), boletim_secao_resposta (resposta explícita de ausência —
 "Nada a registrar hoje", com autor e hora; escrita SÓ por gatilho a
 partir de boletins.payload.secoes) e a visão vw_completude_boletim
 (sql/047; o app só lê, sob demanda).
+Desde a v75: NENHUMA tabela nova. O plano do dia seguinte viaja dentro
+de boletins.payload.plano (o app grava e lê) e o sql/048 só acrescenta
+leitura ao motor de relatórios: a visão vw_plano_x_executado e o
+relatório mensal plano_x_executado_diario em relatorios_gerados (o app
+só lê, como os outros).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -572,6 +577,76 @@ componente.
   com 9 unidades) — e, nos grãos, a prova da AUSÊNCIA: com dois
   problemas do pivô escolhidos, zero contêiner na tela. Detalhe em
   docs/definicao-de-pronto.md, item 15.
+
+### c13) Plano do dia seguinte × executado (desde a v75)
+O gerente planeja SÓ o dia seguinte, ao fechar o boletim; as metas do mês
+continuam sendo assunto da programação (Diretoria/Escritório). O app
+cruza os dois níveis sozinho — nada de status digitado.
+- **Onde mora o dado.** `D.planoDia` guarda os planos cujo dia-alvo ainda
+  não fechou. Ao enviar o boletim do dia-alvo, o plano fechado (itens +
+  status automático + motivo + clima declarado do dia) entra DENTRO do
+  próprio boletim, em `b.plano`, e sai do `D.planoDia`. Assim ele sobe
+  pelo payload de `boletins`, que já sincroniza: sem tabela nova, sem
+  caminho de sincronização novo e sem nada digitado duas vezes. Por isso
+  o campo de texto do boletim voltou a se chamar "O que ficou para
+  terminar" — o plano de amanhã tem lugar próprio.
+- **Componentes ÚNICOS, três atividades:** `abrirFolhaPlano(r, {alvo,
+  replan})` (a folha "📋 Amanhã"), `faixaPlanoHoje(r)` /
+  `pintarPlanoHoje(r)` (a faixa do topo do boletim), `linhaPlanoCasa` /
+  `linhaPlanoSemana` (casa do gerente), `cartaoPlanoPainel()`
+  (Diretoria), `avaliarPlano(plano, b)` (status), `planoResumo(fz, dias)`
+  (todas as correlações), `gravarPlanoNoBoletim(r, motivo)` (o fechamento).
+  A diferença de vocabulário — onde se planeja, quais operações existem,
+  onde o registro aparece no payload — vem do catálogo `PLANO_ATIVIDADE`,
+  por chave; proibido `if(atividade==="…")` nas telas (regra c4).
+- **A folha "📋 Amanhã"** abre DEPOIS do cinto de segurança e ANTES de
+  gravar, só quando o boletim que fecha é do dia de hoje. É pulável com
+  um toque, nunca obrigatória, e nunca bloqueia o envio: dois botões no
+  rodapé ("Pular" · "Salvar plano"), verbo no afirmativo (c10). Até 3
+  linhas, no padrão de 3 passos (ONDE em chips → O QUÊ em chips →
+  DETALHES: pessoas previstas), nada visível antes do toque anterior. Por
+  ser apontamento em 3 passos, ela NÃO recebe régua (c11), chip removível
+  (c12), ação desabilitada por perfil (c9), botão de avanço (c10), badge
+  de categoria (c6) nem métrica (c4).
+- **Sugestão automática:** o que o gerente marcou como "continua amanhã"
+  já vem preenchido, com a tag "sugestão" — ele só confirma ou troca. A
+  pré-marcação pelas METAS EM RISCO depende do módulo de programação/metas,
+  que ainda não existe (ESTADO.md, PENDÊNCIAS).
+- **A faixa "📋 O plano de ontem para hoje"** fica no topo do boletim, com
+  até 3 linhas (uma linha visual cada a 360 px) e a caixinha de status que
+  o app troca de ⚪ para ✅ sozinho conforme os lançamentos, no lugar, sem
+  redesenhar. Unidade sem plano não mostra NADA — nem faixa, nem linha na
+  casa, nem linha no cartão da Diretoria.
+- **Status relata REGISTRO, nunca trabalho:** ✅ feito (todos os "onde" do
+  item têm registro daquela operação), ◐ parcial (parte deles, ou registro
+  marcado "continua amanhã"), ⚪ não feito (nenhum). Registro sem
+  talhão/pasto cobre o item inteiro — na dúvida, a favor de quem
+  registrou. Proibidos "não fez", "não realizou", "pendente", "atrasado",
+  "faltou", "esqueceu".
+- **Motivo do desvio:** com ⚪ ou ◐, UMA pergunta por chips ao fechar
+  ("o que atrapalhou hoje?": choveu · máquina quebrou · faltou gente ·
+  faltou insumo · mudou a prioridade · outro). Sem resposta grava "não
+  informado" e o envio segue. **Dia impedido pelo clima DECLARADO no
+  boletim** (`CLIMA_IMPEDITIVO` = Chuva forte, Granizo, Geada, ou chuva
+  declarada ≥ `PLANO_CHUVA_MM`) nem é perguntado: o motivo entra
+  automático como "clima" e **nunca conta como desvio evitável**.
+- **Regras de justiça (não se discutem):** (1) item sem registro em dia
+  impedido pelo clima é "clima", nunca evitável; (2) nenhuma tela expõe um
+  gerente para outro — o cartão da Diretoria lista UNIDADES, sem nome de
+  pessoa, ordenado por "unidades com mais desvios evitáveis" (apoio, não
+  ranking); (3) o plano pode ser trocado no próprio dia (botão "ajustar" na
+  faixa) e a troca fica registrada como "replanejado", nunca como falha.
+- **Correlações, todas calculadas (`planoResumo`):** aderência (itens ✅ /
+  itens planejados) em 7 e 30 dias; distribuição dos motivos no período;
+  desvios evitáveis × de clima; dias trabalháveis × dias impedidos (fonte:
+  o clima declarado no boletim); precisão de esforço (pessoas previstas ×
+  pessoas lançadas na mão de obra). META × RITMO fica para quando o módulo
+  de metas existir.
+- **WhatsApp:** a primeira linha do resumo não muda; a aderência da semana
+  entra SÓ no resumo de sexta.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "13. Plano do dia";
+  detalhe em docs/definicao-de-pronto.md, item 16. Consolidado mensal
+  opcional no Supabase: sql/048 (o app lê pela vitrine de relatórios).
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

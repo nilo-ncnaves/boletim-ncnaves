@@ -224,6 +224,20 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
    de opção (.chip), rótulo + × à direita. O × é o único alvo: 44 × 44 px por si (margens negativas — não cresce o
    chip); o corpo não faz nada. Vazio = contêiner sem conteúdo, nada desenhado. Quebra em linhas (flex-wrap do .chips),
    nunca rola de lado. Sem cor nova: a seleção já é o verde do chip de opção; aqui só o neutro do chip. */
+/* v75: faixa do plano no topo do boletim, linha do plano na casa e cartão da Diretoria.
+   Sem cor nova: o status é ícone + palavra (a cor é canal do farol). Cada item do plano ocupa
+   UMA linha visual a 360 px (nowrap + reticências); no máximo PLANO_MAX_ITENS itens. */
+.plano-faixa{background:var(--verde-claro);border-color:#cfe0c8}
+.plano-faixa .plano-conta{font-size:.78rem;font-weight:700;font-variant-numeric:tabular-nums}
+.plano-item{display:flex;align-items:baseline;gap:6px;margin-top:5px;font-size:.85rem;white-space:nowrap;overflow:hidden}
+.plano-item>b{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.plano-item .mut{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.85rem}
+.plano-item .plano-st{flex:none;font-size:.9rem}
+.plano-item .plano-ler{flex:none;margin-left:auto;font-size:.72rem;color:var(--tinta-2);font-weight:600}
+.plano-linha-casa{margin:0 0 8px;font-size:.82rem}
+.plano-un{padding:8px 0;border-top:1px solid var(--linha)}
+.plano-un:first-of-type{border-top:none;padding-top:0}
+.plano-item-ed{gap:8px;padding:8px 0;border-top:1px solid var(--linha)}
 .sel-box:empty{display:none}
 .sel-box{margin:0 0 10px}
 .cad-item>.sel-box{width:100%}
@@ -1141,7 +1155,8 @@ async function carregarTudo(){
 async function salvarDados(){ await Persist.set("bdf:dados", JSON.stringify(D)); }
 function salvarDadosDebounce(){ clearTimeout(salvandoTimer); salvandoTimer=setTimeout(salvarDados,400); }
 function salvarRascunho(){ clearTimeout(rascunhoTimer); rascunhoTimer=setTimeout(()=>Persist.set("bdf:rascunho", JSON.stringify(rascunho)),300);
-  if(rascunho) atualizarAvanco("bt-enviar", faltaEnvio(rascunho)); }   /* v72: validação silenciosa do Enviar, no lugar */
+  if(rascunho){ atualizarAvanco("bt-enviar", faltaEnvio(rascunho));   /* v72: validação silenciosa do Enviar, no lugar */
+    pintarPlanoHoje(rascunho); } }                                    /* v75: caixinhas ✅/◐/⚪ do plano, no lugar */
 
 /* ---------- Consultas ---------- */
 const talhao = id => D.talhoes.find(t=>t.id===id)||{nome:"?",area:0};
@@ -2053,6 +2068,7 @@ const REL_CATALOGO={
   custo_fisico_talhao_mes:{nome:"Custo físico por talhão — mês", per:"mes"},
   rebanho_mes:{nome:"Rebanho — mês", per:"mes"},
   plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"},
+  plano_x_executado_diario:{nome:"Planejado × executado (plano do dia) — mês", per:"mes"},
   /* fase 2 (v57): relatórios narrativos redigidos pelo robô-redator (sql/030) — texto acima dos números,
      marcado "gerado automaticamente — revisar antes de enviar"; só Diretoria/ADMIN, nunca o gerente */
   devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", per:"semana", texto:true},
@@ -2456,9 +2472,17 @@ function ajustarTextosLongos(){
     p.classList.toggle("cortado",corta); if(bt) bt.classList.toggle("oculto",!corta);
   });
 }
+/* trava e destrava o fundo enquanto uma folha de tela cheia está aberta — mesmo mecanismo para a
+   folha de leitura (v68) e para a folha "Amanhã" (v75); só uma folha fica aberta por vez */
+function travarFolha(){
+  folhaScrollY=window.scrollY||window.pageYOffset||0;
+  document.body.style.top=(-folhaScrollY)+"px"; document.body.classList.add("folha-aberta");
+}
+function destravarFolha(){
+  document.body.classList.remove("folha-aberta"); document.body.style.top=""; window.scrollTo(0,folhaScrollY);
+}
 function abrirFolhaTexto(o){
   fecharFolhaTexto();
-  folhaScrollY=window.scrollY||window.pageYOffset||0;
   const f=document.createElement("div"); f.className="folha"; f.id="folha-texto";
   f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label",o.titulo);
   f.innerHTML=`<div class="miolo">
@@ -2471,17 +2495,19 @@ function abrirFolhaTexto(o){
     <button class="btn sec" id="bt-folha-fechar">Fechar</button>
     <button class="btn" id="bt-folha-copiar">${esc(o.copiar||"copiar")}</button></div></div>`;
   document.body.appendChild(f);
-  document.body.style.top=(-folhaScrollY)+"px"; document.body.classList.add("folha-aberta");
+  travarFolha();
   f.onclick=ev=>{ const t=ev.target.closest("button"); if(!t) return;
     if(t.id==="bt-folha-copiar"){ if(o.aoCopiar) o.aoCopiar(t); return; }
     if(t.id==="bt-folha-fechar"||t.id==="bt-folha-voltar") fecharFolhaTexto(); };
 }
 function fecharFolhaTexto(){
   const f=document.getElementById("folha-texto"); if(!f) return;
-  f.remove(); document.body.classList.remove("folha-aberta"); document.body.style.top="";
-  window.scrollTo(0,folhaScrollY);
+  f.remove(); destravarFolha();
 }
-document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"){ fecharFolhaTexto(); fecharDialogo(false); } });
+/* Escape: fecha a folha de leitura, cancela o diálogo binário e vale como "Pular" na folha
+   "Amanhã" (v75) — pular é o caminho neutro dela, o envio segue de todo modo */
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"){ fecharFolhaTexto(); fecharDialogo(false);
+  if(document.getElementById("folha-plano")) fecharFolhaPlano(false); } });
 
 /* ---------- Diálogo binário (v72) — componente ÚNICO ----------
    perguntar(o) → Promise<boolean>. Substitui todo confirm() nativo (proibido desde a v72). Uma pergunta curta em
@@ -3341,7 +3367,9 @@ function vCasaGerente(){
   const critico = x => (x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou"));
   return cabecalhoContexto(fz,{sub:"Gerente"})
   +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`
-  +reguaDias(fz, dia)+`
+  +reguaDias(fz, dia)
+  +linhaPlanoCasa(fz, dia)+linhaPlanoSemana(fz, dia)   /* v75: espelho do plano; sem plano, nada aparece */
+  +`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
       <h2>✅ Boletim enviado!</h2>
       <p class="mut">Quer avisar o grupo? Um toque e o resumo já vai pronto.</p>
@@ -3475,6 +3503,399 @@ function cartaoDiaRegua(o){
       <span class="farol ${o.farol||"ok"}"></span>
       <div class="cresce"><h2>${esc(o.rotulo)} de ${fmtDataCurta(o.dia)} enviado</h2><p class="mut">${o.sub||""}</p></div>
       <span class="mut">›</span></button></div>`;
+}
+
+/* ---------- Planejamento do dia seguinte × executado (v75) ----------
+   Dois níveis que o app cruza sozinho: o gerente planeja SÓ o dia seguinte (folha curta ao fechar
+   o boletim, pulável com um toque) e o app confere o resultado no boletim do dia seguinte, sem
+   ninguém digitar status. Tudo por componentes ÚNICOS nas três atividades; a diferença de
+   vocabulário (onde se planeja, que operações existem, onde o registro aparece no payload) vem do
+   catálogo PLANO_ATIVIDADE, por chave — nunca de `if(atividade==="…")` nas telas (CLAUDE.md, c4).
+
+   ONDE MORA O DADO. `D.planoDia` guarda os planos cujo dia-alvo ainda não fechou. Ao enviar o
+   boletim do dia-alvo, o plano fechado (itens + status automático + motivo do desvio + clima
+   declarado do dia) entra DENTRO do próprio boletim, em `b.plano`, e sai do `D.planoDia`: assim
+   ele sobe pelo payload de `boletins`, que já sincroniza, sem tabela nova, sem caminho de
+   sincronização novo e sem nada digitado duas vezes. A Diretoria lê `b.plano` dos boletins que já
+   baixa. Sem plano, `b.plano` não existe e nenhuma tela mostra nada.
+
+   TOM. Espelho, nunca cobrança: o farol/status relata REGISTRO ("não feito" = não foi registrado
+   naquele dia), o dia impedido pelo clima declarado nunca conta como desvio evitável, o plano pode
+   ser trocado no próprio dia (fica "replanejado", não falha) e nenhuma tela mostra um gerente para
+   outro. Proibidos "atrasado", "pendente", "faltou", "esqueceu", "não fez".
+
+   PENDÊNCIA DECLARADA. A pré-marcação pelas METAS EM RISCO e o cruzamento META × RITMO (item 3c da
+   tarefa) dependem do módulo de programação/metas, que ainda não existe no app — ver ESTADO.md,
+   PENDÊNCIAS. Enquanto não existir, a sugestão automática vem do que o gerente marcou como
+   "continua amanhã" no próprio boletim, e "dias efetivos" usa o clima DECLARADO no boletim como
+   fonte (a taxonomia F1..F5 citada na tarefa também não existe no repositório). */
+const PLANO_MAX_ITENS=3;
+const PLANO_ST={feito:{ico:"✅",rot:"feito"},parcial:{ico:"◐",rot:"parcial"},nao_feito:{ico:"⚪",rot:"não feito"}};
+const PLANO_MOTIVOS=[
+  {id:"clima",      rot:"Clima",               clima:true, auto:true},   /* só o app usa: dia impedido pelo clima declarado */
+  {id:"chuva",      rot:"Choveu",              clima:true},
+  {id:"maquina",    rot:"Máquina quebrou"},
+  {id:"gente",      rot:"Faltou gente"},
+  {id:"insumo",     rot:"Faltou insumo"},
+  {id:"prioridade", rot:"Mudou a prioridade"},
+  {id:"outro",      rot:"Outro",               texto:true}
+];
+const PLANO_MOTIVOS_CHIP = PLANO_MOTIVOS.filter(m=>!m.auto);
+const planoMotivo = id => PLANO_MOTIVOS.find(m=>m.id===id) || null;
+const planoMotivoRot = m => !m||!m.id ? "não informado"
+  : (m.texto && (m.id==="outro"||m.id==="clima")) ? m.texto : ((planoMotivo(m.id)||{}).rot || "não informado");
+const planoMotivoClima = m => !!(m && planoMotivo(m.id) && planoMotivo(m.id).clima);
+/* dia impedido: só o clima DECLARADO pelo gerente no boletim (nada é inferido de estação nem de
+   fora do boletim). Serve às duas regras: o desvio do dia vira "clima" e o dia sai dos trabalháveis.
+   A condição declarada é o sinal principal; o limite em milímetros é o de uma chuva que para o
+   serviço no campo (a confirmar com o Nilo / o agrônomo — ver ESTADO.md, PENDÊNCIAS). */
+const CLIMA_IMPEDITIVO=["Chuva forte","Granizo","Geada"];
+const PLANO_CHUVA_MM=25;
+const diaISO=(iso,delta)=>{ const d=new Date(String(iso).slice(0,10)+"T12:00:00"); d.setDate(d.getDate()+delta);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const diaImpedido = b => { const c=(b&&b.clima)||{};
+  return CLIMA_IMPEDITIVO.includes(c.cond) || n0(c.chuvaMm)>=PLANO_CHUVA_MM; };
+
+/* de-para pecuária: bloco do payload → operação do catálogo. Espelho exato de `operacao_alias`
+   (sql/040-dias-sem-registro.sql), para o plano contar como feito o que o gerente registrou na
+   seção própria (movimentação, sanidade, manejo em massa) e não só em "Outros manejos". */
+const PLANO_PEC_DEPARA=[
+  ["mov","tipo",{"Nascimento":"Parto / nascimento","Morte":"Mortalidade (com causa)","Desmama":"Desmama",
+    "Mudança de pasto":"Rotação de pasto — entrada de lote","Entrada":"Compra / entrada de animais","Saída":"Embarque / venda"}],
+  ["massa","tipo",{"Vacinação":"Vacinação (especificar)","Vermifugação":"Vermifugação"}],
+  ["san","problema",{"Bicheira":"Cura de bicheira","Carrapato / mosca em excesso":"Controle de carrapato / mosca-do-chifre"}]
+];
+const PLANO_ATIVIDADE={
+  CAFE:{ ondeRot:"Talhão", ondeGeral:"Área geral",
+    onde:fz=>talhoesDa(fz).filter(t=>t.fazendaId===fz&&t.tipo!=="ESTRUTURA"&&t.tipo!=="ARRENDADO").map(t=>({id:t.id,nome:t.nome})),
+    ops:()=>LISTA_ATIV.filter(n=>n!=="Outra"),
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:a.tipo,onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+  GRAOS:{ ondeRot:"Talhão / pivô", ondeGeral:"Área geral / sede",
+    onde:fz=>talhoesAnuais(fz).map(t=>({id:t.id,nome:t.nome})),
+    ops:()=>OPS_GRAOS_FASES.flatMap(([,ops])=>ops),
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:a.tipo,onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+  PECUARIA:{ ondeRot:"Pasto / retiro", ondeGeral:"Toda a fazenda",
+    onde:fz=>pastosCadastrados(fz).map(nm=>({id:nm,nome:nm})),
+    ops:()=>LISTA_PECUARIA,
+    feitos:b=>{ const p=b.pecuaria||{}, out=[];
+      (p.eventos||[]).forEach(e=>{ if(e.tipo) out.push({op:e.tipo,onde:e.talhaoId||""}); });
+      PLANO_PEC_DEPARA.forEach(([bloco,campo,mapa])=>(p[bloco]||[]).forEach(x=>{ const op=mapa[x[campo]];
+        if(op) out.push({op,onde:x.pastoPara||x.pastoDe||x.talhaoId||""}); }));
+      (p.lotes||[]).forEach(l=>{ if(n0(l.cabecas)) out.push({op:"Contagem",onde:l.talhaoId||""}); });
+      (p.nut||[]).forEach(u=>{ if(u.insumo) out.push({op:"Suplementação (sal mineral / proteinado / ração)",onde:u.talhaoId||""}); });
+      const rp=p.rep||{};
+      if(rp.iatfEtapa) out.push({op:"IATF",onde:""});
+      if(n0(rp.dgPrenhes)||n0(rp.dgVazias)) out.push({op:"Diagnóstico de gestação",onde:""});
+      return out; } }
+};
+const planoCat = fz => PLANO_ATIVIDADE[atividadeDe(fz)] || PLANO_ATIVIDADE.CAFE;
+const planoOndeNome = (fz,id) => { if(!id||id==="geral") return planoCat(fz).ondeGeral;
+  const o=planoCat(fz).onde(fz).find(x=>x.id===id); if(o) return o.nome;
+  const t=talhao(id); return t.nome!=="?"?t.nome:String(id); };
+
+/* ---- guarda e leitura do plano ---- */
+const planosDia = () => (D.planoDia = D.planoDia || []);
+const planoPendente = (fz,data) => planosDia().find(p=>p.fazendaId===fz && p.data===data) || null;
+/* o plano que vale para (unidade, dia): o que já foi fechado dentro do boletim daquele dia ou,
+   se o dia ainda não fechou, o que está guardado em D.planoDia */
+function planoDiaDe(fz,data){
+  const pend=planoPendente(fz,data);
+  if(pend) return pend;                       /* replanejamento do próprio dia vence o que já fechou */
+  const b=boletimDoDia(data,fz);
+  return (b && b.plano && (b.plano.itens||[]).length) ? b.plano : null;
+}
+/* status automático de cada item, a partir dos registros do próprio boletim do dia (nada digitado):
+   ✅ feito = todos os "onde" do item têm registro daquela operação; ◐ parcial = parte deles, ou
+   registro marcado "continua amanhã"; ⚪ não feito = nenhum. Registro sem talhão/pasto ("Área
+   geral") cobre o item inteiro — na dúvida, a favor de quem registrou. */
+function avaliarPlano(plano, b){
+  if(!plano) return null;
+  const feitos=(planoCat(b.fazendaId).feitos(b)||[]);
+  const itens=(plano.itens||[]).map(it=>{
+    const ondes=(it.ondes||[]).length?it.ondes:["geral"];
+    const casa=onde=>feitos.filter(f=>f.op===it.op && (onde==="geral" || !f.onde || f.onde==="geral" || f.onde===onde));
+    const achados=ondes.map(casa);
+    const cobertos=achados.filter(l=>l.length).length;
+    const soParcial=achados.some(l=>l.length && l.every(f=>f.parcial));
+    const status = cobertos===0 ? "nao_feito" : (cobertos<ondes.length || soParcial) ? "parcial" : "feito";
+    return {...it, ondes, status};
+  });
+  const cont=k=>itens.filter(x=>x.status===k).length;
+  return { itens, n:itens.length, feito:cont("feito"), parcial:cont("parcial"), naoFeito:cont("nao_feito"),
+    desvio: cont("parcial")+cont("nao_feito")>0,
+    pessoasPrev: itens.reduce((s,x)=>s+n0(x.pessoas),0) };
+}
+/* fecha o plano do dia DENTRO do boletim: status automático, motivo (o declarado, ou "clima" quando
+   o dia foi impedido pelo clima declarado) e o clima do dia. Sai do D.planoDia. */
+function gravarPlanoNoBoletim(r, motivo){
+  const plano=planoDiaDe(r.fazendaId, r.data);
+  D.planoDia = planosDia().filter(p=>!(p.fazendaId===r.fazendaId && p.data===r.data));
+  if(!plano || !(plano.itens||[]).length){ delete r.plano; return null; }
+  const av=avaliarPlano(plano,r), imped=diaImpedido(r), antes=(r.plano||{}).motivo;
+  const mot = !av.desvio ? null
+    : imped ? {id:"clima", auto:true, texto:((r.clima||{}).cond)||(n0((r.clima||{}).chuvaMm)+" mm de chuva")}
+    : (motivo && motivo.id) ? motivo
+    : (antes && antes.id) ? antes : {id:"", texto:""};
+  r.plano={ data:r.data, criadoEm:plano.criadoEm||"", por:plano.por||"", obs:plano.obs||"",
+    replanejado:!!plano.replanejado, replanejadoEm:plano.replanejadoEm||"",
+    itens:av.itens.map(x=>({op:x.op, ondes:x.ondes, pessoas:x.pessoas||"", status:x.status})),
+    clima:{cond:(r.clima||{}).cond||"", chuvaMm:(r.clima||{}).chuvaMm||"", impedido:imped},
+    motivo:mot, pessoasPrev:av.pessoasPrev,
+    pessoasReal:n0(r.mo&&r.mo.proprios)+n0(r.mo&&r.mo.diaristas) };
+  return r.plano;
+}
+
+/* ---- correlações: uma função só, usada pelo gerente, pela Diretoria e pelo resumo de sexta ---- */
+/* Aderência = itens ✅ / itens planejados (o parcial NÃO conta como cumprido; aparece à parte).
+   Motivos: um por dia com desvio; dia impedido pelo clima declarado entra sempre como "chuva"
+   (nunca como desvio evitável). Dias efetivos: dias com boletim × dias impedidos pelo clima
+   declarado. Precisão de esforço: pessoas previstas no plano × pessoas lançadas na mão de obra. */
+function planoResumo(fz, dias){
+  const hoje=hojeBRT(), lim=diaISO(hoje,-(dias-1));
+  const todos=D.boletins.filter(b=>b.fazendaId===fz && b.data>=lim && b.data<=hoje);
+  const comPlano=todos.filter(b=>b.plano && (b.plano.itens||[]).length);
+  const r={dias, de:lim, ate:hoje, diasReg:todos.length, diasComPlano:comPlano.length,
+    n:0, feito:0, parcial:0, naoFeito:0, replan:0, motivos:{}, evitaveis:0, clima:0,
+    pessoasPrev:0, pessoasReal:0,
+    diasImped:todos.filter(diaImpedido).length};
+  r.diasTrab=r.diasReg-r.diasImped;
+  comPlano.forEach(b=>{ const p=b.plano;
+    (p.itens||[]).forEach(x=>{ r.n++; if(x.status==="feito") r.feito++; else if(x.status==="parcial") r.parcial++; else r.naoFeito++; });
+    if(p.replanejado) r.replan++;
+    r.pessoasPrev+=n0(p.pessoasPrev); r.pessoasReal+=n0(p.pessoasReal);
+    const desvio=(p.itens||[]).some(x=>x.status!=="feito");
+    if(!desvio) return;
+    const clima=(p.clima&&p.clima.impedido)||planoMotivoClima(p.motivo);
+    const k=clima?"chuva":((p.motivo&&p.motivo.id)||"nao_informado");
+    r.motivos[k]=(r.motivos[k]||0)+1;
+    if(clima) r.clima++; else r.evitaveis++;
+  });
+  r.ader = r.n ? Math.round(r.feito*100/r.n) : null;
+  r.precisao = r.pessoasPrev ? Math.round(r.pessoasReal*100/r.pessoasPrev) : null;
+  return r;
+}
+/* "40% chuva · 25% máquina quebrou" — distribuição dos motivos do período, do maior para o menor */
+function planoMotivosTexto(res, max){
+  const tot=Object.values(res.motivos).reduce((s,v)=>s+v,0);
+  if(!tot) return "";
+  return Object.entries(res.motivos).sort((a,b)=>b[1]-a[1]).slice(0,max||3)
+    .map(([k,v])=>Math.round(v*100/tot)+"% "+(k==="nao_informado"?"não informado":planoMotivoRot({id:k})).toLowerCase()).join(" · ");
+}
+
+/* ---- faixa "O plano de ontem para hoje", no topo do boletim (as três atividades) ----
+   Componente ÚNICO. Sem plano para o dia, devolve "" — unidade sem plano não mostra nada.
+   Até PLANO_MAX_ITENS linhas, uma linha visual cada a 360 px (nowrap + reticências). A caixinha de
+   status é preenchida pelo próprio app conforme os lançamentos do dia; pintarPlanoHoje() a
+   atualiza no lugar, sem redesenhar o formulário. */
+function faixaPlanoHoje(r){
+  const plano=planoDiaDe(r.fazendaId, r.data);
+  if(!plano || !(plano.itens||[]).length) return "";
+  return `<div class="aviso plano-faixa" id="plano-faixa">${htmlPlanoFaixaCorpo(r, plano)}</div>`;
+}
+function htmlPlanoFaixaCorpo(r, plano){
+  const av=avaliarPlano(plano, r), fz=r.fazendaId, atv=atividadeDe(fz);
+  return `<div class="linha-flex" style="gap:8px">
+      <b class="cresce">📋 O plano de ontem para hoje <span class="mut plano-conta">${av.feito} de ${av.n} ✅</span></b>
+      <button class="btn suave mini" id="bt-plano-ajustar">ajustar</button></div>
+    ${av.itens.map(it=>`<div class="plano-item"><span class="plano-st" aria-hidden="true">${PLANO_ST[it.status].ico}</span>
+      <b>${badgeCategoria(atv,{nome:it.op})}${esc(it.op)}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+"p":""}</span>
+      <span class="plano-ler">${esc(PLANO_ST[it.status].rot)}</span></div>`).join("")}
+    ${plano.obs?`<p class="mut" style="margin:6px 0 0;font-size:.78rem">${esc(plano.obs)}</p>`:""}
+    ${plano.replanejado?`<p class="mut" style="margin:6px 0 0;font-size:.76rem">Plano replanejado hoje.</p>`:""}`;
+}
+function pintarPlanoHoje(r){
+  const box=document.getElementById("plano-faixa"); if(!box||!r) return;
+  const plano=planoDiaDe(r.fazendaId, r.data); if(!plano) return;
+  box.innerHTML=htmlPlanoFaixaCorpo(r, plano);
+}
+/* linha única na casa do gerente — espelho do dia escolhido na régua; sem plano, devolve "" */
+function linhaPlanoCasa(fz, dia){
+  const plano=planoDiaDe(fz, dia);
+  if(!plano || !(plano.itens||[]).length) return "";
+  const b=boletimDoDia(dia, fz);
+  const rot=dia===hojeBRT()?"hoje":fmtDataCurta(dia);
+  if(!b) return `<p class="mut plano-linha-casa">📋 Plano de ${esc(rot)}: ${plano.itens.length} linha${plano.itens.length>1?"s":""} — o app confere sozinho quando o boletim for enviado.</p>`;
+  const av=avaliarPlano(plano, b);
+  const mot=av.desvio?planoMotivoRot((b.plano||{}).motivo).toLowerCase():"";
+  const partes=[av.feito+" de "+av.n+" ✅"];
+  if(av.parcial) partes.push(av.parcial+" parcial");
+  if(av.naoFeito) partes.push(av.naoFeito+" não feito"+(mot?" ("+mot+")":""));
+  return `<p class="mut plano-linha-casa">📋 Plano de ${esc(rot)}: ${esc(partes.join(" · "))}</p>`;
+}
+/* fim de semana (sexta, sábado, domingo): o espelho da semana, em primeira pessoa e sem cobrança */
+function linhaPlanoSemana(fz, dia){
+  const d=new Date(String(dia).slice(0,10)+"T12:00:00").getDay();
+  if(!(d===5||d===6||d===0)) return "";
+  const res=planoResumo(fz,7);
+  if(!res.diasComPlano || res.ader===null) return "";
+  return `<p class="mut plano-linha-casa">📋 Você cumpriu ${res.ader}% do que planejou nesta semana.</p>`;
+}
+
+/* ---- cartão da Diretoria "📋 Planejado × Executado" (componente ÚNICO, três atividades) ----
+   Ordenado por quem mais precisa de apoio — mais desvios EVITÁVEIS primeiro (o desvio de clima
+   nunca sobe a unidade na lista). Rótulo neutro; nenhuma tela mostra um gerente para outro
+   (a lista é de unidades, sem nome de pessoa). */
+function cartaoPlanoPainel(){
+  const uns=D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
+      && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
+    .map(f=>({f, r7:planoResumo(f.id,7), r30:planoResumo(f.id,30)}))
+    .filter(x=>x.r30.diasComPlano>0)
+    .sort((a,b)=>(b.r7.evitaveis-a.r7.evitaveis)||(a.r7.ader??101)-(b.r7.ader??101));
+  const corpo = uns.length
+    ? uns.map(({f,r7,r30})=>{
+        const mot=planoMotivosTexto(r7,2)||planoMotivosTexto(r30,2);
+        return `<div class="plano-un"><b>${esc(f.nome)}</b>
+          <p class="mut" style="margin:2px 0 0">aderência <b class="num">${r7.ader===null?"—":r7.ader+"%"}</b> em 7 dias · <b class="num">${r30.ader===null?"—":r30.ader+"%"}</b> em 30 dias
+            <span class="mut">(${r30.n} linha${r30.n===1?"":"s"} planejada${r30.n===1?"":"s"} em ${r30.diasComPlano} dia${r30.diasComPlano===1?"":"s"})</span></p>
+          ${mot?`<p class="mut" style="margin:2px 0 0">motivos: ${esc(mot)}</p>`:""}
+          <p class="mut" style="margin:2px 0 0">desvios evitáveis <b class="num">${r7.evitaveis}</b> · de clima <b class="num">${r7.clima}</b> · dias trabalháveis <b class="num">${r7.diasTrab}</b> de <b class="num">${r7.diasReg}</b> com boletim${r7.replan?" · "+r7.replan+" replanejado"+(r7.replan>1?"s":""):""}</p>
+          ${r7.precisao!==null?`<p class="mut" style="margin:2px 0 0">esforço: previu <b class="num">${r7.pessoasPrev}</b> pessoas, lançou <b class="num">${r7.pessoasReal}</b> (${r7.precisao}%)</p>`:""}</div>`;
+      }).join("")
+    : htmlEstado("vazio",{que:"plano do dia registrado", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
+        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:periodoVazio(diaISO(hojeBRT(),-29),hojeBRT())},{classe:"mut"});
+  return `<div class="cartao"><h3>📋 Planejado × Executado</h3>
+    <p class="mut" style="font-size:.78rem;margin:0 0 8px">O que o gerente planejou para o dia seguinte × o que o boletim daquele dia registrou. Ordem: unidades com mais desvios evitáveis.</p>
+    ${corpo}
+    <p class="mut" style="font-size:.72rem;margin-top:8px">Fonte: o próprio boletim (plano e registros do dia). O cruzamento com as metas do mês entra quando o módulo de programação/metas existir.</p></div>`;
+}
+
+/* ---- folha "📋 Amanhã" (v75) ----
+   Tela curta no fim do envio, DEPOIS do cinto de segurança e ANTES de gravar: pulável com um toque,
+   nunca obrigatória, nunca bloqueia o envio. Dois blocos: (1) "o que atrapalhou hoje?", só quando o
+   plano de hoje ficou com ⚪ ou ◐ e o dia NÃO foi impedido pelo clima declarado (aí o motivo é
+   "clima" e nem se pergunta); (2) o plano de amanhã, no padrão de 3 passos (ONDE em chips → O QUÊ
+   em chips → DETALHES), até PLANO_MAX_ITENS linhas. Nada visível antes do toque anterior. Sem
+   régua, sem chips removíveis, sem ação por perfil, sem botão de avanço e sem métrica (CLAUDE.md,
+   c4/c9/c10/c11/c12: a tela de apontamento em 3 passos não recebe nada disso). */
+let planoUI=null, planoResolve=null;
+/* sugestão automática: o que o gerente marcou hoje como "continua amanhã" já vem preenchido —
+   ele só confirma ou troca. (Com o módulo de metas, entram também as metas em risco.) */
+function planoSugestao(r){
+  const out=[];
+  (r.atividades||[]).forEach(a=>{
+    if(a.status!=="continua" || !a.tipo) return;
+    const onde=(a.talhaoId&&a.talhaoId!=="geral")?a.talhaoId:"geral";
+    const ja=out.find(x=>x.op===a.tipo);
+    if(ja){ if(!ja.ondes.includes(onde)) ja.ondes.push(onde); return; }
+    if(out.length<PLANO_MAX_ITENS) out.push({op:a.tipo, ondes:[onde], pessoas:String(n0(a.pessoas)||""), sugerido:true});
+  });
+  return out;
+}
+function planoFolhaHtml(){
+  const u=planoUI, fz=u.fz, cat=planoCat(fz), nv=u.novo;
+  const motivoBloco = !u.pedeMotivo ? "" : `<div class="cartao"><b>O que atrapalhou hoje?</b>
+    <p class="mut" style="font-size:.78rem;margin:2px 0 8px">${u.av.naoFeito?u.av.naoFeito+" linha"+(u.av.naoFeito>1?"s":"")+" sem registro":""}${u.av.naoFeito&&u.av.parcial?" · ":""}${u.av.parcial?u.av.parcial+" parcial":""}. Um toque responde; dá para deixar em branco.</p>
+    <div class="chips">${PLANO_MOTIVOS_CHIP.map(m=>`<button class="chip ${u.motivo.id===m.id?"on":""}" data-plano-motivo="${m.id}">${esc(m.rot)}</button>`).join("")}</div>
+    ${u.motivo.id==="outro"?`<input id="plano-motivo-txt" value="${esc(u.motivo.texto||"")}" placeholder="O que foi?" style="margin-top:8px">`:""}</div>`;
+  const lista = u.itens.length
+    ? u.itens.map((it,i)=>`<div class="linha-flex plano-item-ed" data-plano-item="${i}">
+        <span class="cresce"><b>${esc(it.op)}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+" pessoa"+(n0(it.pessoas)>1?"s":""):""}</span>${it.sugerido?` <span class="tag verde">sugestão</span>`:""}</span>
+        <button class="btn suave mini" data-plano-rm="${i}" aria-label="Remover ${esc(it.op)} do plano">remover</button></div>`).join("")
+    : `<p class="mut" id="plano-vazio">Nenhuma linha ainda. Toque em ＋ para escrever o plano de amanhã, ou pule.</p>`;
+  let passos="";
+  if(nv.ativo){
+    const ondes=[...cat.onde(fz),{id:"geral",nome:cat.ondeGeral}];
+    passos=`<div class="subcartao" id="plano-novo">
+      <label>${esc(cat.ondeRot)}</label>
+      <div class="chips">${ondes.map(o=>`<button class="chip ${nv.ondes.includes(o.id)?"on":""}" data-plano-onde="${esc(o.id)}">${esc(o.nome)}</button>`).join("")}</div>
+      ${nv.ondes.length?`<label class="mt">O que vai ser feito</label>
+        <div class="chips">${cat.ops(fz).map(op=>`<button class="chip ${nv.op===op?"on":""}" data-plano-op="${esc(op)}">${esc(op)}</button>`).join("")}</div>`:""}
+      ${(nv.ondes.length&&nv.op)?`<label class="mt">Quantas pessoas você prevê</label>
+        <input inputmode="numeric" id="plano-pessoas" value="${esc(nv.pessoas||"")}" placeholder="Ex.: 8">
+        <button class="btn mt" id="bt-plano-ok">Adicionar linha</button>`:""}
+      <button class="btn suave mini mt" id="bt-plano-cancelar">cancelar esta linha</button></div>`;
+  } else if(u.itens.length<PLANO_MAX_ITENS){
+    passos=`<button class="btn suave mt" id="bt-plano-add">＋ linha do plano</button>`;
+  }
+  return `${motivoBloco}
+    <div class="cartao"><b>Plano de ${fmtData(u.alvo)}</b>
+      <p class="mut" style="font-size:.78rem;margin:2px 0 8px">Até ${PLANO_MAX_ITENS} linhas: onde, o que e quantas pessoas. Leva uns 20 segundos — e dá para pular.</p>
+      ${u.itens.some(x=>x.sugerido)?`<p class="mut" style="font-size:.76rem;margin:0 0 6px">Sugestão do app a partir do que você marcou como "continua amanhã" — confirme ou troque.</p>`:""}
+      ${lista}
+      ${passos}
+      <label class="mt">Observação de amanhã <span class="mut">(opcional)</span></label>
+      <input id="plano-obs" value="${esc(u.obs||"")}" placeholder="Uma linha, se ajudar"></div>`;
+}
+function planoLerCampos(){
+  const u=planoUI; if(!u) return;
+  const g=id=>{ const el=document.getElementById(id); return el?el.value:null; };
+  const ps=g("plano-pessoas"); if(ps!==null) u.novo.pessoas=ps;
+  const ob=g("plano-obs"); if(ob!==null) u.obs=ob;
+  const mt=g("plano-motivo-txt"); if(mt!==null) u.motivo.texto=mt;
+}
+function planoPintar(){
+  const c=document.getElementById("plano-corpo"); if(!c) return;
+  planoLerCampos(); c.innerHTML=planoFolhaHtml();
+}
+/* grava o plano de um dia-alvo em D.planoDia (plano vazio não cria linha nenhuma).
+   replan=true: alteração no próprio dia — fica registrada como "replanejado", nunca como falha. */
+function planoGuardar(resp){
+  if(!resp || !resp.fz || !resp.alvo) return;
+  const itens=(resp.itens||[]).filter(x=>x.op).slice(0,PLANO_MAX_ITENS)
+    .map(x=>({op:x.op, ondes:(x.ondes||[]).length?x.ondes:["geral"], pessoas:x.pessoas||""}));
+  const antes=planoPendente(resp.fz,resp.alvo);
+  D.planoDia = planosDia().filter(p=>!(p.fazendaId===resp.fz && p.data===resp.alvo));
+  if(!itens.length) return;
+  planosDia().push({ id:(antes&&antes.id)||uid(), fazendaId:resp.fz, data:resp.alvo, itens, obs:resp.obs||"",
+    criadoEm:(antes&&antes.criadoEm)||hojeBRT(), por:(rascunho&&rascunho.responsavel)||(antes&&antes.por)||"",
+    replanejado:!!(resp.replan||(antes&&antes.replanejado)),
+    replanejadoEm: resp.replan?(hojeBRT()+" "+agoraHM()):((antes&&antes.replanejadoEm)||"") });
+}
+/* o = {alvo, replan}: sem `o`, planeja o dia seguinte ao boletim; com replan, ajusta o plano do
+   próprio dia (o motivo do desvio não é perguntado aqui — ele é perguntado ao fechar o boletim). */
+function abrirFolhaPlano(r,o){
+  o=o||{};
+  return new Promise(res=>{
+    const fz=r.fazendaId, alvo=o.alvo||diaISO(r.data,1), replan=!!o.replan;
+    const base=replan?planoDiaDe(fz,alvo):planoPendente(fz,alvo);
+    const plHoje=planoDiaDe(fz,r.data);
+    const av=plHoje?avaliarPlano(plHoje,r):null;
+    planoUI={ fz, alvo, r, av, replan,
+      itens: base?JSON.parse(JSON.stringify(base.itens||[])):planoSugestao(r),
+      obs: base?(base.obs||""):"",
+      novo:{ativo:false, ondes:[], op:"", pessoas:""},
+      motivo:{id:"", texto:""},
+      pedeMotivo: !replan && !!(av && av.desvio && !diaImpedido(r)) };
+    planoResolve=res;
+    const titulo=replan?"📋 Plano de hoje":"📋 Amanhã";
+    const f=document.createElement("div"); f.className="folha"; f.id="folha-plano";
+    f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label",replan?"Plano de hoje":"Amanhã");
+    f.innerHTML=`<div class="miolo">
+      <div class="topo"><button class="btn-topo" id="bt-plano-pular2">‹ ${replan?"Voltar":"Pular"}</button><h1>${titulo}</h1></div>
+      <div id="plano-corpo">${planoFolhaHtml()}</div>
+    </div>
+    <div class="rodape no-print"><div class="linha-flex" style="gap:8px;max-width:640px;margin:0 auto">
+      <button class="btn sec" id="bt-plano-pular">${replan?"Voltar":"Pular"}</button>
+      <button class="btn" id="bt-plano-salvar">Salvar plano</button></div></div>`;
+    document.body.appendChild(f);
+    travarFolha();
+    f.oninput=ev=>{ if(ev.target && ev.target.id) planoLerCampos(); };
+    f.onclick=ev=>{ const t=ev.target.closest("button"); if(!t) return; const d=t.dataset;
+      if(t.id==="bt-plano-pular"||t.id==="bt-plano-pular2"){ fecharFolhaPlano(false); return; }
+      if(t.id==="bt-plano-salvar"){ fecharFolhaPlano(true); return; }
+      if(d.planoMotivo!==undefined){ planoLerCampos();
+        planoUI.motivo={id: planoUI.motivo.id===d.planoMotivo?"":d.planoMotivo, texto:planoUI.motivo.texto||""};
+        planoPintar(); return; }
+      if(t.id==="bt-plano-add"){ planoUI.novo={ativo:true, ondes:[], op:"", pessoas:""}; planoPintar(); return; }
+      if(t.id==="bt-plano-cancelar"){ planoUI.novo={ativo:false, ondes:[], op:"", pessoas:""}; planoPintar(); return; }
+      if(d.planoOnde!==undefined){ const l=planoUI.novo.ondes, i=l.indexOf(d.planoOnde);
+        if(i>=0) l.splice(i,1); else l.push(d.planoOnde); planoPintar(); return; }
+      if(d.planoOp!==undefined){ planoUI.novo.op = planoUI.novo.op===d.planoOp?"":d.planoOp; planoPintar(); return; }
+      if(t.id==="bt-plano-ok"){ planoLerCampos(); const nv=planoUI.novo;
+        if(nv.ondes.length && nv.op && planoUI.itens.length<PLANO_MAX_ITENS)
+          planoUI.itens.push({op:nv.op, ondes:[...nv.ondes], pessoas:nv.pessoas||""});
+        planoUI.novo={ativo:false, ondes:[], op:"", pessoas:""}; planoPintar(); return; }
+      if(d.planoRm!==undefined){ planoLerCampos(); planoUI.itens.splice(parseInt(d.planoRm),1); planoPintar(); return; }
+    };
+  });
+}
+/* fecha a folha; salvar=true grava o plano de amanhã (e o motivo respondido) — pular não grava
+   plano nenhum, e nos dois casos o envio segue. */
+function fecharFolhaPlano(salvar){
+  const u=planoUI, f=document.getElementById("folha-plano");
+  if(f){ planoLerCampos(); f.remove(); destravarFolha(); }
+  const res=planoResolve; planoResolve=null; planoUI=null;
+  if(res) res(u ? {salvar:!!salvar, itens:u.itens, obs:u.obs, motivo:u.motivo, alvo:u.alvo, fz:u.fz, replan:!!u.replan} : null);
 }
 
 /* ---------- Seções multicultura do formulário ---------- */
@@ -4206,7 +4627,9 @@ function vForm(){
   const cats=[...new Set(D.maquinas.map(m=>m.cat))];
   const atForm=atividadeDe(r.fazendaId);
   return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), emojiAtividade(atForm)+" "+rotuloAtividade(atForm)+" · "+(r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente"), true)
-  +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`+`
+  +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`
+  +faixaPlanoHoje(r)   /* v75: o encontro — o plano de ontem para hoje, com status que o app preenche sozinho */
+  +`
   <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>
   ${(soGraos||temPec)?`<datalist id="dl-prod">${[...(D.insumos||[]).map(i2=>i2.nome),...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}
   ${soGraos?`<datalist id="dl-adubo">${[...ADUBOS_SUGERIDOS,...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}`+`
@@ -4334,7 +4757,7 @@ function vForm(){
   <details class="secao"><summary><span class="ico">📝</span>Observações e pendências<span class="seta">›</span></summary>
     <div class="corpo">
       <label>Observações do dia</label><textarea data-t="obsGeral" placeholder="O que mais vale registrar">${esc(r.obsGeral)}</textarea>
-      <label>Pendente / programado para amanhã</label><textarea data-t="pendencias" placeholder="Vira a pauta de amanhã">${esc(r.pendencias)}</textarea>
+      <label>O que ficou para terminar</label><textarea data-t="pendencias" placeholder="Ex.: 3 ruas do talhão 5 sem terminar">${esc(r.pendencias)}</textarea>
     </div></details>
 
   <div class="rodape no-print"><div class="interno">
@@ -4668,6 +5091,7 @@ function vPainel(){
     ${(()=>{ const uns=farolPorUnidade(), nf=uns.filter(u=>u.n.vermelho).length, na=uns.filter(u=>!u.n.vermelho&&u.n.amarelo).length;
       return `<button class="btn sec mb no-print" id="bt-farois-tela" style="box-shadow:none;border-radius:0;">Faróis de registro${uns.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nf?nf+" com janela fechada":""}${nf&&na?" · ":""}${na?na+" com janela aberta":""}${!nf&&!na?"tudo em dia":""}</span>`:""}</button>`; })()}
     ${cartaoFarolBoletins()}
+    ${cartaoPlanoPainel()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
       const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
@@ -5071,7 +5495,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v74";
+const APP_VERSAO="v75";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -5991,7 +6415,15 @@ function resumoWhats(b){
   if(b.obsGeral) L.push("📝 "+b.obsGeral);
   const cont=(b.atividades||[]).filter(a=>a.status==="continua");
   if(cont.length) L.push("⏳ *Continua amanhã:* "+cont.map(a=>(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(a.falta?" ("+a.falta+")":"")).join("; "));
-  if(b.pendencias) L.push("📌 Amanhã: "+b.pendencias);
+  if(b.pendencias) L.push("📌 Ficou para terminar: "+b.pendencias);
+  /* v75: a aderência ao plano entra SÓ no resumo de sexta (a primeira linha do resumo não muda) */
+  if(new Date(b.data+"T12:00:00").getDay()===5){
+    const res=planoResumo(b.fazendaId,7);
+    if(res.diasComPlano && res.ader!==null){
+      const mot=planoMotivosTexto(res,2);
+      L.push("📋 Plano da semana: "+res.ader+"% do que foi planejado saiu ("+res.feito+" de "+res.n+" linhas em "+res.diasComPlano+" dia"+(res.diasComPlano>1?"s":"")+")"+(mot?" · "+mot:""));
+    }
+  }
   return L.join("\n");
 }
 function abrirWhats(id){
@@ -6450,6 +6882,17 @@ function validarEnviar(){
 }
 async function concluirEnvio(){
   const r=rascunho;
+  /* v75: fecha o dia e planeja amanhã — folha CURTA depois do cinto de segurança e antes de gravar.
+     Só quando o boletim que fecha é do dia de hoje (corrigir boletim antigo não pede plano de
+     "amanhã"). Pular é um toque; nos dois casos o envio segue. Nunca bloqueia. */
+  let motivoPlano=null;
+  if(r.data===hojeBRT()){
+    const resp=await abrirFolhaPlano(r);
+    if(resp){ motivoPlano=resp.motivo; if(resp.salvar) planoGuardar(resp); }
+  }
+  /* status ✅/◐/⚪ de cada linha do plano de HOJE, calculado dos registros do próprio boletim, e o
+     motivo do desvio (ou "clima", quando o dia foi impedido pelo clima declarado) — nada digitado */
+  gravarPlanoNoBoletim(r, motivoPlano);
   const propostasCiclo=[];   /* v72: plantio lançado → propostas de abrir/completar ciclo, perguntadas de uma vez ao fim */
   /* v69: "sem ocorrência" nunca sobe junto com registro; quem respondeu = quem assina o boletim, se o chip veio antes do nome */
   limparRespostasSecao(r);
@@ -6760,6 +7203,11 @@ function ligarEventos(tela){
     if(!rascunho) return;
     const r=rascunho;
 
+    /* v75: replanejar o próprio dia — o campo muda e fica registrado como "replanejado", não como falha */
+    if(t.id==="bt-plano-ajustar"){
+      const resp=await abrirFolhaPlano(r,{alvo:r.data, replan:true});
+      if(resp && resp.salvar){ planoGuardar({...resp, replan:true}); salvarDados(); ir("form",null,true); }
+      return; }
     if(t.id==="bt-copiar-ontem"){
       const ontem = boletinsOrdenados().find(b=>b.data<r.data && b.fazendaId===r.fazendaId && b.id!==r.id);
       if(ontem){
