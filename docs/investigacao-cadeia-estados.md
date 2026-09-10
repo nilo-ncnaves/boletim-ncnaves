@@ -1,559 +1,617 @@
 # Investigação — cadeia de estados (Recomendado → Planejado → Realizado → Saldo)
 
-Apuração feita em **09/09/2026** sobre o repositório na v74, para decidir se a
-Onda 2 pode abrir com a cadeia de estados e a confirmação em dois toques.
-**Nada foi alterado**: nenhuma tabela, visão, função, índice ou política foi
-criada, mudada ou apagada, e nenhum SQL de escrita foi executado.
+Apuração para decidir se a Onda 2 pode abrir com a cadeia de estados e a
+confirmação em dois toques.
+
+> **Leia esta nota antes do resto.** A apuração foi feita em **09/09/2026**
+> sobre a **v74**. Entre a apuração e a entrega deste relatório entraram no
+> `main` as versões **v75, v76, v77 e v78** — e três delas constroem
+> exatamente aquilo que a investigação tinha ido apurar se dava para
+> construir. O relatório foi **reescrito em 10/09/2026 contra a v78**. A
+> seção 2 conta o que mudou e o que da apuração original sobreviveu; o
+> restante já está atualizado.
+
+**Nada foi alterado** nesta tarefa: nenhuma tabela, visão, função, índice ou
+política foi criada, mudada ou apagada, e nenhum SQL de escrita foi executado.
 
 **Base da apuração.** Leitura completa de `CLAUDE.md`, `ESTADO.md`, `docs/`
 (incluindo `PLANO-DE-SAFRA.md`, `PLANO-2627-AUDITORIA.md`, `CAMPOS-LIVRES.md`,
-`relatorios.md`, `catalogos-por-atividade.md`, `qualidade-log.md`,
-`vistoria-semanal.md`), de todos os arquivos em `sql/` e do `index.html`
-(consultas ao Supabase, envio do boletim, sincronização, catálogos).
+`relatorios.md`, `catalogos-por-atividade.md`, `qualidade-log.md`), de todos os
+arquivos em `sql/` e do `index.html` — na v74 e, na reescrita, na v78.
 
 **Limite desta apuração.** Não houve leitura do banco real. Tentei uma consulta
-somente-leitura pela API pública do Supabase e o ambiente desta sessão bloqueou
-a chamada. Por isso **tudo que depende do estado atual do banco está marcado
-"não apurado"** e vai no bloco SQL do fim, para o Nilo rodar. O que está afirmado
-aqui sem essa marca vem do código e da documentação, que são fato.
+somente-leitura pela API pública do Supabase e o ambiente da sessão bloqueou a
+chamada. Por isso **tudo que depende do estado atual do banco está marcado
+"não apurado"** e vai no bloco SQL da seção 9. O que está afirmado sem essa
+marca vem do código e da documentação da v78, que são fato.
 
 ---
 
 ## 1. Resumo em cinco linhas
 
-1. **Existe plano no banco?** A **estrutura** existe escrita e pronta
-   (`sql/005`–`007`: 9 tabelas, 69 unidades, 71 calagens, 1.533 linhas de adubo
-   mês a mês) mas **só para café, em 8 fazendas**, e a última evidência do
-   repositório (04/09/2026) diz que essas tabelas **ainda não foram criadas** no
-   Supabase. Grãos e pecuária não têm plano nenhum, nem estrutura nem dado.
-2. **Como o plano entraria?** Hoje, só por **carga manual**: PPTX do Salvino →
-   script Python → arquivo SQL colado no SQL Editor, uma vez por versão. O iCrop
-   entrega uma **recomendação de irrigação** de verdade (é o único "Recomendado"
-   automático que já existe no banco); a Solinftec entrega **só execução**; o ERP
-   AgroGestão não está integrado.
-3. **Identidade das entidades?** As duas chaves que a cadeia precisa **existem e
-   são estáveis**: unidade operacional (`f01`, `f03c`…) e operação
-   (`operacao_catalogo.id` + de-para por igualdade exata). O defeito do Sigma
-   aparece em outro lugar: iCrop e Solinftec são conciliados por **pedaço de nome
-   de fazenda**, o **talhão só existe no aparelho** (não está no banco), e
-   produto, lote, cultivar e prestador são **texto livre**.
-4. **Como o apontamento é gravado?** **Uma linha por unidade e por dia**
-   (`boletins`, chave `fazenda_id + data`), com o boletim inteiro num JSON.
-   Não existe linha por operação, não existe coluna de estado no apontamento e
-   não existe histórico: corrigir um boletim **sobrescreve** o anterior.
-5. **Comportamento observado?** **Não apurável.** O "Nada a registrar hoje"
-   entrou no main em **08/09/2026** — ontem — e o `sql/047`, que é o que grava
-   isso em tabela, ainda consta como não rodado. Não há tempo de uso suficiente.
+1. **Existe plano no banco?** Existem **dois planos diferentes, e eles não se
+   falam.** O do agrônomo (`plano_safra`, adubação/calagem/fito de café)
+   continua **escrito e não rodado** no Supabase. O **plano de execução**
+   (tarefas da ata mensal e da semana, `planejamento_tarefa`, e o plano do dia
+   seguinte dentro do boletim) **nasceu na v75/v77, vale para as três
+   atividades** e está no aparelho — no banco, só quando o `sql/050` rodar.
+2. **Como o plano entraria?** O do agrônomo, só por carga manual de PPTX, uma
+   vez por versão. O de execução **já entra sozinho**: ata colada pelo
+   escritório, tarefa da semana, plano do dia seguinte em chips pelo gerente.
+   O iCrop segue como a única fonte de "Recomendado" automática — e só de
+   irrigação. A Solinftec só entrega execução; o ERP não está integrado.
+3. **Identidade das entidades?** A unidade operacional (`f01`, `f03c`…) e a
+   operação (`operacao_catalogo.id`, com apelidos por igualdade exata) têm
+   chave estável, e a v76 provou isso ao renomear operações **sem quebrar
+   boletim antigo**. Mas o elo **tarefa → operação é feito por casamento de
+   texto** da descrição da ata, o cadastro de talhões continua só no aparelho,
+   e produto/lote/cultivar seguem em texto livre.
+4. **Como o apontamento é gravado?** `boletins` continua **uma linha por
+   unidade-dia**, com tudo num JSON, sobrescrita na correção e sem histórico.
+   Mas agora existe, **ao lado**, um registro com identidade e estado próprios:
+   `planejamento_tarefa`, com 6 status, prazo, unidade e trilha de alteração.
+5. **Comportamento observado?** **Não apurável.** O "Nada a registrar hoje" tem
+   dois dias de main; o módulo de planejamento tem um. E a pergunta "quantos
+   segundos após abrir o boletim" **não é medível**: o app não guarda a hora de
+   abertura.
+
+**Veredito: viável parcialmente — e bem mais perto do que estava há dois dias.**
+Detalhe na seção 8.
 
 ---
 
-## 2. Bloco 1 — Existe plano no banco?
+## 2. O que mudou entre a apuração e este relatório (v75 → v78)
 
-### 2.1 A estrutura existe (escrita, no repositório)
+Quatro versões entraram no `main` em 10/09/2026. Três mexem no coração desta
+investigação.
 
-`sql/005-plano-safra.sql` cria 11 tabelas. As que guardam **intenção futura**:
+### 2.1 v75 — plano do dia seguinte × executado (três atividades)
+
+O gerente planeja o dia seguinte em chips ao fechar o boletim (ONDE → O QUÊ →
+pessoas previstas, até 3 linhas) e, no dia seguinte, **o app confere sozinho**:
+a caixinha de cada linha vai de ⚪ para ◐/✅ conforme os lançamentos entram, no
+lugar, sem ninguém digitar status.
+
+- **Onde mora:** `D.planoDia` enquanto o dia-alvo não fecha; ao enviar o
+  boletim do dia-alvo, `gravarPlanoNoBoletim` fecha o plano **dentro do
+  boletim**, em `b.plano`. Como vive no payload de `boletins`, **sincroniza
+  pelo caminho que já existia** — nenhuma tabela nova.
+- **Status (`avaliarPlano`), sempre sobre REGISTRO:** ✅ todos os "onde" do item
+  com registro; ◐ parte deles ou registro "continua amanhã"; ⚪ nenhum.
+- Correlações calculadas, nada digitado: aderência em 7 e 30 dias, motivos,
+  desvios evitáveis × de clima, dias trabalháveis × impedidos, precisão de
+  esforço (pessoas previstas × lançadas).
+- Supabase: `sql/048` (visão `vw_plano_x_executado` + relatório mensal) —
+  **falta rodar**.
+
+### 2.2 v76 — nomenclatura do café, e a prova de que a identidade aguenta
+
+As operações do café foram renomeadas para a palavra da lavoura. O jeito como
+isso foi feito **é a melhor evidência desta investigação** de que a chave da
+operação é estável:
+
+- operações novas entram em `operacao_catalogo` com o grupo na coluna `fase`;
+- o nome antigo vira **apelido** em `operacao_alias`;
+- as renomeadas 1 para 1 são **desativadas** (`ativo = false`), nunca apagadas;
+- boletim antigo gravado com "Desbrota" continua na tela mostrando "Desbrota
+  manual", com o dado bruto intacto; plano gravado com nome antigo fecha como
+  feito com registro no nome novo, e o contrário também.
+
+Supabase: `sql/049` — **falta rodar**.
+
+### 2.3 v77 e v78 — módulo de planejamento, e o "Saldo" existindo de fato
+
+A mesma tarefa vista em dois horizontes (reunião mensal e semana); concluir num
+atualiza o outro, sem cópia. É aqui que a cadeia aparece inteira:
+
+- **Planejado** — a ata da reunião entra por **colagem**, com pré-visualização
+  editável item a item; reimportar não duplica. A semana nasce sozinha na
+  sexta. A meta é a área que a ata trouxe (`t.area`) ou a que o escritório
+  informar (`t.meta`).
+- **Realizado** — a soma da área dos **talhões distintos** com lançamento
+  casado, na janela da tarefa (de "Comecei" até "Concluí"; depois congela).
+- **Saldo** — `planProgresso` devolve **planejado · executado · restante** com
+  barra, arredondando antes de subtrair para os três fecharem na tela. Sem
+  meta, **não inventa denominador**: conta os lançamentos e diz isso com todas
+  as letras.
+- **Rastreabilidade** — um toque no "executado" abre a lista dos lançamentos
+  que o compuseram: data, local, área e quem lançou.
+- **Confirmação em um toque** — na folha do gerente: *Comecei · Concluí ·
+  Travado* (com chips de motivo) · "💬 Falar com o Nilo". Zero campo de
+  digitação, zero diálogo, nada bloqueia o boletim.
+- **A sugestão de dois toques já existe** — quando a descrição casa com uma
+  operação e o registro entra no boletim do dia: *"Você lançou levantar café
+  hoje — concluir a tarefa?"*, com os chips "Concluí" e "ainda não". Tarefa de
+  estrutura nunca recebe sugestão.
+- **A outra metade** — 🧾 Executado fora do plano: os lançamentos que não
+  casaram com tarefa nenhuma, agrupados por operação. A tela diz, em letras,
+  que **não é cobrança**.
+- Supabase: `sql/050` (as três tabelas + `vw_planejamento_mes`) e `sql/051`
+  (relatório `ata_x_executado`) — **faltam rodar**. Enquanto isso o módulo
+  funciona inteiro no aparelho e as tarefas ficam na fila de sincronização.
+
+### 2.4 O que da apuração original caiu, e o que sobreviveu
+
+| Conclusão da v74 | Situação na v78 |
+|---|---|
+| "Grãos e pecuária não têm plano nenhum" | **Caiu.** A v75 deu plano do dia seguinte às três atividades; a v77 deu tarefas de ata e de semana às três. |
+| "Não há onde gravar o estado de uma operação" | **Caiu.** `planejamento_tarefa.status` com 6 estados, e `b.plano[].status` por item do plano do dia. |
+| "Não há histórico de alteração" | **Caiu para a tarefa.** `payload.historico` (quem, quando, de → para, motivo); "cancelar é status, nunca delete". Continua valendo para o **boletim**. |
+| "Saldo não fecha, o plano está em kg e o boletim registra evento" | **Caiu para a tarefa** (planejado/executado/restante em ha). **Continua valendo** para o plano do agrônomo, que segue em kg. |
+| Plano do agrônomo não rodado no Supabase | **Sobreviveu** — o `ESTADO.md` da v78 ainda lista `sql/005`→`007` como pendentes. |
+| Identidade por pedaço de nome no iCrop e na Solinftec | **Sobreviveu**, intocado. |
+| Cadastro de talhões só no aparelho | **Sobreviveu** — e agora dói mais (a projeção de ritmo e a meta em ha dependem da área do talhão). |
+| `boletins` é uma linha por unidade-dia, sobrescrita, sem histórico | **Sobreviveu**, intocado. |
+| Produto, lote, cultivar em texto livre | **Sobreviveu** — `docs/CAMPOS-LIVRES.md` segue sem decisão. |
+
+---
+
+## 3. Bloco 1 — Existe plano no banco?
+
+Existem **dois planos**, com donos, formatos e finalidades diferentes. Confundir
+os dois é o erro mais fácil de cometer no desenho da Onda 2.
+
+### 3.1 Plano A — o do agrônomo (`plano_safra`, só café)
+
+Estrutura escrita em `sql/005-plano-safra.sql`, 11 tabelas. As que guardam
+intenção futura:
 
 | Tabela | O que guarda | Colunas que importam |
 |---|---|---|
-| `plano_safra` | a versão do plano de uma fazenda numa safra | `fazenda_app`, `safra`, `versao`, `status` (rascunho → vigente → superado), `vigente_de`, `aprovado_por`, `auditoria_ok` |
-| `plano_unidade` | quais unidades a versão cobre | `plano_id`, `unidade_id`, `area_ha_plano`, `safra_zerada_tipo` |
-| `plano_adubo_mes` | **adubação prevista por unidade, mês e insumo** | `plano_id`, `unidade_id`, `mes` (1–12), `insumo` (8 valores fechados), `kg`, `via` |
-| `plano_calagem` | calagem prevista com janela | `unidade_id`, `subarea`, `t_ha`, `t_total`, `janela_ini`, `janela_fim` |
-| `plano_fito_mes` | calendário fitossanitário do grupo | `mes`, `fase`, `alvos[]`, `produtos[]`, `via_solo[]` |
-| `plano_gantt` | **janela do ano por atividade** (modelo NC / NR) | `modelo`, `atividade` (slug), `meses[]`, `tipo` (janela / evento_unico), `evidencia_app` |
-| `plano_parametros` | limites dos faróis | `chave`, `valor` |
+| `plano_safra` | a versão do plano de uma fazenda numa safra | `fazenda_app`, `safra`, `versao`, `status` (rascunho → vigente → superado), `aprovado_por`, `auditoria_ok` |
+| `plano_unidade` | quais unidades a versão cobre | `unidade_id`, `area_ha_plano`, `safra_zerada_tipo` |
+| `plano_adubo_mes` | **adubação prevista por unidade, mês e insumo** | `mes` (1–12), `insumo` (8 valores fechados), `kg`, `via` |
+| `plano_calagem` | calagem prevista com janela | `subarea`, `t_ha`, `t_total`, `janela_ini`, `janela_fim` |
+| `plano_fito_mes` | calendário fitossanitário do grupo | `mes`, `fase`, `alvos[]`, `produtos[]` |
+| `plano_gantt` | **janela do ano por atividade** (modelo NC / NR) | `atividade` (slug), `meses[]`, `tipo`, `evidencia_app` |
 
-Duas observações que mudam o desenho:
+Três coisas que o desenho precisa saber:
 
-- **A unidade do plano não é a unidade operacional do app.** `plano_*` aponta para
-  `unidade_manejo` — o **setor / talhão de café** (ex.: `VEC-S08`), não para
-  `f22c`. A ligação com o app é `unidade_alias` com `sistema = 'app'`, cujo
-  apelido é o **id do talhão** (`t093`).
-- **`plano_adubo_mes` é a coisa mais próxima de "operação prevista"**, mas é
-  previsão de **insumo e quantidade por mês**, não de operação por data.
-  A previsão de **operação** existe só no `plano_gantt`, e em granularidade de
-  **mês × atividade × modelo de empresa** — não por unidade.
+- **A unidade do plano não é a unidade operacional.** `plano_*` aponta para
+  `unidade_manejo` — o setor de café (`VEC-S08`), não `f22c`. A ligação com o
+  app é `unidade_alias` com `sistema = 'app'`, cujo apelido é o **id do
+  talhão** (`t093`).
+- **É previsão de insumo e quantidade por mês, não de operação por data.** A
+  previsão de operação existe só no `plano_gantt`, em granularidade de mês ×
+  atividade × modelo de empresa — não por unidade.
+- **Cobertura:** só café, **8 de 24 unidades**, 69 unidades de manejo, das
+  quais **43 têm apelido `app` e 26 não têm** — para essas, o plano existe e
+  não tem como encontrar o registro do gerente.
 
-### 2.2 Está populada? — provavelmente não, e isso precisa ser confirmado
+**Está populado? Quase certamente não.** O `ESTADO.md` da v78 ainda lista
+"Rodar `sql/005` e depois `sql/006`" como pendência aberta, e
+`docs/relatorios.md` registra que as URLs de `plano_*` respondiam 404 em
+04/09/2026. **Não apurado:** se o Nilo rodou depois. É a primeira linha do
+bloco SQL. E note a diferença: hoje não existe nem a tabela vazia.
 
-Evidência no repositório, na ordem:
+### 3.2 Plano B — o de execução (`planejamento_*` + `b.plano`, três atividades)
 
-- `ESTADO.md`, "Pendências", item **"Plano de safra (v52) — para o Nilo"**:
-  ainda pede, em aberto, "1. Rodar `sql/005` e depois `sql/006`… 2. Publicar as
-  versões vigentes". Não há marca de FEITO, ao contrário do `sql/045` ("FEITO em
-  08/09/2026"), do `sql/042` e do `sql/040` ("FEITO em 07/09/2026") e do robô-
-  redator ("feito em 05/09/2026: sql/020, 030 e 031 rodados").
-- `docs/relatorios.md`, "Avisos sobre as fontes": *"**Tabelas ainda não criadas**
-  (04/09/2026): plano_* (sql/005–007) e codigos_acesso (sql/001–002) respondem
-  404 até o Nilo rodar os SQL"*.
-- `docs/relatorios/04-plano-x-executado.md` repete o mesmo aviso e diz que o
-  relatório fica PENDENTE até lá.
+Nasceu na v75/v77. É este que a cadeia de estados pode usar.
 
-**Não apurado:** se o Nilo rodou os três arquivos depois de 04/09/2026. É a
-primeira linha do bloco SQL do fim. Enquanto não rodar, a diferença é decisiva:
-hoje não existe nem a tabela vazia.
+```
+planejamento_rodada   id · ref (AAAA-MM) · payload            -- a ata do mês
+planejamento_semana   id · ini (segunda) · payload            -- a semana
+planejamento_tarefa   id · unidade_id · prazo · status · payload
+                      status ∈ a_iniciar | em_execucao | finalizado
+                              | aguardando_terceiro | aguardando_clima | cancelado
+                      payload.historico = quem, quando, de → para, motivo
+                      payload.exec = {ha, n, meta, em}  -- a foto que o relatório lê
+```
 
-### 2.3 Cobertura, se rodar
+Mais `b.plano` dentro do payload de `boletins`: o plano do dia seguinte, com
+status por item, motivo, clima declarado e pessoas previstas × lançadas.
 
-- **Atividades:** só **café**. Grãos e pecuária não aparecem em nenhuma tabela
-  de plano.
-- **Fazendas:** **8** de 24 unidades operacionais — Água Limpa (f01), Rio
-  Preto-Lagamar — Café (f03c), Mata Preta — Café (f13c), Monte Carmelo — Café
-  (f14c), Lagamar Café Rodrigo (f20), Vereda — Café (f22c), Vereda Romaria
-  (f23), Vereda Café 5º e 6º (f24). Ficam de fora São Félix (f21) e o Armazém
-  Geral (f25), que são de café mas não têm deck.
-- **Unidades de manejo:** 69 no seed; **43 têm apelido `app`** (47 apelidos) e
-  **26 não têm** — não é falha de carga, é que o cadastro de talhões do app não
-  comporta (várias unidades do plano para um talhão só). Para essas 26, o plano
-  existe e **não tem como ser comparado com registro do gerente**.
-- **Safra:** 2026/27, versão 1, que nasce em **rascunho**. Sem publicar
-  (`sql/007` ou a tela Unidades e Plano), o app não lê nada: `baixarPlano()`
-  busca `status = 'vigente'`.
+**Está populado?** **Não apurado.** O `sql/050` consta como pendente; enquanto
+não rodar, tudo vive no aparelho e as tarefas ficam na fila de sincronização —
+o `ESTADO.md` é explícito em que **nada se perde**, sobe tudo quando as tabelas
+existirem.
 
-### 2.4 Onde mais existe intenção futura no banco
-
-Fora do plano de safra, três coisas:
+### 3.3 Outras formas de intenção futura no banco
 
 | Onde | O que é | Cobertura |
 |---|---|---|
-| `operacao_janela` (`sql/042`) | **cadência esperada** de registro por operação: "espera-se ver esta operação a cada N dias, com N dias de tolerância" | 10 linhas semeadas, todas com `origem = 'proposta'`: 9 de pecuária, 1 de grãos. Nenhuma de café. |
-| `plano_calagem.janela_ini/fim` | janela de data para a calagem | só café, dentro do plano |
-| `icrop_manejo.bruto` | **recomendação de irrigação do iCrop** (ver Bloco 2) | as 4 fazendas com iCrop |
+| `operacao_janela` (`sql/042`) | **cadência esperada** de registro por operação | 10 linhas, todas `origem = 'proposta'`: 9 de pecuária, 1 de grãos |
+| `icrop_manejo.bruto` | **recomendação de irrigação do iCrop** | as 4 fazendas com estação |
+| `plano_calagem.janela_ini/fim` | janela de data | só café, dentro do plano A |
 
-`operacao_janela` é uma **expectativa de ritmo**, não um plano: não diz data,
-não diz quantidade, não diz unidade (a linha geral vale para toda a atividade).
-Serve de farol, não de "Planejado".
-
-**Não existe** nenhuma coluna de "data prevista" em registro de apontamento,
-nenhuma tabela de agenda e nenhum campo de programação semanal.
+`operacao_janela` é expectativa de **ritmo**, não plano: não diz data, nem
+quantidade, nem unidade. Serve de farol.
 
 ---
 
-## 3. Bloco 2 — Como o plano entraria
+## 4. Bloco 2 — Como o plano entraria
 
-### 3.1 Rotinas de importação que existem hoje
+### 4.1 Rotinas que existem hoje
 
-| Rotina | De onde | Para onde | Frequência | Onde mora o código |
+| Rotina | De onde | Para onde | Frequência | Código |
 |---|---|---|---|---|
-| Robô iCrop | API iCrop Vision | `icrop_manejo`, `icrop_fazendas`, `icrop_parcelas` | 03h50 / 04h05 / 04h20 (BRT) + reforço 09h45 / 10h00 / 10h15 | **Só no Supabase** — não está no repositório |
-| Robô Solinftec | API "Detalhes da Operação V3" | `solinftec_diario` | 03h05 (dia anterior fechado) + de hora em hora, 09h35–20h35 (parcial) | `sql/003-solinftec.sql` |
-| Motor de relatórios | as tabelas acima + `boletins` | `relatorios_gerados` | pg_cron 05:00 BRT | `sql/020-relatorios-motor.sql` |
-| Robô-redator | `relatorios_gerados.dados` → API Anthropic | `relatorios_gerados.texto` | junto com o relatório | `sql/030-redator.sql` |
-| Colheita de status HTTP | `net._http_response` | `integracao_execucoes` | 07:35 e 13:30 UTC | `sql/045` |
-| **Carga do plano** | **7 PPTX do Salvino** | `plano_*` | **manual, uma vez por versão** | `docs/plano/importar_plano.py` → `scripts/expandir_apendice_plano.py` → `scripts/gerar_seed_plano.py` → `sql/006` |
-| Telemetria | arquivo importado à mão na tela | `telemetria` | quando alguém importa | `index.html` |
+| Robô iCrop | API iCrop Vision | `icrop_manejo`, `icrop_fazendas`, `icrop_parcelas` | 03h50 / 04h05 / 04h20 + reforço 09h45–10h15 | **Só no Supabase** |
+| Robô Solinftec | API Detalhes da Operação V3 | `solinftec_diario` | 03h05 + de hora em hora, 09h35–20h35 | `sql/003` |
+| Motor de relatórios | as acima + `boletins` | `relatorios_gerados` | pg_cron 05:00 BRT | `sql/020` |
+| Robô-redator | `relatorios_gerados.dados` → API Anthropic | `relatorios_gerados.texto` | junto com o relatório | `sql/030` |
+| **Ata da reunião** | **texto colado pelo escritório** | `planejamento_rodada` + `_tarefa` | **mensal, por volta do dia 10** | `index.html` |
+| **Plano do dia seguinte** | **chips do gerente, ao enviar** | `D.planoDia` → `b.plano` | **diária** | `index.html` |
+| Plano do agrônomo | 7 PPTX | `plano_*` | **manual, uma vez por versão** | 4 scripts → `sql/006` |
+| Telemetria | arquivo importado na tela | `telemetria` | quando importam | `index.html` |
 
-Duas coisas a registrar:
+A diferença que importa: **o plano de execução já tem entrada de rotina, feita
+por quem tem a informação.** O do agrônomo continua sendo uma obra de quatro
+passos manuais, com conferência que trava se as somas não baterem.
 
-- **A carga do plano não é uma integração, é uma obra.** São quatro passos
-  manuais, com conferência que trava se as somas não baterem, e o resultado é um
-  arquivo SQL de 200 KB colado no SQL Editor. Plano novo = repetir tudo. Não há
-  nenhum robô, agendamento ou API envolvida.
-- **O código do robô iCrop não está no repositório.** `ESTADO.md` cita
-  `sql/003-robo-icrop-reforco.sql`, mas esse arquivo não existe em `sql/`. Se o
-  projeto do Supabase for perdido, o robô iCrop se perde junto.
+**O código do robô iCrop não está no repositório.** O `ESTADO.md` cita
+`sql/003-robo-icrop-reforco.sql`, que não existe em `sql/`. Se o projeto do
+Supabase se perder, o robô se perde junto.
 
-### 3.2 O que o iCrop efetivamente traz (o que está gravado, não o que o manual promete)
+### 4.2 O que o iCrop efetivamente traz
 
-Pelo `select` de `baixarIcrop()` no `index.html` e pelas fontes dos relatórios
-6, 15 e 18, `icrop_manejo` tem colunas próprias (`fazenda`, `equipamento`,
-`parcela`, `data`, `irrigacao_mm`, `precipitacao_mm`, `etc`, `eto`,
-`atualizado_em`) e uma coluna `bruto` (JSON) de onde o app lê:
+Pelo `select` de `baixarIcrop()` e pelas fontes dos relatórios 6, 15 e 18,
+`icrop_manejo` tem colunas próprias (`fazenda`, `equipamento`, `parcela`,
+`data`, `irrigacao_mm`, `precipitacao_mm`, `etc`, `eto`) e uma coluna `bruto`
+de onde o app lê:
 
 - **Recomendação:** `percentimetro_recomendado`, `tempo_de_irrigacao`,
   `lamina_minima`, `deficit_previsto`, `dias_em_atraso`.
 - **Medição / estado:** `umidade`, `capacidade_de_campo`,
   `umidade_de_seguranca`, `deficit_consolidado`, `fase_atual`,
-  `gd_dia_acumulado`, `acumulado_irrigacao`, `acumulado_precipitacao`,
-  `eficiencia_irrigacao`, `problemas_irrigacao`.
-- **Clima da estação:** `temperatura_minima/maxima`,
-  `umidade_relativa_do_ar`, `velocidade_do_vento`, `chuva_pluviometro`.
-- **Custo:** `reais_mm_ha`, `reais_por_irrigacao_necessaria`,
-  `reais_por_irrigacao_realizada`.
+  `acumulado_irrigacao`, `eficiencia_irrigacao`, `problemas_irrigacao`.
+- **Clima e custo:** temperatura, UR, vento, chuva do pluviômetro;
+  `reais_mm_ha`, `reais_por_irrigacao_necessaria/realizada`.
 
-**Conclusão do bloco:** o iCrop **é** uma fonte de "Recomendado", e ela já está
-no banco e já aparece na tela (cartão "iCrop — medição automática do dia", linha
-"Recomendação iCrop"). Mas é recomendação **de irrigação, por parcela e por dia**,
-nas 4 fazendas com estação (Rio Preto-Lagamar, Vereda, Floramill, Capoeira
-Grande). Não é plano de operações e não cobre café de sequeiro, grãos secos nem
-pecuária. `icrop_parcelas` traz o cadastro de parcelas ativas com data de fim de
-ciclo — é cadastro e vencimento, não programação de serviço.
+**O iCrop é uma fonte de "Recomendado" de verdade, já gravada e já na tela**
+(cartão "iCrop", linha "Recomendação iCrop"). Mas é recomendação **de
+irrigação, por parcela e por dia**, nas 4 fazendas com estação.
+`icrop_parcelas` traz parcelas ativas com fim de ciclo — cadastro e
+vencimento, não programação de serviço.
 
-### 3.3 O que a Solinftec expõe
+### 4.3 O que a Solinftec expõe
 
-`solinftec_diario` só tem **execução**: `data`, `equipamento`, `cd_operacao`,
+`solinftec_diario` só tem execução: `data`, `equipamento`, `cd_operacao`,
 `operacao`, `talhao`, `horas`, `motor_h`, `ocioso_h`, `area_ha`, `consumo_l`.
-Nenhuma coluna de previsão, ordem de serviço ou programação. A API usada é
-"Detalhes da Operação V3", que é relatório do que a máquina fez.
-**Não apurado:** se a Solinftec tem outro endpoint com ordem de serviço — isso
-se pergunta ao fornecedor, não se lê no banco.
+Nenhuma coluna de previsão ou ordem de serviço. **Não apurado:** se a Solinftec
+tem outro endpoint com ordem de serviço — pergunta para o fornecedor.
 
-### 3.4 Decisão anterior sobre importar os planos do agrônomo
+### 4.4 Decisão anterior sobre importar os planos do agrônomo
 
-Sim, existe, e é explícita — `docs/PLANO-DE-SAFRA.md`:
-
-- **O que o plano é:** "referência e comparação". **O que não é:** "receituário".
-- **Como entra uma versão nova:** PPTX → extrator → resolver cada nome contra
-  `unidade_alias` → montar o seed da versão N+1 → rascunho → auditoria →
-  publicar. Nunca editando a versão vigente.
-- **O que ficou de fora de propósito:** "Solinftec/iCrop cruzados com o plano,
-  kg do ERP, trilha de produção, estimativa automática, robô semanal em pg_cron,
-  devolutiva automática… Tabelas `execucoes_externas`, `plano_farol`,
-  `estimativa_checkpoint` e `devolutivas` não existem ainda."
-
-Ou seja: a decisão registrada é que o plano entra **à mão, por versão**, e que
-cruzar plano com execução externa **foi adiado de propósito**.
+Registrada em `docs/PLANO-DE-SAFRA.md`: o plano é "referência e comparação",
+**não é receituário**; versão nova entra por PPTX → extrator → resolver nomes
+contra `unidade_alias` → rascunho → auditoria → publicar, nunca editando a
+vigente. E ficou de fora **de propósito**: "Solinftec/iCrop cruzados com o
+plano, kg do ERP, trilha de produção, estimativa automática, robô semanal…"
 
 ---
 
-## 4. Bloco 3 — Identidade das entidades
+## 5. Bloco 3 — Identidade das entidades
 
-Este é o bloco que decide a viabilidade. A resposta curta: **a identidade que a
-cadeia precisa existe; a identidade das camadas em volta, não.**
+A resposta curta: **as duas chaves centrais são estáveis e a v76 provou isso na
+prática. O elo novo — tarefa → operação — é por texto.**
 
-### 4.1 Unidade operacional
+### 5.1 Unidade operacional
 
-| Fonte | Chave usada | É estável? |
+| Fonte | Chave | Estável? |
 |---|---|---|
-| `boletins` | `fazenda_id` = id do app (`f01`, `f03c`, `f22g`…) | **Sim.** Chave substituta, curta, imutável. |
-| `rel_unidades` (`sql/020`) | mesma chave, espelhada com nome, fazenda-mãe e perfil | **Sim.** 24 unidades. |
-| `boletim_pecuaria`, `pos_colheitas`, `remessas` | mesma chave | **Sim.** |
-| `unidade_manejo` (plano) | `codigo` (`VEC-S08`), com gatilho que **impede** mudar o código | **Sim**, e é o modelo certo. Mas é outro nível: setor, não unidade operacional. |
-| `solinftec_diario` | `fazenda_id` preenchido por **`solinftec_depara`: pedaço do nome em minúsculas** (`'rio preto' → f03g`, `'caxico' → f14c`) | **Não.** É conciliação por texto. |
-| `icrop_manejo` | não tem coluna de unidade; o app decide por **`DEPARA_ICROP`, também pedaço de nome**, e separa café × grãos procurando a palavra "cafe" no nome do equipamento/parcela | **Não.** É conciliação por texto, duas vezes. |
-| Talhão | `talhaoId` (`t093`) dentro do JSON do boletim | **A chave é estável, mas o cadastro não está no banco** (item 4.4). |
+| `boletins`, `pos_colheitas`, `remessas`, `boletim_pecuaria` | `fazenda_id` = id do app (`f01`, `f03c`…) | **Sim** |
+| `rel_unidades` (`sql/020`) | a mesma, espelhada, 24 unidades | **Sim** |
+| **`planejamento_tarefa`** | **`unidade_id`, normalizado por gatilho** (`plan_normalizar` chama `rel_fz_atual`, então id antigo cai na unidade de hoje) | **Sim — e é o melhor de todos** |
+| `unidade_manejo` (plano A) | `codigo` (`VEC-S08`), com gatilho que **impede** mudar | **Sim**, mas é outro nível (setor) |
+| `solinftec_diario` | `fazenda_id` via `solinftec_depara`: **pedaço do nome em minúsculas** | **Não** |
+| `icrop_manejo` | sem coluna de unidade; o app decide por `DEPARA_ICROP`, **também pedaço de nome**, e separa café × grãos procurando "cafe" no nome do equipamento | **Não** |
+| **Fazenda na ata** | `deparaAtaDe`: chave exata e, se falhar, **`includes` para chaves > 3 letras** | **Parcial** — mas nome não reconhecido **não é adivinhado**: vai para a pré-visualização, e o de-para é editável em Cadastros |
+| Talhão | `talhaoId` (`t093`) dentro do JSON | Chave estável, **cadastro fora do banco** (5.5) |
 
-Há de-para para as duas fontes externas (`solinftec_depara`, `rel_icrop_depara` /
-`DEPARA_ICROP`), o que é o certo — mas o de-para é **por substring**, não por
-identificador do fornecedor. Regras registradas: "o padrão mais comprido ganha
-quando dois casarem". Duas fazendas ficam de fora de propósito ("Estreito" e
-"-1"). Consequência prática: fazenda nova, nome renomeado na Solinftec ou
-equipamento de café batizado sem a palavra "café" cai na unidade errada, ou em
-nenhuma, **em silêncio**.
+### 5.2 Operação / serviço — e a prova da v76
 
-### 4.2 Operação / serviço
+**Tem catálogo e chave substituta**, e é o achado mais favorável desta
+investigação:
 
-**Tem catálogo e tem chave substituta**, e isso é o achado mais favorável desta
-investigação.
+- `operacao_catalogo` (`sql/040`, atualizado pelo `sql/049`): id de texto
+  imutável (`CAFE-PULVERIZACAO`), com `atividade`, `fase`, `nome`, `ordem`,
+  `ativo`. O comentário da tabela é explícito: "Identidade = id".
+- `operacao_alias`: de-para do texto exato do payload → id, **por igualdade
+  exata, nunca LIKE**, com a coluna `origem` dizendo em que caminho do JSON o
+  texto mora.
+- **A v76 renomeou operações de café e nada quebrou** — nome antigo virou
+  apelido, renomeada 1 para 1 foi desativada sem apagar, boletim antigo
+  continua legível e o plano fecha nos dois sentidos. É a demonstração de que
+  o modelo aguenta mudança de nome.
+- O gerente **não digita** operação: escolhe em chip ou seletor do catálogo.
 
-- `operacao_catalogo` (`sql/040`): **75 operações** — 19 de café, 28 de grãos,
-  28 de pecuária. `id` é texto imutável (`CAFE-PULVERIZACAO`,
-  `PEC-VERMIFUGACAO`), com `atividade`, `fase`, `nome`, `ordem`, `ativo`. O
-  comentário da tabela é explícito: "Identidade = id."
-- `operacao_alias` (90 linhas): de-para do **texto exato** gravado no payload
-  para o id do catálogo, **por igualdade exata, nunca LIKE**, com a coluna
-  `origem` dizendo em que caminho do JSON o texto mora
-  (`atividades.tipo`, `pecuaria.mov.tipo`, `pecuaria.san.problema`…). Um termo
-  pode apontar para duas operações (Mudança de pasto = entrada e saída de lote).
-- `operacao_categoria` / `OP_CATEGORIAS` (v67): 5 categorias por atividade,
-  letra única, categoria ligada **pelo id do catálogo**, com a regra escrita de
-  que "a letra é ATRIBUTO do catálogo, nunca derivada de pedaço de nome".
-- O gerente **não digita** o nome da operação: escolhe em chip ou em seletor
-  alimentado pelo catálogo.
+### 5.3 O elo novo, e onde ele é frágil
 
-Duas frestas, e as duas importam para a cadeia:
+`planejamento_tarefa` guarda `unidade_id` (id) e `status` (enum), mas **não
+guarda o id da operação**. O casamento tarefa → operação é feito em
+`planOperacoesDe(t)`, no aparelho, **por texto da descrição da ata**:
 
-1. **"Outra".** `LISTA_ATIV` termina em `"Outra"`, e o gerador do catálogo o
-   exclui de propósito (`LISTA_ATIV.filter(n => n !== "Outra")`). Uma atividade
-   lançada como "Outra" **não tem id, não tem de-para e é invisível** para
-   `vw_dias_sem_registro`, `vw_farol_registro`, `vw_ritmo_operacoes` e para
-   qualquer cadeia de estados. Não é erro: é o escape do catálogo. Mas é um
-   buraco por onde a cadeia vaza.
-2. **Termos extras dos catálogos (v56).** Em Cadastros › Catálogos o escritório
-   pode acrescentar termos de operação (`catExtraAdd`). Esse termo entra nas
-   listas do gerente **naquele aparelho**, é gravado no payload como texto, e
-   **não existe** em `operacao_catalogo` nem em `operacao_alias`. Mesmo efeito:
-   registro invisível para o catálogo.
+1. tabela de sinônimos `PLAN_SINONIMOS[atividade]` — descrição contém a chave;
+2. senão, qualquer palavra de **5 letras ou mais** do nome da operação que
+   apareça na descrição.
 
-### 4.3 Tabelas de conciliação que existem
+É a decisão certa para o problema (a ata é texto humano, escrito na reunião), e
+o app é honesto quando falha: *"A descrição não casa com nenhuma operação do
+catálogo — o app não consegue somar sozinho."* Mas é bom não se iludir:
+**o número de "executado" de uma tarefa depende de casamento de palavras.**
+Duas consequências práticas:
+
+- descrição escrita de outro jeito na ata do mês que vem → a tarefa deixa de
+  somar, em silêncio, e cai no "fora do plano";
+- palavra de 5 letras compartilhada por duas operações → soma a mais.
+
+O caminho de conserto já existe e é barato: guardar na tarefa o **id da
+operação** escolhido na pré-visualização da ata (que já é editável item a
+item), e usar o texto só como sugestão inicial.
+
+### 5.4 Duplicidade — onde o defeito do Sigma mora
+
+O caso `SULFATO DE MANGANES` × `Sulfato de manganes` é o risco já mapeado em
+`docs/CAMPOS-LIVRES.md` (v44), com **20 pontos de digitação livre**. Os de
+risco ALTO:
+
+| # | Campo livre | Por que quebra |
+|---|---|---|
+| 1 | Produto / defensivo da receita | "mesmo defensivo com 3 grafias impede fechar custo e rastrear carência" |
+| 2 | Produto / vacina (pecuária) | controle sanitário vira texto solto |
+| 5 | Cultivar / híbrido | censo de plantio e ciclos dependem disso |
+| 11 | Lote / categoria (pecuária) | sem lote padronizado não há GMD nem contagem |
+| 13 | Lote (terreiro → secador → tulha → benefício) | o mesmo lote em 4 lugares, como texto |
+| 7 | Prestador terceirizado | comparar preço e desempenho não fecha |
+
+**Não apurado:** quantas grafias divergentes já existem. O bloco SQL conta
+exatamente isso, ignorando acento e caixa.
+
+### 5.5 O cadastro de talhões continua fora do banco
+
+- `D` (fazendas, **talhões**, máquinas, insumos, usuários, ciclos, inventário
+  de pecuária, catálogos extras, **de-para da ata**) vive em `localStorage`,
+  na chave `bdf:dados`.
+- A fila de sincronização carrega **nove tipos**: boletim, pós-colheita,
+  remessa, telemetria, código de acesso, espelho de pecuária e — novos na v77 —
+  `tar`, `rod`, `sem`. **Nenhum cadastro sobe.**
+- Um talhão criado em Cadastros **não existe** no Supabase nem no aparelho de
+  mais ninguém. `docs/relatorios.md` confirma pelo outro lado: "Nomes de talhão
+  vivem no cadastro do `index.html`".
+
+**Isto piorou com a v78.** A meta em hectares e a projeção de ritmo saem da
+**área do talhão** — que só existe no celular. Duas pessoas com cadastros
+diferentes veem "executado" diferente para a mesma tarefa. E o `ESTADO.md`
+já registra o sintoma: Igrejinha e Lazaro entraram com **0 ha**, e sem isso
+não há projeção.
+
+### 5.6 De-paras que existem
 
 | De-para | Liga | Como |
 |---|---|---|
-| `operacao_alias` | texto do payload → operação do catálogo | igualdade exata ✔ |
-| `unidade_alias` | unidade do plano → nome no deck, id do talhão do app, nome na Solinftec, nome no iCrop, nome no AgroGestão | igualdade exata, com vigência e unicidade por (sistema, fazenda, apelido) ✔ |
-| `solinftec_depara` | nome da fazenda na Solinftec → unidade do app | **substring** ✘ |
-| `rel_icrop_depara` / `DEPARA_ICROP` | nome da fazenda no iCrop → fazenda física | **substring** ✘ |
-| `solinftec_operacoes` | código da operação Solinftec → nome amigável | igualdade exata, mas **vazio** (pendência: pedir a lista à Solinftec) |
-| `FZ_LEGADO` / `rel_fz_atual` | ids antigos de fazenda → unidade atual (f19→f03c, f05/f15/f16/f14→f14c…) | igualdade exata ✔ |
+| `operacao_alias` | texto do payload → operação | igualdade exata ✔ |
+| `unidade_alias` | unidade do plano → deck, talhão do app, Solinftec, iCrop, AgroGestão | igualdade exata, com vigência ✔ |
+| `FZ_LEGADO` / `rel_fz_atual` | id antigo de fazenda → unidade atual | igualdade exata ✔ |
+| `DEPARA_ATA_PADRAO` | nome da fazenda na ata → unidade | exato, com `includes` de reserva; **editável em Cadastros**, mora no aparelho |
+| `PLAN_SINONIMOS` | descrição da ata → operação | casamento de palavras (5.3) |
+| `solinftec_depara` | nome na Solinftec → unidade | **substring** ✘ |
+| `rel_icrop_depara` / `DEPARA_ICROP` | nome no iCrop → fazenda física | **substring** ✘ |
+| `solinftec_operacoes` | código Solinftec → nome | exato, mas **vazio** |
 
-`unidade_alias` já prevê o slot `agrogestao`, mas **o ERP não está integrado**
-(`docs/relatorios.md`: "AGUARDA ERP (AgroGestão não integrado)").
-
-### 4.4 Duplicidade — onde o defeito do Sigma mora neste app
-
-O caso `SULFATO DE MANGANES` × `Sulfato de manganes` **é exatamente o risco
-mapeado neste projeto**, e já está catalogado em `docs/CAMPOS-LIVRES.md` (v44),
-que lista **20 pontos de digitação livre**. Os de risco ALTO:
-
-| # | Campo livre | Por que quebra a cadeia |
-|---|---|---|
-| 1 | Produto / defensivo da receita (grãos, quimigação) | "mesmo defensivo com 3 grafias impede fechar custo e rastrear carência" |
-| 2 | Produto / vacina (pecuária) | controle sanitário por produto vira texto solto |
-| 5 | Cultivar / híbrido | "censo de plantio e ciclos dependem disso" |
-| 11 | Lote / categoria (pecuária) | sem lote padronizado não há GMD nem contagem entre dias |
-| 13 | Lote (pós-colheita: terreiro → secador → tulha → benefício) | "o mesmo lote precisa amarrar 4 etapas; hoje é texto em 4 lugares" |
-| 7 | Prestador terceirizado | comparar preço e desempenho não fecha |
-
-O app até "aprende" os nomes digitados (`D.insumosAprendidos`) e os oferece como
-sugestão — o que reduz a divergência, mas **no aparelho de quem digitou**, e não
-impede grafia nova.
-
-**Não apurado:** quantas grafias divergentes já existem de fato no banco. O bloco
-SQL do fim conta exatamente isto: "grafias distintas de produto/insumo" e
-"produtos com mais de uma grafia" (comparação sem acento e sem caixa).
-
-### 4.5 O cadastro de talhões não está no banco
-
-Achado que não estava explicitado em lugar nenhum e que muda o desenho:
-
-- `D` (fazendas, **talhões**, máquinas, insumos, usuários, ciclos, inventário de
-  pecuária, catálogos extras) vive em `localStorage`, na chave `bdf:dados`,
-  semeado por constantes do `index.html`.
-- A fila de sincronização (`syncEnfileirar`) só carrega **seis tipos**: boletim,
-  pós-colheita, remessa, telemetria, código de acesso e espelho de pecuária.
-  **Nenhum cadastro sobe.**
-- Portanto: um talhão criado em Cadastros num iPhone **não existe** no Supabase
-  nem no iPhone de mais ninguém. `docs/relatorios.md` confirma pelo outro lado —
-  "**Nomes de talhão** vivem no cadastro do `index.html`" e "**Ciclos de grãos
-  não têm tabela própria**".
-- No banco, `talhaoId` é só um texto dentro do JSON. Não há tabela para dar
-  nome, área ou fazenda a ele.
+`unidade_alias` já prevê o slot `agrogestao`, mas o ERP **não está integrado**.
 
 ---
 
-## 5. Bloco 4 — Estrutura do apontamento atual
+## 6. Bloco 4 — Estrutura do apontamento atual
 
-### 5.1 Como um apontamento é gravado
+### 6.1 Como um apontamento é gravado
 
-**Uma linha por unidade e por dia.** A gravação é um `POST` com
-`on_conflict=fazenda_id,data`, ou seja, um **upsert**:
+**Uma linha por unidade e por dia**, com upsert em `fazenda_id + data`:
 
 ```
-boletins:  id (texto)  ·  fazenda_id  ·  data  ·  payload (JSON com o boletim inteiro)
+boletins:  id · fazenda_id · data · payload (o boletim inteiro em JSON)
 ```
 
-Dentro do `payload` ficam as listas: `atividades[]` (uma entrada por lançamento
-do gerente, com `talhaoId`, `tipo`, `pessoas`, `insumos[]`, `produtos[]`…),
-`irg[]` (pivôs), `fito[]`, `ocorrencias[]`, `colheita[]`, `mo`, `clima`,
-`pecuaria{}` e, desde a v69, `secoes{}`.
+Dentro do payload: `atividades[]`, `irg[]`, `fito[]`, `ocorrencias[]`,
+`colheita[]`, `mo`, `clima`, `pecuaria{}`, `secoes{}` (v69) e **`plano{}`**
+(v75).
 
-Consequências diretas para a cadeia de estados:
+Consequências, todas ainda de pé:
 
-- **Não existe linha por operação.** As visões de farol (`vw_dsr_registros`)
-  desmontam o JSON com `jsonb_array_elements` a cada consulta para chegar em
-  (unidade, data, operação). Funciona para leitura; não serve de âncora para
-  gravar um estado por operação.
-- **A chave é a unidade-dia, não o registro.** Dois aparelhos preenchendo a
-  mesma unidade no mesmo dia **sobrescrevem um ao outro** — vence o último a
-  sincronizar. O app tenta evitar isso na tela ("Já existe boletim de … nesta
-  unidade"), mas o banco não impede.
-- Há **duas cópias parciais** do mesmo dado: `boletim_pecuaria` (espelho da parte
-  de pecuária, para consulta/ERP) e `boletim_secao_resposta` (gravada por gatilho
-  a partir de `payload.secoes`). Ambas derivadas, nunca fonte.
-- Pós-colheita é a mesma forma (`pos_colheitas`, upsert por `fazenda_id + data`).
+- **Não existe linha por operação.** As visões de farol desmontam o JSON com
+  `jsonb_array_elements` a cada consulta.
+- **A chave é a unidade-dia.** Dois aparelhos na mesma unidade no mesmo dia
+  sobrescrevem um ao outro; o app avisa na tela, o banco não impede.
+- Existem **cópias derivadas**: `boletim_pecuaria`, `boletim_secao_resposta`
+  (por gatilho) e, agora, `planejamento_tarefa.payload.exec` (foto que o app
+  grava para o relatório ler). Todas derivadas, nunca fonte.
 
-### 5.2 Existe noção de estado em algum registro?
-
-Sim — em cinco lugares, e nenhum deles no apontamento em si:
+### 6.2 Noção de estado — agora são sete lugares
 
 | Onde | Estados | Quem muda | Onde vive |
 |---|---|---|---|
-| `atividades[].status` (dentro do payload) | `concluida` ⇄ `continua` (+ campo `falta`: "o que falta?") | o gerente, em chip | JSON do boletim |
-| `remessas.status` | `enviada` → `recebida` (com `recebidoEm`, `recebidoQtd`, `obsReceb`) | o gerente **da fazenda de destino** | tabela própria |
-| `plano_safra.status` | `rascunho` → `vigente` → `superado` | ADMIN, na tela Unidades e Plano | tabela própria |
-| `unidade_manejo.status` | `producao`, `poda`, `renovacao`, `recepa`, `plantio`, `a_confirmar` | ADMIN | tabela própria |
-| `ciclos` (grãos) | abre no plantio, encerra quando a colheita cobre a área do talhão | o app, propondo ao gerente | **só no aparelho** |
+| **`planejamento_tarefa.status`** | a_iniciar · em_execucao · finalizado · aguardando_terceiro · aguardando_clima · cancelado | gerente (1 toque) e escritório | **tabela própria, com enum no banco** |
+| **`b.plano[].status`** | ⚪ · ◐ · ✅ | **ninguém — o app avalia sozinho pelo registro** | JSON do boletim |
+| `atividades[].status` | concluida ⇄ continua (+ `falta`) | gerente, em chip | JSON do boletim |
+| `remessas.status` | enviada → recebida | o gerente **do destino** | tabela própria |
+| `plano_safra.status` | rascunho → vigente → superado | ADMIN | tabela própria |
+| `unidade_manejo.status` | producao, poda, renovacao, recepa, plantio, a_confirmar | ADMIN | tabela própria |
+| `ciclos` (grãos) | abre no plantio, encerra na colheita | o app, propondo | **só no aparelho** |
 
-**Dois desses são precedentes valiosos para a Onda 2**, e vale dizer em voz alta:
+Vale sublinhar dois: **`b.plano[].status` é o único que ninguém digita** — o app
+o deriva do registro, que é exatamente o espírito da cadeia; e **`remessas`** é
+o precedente antigo de confirmação por outra pessoa (quem envia cria, quem
+recebe confirma, com registro de divergência).
 
-- **`atividades[].status = "continua"`** é, na prática, um estado de execução
-  parcial que **atravessa o dia**: a tela "O que ficou de ontem" traz de volta as
-  atividades marcadas assim, com o texto do que falta. Já é meia cadeia.
-- **`remessas`** é o único **fluxo com confirmação em outro toque, por outra
-  pessoa**: quem envia cria "enviada", quem recebe confirma e vira "recebida",
-  com registro de divergência de quantidade. É o modelo mais próximo da
-  confirmação em dois toques que já roda em produção.
-
-O que **não** existe: nenhuma coluna de estado numa tabela de apontamento, e
-nenhum estado que signifique "previsto e ainda não confirmado".
-
-### 5.3 Existe histórico de alteração?
+### 6.3 Histórico de alteração
 
 | Registro | Histórico |
 |---|---|
-| Boletim | **Não.** Só o campo `editadoEm` no payload, que registra a data da última correção. O upsert substitui o payload inteiro; a versão anterior desaparece. |
-| Unidade de manejo (plano) | **Sim** — `unidade_manejo_log`: uma linha por campo alterado, com `antes`, `depois`, `quem`, `quando`. É o único log de campo do projeto. |
-| Plano de safra | **Sim, por versão** — nova linha em `plano_safra`, a anterior vira `superado`. Nada se apaga (não há política de DELETE em nenhuma tabela do plano). |
-| Robôs | **Sim** — `relatorios_execucoes` (diário das rodadas) e `integracao_execucoes` (status HTTP de cada pedido à iCrop). |
+| **Tarefa do planejamento** | **Sim** — `payload.historico` / `D.tarefaHistorico`: quem, quando, de → para, motivo. "Cancelar é status, nunca delete." |
+| **Boletim** | **Não.** Só `editadoEm`. O upsert substitui o payload inteiro; a versão anterior desaparece. |
+| Unidade de manejo (plano A) | **Sim** — `unidade_manejo_log`, uma linha por campo alterado |
+| Plano de safra | **Sim, por versão** — a anterior vira `superado`; nada se apaga |
+| Robôs | **Sim** — `relatorios_execucoes`, `integracao_execucoes` |
 
-Duas observações que o desenho precisa levar em conta:
+Duas coisas que o desenho precisa levar em conta:
 
-- **O prazo de 48 h para o gerente corrigir é só de interface.** Está em
-  `ACOES_PERFIL.corrigir_boletim` no `index.html`, e o próprio código diz a regra
-  ("Isto é interface, não segurança"). No banco, a chave publishable pode dar
-  upsert em qualquer `fazenda_id + data`, de qualquer data, sem limite e sem
-  deixar rastro.
-- **As políticas do plano permitem escrita pública.** `sql/005` cria, para as 11
-  tabelas, política de `select using (true)`, `insert with check (true)` e
-  `update using (true)`. "Só a tela de ADMIN escreve" é combinação, não trava.
+- **O prazo de 48 h para o gerente corrigir é só de interface**
+  (`ACOES_PERFIL.corrigir_boletim`); o próprio código diz "isto é interface,
+  não segurança". No banco, a chave publishable dá upsert em qualquer data, sem
+  limite e sem rastro.
+- **As políticas do plano A permitem escrita pública:** `sql/005` cria, para as
+  11 tabelas, `select using (true)`, `insert with check (true)` e
+  `update using (true)`.
 
-### 5.4 O que o botão "Enviar boletim" grava
+### 6.4 O que o botão "Enviar boletim" grava
 
-Na ordem em que acontece (`validarEnviar` → `concluirEnvio`, `index.html`):
+1. **Barreiras:** botão inativo com boletim vazio; aviso se já existe boletim na
+   data; **exige resposta em toda seção eventual** (v70); diálogo de avisos de
+   conferência (dito × medido do iCrop).
+2. **Limpa** a resposta de seção que ganhou registro e carimba quem respondeu.
+3. **Aprende no aparelho:** doses, receitas por operação e por talhão,
+   fertirrigação, insumos novos, último evento de pecuária.
+4. **Propõe abrir ciclo** dos talhões plantados (grãos), num diálogo só.
+5. **(v75) Abre a folha "📋 Amanhã"** — pergunta o que atrapalhou hoje, se for o
+   caso, e coleta o plano de amanhã em até 3 linhas. "Pular" e "Salvar plano"
+   **enviam o boletim do mesmo jeito**.
+6. **(v75) `gravarPlanoNoBoletim`** fecha o plano do dia-alvo em `b.plano`.
+7. **Grava o boletim:** novo ganha `id` e `enviadoEm`; correção substitui e
+   carimba `editadoEm`.
+8. **Enfileira:** `boletins` sempre, `boletim_pecuaria` se houver pecuária.
+9. **Gera as remessas** de café para outra fazenda (status `enviada`).
 
-1. **Barreiras antes de enviar** — botão inativo se o boletim está vazio; aviso
-   se já existe boletim naquela data na unidade; **desde a v70, exige resposta em
-   toda seção eventual** (registro ou "Nada a registrar hoje"); se houver avisos
-   de conferência (dito × medido do iCrop), abre o diálogo com a lista.
-2. **Limpa a resposta de seção que ganhou registro** e carimba quem respondeu.
-3. **Aprende para a próxima vez, no aparelho:** últimas doses, receitas por
-   operação, últimas operações e receitas por talhão, última fertirrigação,
-   nomes de insumo novos, último evento de pecuária.
-4. **Propõe abrir ciclo** dos talhões plantados no dia (grãos), num único
-   diálogo.
-5. **Grava o boletim** — se é novo, gera `id` e carimba
-   `enviadoEm = data + hora`; se é correção, substitui o registro e carimba
-   `editadoEm`.
-6. **Enfileira para o Supabase:** `boletins` sempre; `boletim_pecuaria` se houver
-   pecuária. A fila é offline: sobe na próxima sincronização.
-7. **Gera as remessas** de café enviado para outra fazenda (status `enviada`).
-8. Espelha a colheita de grãos, salva, apaga o rascunho e volta para a casa.
-
-O que **não** grava: nada em tabela de operação, nada em tabela de estado,
-nenhuma linha por atividade. Tudo vai dentro do JSON.
+O que **não** grava: nenhuma linha por operação. Tudo dentro do JSON — inclusive
+o plano do dia.
 
 ---
 
-## 6. Bloco 5 — Comportamento observado
+## 7. Bloco 5 — Comportamento observado
 
-**Não apurável hoje.** O item existe, mas não há tempo de uso:
+**Não apurável.** E agora por dois motivos:
 
-- A resposta explícita de ausência ("Nada a registrar hoje") entrou no main em
-  **08/09/2026** (v69) e a exigência no envio em **08/09/2026** (v70). Hoje é
-  **09/09/2026** — um dia.
-- O que grava isso em tabela é `sql/047-secao-resposta.sql`, e o teste manual no
-  `docs/qualidade-log.md` ainda está escrito como tarefa em aberto ("**Teste
-  manual (Nilo, no iPhone).** Rodar `sql/047`"), sem marca de FEITO. Sem ele, as
-  respostas existem **só dentro de `boletins.payload.secoes`** — dá para contar,
-  mas não pela visão `vw_completude_boletim`.
-- Além disso, os aparelhos dos gerentes só recebem a v70 depois de o service
-  worker trocar o cache; o alcance real no primeiro dia é desconhecido.
+- O "Nada a registrar hoje" (v69/v70) entrou no `main` em **08/09/2026**; o
+  módulo de planejamento (v77/v78), em **10/09/2026**. Hoje é 10/09/2026.
+- O que grava as respostas em tabela é o `sql/047`, e o que grava as tarefas é o
+  `sql/050` — **os dois constam como não rodados**. Sem eles, tudo vive dentro
+  de `boletins.payload` e no aparelho: dá para contar, mas não pelas visões.
+- Os aparelhos dos gerentes só recebem a versão nova quando o service worker
+  troca o cache. O alcance real nos primeiros dias é desconhecido.
 
-**Sobre a segunda pergunta — "com que frequência 'sem ocorrência' é marcado em
-poucos segundos após abrir o boletim":** ela **não é medível como está escrita**,
-e é importante dizer isso antes de alguém tentar. O app **não guarda a hora em
-que o boletim foi aberto**. O que existe é `secoes[id].em` (hora exata do toque
-no chip, em ISO) e `enviadoEm` (data + hora do envio, **só até o minuto**).
+**Sobre "com que frequência 'sem ocorrência' é marcado em poucos segundos após
+abrir o boletim":** a pergunta **não é medível como está escrita**, e é
+importante dizer isso antes de alguém tentar. O app **não guarda a hora em que o
+boletim foi aberto**. Existe `secoes[id].em` (hora exata do toque, em ISO) e
+`enviadoEm` (só até o minuto).
 
-O que **dá** para medir, e mede a mesma coisa, é o **carimbo em lote**: quando
-duas ou mais seções eventuais são respondidas com poucos segundos entre uma e
-outra, é toque automático em sequência, não leitura. O bloco SQL do fim já traz
-essa contagem e a mediana de segundos entre a primeira e a última resposta do
-mesmo boletim. Vale rodar de novo daqui a **duas ou três semanas** — antes disso,
-qualquer número é ruído.
+O que **dá** para medir, e mede a mesma coisa, é o **carimbo em lote**: duas ou
+mais seções respondidas com poucos segundos entre uma e outra é toque
+automático, não leitura. O bloco SQL traz a contagem e a mediana de segundos
+entre a primeira e a última resposta do mesmo boletim.
+
+**E agora há mais o que medir, pelo mesmo motivo.** A v77 pôs ações de um toque
+(*Comecei · Concluí · Travado*) e a v78 pôs a sugestão de dois toques
+("concluir a tarefa?"). Se o carimbo automático for um hábito, ele vai aparecer
+ali também — e o `payload.historico` da tarefa registra **quem, quando e de →
+para**, então dá para medir com precisão assim que o `sql/050` rodar. Vale
+olhar os dois juntos daqui a **duas ou três semanas**. Antes disso é ruído.
 
 ---
 
-## 7. Tabela de lacunas
+## 8. Tabela de lacunas
 
-| # | O que é | Por que bloqueia a cadeia | O que resolveria |
+| # | O que é | Por que bloqueia | O que resolveria |
 |---|---|---|---|
-| 1 | **Não há plano para grãos e pecuária** — nem estrutura, nem dado | Sem "Planejado", 2 das 3 atividades não têm o que confirmar; a confirmação em dois toques não tem objeto | Uma fonte de intenção para essas atividades (programação semanal do gerente ou do agrônomo). Decisão de negócio, não de código. Enquanto não houver, `operacao_janela` dá só "esperado por ritmo". |
-| 2 | **O plano de café provavelmente não está no banco** (404 em 04/09/2026) | Sem `plano_*` populado e **publicado como vigente**, nem o café tem "Planejado" | Rodar `sql/005` → `006` → `007` (ou publicar pela tela Unidades e Plano). É a primeira linha do bloco SQL. |
-| 3 | **26 das 69 unidades do plano não têm apelido `app`** | Para essas, previsto e registrado não se encontram: o farol fica cinza e o "Saldo" não fecha | Desmembrar talhões no app (muda os chips do gerente — versão própria) ou aceitar cobertura parcial e dizer isso na tela. |
-| 4 | **O plano prevê insumo e kg por mês, não operação por data** | A cadeia é de **operação**; o plano de hoje é de **adubação**. `plano_gantt` tem operação, mas por mês e por modelo de empresa, não por unidade | Ou a cadeia nasce só para as operações que o Gantt cobre (16 atividades de café, granularidade de mês), ou o agrônomo passa a entregar operação × unidade × janela. |
-| 5 | **`boletins` é uma linha por unidade-dia, com o boletim inteiro em JSON** | Não há onde gravar o estado de **uma** operação; confirmar em dois toques exige um registro com identidade e estado próprios | Tabela nova de execução por (unidade, operação, data, estado), alimentada pelo app. É mudança de modelo, não de tela — e é o item mais caro da Onda 2. |
-| 6 | **Não há histórico de alteração do boletim** | "Confirmado por fulano às 14h" e depois desfeito não deixa rastro; a cadeia de estados vive de trilha | Tabela de eventos (append-only), no modelo de `unidade_manejo_log` ou de `plano_safra` (versão). Nada se apaga. |
-| 7 | **O cadastro de talhões só existe no aparelho** | O plano aponta para `talhaoId`; o banco não sabe o que é `t093`. Nenhum cálculo de saldo por área fecha no servidor | Subir o cadastro de talhões (id, nome, unidade, área, tipo) para o Supabase, como já se fez com `rel_unidades`. |
-| 8 | **iCrop e Solinftec conciliados por pedaço de nome** | Execução externa entrando na conta do "Realizado" errado, em silêncio | Trocar por identificador do fornecedor onde ele existir, ou migrar os dois para `unidade_alias` (que já tem os slots `icrop` e `solinftec` e é por igualdade exata). |
-| 9 | **"Outra" e os termos extras de catálogo não têm id** | Registro feito por esses caminhos é invisível para a cadeia | Ou aceitar (e dizer que "Outra" fica fora), ou dar id ao termo extra no momento em que o escritório o cria. |
-| 10 | **Produto, lote, cultivar e prestador são texto livre** | É o defeito do Sigma. Sem isso, "Saldo" em kg, em lote ou em produto não fecha | `docs/CAMPOS-LIVRES.md` já mapeou os 20 pontos e o esforço de cada um. Decisão campo a campo, pendente com o Nilo desde a v44. |
-| 11 | **Não se sabe quanto o "Nada a registrar hoje" é carimbo automático** | Se for alto, a confirmação em lote da cadeia nasce com o mesmo vício | Rodar o bloco SQL daqui a 2–3 semanas e olhar "todas em até 10 s". |
-| 12 | **`plano_*` aceita escrita com a chave pública** | Um plano é o "Planejado": se qualquer um pode gravar, o estado não é confiável | Restringir as políticas de insert/update das tabelas de plano. Já vale hoje, independente da Onda 2. |
+| 1 | **Cinco SQL pendentes** (`048`, `049`, `050`, `051` e os antigos `005`→`007`) | Enquanto o `050` não rodar, o planejamento não sincroniza entre celulares e o relatório não existe; sem o `049`, o catálogo do banco não conhece os nomes novos do café | Rodar no SQL Editor, nesta ordem: `049`, `050`, `051`, `048`. O do agrônomo (`005`→`007`) é decisão à parte |
+| 2 | **O cadastro de talhões só existe no aparelho** | A meta em ha e a projeção de ritmo saem da área do talhão; celulares com cadastros diferentes mostram "executado" diferente | Subir o cadastro para o Supabase, como já se fez com `rel_unidades`. **É a lacuna mais urgente hoje** |
+| 3 | **A tarefa não guarda o id da operação** | O "executado" depende de casamento de palavras da descrição da ata; descrição reescrita deixa de somar, em silêncio | Gravar o id escolhido na pré-visualização da ata (que já é editável) e usar o texto só como sugestão |
+| 4 | **Os dois planos não se falam** | O do agrônomo (kg, por setor de café) e o de execução (tarefas, por unidade) não se cruzam; a mesma calagem pode aparecer nos dois sem se reconhecer | Decidir se o plano do agrônomo vira **origem de tarefas** da ata, ou se fica só como referência (é o que a regra do projeto diz hoje) |
+| 5 | **Não há histórico de alteração do boletim** | A tarefa tem trilha; o boletim, não. Correção apaga a versão anterior — e o "executado" é calculado sobre boletins | Tabela de eventos append-only, no molde de `unidade_manejo_log` |
+| 6 | **iCrop e Solinftec conciliados por pedaço de nome** | Execução externa entrando na unidade errada, em silêncio | Identificador do fornecedor onde existir, ou migrar para `unidade_alias` (que já tem os slots e é por igualdade exata) |
+| 7 | **"Outra" e termos extras de catálogo não têm id** | Registro por esses caminhos é invisível para farol, ritmo e para o "executado" da tarefa | Ou aceitar e dizer, ou dar id ao termo no momento em que o escritório o cria |
+| 8 | **Produto, lote, cultivar e prestador em texto livre** | É o defeito do Sigma. "Saldo" em kg, lote ou produto não fecha | `docs/CAMPOS-LIVRES.md` já mapeou os 20 pontos e o esforço de cada um |
+| 9 | **"Recomendado" só existe para irrigação** | Dos quatro estados, é o único sem fonte para o resto | Ou o plano do agrônomo publicado (café), ou aceitar que a cadeia comece em "Planejado" |
+| 10 | **26 das 69 unidades do plano A sem apelido `app`** | Para elas, previsto e registrado não se encontram | Desmembrar talhões (muda os chips do gerente — versão própria) ou assumir a cobertura parcial e dizer na tela |
+| 11 | **Tarefa sem meta não tem barra nem restante** | Sem denominador não há Saldo. A ata só traz área em algumas linhas | O escritório informa a meta pelo chip "Definir meta" nas tarefas grandes — já existe, é uso, não código |
+| 12 | **`plano_*` aceita escrita com a chave pública** | O "Planejado" precisa ser confiável | Restringir as políticas de insert/update. Vale hoje, independente da Onda 2 |
+| 13 | **Não se sabe quanto do "sem ocorrência" e do "Concluí" é carimbo automático** | Se for alto, a confirmação em lote nasce com o mesmo vício | Rodar o bloco SQL daqui a 2–3 semanas, depois do `sql/047` e do `sql/050` |
 
 ---
 
-## 8. Veredito
+## 9. Veredito
 
-### **Viável parcialmente.**
+### **Viável parcialmente — e a maior parte já foi construída.**
 
-Com precisão, porque "parcialmente" quer dizer coisas diferentes em cada
-atividade:
+A pergunta que abriu esta investigação era se a cadeia podia existir. Entre a
+apuração e este relatório, três das quatro pontas passaram a existir. O que
+sobra é diferente do que se esperava.
 
-**☕ Café (8 fazendas com deck), depois de rodar `sql/005`→`007` e publicar:**
-os quatro estados são possíveis, com estas fronteiras:
+**O que já está de pé, nas três atividades:**
 
-- **Recomendado** — existe de verdade para **irrigação**, vindo do iCrop
-  (percentímetro, lâmina mínima, tempo, déficit previsto), nas 4 fazendas com
-  estação. Para o resto, não existe e não há de onde tirar.
-- **Planejado** — existe para **adubação (kg por unidade e mês)**, **calagem
-  (t e janela)** e **fito (alvos do mês)**, nas 43 unidades com apelido `app`.
-  Para as outras 26, o plano existe e não encontra o registro.
-- **Realizado** — existe hoje, com boa identidade: operação pelo catálogo, unidade
-  pela chave do app.
-- **Saldo** — calculável só onde Planejado e Realizado falam a mesma unidade de
-  medida. Hoje **não falam**: o plano está em kg e t; o boletim registra o evento
-  ("Adubação via lanço no talhão X"), não a quantidade. O saldo possível é de
-  **evento** ("previsto no mês × registrado / sem registro"), que é exatamente o
-  que o relatório `plano_executado_mes` já faz — não é saldo de quantidade.
+- **Planejado** — tarefas da ata e da semana (`planejamento_tarefa`, com prazo,
+  unidade por id e 6 status) e o plano do dia seguinte (`b.plano`).
+- **Realizado** — os lançamentos do boletim, casados por operação do catálogo.
+- **Saldo** — planejado · executado · restante em hectares, com barra e
+  rastreabilidade lançamento a lançamento (`planTrio` / `planProgresso`).
+- **Confirmação em toque** — *Comecei · Concluí · Travado* na folha do gerente,
+  e a sugestão de dois toques quando o lançamento casa com a tarefa.
+- **Trilha** — `payload.historico` com quem, quando, de → para e motivo.
 
-**🌾 Grãos e 🐂 Pecuária:** sem "Planejado" e sem "Recomendado". Sobra
-**Realizado + farol de ritmo**, que é o que a Onda 1 já entregou
-(`vw_dias_sem_registro`, `vw_farol_registro`, `vw_ritmo_operacoes`). Uma cadeia
-de estados aqui seria uma etiqueta nova sobre o mesmo dado.
+**O que falta, em ordem de importância:**
 
-**E uma pré-condição que vale para as três, e que não é sobre o plano:** a
-confirmação em dois toques precisa gravar **um registro por operação, com estado
-próprio e trilha**. O `boletins` de hoje não comporta isso: é um documento por
-dia, sobrescrito a cada correção. Enquanto esse registro não existir, "confirmar
-o previsto" vira mais um campo dentro do mesmo JSON — e aí a cadeia é enfeite,
-não modelo.
+1. **Rodar os SQL.** Enquanto o `sql/050` não rodar, tudo isso existe **só no
+   aparelho de quem digitou**. É a diferença entre um módulo e um caderno.
+2. **Subir o cadastro de talhões.** O Saldo é medido em hectares que só existem
+   no celular. Duas pessoas veem números diferentes para a mesma tarefa, e
+   ninguém percebe.
+3. **Dar id de operação à tarefa.** Hoje o elo Planejado → Realizado é
+   casamento de palavras. Funciona, é honesto quando falha, mas é o ponto em
+   que a cadeia se desfaz sem avisar.
+4. **"Recomendado".** É a ponta que continua faltando, e não há de onde tirá-la
+   fora da irrigação — a não ser publicando o plano do agrônomo, que cobre
+   adubação, calagem e fito de café, em 43 unidades.
 
-**Recomendação de sequenciamento** (é opinião, não apuração):
+**E uma coisa que não é lacuna, é decisão:** o app hoje tem **dois planos que
+não se falam**. O do agrônomo diz kg de sulfato por setor por mês; o da ata diz
+"levantar café na Vereda até 20/09". Antes de desenhar a Onda 2, vale decidir se
+o do agrônomo vira **origem de tarefas** — e aí a cadeia é uma só — ou se
+continua sendo referência de leitura, como a regra do projeto diz hoje. As duas
+respostas são defensáveis; o que não dá é deixar em aberto e descobrir depois
+que a mesma calagem está contada duas vezes.
 
-1. Rodar `sql/005`→`007` e publicar pelo menos uma fazenda. Sem isso não há o que
-   desenhar, e o custo é uma tarde de SQL Editor.
-2. Subir o cadastro de talhões para o Supabase (lacuna 7). É pequeno, destrava a
-   lacuna 3 e serve a tudo, não só à Onda 2.
-3. Só então decidir entre: (a) cadeia completa **só de café**, sobre adubação /
-   calagem / fito, aceitando a cobertura de 43 unidades; ou (b) adiar a cadeia e
-   entregar antes o registro por operação com estado (lacunas 5 e 6), que é a
-   fundação que ela vai precisar de qualquer jeito.
+**Sequenciamento que eu recomendo** (opinião, não apuração):
+
+1. Rodar `sql/049` → `050` → `051` → `048`. Uma tarde de SQL Editor, e destrava
+   tudo que já foi construído.
+2. Subir o cadastro de talhões para o Supabase (lacuna 2).
+3. Guardar o id da operação na tarefa (lacuna 3).
+4. Só então decidir sobre o plano do agrônomo (lacuna 4) e sobre "Recomendado".
 
 ---
 
-## 9. Bloco SQL de leitura — para o Nilo rodar
+## 10. Bloco SQL de leitura — para o Nilo rodar
 
-Este bloco **só lê**. Não cria, não altera e não apaga nada. Ele responde as
-perguntas que dependem do banco e que eu não consegui apurar daqui.
+Este bloco **só lê**. Não cria, não altera e não apaga nada.
 
 **Como fazer, pelo iPhone:**
 
-1. Abra o **Supabase** (o projeto `syvehtgrbqteyuqhoban`).
+1. Abra o **Supabase** (projeto `syvehtgrbqteyuqhoban`).
 2. Toque em **SQL Editor**.
 3. Cole **o bloco inteiro** de uma vez (é uma consulta só).
 4. Toque em **Run**.
-5. Copie o resultado (são cerca de 39 linhas, em 3 colunas) e mande de volta.
+5. Copie o resultado (46 linhas, em 3 colunas) e mande de volta.
 
-Se aparecer algum erro, copie a mensagem inteira e mande também — não tente
-consertar.
+Se der erro, copie a mensagem inteira e mande também — não tente consertar.
 
 ```sql
 -- Boletim NCNaves — raio-X de leitura para a investigação da cadeia de estados.
 -- SÓ LÊ. Não cria, não altera e não apaga nada.
 with alvo(bloco, item) as (values
-  ('1 plano',      'plano_safra'),      ('1 plano',      'plano_unidade'),
-  ('1 plano',      'plano_adubo_mes'),  ('1 plano',      'plano_calagem'),
-  ('1 plano',      'plano_fito_mes'),   ('1 plano',      'plano_gantt'),
-  ('1 plano',      'plano_parametros'), ('1 plano',      'unidade_manejo'),
-  ('1 plano',      'unidade_alias'),
-  ('2 fontes',     'icrop_manejo'),     ('2 fontes',     'solinftec_diario'),
-  ('3 identidade', 'rel_unidades'),     ('3 identidade', 'operacao_catalogo'),
-  ('3 identidade', 'operacao_alias'),   ('3 identidade', 'operacao_janela'),
-  ('3 identidade', 'solinftec_depara'), ('3 identidade', 'rel_icrop_depara'),
-  ('4 apontamento','boletins'),         ('4 apontamento','pos_colheitas'),
-  ('4 apontamento','remessas'),         ('4 apontamento','boletim_pecuaria'),
-  ('5 secoes',     'boletim_secao'),    ('5 secoes',     'boletim_secao_resposta')
+  ('1 plano agronomo','plano_safra'),      ('1 plano agronomo','plano_unidade'),
+  ('1 plano agronomo','plano_adubo_mes'),  ('1 plano agronomo','plano_calagem'),
+  ('1 plano agronomo','plano_fito_mes'),   ('1 plano agronomo','plano_gantt'),
+  ('1 plano agronomo','unidade_manejo'),   ('1 plano agronomo','unidade_alias'),
+  ('2 planejamento', 'planejamento_rodada'),
+  ('2 planejamento', 'planejamento_semana'),
+  ('2 planejamento', 'planejamento_tarefa'),
+  ('2 planejamento', 'vw_planejamento_mes'),
+  ('3 fontes',       'icrop_manejo'),      ('3 fontes',       'solinftec_diario'),
+  ('4 identidade',   'rel_unidades'),      ('4 identidade',   'operacao_catalogo'),
+  ('4 identidade',   'operacao_alias'),    ('4 identidade',   'operacao_janela'),
+  ('4 identidade',   'solinftec_depara'),  ('4 identidade',   'rel_icrop_depara'),
+  ('5 apontamento',  'boletins'),          ('5 apontamento',  'pos_colheitas'),
+  ('5 apontamento',  'remessas'),          ('5 apontamento',  'boletim_pecuaria'),
+  ('6 secoes',       'boletim_secao'),     ('6 secoes',       'boletim_secao_resposta')
 ),
 tab as (
   select bloco, 'tabela '||item as item,
@@ -578,6 +636,9 @@ nome_ok as (
     upper(translate(btrim(nome),'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
                                 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')) as chave
   from nomes where coalesce(btrim(nome),'') <> ''),
+plan as (select payload from b where jsonb_typeof(payload->'plano')='object'),
+plit as (select i from plan cross join lateral jsonb_array_elements(
+    case when jsonb_typeof(payload->'plano'->'itens')='array' then payload->'plano'->'itens' else '[]'::jsonb end) i),
 secs as (select payload from b where jsonb_typeof(payload->'secoes')='object'),
 resp as (
   select (select min((v->>'em')::timestamptz) from jsonb_each(payload->'secoes') s(k,v)
@@ -588,11 +649,26 @@ resp as (
             where v->>'resposta'='sem_ocorrencia') as n
   from secs),
 extra(bloco, item, resposta) as (
-  select '1 plano','planos com status vigente',
+  select '1 plano agronomo','planos com status vigente',
     case when to_regclass('public.plano_safra') is null then 'sem a tabela plano_safra'
     else (xpath('/row/c/text()', query_to_xml(
       'select count(*) as c from public.plano_safra where status = ''vigente''', false,true,'')))[1]::text end
-  union all select '3 identidade','grafias de operacao sem de-para no catalogo',
+  union all select '2 planejamento','tarefas por status',
+    case when to_regclass('public.planejamento_tarefa') is null then 'sem a tabela planejamento_tarefa'
+    else coalesce((xpath('/row/c/text()', query_to_xml($q$
+      select coalesce(string_agg(status||': '||n, ' · ' order by status), 'nenhuma tarefa') as c
+      from (select status, count(*) as n from public.planejamento_tarefa group by status) z
+    $q$, false,true,'')))[1]::text, 'nenhuma tarefa') end
+  union all select '2 planejamento','tarefas com historico no payload',
+    case when to_regclass('public.planejamento_tarefa') is null then 'sem a tabela planejamento_tarefa'
+    else (xpath('/row/c/text()', query_to_xml($q$
+      select count(*) as c from public.planejamento_tarefa
+      where jsonb_typeof(payload->'historico') = 'array' and jsonb_array_length(payload->'historico') > 0
+    $q$, false,true,'')))[1]::text end
+  union all select '2 planejamento','boletins com plano do dia seguinte', count(*)::text from plan
+  union all select '2 planejamento','itens de plano do dia · ja avaliados',
+    count(*)::text || ' · ' || count(*) filter (where coalesce(i->>'status','') <> '')::text from plit
+  union all select '4 identidade','grafias de operacao sem de-para no catalogo',
     case when to_regclass('public.operacao_alias') is null then 'sem a tabela operacao_alias'
     else (xpath('/row/c/text()', query_to_xml($q$
       select count(distinct t) as c from (
@@ -601,31 +677,31 @@ extra(bloco, item, resposta) as (
         where coalesce(e->>'tipo','') <> '') x
       where t not in (select termo from public.operacao_alias where origem = 'atividades.tipo')
     $q$, false,true,'')))[1]::text end
-  union all select '3 identidade','grafias distintas de operacao gravadas', count(distinct e->>'tipo')::text
+  union all select '4 identidade','grafias distintas de operacao gravadas', count(distinct e->>'tipo')::text
     from lst where coalesce(e->>'tipo','') <> ''
-  union all select '3 identidade','operacoes gravadas como "Outra"', count(*)::text from lst where e->>'tipo'='Outra'
-  union all select '3 identidade','grafias distintas de produto/insumo', count(distinct nome)::text from nome_ok
-  union all select '3 identidade','produtos com mais de uma grafia', count(*)::text
+  union all select '4 identidade','operacoes gravadas como "Outra"', count(*)::text from lst where e->>'tipo'='Outra'
+  union all select '4 identidade','grafias distintas de produto/insumo', count(distinct nome)::text from nome_ok
+  union all select '4 identidade','produtos com mais de uma grafia', count(*)::text
     from (select chave from nome_ok group by chave having count(distinct nome)>1) g
-  union all select '4 apontamento','boletins reais (fora os de exemplo)', count(*)::text from b
-  union all select '4 apontamento','unidades com boletim', count(distinct fazenda_id)::text from b
-  union all select '4 apontamento','1o e ultimo boletim',
+  union all select '5 apontamento','boletins reais (fora os de exemplo)', count(*)::text from b
+  union all select '5 apontamento','unidades com boletim', count(distinct fazenda_id)::text from b
+  union all select '5 apontamento','1o e ultimo boletim',
     coalesce(min(data)::text,'-')||' a '||coalesce(max(data)::text,'-') from b
-  union all select '4 apontamento','linhas de atividade dentro dos payloads', count(*)::text from lst
-  union all select '4 apontamento','RLS e policies de boletins',
+  union all select '5 apontamento','linhas de atividade dentro dos payloads', count(*)::text from lst
+  union all select '5 apontamento','RLS e policies de boletins',
     (select case when relrowsecurity then 'RLS ligado' else 'RLS DESLIGADO' end
        from pg_class where oid = 'public.boletins'::regclass)
     || ' · ' || coalesce((select string_agg(cmd||' '||policyname, ' · ' order by policyname)
        from pg_policies where schemaname='public' and tablename='boletins'), 'sem policy')
-  union all select '4 apontamento','colunas status/estado/situacao no banco',
+  union all select '5 apontamento','colunas status/estado/situacao no banco',
     coalesce((select string_agg(table_name||'.'||column_name, ' · ' order by table_name, column_name)
       from information_schema.columns
       where table_schema='public' and column_name in ('status','estado','situacao')), 'nenhuma')
-  union all select '5 secoes','boletins com o campo secoes no payload', count(*)::text from secs
-  union all select '5 secoes','boletins com "Nada a registrar hoje"', count(*)::text from resp where n>0
-  union all select '5 secoes','com 2+ respostas: todas em ate 10 s', count(*)::text
+  union all select '6 secoes','boletins com o campo secoes no payload', count(*)::text from secs
+  union all select '6 secoes','boletins com "Nada a registrar hoje"', count(*)::text from resp where n>0
+  union all select '6 secoes','com 2+ respostas: todas em ate 10 s', count(*)::text
     from resp where n>1 and fim-ini <= interval '10 seconds'
-  union all select '5 secoes','com 2+ respostas: mediana de segundos entre a 1a e a ultima',
+  union all select '6 secoes','com 2+ respostas: mediana de segundos entre a 1a e a ultima',
     coalesce(round(percentile_cont(0.5) within group (order by extract(epoch from (fim-ini))))::text,'-')
     from resp where n>1
 )
@@ -634,72 +710,78 @@ union all select bloco, item, resposta from extra
 order by 1, 2;
 ```
 
-**Como o bloco foi conferido antes de chegar aqui:** rodado num PostgreSQL 16
-local, em dois cenários — (a) banco com `boletins`, `operacao_catalogo`,
-`operacao_alias`, `rel_unidades`, `icrop_manejo` e `solinftec_diario` e **sem** as
-tabelas de plano; (b) banco com `plano_safra` presente, `data` do boletim como
-texto e um carimbo de hora inválido no payload. Nos dois casos: 39 linhas, sem
-erro, tabela que não existe aparece como `NAO EXISTE` em vez de derrubar a
-consulta, e a contagem de grafias juntou corretamente `SULFATO DE MANGANES`,
-`Sulfato de manganes` e `sulfato de Manganês` como o mesmo produto com 3 grafias.
+**Como o bloco foi conferido:** rodado num PostgreSQL 16 local em três
+cenários — (a) o banco de hoje, sem as tabelas de plano nem as de planejamento;
+(b) com `plano_safra` populada, a coluna `data` do boletim como **texto**,
+carimbo de hora inválido em `secoes` e payload malformado (`plano.itens` e
+`atividades` gravados como texto em vez de lista); (c) com
+`planejamento_tarefa` em quatro status diferentes, `vw_planejamento_mes`,
+RLS ligada com duas policies e boletins com `plano` no payload. Nos três: **46
+linhas, sem erro**; tabela ausente vira `NAO EXISTE` em vez de derrubar a
+consulta; payload malformado é ignorado em silêncio; a contagem por status sai
+agregada numa linha só (`a_iniciar: 1 · em_execucao: 1 …`); e a contagem de
+grafias juntou corretamente `SULFATO DE MANGANES`, `Sulfato de manganes` e
+`sulfato de Manganês` como o mesmo produto com 3 grafias.
 
 **Como ler o resultado:**
 
 | Se aparecer | Quer dizer |
 |---|---|
-| `tabela plano_safra · NAO EXISTE` | o `sql/005` nunca foi rodado — a estrutura do plano não existe |
-| `tabela plano_safra · 8 linhas` + `planos com status vigente · 0` | as tabelas existem, o seed entrou, **mas nada foi publicado** — o app não lê |
-| `planos com status vigente · 8` | o café tem "Planejado" de verdade |
-| `grafias de operacao sem de-para no catalogo` alto | há registro que a cadeia não enxerga (termos extras, "Outra", grafia antiga) |
+| `tabela planejamento_tarefa · NAO EXISTE` | o `sql/050` não rodou — o planejamento existe só nos celulares |
+| `tarefas por status · a_iniciar: 12 · em_execucao: 3 …` | o módulo está sincronizando de verdade |
+| `tarefas com historico no payload · 0` | as tarefas subiram mas ninguém mudou status ainda |
+| `boletins com plano do dia seguinte · 0` | a v75 ainda não chegou aos celulares, ou ninguém salvou plano |
+| `tabela plano_safra · NAO EXISTE` | o `sql/005` nunca rodou |
+| `plano_safra · 8 linhas` + `planos vigentes · 0` | o seed entrou mas nada foi publicado — o app não lê |
+| `grafias de operacao sem de-para no catalogo` alto | há registro que a cadeia não enxerga (o `sql/049` pode ser a causa) |
 | `produtos com mais de uma grafia` alto | é o caso do Sigma acontecendo aqui |
 | `RLS DESLIGADO` em `boletins` | qualquer um com a chave pública lê e grava boletim |
 | `com 2+ respostas: todas em ate 10 s` alto | carimbo automático — a confirmação em lote precisa nascer protegida |
 
 ---
 
-## 10. Coisas que provavelmente ninguém sabe que estão (ou não estão) no banco
+## 11. Coisas que provavelmente ninguém sabe que estão (ou não estão) no banco
 
-Encontradas por acidente, todas verificadas no código. Nenhuma é urgente; três
-são incômodas.
+Encontradas de passagem, todas verificadas no código da v78.
 
 1. **"Marcar como visto" nunca sai do celular.** O botão da Diretoria grava
-   `b.visto` no aparelho e **não entra na fila de sincronização**. Pior: na
-   sincronização seguinte o boletim é rebaixado pela cópia do servidor, que não
-   tem esse campo — ou seja, **o "visto" é apagado sozinho**. Quem marcou acha
-   que marcou; ninguém mais vê, e depois nem quem marcou.
-2. **Todo o cadastro vive só no aparelho.** Talhões, máquinas, insumos, usuários,
-   ciclos de grãos, inventário de pecuária e os termos extras dos catálogos estão
-   em `localStorage`, nunca no Supabase. Um talhão criado em Cadastros existe só
-   naquele iPhone. Se o aparelho for trocado ou o navegador limpo, o cadastro
-   volta ao que veio dentro do `index.html`.
-3. **Operação lançada como "Outra" some dos faróis.** Ela é excluída de propósito
-   do catálogo (`operacao_catalogo`), então não tem id — e tudo que é farol,
-   ritmo, dias sem registro e relatório passa por id. O mesmo vale para qualquer
-   termo que o escritório acrescente em Cadastros › Catálogos.
-4. **O prazo de 48 h de correção é combinado, não trancado.** A trava está na
+   `b.visto` no aparelho e **não entra na fila de sincronização** — continua
+   assim na v78. Pior: na sincronização seguinte a cópia do servidor rebaixa o
+   registro local, e **o "visto" é apagado sozinho**.
+2. **Todo o cadastro vive só no aparelho.** Talhões, máquinas, insumos,
+   usuários, ciclos de grãos, inventário de pecuária, termos extras dos
+   catálogos e o **de-para da ata**. A fila sincroniza nove tipos de registro;
+   cadastro não é nenhum deles.
+3. **O "executado" em hectares depende do cadastro do celular.** Como a área do
+   talhão só existe ali, dois aparelhos com cadastros diferentes mostram números
+   diferentes para a mesma tarefa — e nada na tela avisa.
+4. **Operação lançada como "Outra" some dos faróis e do "executado".** É
+   excluída de propósito do catálogo, então não tem id. O mesmo vale para termo
+   acrescentado em Cadastros › Catálogos.
+5. **O prazo de 48 h de correção é combinado, não trancado.** A trava está na
    tela; o banco aceita gravar boletim de qualquer data, quantas vezes quiser.
-5. **Corrigir um boletim apaga a versão anterior.** É um upsert por unidade+dia:
-   fica só o `editadoEm` dizendo que houve correção, sem dizer o que mudou.
-6. **O iCrop já entrega recomendação, e ela já está gravada.** Percentímetro
+6. **Corrigir um boletim apaga a versão anterior.** Fica só o `editadoEm`
+   dizendo que houve correção, sem dizer o que mudou. E o "executado" das
+   tarefas é calculado sobre boletins.
+7. **O iCrop já entrega recomendação, e ela já está gravada.** Percentímetro
    recomendado, lâmina mínima, tempo de irrigação e déficit previsto estão em
-   `icrop_manejo.bruto` desde a v47. Se um dia se quiser um "Recomendado" de
-   verdade na tela, ele já existe — para irrigação.
-7. **As tabelas do plano aceitam escrita com a chave pública.** `sql/005` cria
-   políticas de insert e update com `true`. "Só o ADMIN escreve" é a tela, não o
-   banco.
-8. **O robô do iCrop não está no repositório.** Ele vive só dentro do Supabase.
-   O `ESTADO.md` cita um arquivo `sql/003-robo-icrop-reforco.sql` que **não
-   existe** em `sql/`. Se o projeto do Supabase se perder, o robô se perde junto
-   — vale exportar as três funções para o repositório numa tarefa qualquer.
-9. **`relatorios_gerados.texto` guarda texto escrito por IA.** O robô-redator
-   (sql/030) chama a API da Anthropic pela madrugada e grava o texto no banco.
-   Está sinalizado na tela ("gerado automaticamente — revisar antes de enviar"),
-   mas quem olhar a tabela direto vê texto de máquina misturado a número medido.
-10. **`solinftec_operacoes` está vazio.** Por isso a tela mostra "Operação NNN":
-    falta a Solinftec mandar a lista de código → nome. É pendência antiga, e
-    atrapalha qualquer cruzamento de máquina com operação do catálogo.
+   `icrop_manejo.bruto` desde a v47.
+8. **As tabelas do plano do agrônomo aceitam escrita com a chave pública.**
+   `sql/005` cria políticas de insert e update com `true`.
+9. **O robô do iCrop não está no repositório.** Vive só dentro do Supabase, e o
+   arquivo `sql/003-robo-icrop-reforco.sql` citado no `ESTADO.md` **não existe**
+   em `sql/`. Vale exportar as três funções numa tarefa qualquer.
+10. **`relatorios_gerados.texto` guarda texto escrito por IA.** O robô-redator
+    chama a API da Anthropic pela madrugada e grava no banco. Está sinalizado na
+    tela, mas quem olhar a tabela direto vê texto de máquina ao lado de número
+    medido.
+11. **`solinftec_operacoes` está vazio.** Por isso a tela mostra "Operação NNN".
+12. **Notificação do planejamento não é push de verdade.** Os avisos disparam
+    quando o app é aberto a partir da hora marcada — e no iPhone só se o app
+    estiver instalado na tela de início.
 
 ---
 
 *Investigação de leitura. Nenhum arquivo do app, nenhuma tabela e nenhuma
-política foram alterados.*
+política foram alterados. Apurado na v74 em 09/09/2026, reescrito contra a v78
+em 10/09/2026.*
