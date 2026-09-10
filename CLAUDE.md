@@ -733,6 +733,17 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
   o prazo original nunca se perde (`prazoOriginal`).
 - **Nada bloqueia o preenchimento do boletim.** A faixa é leitura; o envio
   não olha para tarefa nenhuma.
+- **Ação escondida atrás de ícone é ação que não existe (desde a v82).** O "⋯" do
+  cartão de tarefa guardava Comecei · Concluí · Travado · Novo prazo · Definir
+  meta, e ninguém adivinha isso: o botão passou a dizer **"atualizar"** (e
+  **"fechar"** quando está aberto). Regra que fica: **num cartão de lista, a ação
+  principal é PALAVRA, nunca ícone mudo** — "⋯", "›" e afins só valem quando o
+  destino já está dito em outro lugar da linha.
+  **Duas aparências não podem ter o mesmo peso com comportamentos diferentes:**
+  "atualizar" é botão (retângulo com borda, sem sublinhado) e o "executado" logo
+  abaixo é link (verde sublinhado) — um abre ações, o outro abre a lista de
+  lançamentos. E o botão é retângulo sem raio e sem sombra: **não se acrescenta
+  pílula nova** enquanto o CSS-base não for decidido (P10, ❌ herdado do ESTADO.md).
 - **"Assumir", não "comprometer" (desde a v81).** O botão da tela da Semana que põe
   uma tarefa na semana corrente diz **assumir**; a lista é "Parte A · tarefas
   assumidas nesta semana" e o histórico lê "assumida na semana". A palavra

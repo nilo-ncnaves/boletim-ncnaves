@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v81** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v82** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1214,6 +1214,32 @@ bruto no armazenamento segue `["Desbrota","Pulverização"]`; plano
 gravado com o nome antigo fecha como "feito" com registro no nome novo, e
 o contrário também; regressão main × branch com grãos e pecuária
 idênticos (só o relógio do envio difere).
+
+## O "⋯" do cartão de tarefa virou "atualizar" (v82)
+Apontado pelo Nilo em 10/09/2026, olhando a tela real: "quem vai mexer no
+aplicativo não vai ter a intuição de que se clicar ali vai aparecer opções".
+Estava certo — e o problema era maior do que o print mostrava.
+- **Duas portas invisíveis e a porta óbvia trancada.** Abriam as ações: o "⋯"
+  (`data-plan-acoes`, chips no lugar) e o **próprio ponto do farol**
+  (`data-tar`, a folha inteira). O NOME da tarefa, que é o que a pessoa tentaria
+  tocar, não fazia nada.
+- **O "⋯" passou a dizer "atualizar"** — e **"fechar"** enquanto está aberto.
+  Atrás dele continuam os mesmos cinco: Comecei · Concluí · Travado · Novo prazo
+  · Definir meta.
+- **Botão, não link.** O "executado" do mesmo cartão é verde sublinhado e abre a
+  lista de lançamentos; se "atualizar" ficasse igual, dois comportamentos
+  diferentes teriam a mesma aparência. "atualizar" é retângulo com borda, sem
+  sublinhado — e **sem raio e sem sombra**, para não acrescentar pílula nova
+  enquanto o CSS-base não for decidido (P10).
+- **Medido a 390 px:** botão de 86 × 44 px (alvo cumprido), nome da tarefa com
+  196 px e continuando a quebrar em duas linhas como antes; página em 390 px.
+- **O ponto do farol continua abrindo a folha** — redundância inofensiva agora
+  que existe um caminho com nome. O nome da tarefa continua não sendo tocável:
+  não dá para embrulhá-lo num botão porque o "executado" já é um botão dentro
+  dele (botão dentro de botão é HTML inválido). Fica como sugestão.
+- `scripts/checar-poluicao.cjs` seleciona pelo atributo `[data-plan-acoes]`, não
+  pelo texto, então a prova continuou valendo; só os RÓTULOS do checklist foram
+  atualizados de "⋯" para "atualizar", para o relatório não mentir.
 
 ## "Assumir" no lugar de "comprometer" (v81)
 Troca de vocabulário pedida pelo Nilo em 10/09/2026, depois de perguntar o que o
