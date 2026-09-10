@@ -486,3 +486,62 @@ antes do PR:
     plano semeado no café e sem plano em grãos e pecuária, a única
     diferença fora do café é o rótulo do campo de pendências e o cartão
     novo da Diretoria.
+
+## 17. Renomear termo exige DEPARA_NOMES; histórico nunca é reescrito (desde a v76)
+
+Regra permanente, nascida da revisão da nomenclatura do café (v76) e
+válida para QUALQUER catálogo do app (operações por talhão, funções de
+mão de obra, eventos de pecuária, fases de grãos, chips de qualquer
+seção), nas três atividades. Vale toda vez que uma tarefa troca o
+TEXTO de um termo que o app já gravou em algum boletim.
+
+1. **Nada de reescrever o passado.** Nenhuma tarefa altera
+   `boletins.payload` (nem `pos_colheitas`, `remessas`, `boletim_pecuaria`
+   ou qualquer registro já enviado) para acomodar um nome novo. O que foi
+   lançado fica exatamente como foi lançado: é o documento do dia, com a
+   palavra que a pessoa usou. Nenhum `update` de payload entra em arquivo
+   `sql/` por causa de renomeação.
+2. **Quem traduz é a leitura.** O termo antigo vira o termo de hoje na
+   hora de MOSTRAR e de SOMAR, pela função única `nomeAtual(nome)` do
+   index.html, que lê a tabela única `DEPARA_NOMES` (antigo → novo).
+   Nenhuma tela monta o seu próprio de-para, e nenhum `if` de nome solto
+   pelo código.
+3. **Onde `nomeAtual` é obrigatório** em toda renomeação: exibição
+   (boletim enviado, casa do gerente, "o que ficou de ontem", plano,
+   resumo de uma linha, exportação CSV, resumo do WhatsApp), comparação
+   (`avaliarPlano`, filtro do painel por atividade, chave de "última
+   receita") e classificação (`categoriaOperacao`, badge). Um passo
+   esquecido aparece como registro que "sumiu" do total — por isso o
+   inventário do item 5 abaixo.
+4. **De-para é de UM para UM.** Termo antigo que se abre em DOIS novos
+   (o app não tem como saber qual foi) NÃO é adivinhado: entra em
+   `TERMOS_LEGADO`, some da escolha de lançamento novo, continua legível
+   e continua somando com o nome que foi gravado, e a pergunta vai para o
+   Nilo no resumo do PR. O valor de `TERMOS_LEGADO` é a NATUREZA (grupo
+   do catálogo), que costuma ser a mesma nos dois candidatos — assim o
+   badge e as somas por natureza não se perdem enquanto a decisão não vem.
+5. **Inventário no PR.** Todo PR que renomeie termo traz três colunas —
+   **termo antigo → termo novo** (substituições), **termos acrescentados**
+   e **termos mantidos** — mais a lista dos ambíguos com a pergunta ao
+   Nilo. Sem as três colunas o PR não abre.
+6. **Espelho no Supabase pela mesma regra.** O nome antigo entra como
+   APELIDO da operação nova em `operacao_alias` (igualdade exata, nunca
+   pedaço de nome), gerado por
+   `node scripts/gerar_catalogo_operacoes.cjs` a partir de
+   `DEPARA_NOMES`; a operação substituída sai de cena com
+   `ativo = false`, nunca com `delete`. É o que faz `vw_dias_sem_registro`
+   e o motor de relatórios continuarem contando o histórico na operação
+   de hoje.
+7. **Prova antes do PR:** `node scripts/teste_nomenclatura.cjs
+   http://localhost:8152` (Chromium sem rede, 390 px; 23 checagens na
+   v76) — (a) um boletim antigo semeado
+   com o termo substituído continua aparecendo, com o nome de hoje, e o
+   dado bruto no armazenamento continua com o nome antigo; (b) um plano
+   gravado com o nome antigo fecha como "feito" com um registro no nome
+   novo, e o contrário também; (c) a regressão
+   (`scripts/regressao_render.cjs`) mostra as outras duas atividades
+   idênticas. O ESTADO.md registra o de-para vigente.
+8. **O rótulo é da lavoura, não do escritório.** A pergunta que decide um
+   termo novo é "o funcionário reconhece nesta lista a palavra que ele
+   usa?". Termo que só o escritório entende continua existindo em
+   Cadastros › Catálogos, nunca no lugar do termo de campo.

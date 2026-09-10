@@ -2,8 +2,9 @@
 /*
  gerar_catalogo_operacoes.cjs — imprime o seed do catálogo de operações
  (tabelas operacao_catalogo e operacao_alias do Supabase) a partir das
- constantes do index.html: LISTA_ATIV (café), OPS_GRAOS_FASES (grãos) e
- OPS_PECUARIA_FASES (pecuária). Fonte oficial do vocabulário:
+ constantes do index.html: OPS_CAFE_GRUPOS + DEPARA_NOMES (café),
+ OPS_GRAOS_FASES (grãos) e OPS_PECUARIA_FASES (pecuária). Fonte oficial
+ do vocabulário:
  docs/catalogos-por-atividade.md — o catálogo do Supabase é um espelho
  dele, no mesmo espírito de rel_unidades (espelho de FAZENDAS).
 
@@ -31,17 +32,33 @@ function constante(nome) {
   const trecho = html.slice(i, fim + 2).replace(/^const\s+\w+\s*=\s*/, '');
   return eval(trecho); // arrays literais de texto, sem código
 }
+function constanteObj(nome) {
+  const i = html.indexOf('const ' + nome + ' = {');
+  if (i < 0) throw new Error('constante não encontrada: ' + nome);
+  const fim = html.indexOf('};', i);
+  return eval('(' + html.slice(html.indexOf('{', i), fim + 1) + ')'); // objeto literal de texto, sem código
+}
 const semAcento = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const codigo = (prefixo, nome) => prefixo + '-' + semAcento(nome).toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 const q = s => "'" + String(s).replace(/'/g, "''") + "'";
 
-const cafe = constante('LISTA_ATIV').filter(n => n !== 'Outra');         // "Outra" não é operação identificável
+const cafe = constante('OPS_CAFE_GRUPOS')                                // café: [[grupo, [ops]]] desde a v76
+  .map(([g, ops]) => [g, ops.filter(n => n !== 'Outra')]);               // "Outra" não é operação identificável
 const graos = constante('OPS_GRAOS_FASES');
 const pec = constante('OPS_PECUARIA_FASES');
 
 const cat = [], alias = [];
-cafe.forEach((n, i) => { cat.push(['CAFE', codigo('CAFE', n), null, n, i + 1]); alias.push([codigo('CAFE', n), 'atividades.tipo', n]); });
 let ordem = 0;
+cafe.forEach(([grupo, ops]) => ops.forEach(n => { ordem++; cat.push(['CAFE', codigo('CAFE', n), grupo, n, ordem]); alias.push([codigo('CAFE', n), 'atividades.tipo', n]); }));
+/* v76: o nome ANTIGO continua sendo apelido da operação NOVA — boletim já lançado não é reescrito e
+   segue somando na visão. Espelho exato de DEPARA_NOMES (index.html). */
+const DEPARA = constanteObj('DEPARA_NOMES');
+const cafeId = n => { const c = cat.find(r => r[0] === 'CAFE' && r[3] === n); return c ? c[1] : null; };
+Object.entries(DEPARA).forEach(([antigo, novo]) => { const id = cafeId(novo);
+  if (!id) return;                                    // de-para cujo termo novo não é operação do catálogo
+  alias.push([id, 'atividades.tipo', antigo]); });    // vale também para o de-para de função: se o nome antigo
+                                                      // aparecer em atividades.tipo, conta na operação de hoje
+ordem = 0;
 graos.forEach(([fase, ops]) => ops.forEach(n => { ordem++; cat.push(['GRAOS', codigo('GRAOS', n), fase, n, ordem]); alias.push([codigo('GRAOS', n), 'atividades.tipo', n]); }));
 ordem = 0;
 pec.forEach(([fase, ops]) => ops.forEach(n => { ordem++; cat.push(['PECUARIA', codigo('PEC', n), fase, n, ordem]); alias.push([codigo('PEC', n), 'pecuaria.eventos.tipo', n]); }));

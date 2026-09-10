@@ -6,6 +6,123 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 10/09/2026 · v76 · Nomenclatura das atividades e funções do café na palavra da lavoura
+
+**Entrega.** As listas de atividade por talhão e de função de mão de obra
+do café passaram a usar os termos que o funcionário fala, e que dizem
+COMO o serviço foi feito (manual × mecanizado × químico). A lista cresceu
+de 20 para 27 termos, então o passo O QUÊ virou 4 grupos por natureza,
+recolhidos: Tratos culturais (18) · Irrigação e fertirrigação (4) ·
+Colheita e pós-colheita (3) · Estrutura e apoio (2). O cartão de
+atividade do café virou cascata de verdade — ONDE (talhão) → O QUÊ
+(grupos) → DETALHES. Regra nova em CLAUDE.md ("Nomenclatura e histórico"
+e item c14); checagem em docs/definicao-de-pronto.md, item 17.
+
+**A regra central: nenhum boletim já lançado perde sentido.** Nada do que
+foi gravado foi tocado. O de-para antigo → novo vive na tabela única
+`DEPARA_NOMES` e é aplicado só na LEITURA pela função única
+`nomeAtual(nome)`: exibição (boletim enviado, casa do gerente, "o que
+ficou de ontem", plano, resumo de uma linha, CSV, WhatsApp), comparação
+(`avaliarPlano`, filtro do painel, chave de "última receita") e
+classificação (`categoriaOperacao`/badge). No Supabase, o nome antigo
+virou APELIDO da operação de hoje em `operacao_alias` e as duas operações
+renomeadas saíram com `ativo = false` — sem `delete`, sem `update` de
+payload (`sql/049-nomenclatura-cafe.sql`).
+
+**Três colunas (o inventário exigido pela regra).**
+- *Substituídos (6 de-para):* Desbrota → Desbrota manual (atividade e
+  função); Poda / esqueletamento → Poda mecanizada esqueletamento;
+  Poda (decote/esqueletamento) → Poda mecanizada esqueletamento;
+  Roçada costal → Capina mecânica com roçadeira; Aplicação de herbicida
+  (costal) → Capina química manual; Aplicação de defensivo (costal) →
+  Pulverização manual.
+- *Acrescentados (13):* Pulverização manual · Pulverização mecanizada ·
+  Adubação manual (atividade; já existia como função) · Capina mecânica
+  com trincha · Capina mecânica com roçadeira · Capina química manual ·
+  Capina química mecanizada · Adubação via fertirrigação · Irrigação
+  manual · Irrigação automática · Desbrota manual · Poda mecanizada
+  esqueletamento · Levantar café.
+- *Mantidos (13 atividades + 18 funções):* Colheita · Catação · Repasse ·
+  Adubação via lanço · Adubação orgânica · Aplicação via drench / via
+  solo · Calagem / gessagem · Capina manual · Arruação / esparramação de
+  cisco · Monitoramento de pragas (MIP) · Limpeza do sistema de irrigação
+  · Plantio / renovação · Manutenção de estradas e aceiros · Outra; e as
+  funções de colheita, terreiro, secador/tulha, benefício, abanação,
+  varrição/rapagem, carregamento, arranquio de corda-de-viola, arruação,
+  esparramação de cisco, plantio/replantio de mudas, irrigação
+  (manutenção/filtros), limpeza de carreadores, cercas/benfeitorias,
+  apoio a máquinas e serviços gerais.
+- *Ambíguos — perguntados ao Nilo, NÃO decididos:* "Pulverização",
+  "Aplicação de herbicida", "Capina roçadeira / trincha" e "Irrigação"
+  viraram DOIS termos cada. Ficaram em `TERMOS_LEGADO` com a natureza
+  deles: saem da escolha nova, continuam legíveis e continuam somando com
+  o nome gravado. Estão em ESTADO.md › PENDÊNCIAS.
+
+**Verificado (automático, sem rede, 390 × 844 px).**
+- `node --check` no JavaScript extraído do `index.html` e no `sw.js`.
+- `scripts/checar-poluicao.cjs`: **454 ✅ · 41 ❌**, os mesmos 41 ❌
+  herdados da v58 — **nenhum ❌ novo**. A única linha que mudou de texto
+  é a do café "＋ Adicionar atividade": de "2 seletores, 5 campos, 2
+  chips, 7 rótulos" para "1 seletor, 0 campos, 0 chips, 1 rótulo" (o
+  mesmo retrato do "＋ operação" dos grãos). Ela continua ❌ porque o
+  ONDE ainda é `<select>` nas três atividades — zerar isso mexeria em
+  grãos, que esta tarefa tinha de deixar intacto; virou pendência.
+- `scripts/regressao_render.cjs` main × branch, 6 cenários: **grãos e
+  pecuária idênticos** (a única diferença nos dois é o relógio do envio,
+  12:12 × 12:13). Fora deles, só o esperado: rodapé v75 → v76, o filtro
+  "Todas as atividades" do painel com os termos novos, a contagem de
+  itens em Cadastros › Catálogos (696 → 705) e, na tela de detalhe de um
+  boletim de exemplo com "Pulverização", o badge que sumiu — corrigido
+  ainda nesta entrega pelo `TERMOS_LEGADO` (que guarda a natureza), e
+  reconferido depois.
+- **`node scripts/teste_nomenclatura.cjs`** (novo nesta entrega, fica no
+  repositório para as próximas renomeações): 23 checagens ✅, sem rede,
+  390 × 844 px. De-para antigo →
+  novo nos 6 termos; termo sem de-para volta igual; badge do termo
+  renomeado e do termo legado achando a natureza certa; plano gravado com
+  o nome ANTIGO fecha como "feito" com registro no nome NOVO, e o
+  contrário também; boletim de 08/09 semeado com "Desbrota"/"Roçada
+  costal" aparece na tela como "Desbrota manual"/"Capina mecânica com
+  roçadeira" enquanto o armazenamento continua `["Desbrota",
+  "Pulverização"]` — nada reescrito.
+  Ainda no mesmo script, os 3 passos: depois do "＋", 1 seletor e 0
+  campos; escolhido o talhão, 4 grupos e ZERO chip visível (cartão de
+  369 px); aberto "Tratos culturais", 18 chips com "Capina mecânica com
+  trincha", "Levantar café" e "Desbrota manual"; escolhida a atividade,
+  os detalhes aparecem.
+- `node scripts/gerar_categorias_operacoes.cjs`: ✅ catálogo consistente
+  (café 4/26, grãos 5/28, pecuária 5/28; ≤ 5 categorias, letra única,
+  toda operação em uma categoria).
+- Vocabulário: `git grep` por "não fez", "atrasad", "pendente", "faltou",
+  "esqueceu" no que foi tocado — nada.
+
+- `sql/049-nomenclatura-cafe.sql` rodado **2×** num PostgreSQL local
+  (pgserver), com as linhas antigas do catálogo semeadas antes: sem
+  erro, idempotente (2ª rodada = `INSERT 0 0` nos apelidos), 27
+  operações ativas de café, `CAFE-DESBROTA` e
+  `CAFE-PODA_ESQUELETAMENTO` com `ativo = false` (sem apagar), o
+  apelido "Desbrota" pertencendo às duas linhas (a antiga, inativa, e a
+  de hoje) e os termos legados continuando ativos de propósito.
+
+**Depende de teste manual (Nilo).**
+1. Rodar `sql/049-nomenclatura-cafe.sql` no SQL Editor do Supabase (uma
+   vez; pode repetir sem estragar). A conferência do fim mostra os 4
+   grupos do café e a lista "operação de hoje × nome antigo reconhecido".
+2. No iPhone, numa unidade de café: abrir o boletim, tocar em "＋
+   Adicionar atividade", escolher o talhão e conferir se ele reconhece as
+   palavras dentro de "Tratos culturais". **A pergunta que vale:** "o
+   funcionário acha aqui a palavra que ele usa?" Falta alguma? É uma
+   linha do catálogo.
+3. Abrir um boletim antigo de café (Últimos boletins) e conferir que ele
+   continua fazendo sentido, agora com os nomes de hoje.
+4. Responder as 4 perguntas de PENDÊNCIAS (mais a 5ª, sobre "Adubação via
+   lanço" e "Adubação orgânica").
+
+**Não tocado.** Nenhuma tela de grãos e de pecuária (provado pela
+regressão), nenhuma outra seção do café (clima, irrigação, colheita,
+pós-colheita, fito, ocorrências), nenhum registro já gravado, nenhuma
+tabela nova no Supabase, `syncTudo` e o caminho de sincronização.
+
 ## 10/09/2026 · v75 · Planejamento do dia seguinte no boletim + correlação planejado × executado
 
 **Entrega.** O gerente planeja SÓ o dia seguinte, ao fechar o boletim

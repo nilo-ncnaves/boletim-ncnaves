@@ -57,6 +57,12 @@ esperada), boletim_secao_resposta (resposta explícita de ausência —
 "Nada a registrar hoje", com autor e hora; escrita SÓ por gatilho a
 partir de boletins.payload.secoes) e a visão vw_completude_boletim
 (sql/047; o app só lê, sob demanda).
+Desde a v76: NENHUMA tabela nova. A revisão da nomenclatura do café só
+acrescenta LINHAS ao catálogo que já existe — operacao_catalogo (agora
+com o grupo por natureza na coluna fase) e operacao_alias (o nome antigo
+vira apelido da operação de hoje) — pelo sql/049, e desativa (ativo =
+false, sem apagar) as duas operações renomeadas. Nenhum boletim é
+reescrito.
 Desde a v75: NENHUMA tabela nova. O plano do dia seguinte viaja dentro
 de boletins.payload.plano (o app grava e lê) e o sql/048 só acrescenta
 leitura ao motor de relatórios: a visão vw_plano_x_executado e o
@@ -64,6 +70,30 @@ relatório mensal plano_x_executado_diario em relatorios_gerados (o app
 só lê, como os outros).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
+
+## Nomenclatura e histórico (REGRA PERMANENTE desde a v76)
+Os termos do app são os que o funcionário fala. Revisar nomenclatura é
+tarefa normal — reescrever o passado, nunca.
+1. **Nenhum boletim já lançado perde sentido.** Trocar o texto de um
+   termo NÃO altera nada que já foi gravado (boletins.payload e
+   companhia). O registro fica com a palavra do dia em que foi feito.
+2. **Quem traduz é a leitura.** Antigo → novo vive na tabela ÚNICA
+   `DEPARA_NOMES` do index.html, aplicada pela função única
+   `nomeAtual(nome)` em toda exibição, soma, comparação (plano, filtro,
+   última receita) e classificação (badge de categoria). Nenhuma tela
+   monta o próprio de-para.
+3. **De-para é de UM para UM.** Termo antigo que se abre em DOIS novos
+   não é adivinhado: entra em `TERMOS_LEGADO` (com a NATUREZA dele, que
+   é a mesma nos dois candidatos), sai da escolha de lançamento novo,
+   continua legível e somando, e a pergunta vai ao Nilo no resumo do PR.
+4. **Espelho no Supabase pela mesma regra:** nome antigo vira apelido em
+   `operacao_alias` (igualdade exata) e a operação substituída sai com
+   `ativo = false` — nunca `delete`, nunca `update` de payload.
+5. **PR de renomeação traz três colunas:** termo antigo → termo novo,
+   termos acrescentados, termos mantidos; mais a lista dos ambíguos.
+Prova: `node scripts/teste_nomenclatura.cjs` (sem rede, 390 px).
+Detalhe em docs/definicao-de-pronto.md, item 17; o catálogo
+vigente do café está em docs/catalogos-por-atividade.md, seção CAFÉ.
 
 ## Segurança (INEGOCIÁVEL)
 - NUNCA colocar tokens, senhas ou chaves secretas no código ou em
@@ -647,6 +677,26 @@ cruza os dois níveis sozinho — nada de status digitado.
 - Conferência: `scripts/checar-poluicao.cjs`, grupo "13. Plano do dia";
   detalhe em docs/definicao-de-pronto.md, item 16. Consolidado mensal
   opcional no Supabase: sql/048 (o app lê pela vitrine de relatórios).
+
+### c14) Lista longa de lançamento nasce agrupada e recolhida (desde a v76)
+Quando o catálogo de uma seção de lançamento cresce a ponto de virar
+listona, o passo O QUÊ passa a ser agrupado por natureza, com os grupos
+RECOLHIDOS, pelo componente ÚNICO `seletorOperacao(a, {rotulo, grupos,
+destaque, nota})` do index.html — o mesmo dos grãos desde a v58, agora
+também do café. Nunca uma variante por atividade: o que muda é o
+CATÁLOGO que quem chama passa (grãos agrupa por fase do ciclo, café por
+natureza do serviço) e o rótulo do passo ("Operação" · "Atividade").
+- **Nenhum grupo aberto por padrão.** Ao escolher o ONDE aparecem só os
+  nomes dos grupos; o toque num deles revela as operações daquele grupo,
+  em chips. Escolhida a operação, ela vira uma linha com "trocar" e só
+  então os DETALHES aparecem.
+- **Máximo 5 grupos**, os mesmos de `OP_CATEGORIAS` (o badge da c6 e o
+  grupo do seletor são a MESMA coisa — uma fonte só).
+- **Seletor nativo continua valendo no ONDE** enquanto o talhão/pivô/
+  pasto não virar chip; isso é ❌ herdado listado no ESTADO.md, igual nas
+  três atividades, e sai numa tarefa própria (mexeria nas três).
+- Conferência: `scripts/checar-poluicao.cjs`, item 4 (depois do "＋", só
+  o ONDE; nenhum campo e nenhum chip antes da escolha).
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

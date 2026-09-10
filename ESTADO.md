@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v75** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v76** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -88,6 +88,10 @@ e sanidade — oferecem o par de chips "Nada a registrar hoje" ·
 "Registrar…" quando não há registro (seção própria abaixo).
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
   irrigação (gotejo), colheita, pós-colheita, fito, ocorrências.
+  Desde a v76 a seção **Atividades por talhão** é cascata de 3 passos —
+  talhão → atividade num seletor agrupado por natureza, com os 4 grupos
+  recolhidos → detalhes — e usa a nomenclatura da lavoura (seção
+  "Nomenclatura do café na palavra da lavoura").
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
   (registro por talhão + operação escolhida em seletor agrupado por
   fase, com campos em cascata específicos de cada operação — fonte:
@@ -1140,12 +1144,84 @@ relatórios só leem as tabelas. Aviso: os prompts 04 (plano) e 21
 (matriz de acesso) dependem de tabelas ainda não criadas (sql/005-007
 e sql/001-002, listadas nas PENDÊNCIAS).
 
+## Nomenclatura do café na palavra da lavoura (v76)
+Revisão feita com o Nilo: o termo do app passou a ser o que o
+funcionário fala, e a dizer COMO o serviço foi feito (manual ×
+mecanizado × químico) — é isso que muda custo e planejamento. Vale para
+as atividades por talhão e, onde faz sentido como serviço de gente, para
+as funções de mão de obra. Catálogo completo em
+docs/catalogos-por-atividade.md, seção CAFÉ.
+
+**Onde os termos novos aparecem:** lista de atividades por talhão do
+boletim, funções de mão de obra, Cadastros › Catálogos › Café, filtro de
+atividade do painel da Diretoria, folha "📋 Amanhã" e faixa do plano,
+resumo do WhatsApp, exportação CSV e badge de categoria.
+
+**Agrupamento (o que evitou a listona).** A lista passou de 20 para 27
+termos, então o passo O QUÊ virou 4 grupos por natureza, RECOLHIDOS:
+Tratos culturais (18) · Irrigação e fertirrigação (4) · Colheita e
+pós-colheita (3) · Estrutura e apoio (2, com "Outra"). O componente é o
+`seletorOperacao` que os grãos já usavam desde a v58 — mesma função,
+mesmo visual, catálogo diferente (CLAUDE.md, c14). O cartão de atividade
+do café virou cascata de verdade: ONDE (talhão) → O QUÊ (grupos) →
+DETALHES. Nada aparece antes do toque anterior; nenhum grupo nasce
+aberto (cartão de 369 px a 390 px, com os 4 grupos fechados).
+
+**Categorias do badge (c6).** A "proposta pendente de aprovação" da v67
+para o café caiu: a categoria do café É o grupo do catálogo, ligada por
+`fase` como em grãos e pecuária. Letras: T · I · C · E.
+
+**De-para (`DEPARA_NOMES`) — a regra central.** Nenhum boletim já
+lançado foi tocado. O registro fica no banco com a palavra do dia; quem
+traduz é a leitura, pela função única `nomeAtual(nome)`, aplicada em
+exibição, soma, comparação com o plano, filtro do painel, chave de
+"última receita" e classificação do badge. De-para vigente:
+
+| termo antigo | termo de hoje | onde |
+| --- | --- | --- |
+| Desbrota | Desbrota manual | atividade e função |
+| Poda / esqueletamento | Poda mecanizada esqueletamento | atividade |
+| Poda (decote/esqueletamento) | Poda mecanizada esqueletamento | função |
+| Roçada costal | Capina mecânica com roçadeira | função |
+| Aplicação de herbicida (costal) | Capina química manual | função |
+| Aplicação de defensivo (costal) | Pulverização manual | função |
+
+**Termos legados (`TERMOS_LEGADO.CAFE`) — esperando o Nilo.** Quatro
+termos antigos se abriram em DOIS novos cada, e o app não adivinha qual
+foi: "Pulverização", "Aplicação de herbicida", "Capina roçadeira /
+trincha" e "Irrigação". Eles saíram da escolha de lançamento novo,
+continuam legíveis e continuam somando com o nome gravado; o app guarda
+a NATUREZA de cada um (a mesma nos dois candidatos), então badge e somas
+por natureza não se perdem. Decisão pendente — ver PENDÊNCIAS.
+
+**Espelho no Supabase:** `sql/049-nomenclatura-cafe.sql` (o Nilo roda uma
+vez no SQL Editor) acrescenta as operações novas em `operacao_catalogo`
+com o grupo na coluna `fase`, põe o nome antigo como apelido em
+`operacao_alias` e desativa (`ativo = false`, sem apagar) as duas
+operações renomeadas 1 para 1. O mesmo seed está recolado no `sql/040`,
+e o `sql/046` (categorias, opcional) foi regerado: café 4/26.
+
+**Provas rodadas nesta entrega** (sem rede, 390 px): boletim antigo
+semeado com "Desbrota" e "Roçada costal" continua na tela — mostrando
+"Desbrota manual" e "Capina mecânica com roçadeira" — enquanto o dado
+bruto no armazenamento segue `["Desbrota","Pulverização"]`; plano
+gravado com o nome antigo fecha como "feito" com registro no nome novo, e
+o contrário também; regressão main × branch com grãos e pecuária
+idênticos (só o relógio do envio difere).
+
 ## Telas × padrões de tela (checagem de poluição — desde 05/09/2026)
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v75, 10/09/2026:
-**454 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v75 acrescentou o grupo
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v76, 10/09/2026:
+**454 ✅ · 41 ❌** — os mesmos 41 ❌ da v58; a v76 não mexeu na contagem:
+a única linha que mudou de texto é a do "＋ Adicionar atividade" do café,
+que caiu de "2 seletores, 5 campos, 2 chips, 7 rótulos" para "1 seletor,
+0 campos, 0 chips, 1 rótulo" — o mesmo retrato do "＋ operação" dos
+grãos, e continua ❌ só porque o ONDE ainda é `<select>` (item herdado,
+igual nas três atividades, que sai numa tarefa própria: zerá-lo aqui
+mexeria em grãos, que esta tarefa tinha de deixar intacto). A v75
+acrescentou o grupo
 "13. Plano do dia" (93 itens ✅: um cenário por atividade — sem plano nada
 aparece; com plano de hoje semeado, faixa de 3 linhas no topo do boletim,
 cada item em UMA linha visual a 360 px (faixa de 154,3 px = 18,3 %), "0 de
@@ -1235,8 +1311,10 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
     lançamento — fechados ✅.
   - Mão de obra: fechada ✅ · ao abrir ❌ (5 totais com ＋/− visíveis
     antes do "＋ função") · "＋ função" ❌ (seletor + 3 campos de uma vez).
-  - Atividades por talhão: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão e
-    atividade em seletor, 7 rótulos e calda/máquinas de uma vez).
+  - Atividades por talhão: fechada ✅ · ao abrir ✅ · "＋" ❌ parcial
+    (v76: só o ONDE aparece — progressivo ✓ —, mas em seletor, não
+    chips; O QUÊ por natureza em grupos recolhidos ✓; DETALHES só depois
+    da escolha ✓ — mesmo retrato do "＋ operação" dos grãos).
   - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
     rótulos de uma vez).
   - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v69: só o par
@@ -1367,6 +1445,30 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Nomenclatura do café (v76) — quatro decisões do Nilo.** Cada termo
+  antigo abaixo virou DOIS termos novos, e o app não tem como saber qual
+  foi. Enquanto a resposta não vem, o termo antigo continua reconhecido e
+  somando com o nome que foi gravado (nada se perde), mas ele não é mais
+  oferecido em lançamento novo — quem for lançar hoje já escolhe o termo
+  específico. Respondida cada linha, é uma linha em `DEPARA_NOMES` e uma
+  linha de apelido no Supabase:
+  1. **"Pulverização"** (histórico) → Pulverização manual ou
+     Pulverização mecanizada?
+  2. **"Aplicação de herbicida"** → Capina química manual ou Capina
+     química mecanizada?
+  3. **"Capina roçadeira / trincha"** → Capina mecânica com trincha ou
+     Capina mecânica com roçadeira?
+  4. **"Irrigação"** → Irrigação manual ou Irrigação automática?
+  Uma quinta pergunta, de catálogo e não de histórico: **"Adubação via
+  lanço" e "Adubação orgânica" continuam na lista?** Elas ficaram
+  (não conflitam com "Adubação manual" nem com "Adubação via
+  fertirrigação"), mas se o pessoal não usa essas duas palavras no dia a
+  dia, elas saem e viram de-para na mesma regra.
+- **ONDE (talhão) ainda é `<select>` nas três atividades.** O passo O
+  QUÊ virou chip agrupado no café (v76) e já era nos grãos; o ONDE
+  continua em seletor nas três — é o ❌ herdado que sobra em "＋
+  Adicionar atividade" e "＋ operação". Trocar por chips é tarefa
+  própria, porque muda café, grãos e pecuária no mesmo componente.
 - **MÓDULO DE PROGRAMAÇÃO/METAS — não existe no app (bloqueia parte da
   v75).** A tarefa da v75 tinha como pré-requisito um módulo de
   programação/metas do mês (metas por unidade, semáforo de metas, fonte

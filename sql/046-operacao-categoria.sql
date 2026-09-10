@@ -1,14 +1,17 @@
--- Categoria (natureza) da operação (v67) — espelho no Supabase
+-- Categoria (natureza) da operação (v67; café revisto na v76) — espelho no Supabase
 -- Rodar no SQL Editor do Supabase (projeto syvehtgrbqteyuqhoban).
 --
 -- OPCIONAL E SÓ DEPOIS DA APROVAÇÃO: o app NÃO lê este bloco. O badge de
 -- categoria da v67 é resolvido no aparelho pelo catálogo do index.html
 -- (constante OP_CATEGORIAS). Este arquivo só mantém o espelho
 -- operacao_catalogo (sql/040) fiel ao app, para uma visão futura poder
--- agrupar por categoria. Rode apenas quando a tabela de categorias do
--- café (proposta no PR da v67) estiver aprovada; se mudar a proposta,
--- gere de novo com `node scripts/gerar_categorias_operacoes.cjs --sql`
--- e recole o trecho entre os marcadores.
+-- agrupar por categoria. Desde a v76 a categoria do café É o grupo por
+-- natureza que o gerente vê no seletor do boletim (Tratos culturais ·
+-- Irrigação e fertirrigação · Colheita e pós-colheita · Estrutura e
+-- apoio) — não há mais proposta pendente. Se mudar o catálogo, gere de
+-- novo com `node scripts/gerar_categorias_operacoes.cjs --sql` e recole
+-- o trecho entre os marcadores. Rode o sql/049 ANTES deste arquivo (é
+-- ele que cria as operações novas do café).
 --
 -- PASSO A PASSO (pelo iPhone):
 --   1. Abra o Supabase (app.supabase.com) e entre no projeto do Boletim.
@@ -19,7 +22,7 @@
 --   5. Toque em "Run".
 --   6. No fim aparece uma tabelinha de conferência (uma linha por
 --      atividade: quantas categorias e quantas operações ligadas — o
---      esperado é café 5/19, grãos 5/28, pecuária 5/28). Se aparecer erro
+--      esperado é café 4/26, grãos 5/28, pecuária 5/28). Se aparecer erro
 --      em vermelho, mande a mensagem inteira para o Claude.
 --   Pode rodar de novo quantas vezes quiser: nada se duplica, nada se
 --   apaga. Não é migração de dados: só acrescenta uma tabela pequena e
@@ -70,7 +73,7 @@ create policy "operacao_categoria leitura" on public.operacao_categoria for sele
 -- sem policy de insert/update/delete: só o SQL Editor (dono) escreve
 
 -- 3. Seed das categorias e da ligação
--- >>> seed gerado por scripts/gerar_categorias_operacoes.cjs (15 categorias, 75 operações ligadas)
+-- >>> seed gerado por scripts/gerar_categorias_operacoes.cjs (14 categorias, 82 operações ligadas)
 insert into public.operacao_categoria (id, atividade, letra, nome, ordem) values
   ('GRAOS-PRE_PLANTIO', 'GRAOS', 'R', 'Pré-plantio', 1),
   ('GRAOS-PLANTIO', 'GRAOS', 'P', 'Plantio', 2),
@@ -82,11 +85,10 @@ insert into public.operacao_categoria (id, atividade, letra, nome, ordem) values
   ('PECUARIA-REPRODUTIVO', 'PECUARIA', 'R', 'Reprodutivo', 3),
   ('PECUARIA-MANEJO_LOTE', 'PECUARIA', 'L', 'Manejo de lote', 4),
   ('PECUARIA-PASTAGEM_ESTRUTURA', 'PECUARIA', 'P', 'Pastagem e estrutura', 5),
-  ('CAFE-COLHEITA', 'CAFE', 'C', 'Colheita', 1),
-  ('CAFE-APLICACAO', 'CAFE', 'A', 'Aplicação', 2),
-  ('CAFE-TRATO_CULTURAL', 'CAFE', 'T', 'Trato cultural', 3),
-  ('CAFE-MONITORAMENTO', 'CAFE', 'M', 'Monitoramento', 4),
-  ('CAFE-IRRIGACAO_INFRA', 'CAFE', 'I', 'Irrigação e infraestrutura', 5)
+  ('CAFE-TRATO_CULTURAL', 'CAFE', 'T', 'Tratos culturais', 1),
+  ('CAFE-IRRIGACAO', 'CAFE', 'I', 'Irrigação e fertirrigação', 2),
+  ('CAFE-COLHEITA', 'CAFE', 'C', 'Colheita e pós-colheita', 3),
+  ('CAFE-ESTRUTURA', 'CAFE', 'E', 'Estrutura e apoio', 4)
 on conflict (id) do update set atividade = excluded.atividade, letra = excluded.letra, nome = excluded.nome, ordem = excluded.ordem;
 
 update public.operacao_catalogo as o set categoria_id = v.categoria_id
@@ -147,25 +149,32 @@ update public.operacao_catalogo as o set categoria_id = v.categoria_id
     ('PEC-REFORMA_DE_PASTO', 'PECUARIA-PASTAGEM_ESTRUTURA'),
     ('PEC-MANUTENCAO_DE_CERCA_COCHO_BEBEDOURO', 'PECUARIA-PASTAGEM_ESTRUTURA'),
     ('PEC-CONTROLE_DE_FORMIGA', 'PECUARIA-PASTAGEM_ESTRUTURA'),
+    ('CAFE-PULVERIZACAO_MANUAL', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-PULVERIZACAO_MECANIZADA', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-ADUBACAO_MANUAL', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-ADUBACAO_VIA_LANCO', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-ADUBACAO_ORGANICA', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-APLICACAO_VIA_DRENCH_VIA_SOLO', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CALAGEM_GESSAGEM', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CAPINA_MANUAL', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CAPINA_MECANICA_COM_TRINCHA', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CAPINA_MECANICA_COM_ROCADEIRA', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CAPINA_QUIMICA_MANUAL', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-CAPINA_QUIMICA_MECANIZADA', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-DESBROTA_MANUAL', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-PODA_MECANIZADA_ESQUELETAMENTO', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-LEVANTAR_CAFE', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-ARRUACAO_ESPARRAMACAO_DE_CISCO', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-MONITORAMENTO_DE_PRAGAS', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-PLANTIO_RENOVACAO', 'CAFE-TRATO_CULTURAL'),
+    ('CAFE-IRRIGACAO_MANUAL', 'CAFE-IRRIGACAO'),
+    ('CAFE-IRRIGACAO_AUTOMATICA', 'CAFE-IRRIGACAO'),
+    ('CAFE-ADUBACAO_VIA_FERTIRRIGACAO', 'CAFE-IRRIGACAO'),
+    ('CAFE-LIMPEZA_DO_SISTEMA_DE_IRRIGACAO', 'CAFE-IRRIGACAO'),
     ('CAFE-COLHEITA', 'CAFE-COLHEITA'),
     ('CAFE-CATACAO', 'CAFE-COLHEITA'),
     ('CAFE-REPASSE', 'CAFE-COLHEITA'),
-    ('CAFE-PULVERIZACAO', 'CAFE-APLICACAO'),
-    ('CAFE-APLICACAO_DE_HERBICIDA', 'CAFE-APLICACAO'),
-    ('CAFE-ADUBACAO_VIA_LANCO', 'CAFE-APLICACAO'),
-    ('CAFE-ADUBACAO_ORGANICA', 'CAFE-APLICACAO'),
-    ('CAFE-APLICACAO_VIA_DRENCH_VIA_SOLO', 'CAFE-APLICACAO'),
-    ('CAFE-CALAGEM_GESSAGEM', 'CAFE-APLICACAO'),
-    ('CAFE-CAPINA_MANUAL', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-CAPINA_ROCADEIRA_TRINCHA', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-ARRUACAO_ESPARRAMACAO_DE_CISCO', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-DESBROTA', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-PODA_ESQUELETAMENTO', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-MONITORAMENTO_DE_PRAGAS', 'CAFE-MONITORAMENTO'),
-    ('CAFE-LIMPEZA_DO_SISTEMA_DE_IRRIGACAO', 'CAFE-IRRIGACAO_INFRA'),
-    ('CAFE-IRRIGACAO', 'CAFE-IRRIGACAO_INFRA'),
-    ('CAFE-PLANTIO_RENOVACAO', 'CAFE-TRATO_CULTURAL'),
-    ('CAFE-MANUTENCAO_DE_ESTRADAS_E_ACEIROS', 'CAFE-IRRIGACAO_INFRA')
+    ('CAFE-MANUTENCAO_DE_ESTRADAS_E_ACEIROS', 'CAFE-ESTRUTURA')
   ) as v (operacao_id, categoria_id)
   where o.id = v.operacao_id;
 -- <<< seed gerado

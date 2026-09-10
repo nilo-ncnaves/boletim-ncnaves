@@ -151,8 +151,104 @@ As listas são filtradas pela cultura do ciclo do talhão.
 ---
 
 ## CAFÉ
-Catálogo original do app (LISTA_ATIV, LISTA_FUNCOES, SUGESTAO_FITO)
-— INTOCADO por este redesenho.
+Fonte: `OPS_CAFE_GRUPOS`, `LISTA_FUNCOES`, `DEPARA_NOMES`,
+`TERMOS_LEGADO` e `SUGESTAO_FITO` do index.html. Revisto na v76 com o
+Nilo: o termo é o que o funcionário fala, e diz COMO o serviço foi feito
+(manual × mecanizado × químico), porque é isso que muda o custo e o
+planejamento. Nada do que já foi lançado é reescrito — quem traduz nome
+antigo para nome de hoje é a leitura (item 17 da definição de pronto).
+
+### Princípios de tela (café)
+- Atividade por talhão em 3 passos: ONDE (talhão) → O QUÊ (grupos por
+  natureza, RECOLHIDOS; toque no grupo abre só as operações dele) →
+  DETALHES (pessoas, como terminou o dia, calda, máquinas). Nada do
+  passo seguinte aparece antes do toque no anterior; nenhum grupo nasce
+  aberto. O seletor agrupado é o componente ÚNICO `seletorOperacao`, o
+  mesmo dos grãos — lá o grupo é a FASE do ciclo, aqui é a NATUREZA do
+  serviço (CLAUDE.md, c4).
+- Irrigação de café é seção própria (💧 gotejo). As operações
+  "Irrigação manual", "Irrigação automática" e "Adubação via
+  fertirrigação" existem na lista por talhão porque são serviço de gente
+  no talhão, com custo e apontamento — não substituem a seção.
+
+### Operações por talhão — 4 grupos, 27 termos (`OPS_CAFE_GRUPOS`)
+**Tratos culturais (badge T) — 18**
+Pulverização manual · Pulverização mecanizada · Adubação manual ·
+Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo
+· Calagem / gessagem · Capina manual · Capina mecânica com trincha ·
+Capina mecânica com roçadeira · Capina química manual · Capina química
+mecanizada · Desbrota manual · Poda mecanizada esqueletamento ·
+Levantar café · Arruação / esparramação de cisco · Monitoramento de
+pragas (MIP) · Plantio / renovação
+
+**Irrigação e fertirrigação (badge I) — 4**
+Irrigação manual · Irrigação automática · Adubação via fertirrigação ·
+Limpeza do sistema de irrigação
+
+**Colheita e pós-colheita (badge C) — 3**
+Colheita · Catação · Repasse
+
+**Estrutura e apoio (badge E) — 2**
+Manutenção de estradas e aceiros · Outra
+
+"Outra" não é operação identificável: não entra no espelho do Supabase
+nem recebe badge. Termos que o escritório acrescentar em Cadastros ›
+Catálogos entram num 5º grupo, "Outras (cadastro do escritório)", que só
+aparece quando existe pelo menos um.
+
+### Funções de mão de obra — 25 (`LISTA_FUNCOES`)
+Colheita manual (derriça) · Varrição / rapagem · Abanação ·
+Carregamento de café · Terreiro (mexer/rodar café) · Secador / tulha
+(apoio) · Benefício (apoio) · Capina manual · Capina mecânica com
+roçadeira · Capina química manual · Arranquio de corda-de-viola ·
+Desbrota manual · Poda mecanizada esqueletamento · Levantar café ·
+Arruação · Esparramação de cisco · Adubação manual · Pulverização manual
+· Plantio / replantio de mudas · Irrigação manual · Irrigação
+(manutenção/filtros) · Limpeza de carreadores · Manutenção de
+cercas/benfeitorias · Apoio a máquinas (abastecimento) · Serviços gerais
+
+A lista de funções é de MÃO DE OBRA: entram os serviços que uma pessoa
+faz. Os termos mecanizados que só existem como operação de máquina
+(Pulverização mecanizada, Capina mecânica com trincha, Capina química
+mecanizada, Irrigação automática, Adubação via fertirrigação) ficam de
+fora daqui — quem trabalha na máquina aparece em "Apoio a máquinas
+(abastecimento)" e a máquina é apontada na própria atividade.
+"Irrigação (manutenção/filtros)" continua separada de "Irrigação
+manual": uma é conserto, a outra é molhar a lavoura.
+
+### De-para de nomenclatura (v76) — `DEPARA_NOMES`
+Termo antigo → termo de hoje. Vale na LEITURA (exibição, soma, plano,
+filtro, badge); o registro no banco nunca muda.
+
+| termo antigo | termo de hoje | onde |
+| --- | --- | --- |
+| Desbrota | Desbrota manual | atividade e função |
+| Poda / esqueletamento | Poda mecanizada esqueletamento | atividade |
+| Poda (decote/esqueletamento) | Poda mecanizada esqueletamento | função |
+| Roçada costal | Capina mecânica com roçadeira | função |
+| Aplicação de herbicida (costal) | Capina química manual | função |
+| Aplicação de defensivo (costal) | Pulverização manual | função |
+
+### Termos legados — `TERMOS_LEGADO.CAFE` (aguardam decisão do Nilo)
+Um antigo que se abriu em DOIS novos: o app não adivinha. Some da
+escolha de lançamento novo, continua legível e continua somando com o
+nome gravado. O valor guardado é a NATUREZA, igual nos dois candidatos,
+para o badge e as somas por natureza não se perderem.
+
+| termo antigo | natureza | pergunta em aberto |
+| --- | --- | --- |
+| Pulverização | Tratos culturais | manual ou mecanizada? |
+| Aplicação de herbicida | Tratos culturais | capina química manual ou mecanizada? |
+| Capina roçadeira / trincha | Tratos culturais | com trincha ou com roçadeira? |
+| Irrigação | Irrigação e fertirrigação | manual ou automática? |
+
+### Espelho no Supabase
+`operacao_catalogo` (o grupo vai na coluna `fase`) e `operacao_alias` (o
+nome antigo é apelido da operação de hoje), gerados por
+`node scripts/gerar_catalogo_operacoes.cjs`. O bloco pronto para rodar
+está em `sql/049-nomenclatura-cafe.sql`; o mesmo seed está recolado
+entre os marcadores do `sql/040`. As duas operações renomeadas 1 para 1
+saem de cena com `ativo = false` — nunca com `delete`.
 
 ## PECUÁRIA (módulo de campo — v50)
 
@@ -402,20 +498,23 @@ NÃO foi copiado); fundo neutro único, sem cor por categoria (a cor é
 canal do farol). Operação sem categoria ("Outra", termo acrescentado
 pelo escritório) não tem badge.
 
-### ☕ Café — PROPOSTA (pendente de aprovação do Nilo)
-O catálogo do café (LISTA_ATIV) não tem fase; as 5 categorias abaixo
-são proposta desta entrega e podem ser trocadas antes do merge (só
-dados: `OP_CATEGORIAS.CAFE` e esta tabela).
+### ☕ Café — categoria = grupo do catálogo (OPS_CAFE_GRUPOS), desde a v76
+Até a v75 as categorias do café eram uma proposta à parte, pendente de
+aprovação. Na v76 a proposta caiu: a categoria do café É o grupo por
+natureza que o gerente vê no seletor do boletim, ligado por `fase`
+exatamente como em grãos e pecuária. Uma fonte só, um agrupamento só.
 
-| Letra | Categoria | Operações (LISTA_ATIV) |
+| Letra | Categoria (grupo) | Operações |
 |---|---|---|
-| **C** | Colheita | Colheita · Catação · Repasse |
-| **A** | Aplicação (natureza: levar insumo à lavoura, qualquer produto) | Pulverização · Aplicação de herbicida · Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo · Calagem / gessagem |
-| **T** | Trato cultural (manejo da planta e do solo, manual ou mecânico) | Capina manual · Capina roçadeira / trincha · Arruação / esparramação de cisco · Desbrota · Poda / esqueletamento · Plantio / renovação |
-| **M** | Monitoramento | Monitoramento de pragas (MIP) |
-| **I** | Irrigação e infraestrutura | Irrigação · Limpeza do sistema de irrigação · Manutenção de estradas e aceiros |
+| **T** | Tratos culturais | Pulverização manual · Pulverização mecanizada · Adubação manual · Adubação via lanço · Adubação orgânica · Aplicação via drench / via solo · Calagem / gessagem · Capina manual · Capina mecânica com trincha · Capina mecânica com roçadeira · Capina química manual · Capina química mecanizada · Desbrota manual · Poda mecanizada esqueletamento · Levantar café · Arruação / esparramação de cisco · Monitoramento de pragas (MIP) · Plantio / renovação |
+| **I** | Irrigação e fertirrigação | Irrigação manual · Irrigação automática · Adubação via fertirrigação · Limpeza do sistema de irrigação |
+| **C** | Colheita e pós-colheita | Colheita · Catação · Repasse |
+| **E** | Estrutura e apoio | Manutenção de estradas e aceiros |
 
-"Outra": sem categoria, sem badge.
+"Outra": sem categoria, sem badge. Termo ANTIGO gravado num boletim de
+antes da v76 continua com badge: o de-para (`DEPARA_NOMES`) leva ao
+termo de hoje e, quando o antigo é ambíguo, `TERMOS_LEGADO` guarda a
+natureza dele — que é a mesma nos dois candidatos.
 
 ### 🌾 Grãos — categoria = fase do catálogo (OPS_GRAOS_FASES)
 | Letra | Categoria (fase) | Operações |
@@ -534,6 +633,13 @@ café, cafezal, cereja, florada, requeima, lata, latas, terreiro,
 secador, tulha, gotejo, gotejadores, derriça, desbrota, arruação,
 esparramação, peneira, catação, bicho-mineiro, broca-do-café,
 passada, repasse, maturação, benefício
+
+> A revisão de nomenclatura da v76 não acrescentou termo exclusivo
+> novo: "desbrota" já estava na lista (e "Desbrota manual" a contém),
+> "Levantar café" cai em "café", e "trincha", "roçadeira",
+> "pulverização", "capina", "adubação" e "fertirrigação" têm uso
+> legítimo em grãos e/ou pecuária — pelo mesmo motivo que "roçada" e
+> "plantio" ficaram de fora desde o começo.
 
 ### Grãos
 pivô, pivôs, soja, milho, feijão, percentímetro, dessecação,

@@ -1503,17 +1503,17 @@ const OP_CATEGORIAS={
     {id:"REPRODUTIVO",letra:"R",nome:"Reprodutivo",fase:"Reprodutivo"},
     {id:"MANEJO_LOTE",letra:"L",nome:"Manejo de lote",fase:"Manejo de lote"},
     {id:"PASTAGEM_ESTRUTURA",letra:"P",nome:"Pastagem e estrutura",fase:"Pastagem e estrutura"}],
-  CAFE:[ /* proposta da v67 — pendente de aprovação do Nilo; mudar aqui e no docs/catalogos-por-atividade.md */
-    {id:"COLHEITA",letra:"C",nome:"Colheita",operacoes:["CAFE-COLHEITA","CAFE-CATACAO","CAFE-REPASSE"]},
-    {id:"APLICACAO",letra:"A",nome:"Aplicação",operacoes:["CAFE-PULVERIZACAO","CAFE-APLICACAO_DE_HERBICIDA","CAFE-ADUBACAO_VIA_LANCO","CAFE-ADUBACAO_ORGANICA","CAFE-APLICACAO_VIA_DRENCH_VIA_SOLO","CAFE-CALAGEM_GESSAGEM"]},
-    {id:"TRATO_CULTURAL",letra:"T",nome:"Trato cultural",operacoes:["CAFE-CAPINA_MANUAL","CAFE-CAPINA_ROCADEIRA_TRINCHA","CAFE-ARRUACAO_ESPARRAMACAO_DE_CISCO","CAFE-DESBROTA","CAFE-PODA_ESQUELETAMENTO","CAFE-PLANTIO_RENOVACAO"]},
-    {id:"MONITORAMENTO",letra:"M",nome:"Monitoramento",operacoes:["CAFE-MONITORAMENTO_DE_PRAGAS"]},
-    {id:"IRRIGACAO_INFRA",letra:"I",nome:"Irrigação e infraestrutura",operacoes:["CAFE-IRRIGACAO","CAFE-LIMPEZA_DO_SISTEMA_DE_IRRIGACAO","CAFE-MANUTENCAO_DE_ESTRADAS_E_ACEIROS"]}]
+  CAFE:[ /* v76: a categoria virou o GRUPO do catálogo (OPS_CAFE_GRUPOS), ligada por `fase` como nas outras
+            duas atividades — o mesmo agrupamento por natureza que o gerente vê no seletor */
+    {id:"TRATO_CULTURAL",letra:"T",nome:"Tratos culturais",fase:"Tratos culturais"},
+    {id:"IRRIGACAO",letra:"I",nome:"Irrigação e fertirrigação",fase:"Irrigação e fertirrigação"},
+    {id:"COLHEITA",letra:"C",nome:"Colheita e pós-colheita",fase:"Colheita e pós-colheita"},
+    {id:"ESTRUTURA",letra:"E",nome:"Estrutura e apoio",fase:"Estrutura e apoio"}]
 };
 /* código da operação = id de operacao_catalogo (sql/040), pela MESMA regra de scripts/gerar_catalogo_operacoes.cjs */
 const codigoOperacao=(prefixo,nome)=>prefixo+"-"+String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\(.*?\)/g,"").replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"");
 /* catálogo de operações de cada atividade no formato [[fase, [nomes]]] + prefixo do código (café: sem fase, sem "Outra") */
-const OP_CATALOGO_FONTE={CAFE:()=>["CAFE",[[null,LISTA_ATIV.filter(n=>n!=="Outra")]]],GRAOS:()=>["GRAOS",OPS_GRAOS_FASES],PECUARIA:()=>["PEC",OPS_PECUARIA_FASES]};
+const OP_CATALOGO_FONTE={CAFE:()=>["CAFE",OPS_CAFE_GRUPOS.map(([g,ops])=>[g,ops.filter(n=>n!=="Outra")])],GRAOS:()=>["GRAOS",OPS_GRAOS_FASES],PECUARIA:()=>["PEC",OPS_PECUARIA_FASES]};
 let opCatIndice=null;
 function opCategoriaIndice(){
   if(opCatIndice) return opCatIndice;
@@ -1523,6 +1523,9 @@ function opCategoriaIndice(){
     fases.forEach(([fase,ops])=>ops.forEach(nome=>{ const id=codigoOperacao(pref,nome);
       const cat=OP_CATEGORIAS[atv].find(c=>(c.fase!=null && c.fase===fase) || (c.operacoes||[]).includes(id));
       if(cat){ porId[id]=cat; porNome[nome]=cat; } }));
+    /* termo legado (v76): sem operação de hoje, mas com natureza conhecida — o badge do histórico fica */
+    Object.entries(TERMOS_LEGADO[atv]||{}).forEach(([nome,grupo])=>{
+      const cat=OP_CATEGORIAS[atv].find(c=>c.fase===grupo); if(cat) porNome[nome]=cat; });
     opCatIndice[atv]={porId,porNome};
   });
   return opCatIndice;
@@ -1530,7 +1533,8 @@ function opCategoriaIndice(){
 /* categoria de uma operação: pelo id do catálogo (linhas das visões) ou pelo nome EXATO gravado no boletim (apelido) */
 function categoriaOperacao(atv, ref){
   const ix=opCategoriaIndice()[atv]; if(!ix||!ref) return null;
-  return (ref.id && ix.porId[ref.id]) || (ref.nome && ix.porNome[ref.nome]) || null;
+  /* v76: nome gravado antes do de-para (boletim antigo) acha a categoria pelo nome de hoje */
+  return (ref.id && ix.porId[ref.id]) || (ref.nome && (ix.porNome[ref.nome] || ix.porNome[nomeAtual(ref.nome)])) || null;
 }
 /* Componente ÚNICO do badge (v67), igual nas três atividades: uma letra maiúscula em fundo neutro; nome da
    categoria em aria-label e title (leitor de tela); toque mostra o nome (ligarEventos). Sem categoria → "". */
@@ -1733,17 +1737,6 @@ function pintarSecoesResposta(r){ limparRespostasSecao(r);
     const cx=document.querySelector(`[data-resp-secao="${s.id}"]`); if(cx) cx.innerHTML=chipsRespostaInner(r,s);
     const sp=document.getElementById(s.resumo); if(!sp) return;
     const e=estadoSecao(r,s); sp.textContent=textoEstadoSecao(r,s); sp.classList.toggle("neutro", e.k!=="registros"); }); }
-/* ATIVIDADES POR TALHÃO por atividade: café mantém o select de sempre; grãos usa o catálogo por fase */
-function opcoesAtiv(fz, sel){
-  if(atividadeDe(fz)!=="GRAOS"){ const lst=[...LISTA_ATIV,...catExtra("operacoes:CAFE")];
-    return ["<option value=''>Selecione…</option>",...lst.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`),(sel&&!lst.includes(sel)?`<option selected>${esc(sel)}</option>`:"")].join(""); }
-  const fases = fasesDa("SOJA");
-  const todas = fases.flatMap(([,ops])=>ops);
-  return "<option value=''>Selecione…</option>"
-    + fases.map(([fase,ops])=>`<optgroup label="${esc(fase)}">${ops.map(t=>`<option ${sel===t?"selected":""}>${t}</option>`).join("")}</optgroup>`).join("")
-    + `<option>Outra</option>`
-    + (sel && sel!=="Outra" && !todas.includes(sel) ? `<option selected>${esc(sel)}</option>` : "");
-}
 function temPecuaria(r){
   const p=r&&r.pecuaria; if(!p) return false;
   const algo=o=>!!o&&Object.values(o).some(v=>v!==""&&v!=null);
@@ -3193,17 +3186,62 @@ const opcoesTalhao = (fz,sel) => ["<option value=''>Selecione…</option>",
   ...talhoesDa(fz).filter(t=>t.tipo!=="ARRENDADO"||sel===t.id).map(t=>`<option value="${t.id}" ${sel===t.id?"selected":""}>${esc(t.nome)} — ${t.area} ha</option>`),
   `<option value="geral" ${sel==="geral"?"selected":""}>Área geral / sede</option>`].join("");
 const boletinsOrdenados = () => [...D.boletins].sort((a,b)=>b.data.localeCompare(a.data));
-const LISTA_ATIV = ["Colheita","Catação","Repasse","Pulverização","Aplicação de herbicida","Adubação via lanço","Adubação orgânica","Aplicação via drench / via solo","Calagem / gessagem","Capina manual","Capina roçadeira / trincha","Arruação / esparramação de cisco","Desbrota","Poda / esqueletamento","Monitoramento de pragas (MIP)","Limpeza do sistema de irrigação","Irrigação","Plantio / renovação","Manutenção de estradas e aceiros","Outra"];
+/* ===== CAFÉ — operações por talhão, na palavra da lavoura (v76) =====
+   Nomenclatura oficial revista com o Nilo: os termos são os que o funcionário usa e dizem
+   COMO o serviço foi feito (manual × mecanizado × químico), porque é isso que muda o custo.
+   Agrupadas por natureza e RECOLHIDAS no seletor (padrão de 3 passos): nada aparece antes
+   do toque. Fonte oficial do vocabulário: docs/catalogos-por-atividade.md, seção CAFÉ.
+   Termo renomeado nunca reescreve boletim: o de-para vive em DEPARA_NOMES, logo abaixo. */
+const OPS_CAFE_GRUPOS = [
+  ["Tratos culturais",["Pulverização manual","Pulverização mecanizada","Adubação manual","Adubação via lanço","Adubação orgânica","Aplicação via drench / via solo","Calagem / gessagem","Capina manual","Capina mecânica com trincha","Capina mecânica com roçadeira","Capina química manual","Capina química mecanizada","Desbrota manual","Poda mecanizada esqueletamento","Levantar café","Arruação / esparramação de cisco","Monitoramento de pragas (MIP)","Plantio / renovação"]],
+  ["Irrigação e fertirrigação",["Irrigação manual","Irrigação automática","Adubação via fertirrigação","Limpeza do sistema de irrigação"]],
+  ["Colheita e pós-colheita",["Colheita","Catação","Repasse"]],
+  ["Estrutura e apoio",["Manutenção de estradas e aceiros","Outra"]]
+];
+const LISTA_ATIV = OPS_CAFE_GRUPOS.flatMap(([,ops])=>ops);
 const LISTA_CLIMA = ["Ensolarado","Nublado","Garoa","Chuva fraca","Chuva forte","Geada","Granizo"];
 const LISTA_FUNCOES = [
   "Colheita manual (derriça)","Varrição / rapagem","Abanação","Carregamento de café",
   "Terreiro (mexer/rodar café)","Secador / tulha (apoio)","Benefício (apoio)",
-  "Capina manual","Roçada costal","Aplicação de herbicida (costal)","Arranquio de corda-de-viola",
-  "Desbrota","Poda (decote/esqueletamento)","Arruação","Esparramação de cisco",
-  "Adubação manual","Aplicação de defensivo (costal)","Plantio / replantio de mudas",
-  "Irrigação (manutenção/filtros)","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
+  "Capina manual","Capina mecânica com roçadeira","Capina química manual","Arranquio de corda-de-viola",
+  "Desbrota manual","Poda mecanizada esqueletamento","Levantar café","Arruação","Esparramação de cisco",
+  "Adubação manual","Pulverização manual","Plantio / replantio de mudas",
+  "Irrigação manual","Irrigação (manutenção/filtros)","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
   "Apoio a máquinas (abastecimento)","Serviços gerais"
 ];
+/* ===== De-para de nomenclatura (v76) — termo ANTIGO → termo NOVO =====
+   REGRA PERMANENTE: renomear termo NUNCA reescreve boletim. O registro fica no banco
+   exatamente como foi gravado; o app traduz na LEITURA (exibição, soma, comparação com o
+   plano, filtro do painel, meta) por esta tabela única, `nomeAtual`. Assim boletim antigo,
+   meta antiga e relatório antigo continuam somando — e passam a mostrar o nome novo.
+   Só entram aqui os de-para de UM antigo para UM novo. Antigo que se abriu em DOIS novos
+   (a decisão é do Nilo, não do código) fica em TERMOS_LEGADO: sai da escolha nova, continua
+   reconhecido e somando com o nome que foi gravado. Espelho no Supabase: operacao_alias
+   (sql/049), pela mesma regra de igualdade EXATA — nunca por pedaço de nome. */
+const DEPARA_NOMES = {
+  /* atividades por talhão (café) */
+  "Desbrota":"Desbrota manual",
+  "Poda / esqueletamento":"Poda mecanizada esqueletamento",
+  /* funções de mão de obra (café) */
+  "Roçada costal":"Capina mecânica com roçadeira",
+  "Aplicação de herbicida (costal)":"Capina química manual",
+  "Aplicação de defensivo (costal)":"Pulverização manual",
+  "Poda (decote/esqueletamento)":"Poda mecanizada esqueletamento"
+};
+/* Antigos que o termo novo não resolve sozinho (UM antigo → DOIS novos): a escolha é do Nilo,
+   não do código. Não são oferecidos em lançamento novo e o histórico segue com o nome gravado.
+   O valor é a NATUREZA (grupo do catálogo), que é a mesma nos dois candidatos — então o badge de
+   categoria e qualquer soma por natureza continuam certos enquanto a decisão não vem. */
+const TERMOS_LEGADO = {
+  CAFE:{
+    "Pulverização":"Tratos culturais",              /* → manual ou mecanizada? */
+    "Aplicação de herbicida":"Tratos culturais",    /* → capina química manual ou mecanizada? */
+    "Capina roçadeira / trincha":"Tratos culturais",/* → com trincha ou com roçadeira? */
+    "Irrigação":"Irrigação e fertirrigação"         /* → manual ou automática? */
+  }
+};
+/* tradutor único de leitura: nome gravado → nome de hoje (desconhecido volta igual) */
+const nomeAtual = n => DEPARA_NOMES[String(n==null?"":n).trim()] || n;
 const LISTA_FITO_TIPO = ["Praga","Doença","Planta daninha"];
 const SUGESTAO_FITO = {"Praga":["Broca-do-café","Bicho-mineiro","Cigarra","Ácaro-vermelho","Cochonilha","Lagarta"],
   "Doença":["Ferrugem","Cercosporiose","Phoma","Mancha-aureolada","Antracnose"],
@@ -3244,7 +3282,7 @@ function novoRascunho(dataBase){
     id:null, data:dataBase||hojeISO(), fazendaId:fz,
     responsavel: (typeof nomeRespLembrado!=="undefined" && nomeRespLembrado) ? nomeRespLembrado : "",
     pendAnterior: ontem ? [
-      ...(ontem.atividades||[]).filter(a=>a.status==="continua").map(a=>"⏳ "+(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(a.falta?" (falta: "+a.falta+")":"")),
+      ...(ontem.atividades||[]).filter(a=>a.status==="continua").map(a=>"⏳ "+(nomeAtual(a.tipo)||"Atividade")+" — "+talhao(a.talhaoId).nome+(a.falta?" (falta: "+a.falta+")":"")),
       ontem.pendencias||""
     ].filter(Boolean).join("\n") : "",
     clima:{cond:"", tmin:"", tmax:"", chuvaMm:"", florada:"", requeima:"", obs:""},
@@ -3394,7 +3432,7 @@ function vCasaGerente(){
     ${ontem && (ontem.pendencias || (ontem.atividades||[]).some(a=>a.status==="continua"))?`
     <div class="cartao mt"><h3>O que ficou de ${fmtData(ontem.data)}</h3>
       ${(ontem.atividades||[]).filter(a=>a.status==="continua").map(a=>`
-        <p class="mt">⏳ <b>${esc(a.tipo||"Atividade")}</b> — ${esc(talhao(a.talhaoId).nome)}${a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}</p>`).join("")}
+        <p class="mt">⏳ <b>${esc(nomeAtual(a.tipo)||"Atividade")}</b> — ${esc(talhao(a.talhaoId).nome)}${a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}</p>`).join("")}
       ${ontem.pendencias?`<p class="mt" style="white-space:pre-wrap">${esc(ontem.pendencias)}</p>`:""}</div>`:""}
     <div class="cartao mt"><h3>Últimos boletins desta fazenda</h3>
       <ul class="lista-limpa">${boletinsOrdenados().filter(x=>x.fazendaId===fz).slice(0,5).map(x=>`
@@ -3409,7 +3447,7 @@ function vCasaGerente(){
 }
 function resumo1linha(b){
   const parts=[];
-  const ats=(b.atividades||[]).map(a=>a.tipo.split(" —")[0]);
+  const ats=(b.atividades||[]).map(a=>nomeAtual(a.tipo||"").split(" —")[0]);
   if(ats.length) parts.push([...new Set(ats)].slice(0,3).join(", "));
   const sac=(b.colheita||[]).reduce((s,c)=>s+n0(c.sacas),0);
   if(sac) parts.push(sac+" sacas");
@@ -3569,11 +3607,11 @@ const PLANO_ATIVIDADE={
   CAFE:{ ondeRot:"Talhão", ondeGeral:"Área geral",
     onde:fz=>talhoesDa(fz).filter(t=>t.fazendaId===fz&&t.tipo!=="ESTRUTURA"&&t.tipo!=="ARRENDADO").map(t=>({id:t.id,nome:t.nome})),
     ops:()=>LISTA_ATIV.filter(n=>n!=="Outra"),
-    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:a.tipo,onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua"})) },
   GRAOS:{ ondeRot:"Talhão / pivô", ondeGeral:"Área geral / sede",
     onde:fz=>talhoesAnuais(fz).map(t=>({id:t.id,nome:t.nome})),
     ops:()=>OPS_GRAOS_FASES.flatMap(([,ops])=>ops),
-    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:a.tipo,onde:a.talhaoId||"",parcial:a.status==="continua"})) },
+    feitos:b=>(b.atividades||[]).filter(a=>a.tipo).map(a=>({op:nomeAtual(a.tipo),onde:a.talhaoId||"",parcial:a.status==="continua"})) },
   PECUARIA:{ ondeRot:"Pasto / retiro", ondeGeral:"Toda a fazenda",
     onde:fz=>pastosCadastrados(fz).map(nm=>({id:nm,nome:nm})),
     ops:()=>LISTA_PECUARIA,
@@ -3613,7 +3651,7 @@ function avaliarPlano(plano, b){
   const feitos=(planoCat(b.fazendaId).feitos(b)||[]);
   const itens=(plano.itens||[]).map(it=>{
     const ondes=(it.ondes||[]).length?it.ondes:["geral"];
-    const casa=onde=>feitos.filter(f=>f.op===it.op && (onde==="geral" || !f.onde || f.onde==="geral" || f.onde===onde));
+    const casa=onde=>feitos.filter(f=>f.op===nomeAtual(it.op) && (onde==="geral" || !f.onde || f.onde==="geral" || f.onde===onde));
     const achados=ondes.map(casa);
     const cobertos=achados.filter(l=>l.length).length;
     const soParcial=achados.some(l=>l.length && l.every(f=>f.parcial));
@@ -3698,7 +3736,7 @@ function htmlPlanoFaixaCorpo(r, plano){
       <b class="cresce">📋 O plano de ontem para hoje <span class="mut plano-conta">${av.feito} de ${av.n} ✅</span></b>
       <button class="btn suave mini" id="bt-plano-ajustar">ajustar</button></div>
     ${av.itens.map(it=>`<div class="plano-item"><span class="plano-st" aria-hidden="true">${PLANO_ST[it.status].ico}</span>
-      <b>${badgeCategoria(atv,{nome:it.op})}${esc(it.op)}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+"p":""}</span>
+      <b>${badgeCategoria(atv,{nome:it.op})}${esc(nomeAtual(it.op))}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+"p":""}</span>
       <span class="plano-ler">${esc(PLANO_ST[it.status].rot)}</span></div>`).join("")}
     ${plano.obs?`<p class="mut" style="margin:6px 0 0;font-size:.78rem">${esc(plano.obs)}</p>`:""}
     ${plano.replanejado?`<p class="mut" style="margin:6px 0 0;font-size:.76rem">Plano replanejado hoje.</p>`:""}`;
@@ -3775,9 +3813,10 @@ function planoSugestao(r){
   (r.atividades||[]).forEach(a=>{
     if(a.status!=="continua" || !a.tipo) return;
     const onde=(a.talhaoId&&a.talhaoId!=="geral")?a.talhaoId:"geral";
-    const ja=out.find(x=>x.op===a.tipo);
+    const op=nomeAtual(a.tipo);
+    const ja=out.find(x=>x.op===op);
     if(ja){ if(!ja.ondes.includes(onde)) ja.ondes.push(onde); return; }
-    if(out.length<PLANO_MAX_ITENS) out.push({op:a.tipo, ondes:[onde], pessoas:String(n0(a.pessoas)||""), sugerido:true});
+    if(out.length<PLANO_MAX_ITENS) out.push({op, ondes:[onde], pessoas:String(n0(a.pessoas)||""), sugerido:true});
   });
   return out;
 }
@@ -3789,8 +3828,8 @@ function planoFolhaHtml(){
     ${u.motivo.id==="outro"?`<input id="plano-motivo-txt" value="${esc(u.motivo.texto||"")}" placeholder="O que foi?" style="margin-top:8px">`:""}</div>`;
   const lista = u.itens.length
     ? u.itens.map((it,i)=>`<div class="linha-flex plano-item-ed" data-plano-item="${i}">
-        <span class="cresce"><b>${esc(it.op)}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+" pessoa"+(n0(it.pessoas)>1?"s":""):""}</span>${it.sugerido?` <span class="tag verde">sugestão</span>`:""}</span>
-        <button class="btn suave mini" data-plano-rm="${i}" aria-label="Remover ${esc(it.op)} do plano">remover</button></div>`).join("")
+        <span class="cresce"><b>${esc(nomeAtual(it.op))}</b><span class="mut"> — ${esc(it.ondes.map(o=>planoOndeNome(fz,o)).join(", "))}${n0(it.pessoas)?" · "+n0(it.pessoas)+" pessoa"+(n0(it.pessoas)>1?"s":""):""}</span>${it.sugerido?` <span class="tag verde">sugestão</span>`:""}</span>
+        <button class="btn suave mini" data-plano-rm="${i}" aria-label="Remover ${esc(nomeAtual(it.op))} do plano">remover</button></div>`).join("")
     : `<p class="mut" id="plano-vazio">Nenhuma linha ainda. Toque em ＋ para escrever o plano de amanhã, ou pule.</p>`;
   let passos="";
   if(nv.ativo){
@@ -3989,8 +4028,21 @@ function linhasProdutos(lista,pref,rotDose){
     ${(lista||[]).length>1?`<button class="btn suave mini mt" data-${pref}-rm="${i}">remover produto</button>`:""}
   </div>`).join("");
 }
-/* Seletor de operação AGRUPADO POR FASE, com as fases recolhidas (nada de listona aberta):
-   toca na fase → ela expande e mostra só as operações dela. Filtrado pela cultura do ciclo. */
+/* Seletor de operação AGRUPADO, com os grupos RECOLHIDOS (nada de listona aberta): toca no grupo
+   → ele expande e mostra só as operações dele. Componente ÚNICO das atividades que o usam
+   (CLAUDE.md, c4): o vocabulário — rótulo do passo, nome dos grupos, operações e o grupo em
+   destaque — vem de quem chama, nunca de `if(atividade==="…")`. Grãos agrupa por FASE do ciclo;
+   café, por NATUREZA do serviço (v76). O nome já escolhido aparece pelo termo de hoje (nomeAtual),
+   mesmo que o boletim tenha sido gravado com o nome antigo. */
+function seletorOperacao(a,{rotulo,grupos,destaque,nota}){
+  if(a.tipo) return `<label>${rotulo}</label>
+    <div class="linha-flex"><span class="cresce"><b>${esc(nomeAtual(a.tipo))}</b></span>
+      <button class="btn suave mini" data-troca-op="${a.id}">trocar</button></div>`;
+  return `<label>${rotulo}</label>
+    ${grupos.map(([f,ops])=>`<details class="fase-op"><summary>${esc(f)}${destaque&&destaque===f?` <span class="mut">${esc(nota)}</span>`:""}</summary>
+      <div class="chips" style="margin:6px 0 8px">${ops.map(o=>`<button class="chip" data-escop="${a.id}|${esc(o)}">${esc(o)}</button>`).join("")}</div>
+    </details>`).join("")}`;
+}
 function seletorOperacaoGraos(a,data){
   const info=infoCiclo(a.talhaoId,data);
   const cultura=info?info.cultura:null;
@@ -4003,16 +4055,18 @@ function seletorOperacaoGraos(a,data){
     /* sem ciclo aberto: só faz sentido preparar e plantar */
     fases=[OPS_GRAOS_FASES[0],OPS_GRAOS_FASES[1]];
   }
-  if(a.tipo) return `<label>Operação</label>
-    <div class="linha-flex"><span class="cresce"><b>${esc(a.tipo)}</b></span>
-      <button class="btn suave mini" data-troca-op="${a.id}">trocar</button></div>`;
-  return `<label>Operação</label>
-    ${fases.map(([f,ops])=>`<details class="fase-op"><summary>${esc(f)}${info&&info.fase===f?` <span class="mut">· fase de agora</span>`:""}</summary>
-      <div class="chips" style="margin:6px 0 8px">${ops.map(o=>`<button class="chip" data-escop="${a.id}|${esc(o)}">${esc(o)}</button>`).join("")}</div>
-    </details>`).join("")}`;
+  return seletorOperacao(a,{rotulo:"Operação",grupos:fases,destaque:info&&info.fase,nota:"· fase de agora"});
 }
-/* Ao trocar de operação, só sobrevivem talhão e identidade — campo de outra operação não fica no registro */
+/* café: grupos por natureza + os termos que o escritório acrescentou em Cadastros */
+function gruposAtivCafe(){
+  const ex=catExtra("operacoes:CAFE");
+  return ex.length?[...OPS_CAFE_GRUPOS,["Outras (cadastro do escritório)",ex]]:OPS_CAFE_GRUPOS;
+}
+/* Ao trocar de operação, só sobrevivem talhão e identidade — campo de outra operação não fica no registro.
+   No café os campos são os mesmos em qualquer atividade (pessoas, calda, máquinas): trocar o termo não
+   apaga o que o gerente já digitou. */
 function limparCamposOp(a){
+  if(!a.gr){ a.tipo=""; return; }
   Object.keys(a).forEach(k=>{ if(!["id","gr","talhaoId"].includes(k)) delete a[k]; });
   a.tipo=""; a.areaHa=""; a.obs="";
 }
@@ -4768,15 +4822,17 @@ function vForm(){
 function cardFn(f,i){
   f=f||{};
   const lista=funcoesDa(rascunho?rascunho.fazendaId:"");
-  const outra = !!(f.nome && !lista.includes(f.nome));
+  /* v76: função gravada com o nome antigo aparece já no termo de hoje (o registro no banco não muda) */
+  const nome=nomeAtual(f.nome);
+  const outra = !!(nome && !lista.includes(nome));
   return `<div class="mt" data-fnrow="${i}" style="border:1px dashed var(--linha);border-radius:10px;padding:10px">
     <label>Função / serviço</label>
     <select data-fnq="nomeSel">
       <option value="">— toque para escolher —</option>
-      ${lista.map(op=>`<option value="${op}" ${f.nome===op?"selected":""}>${op}</option>`).join("")}
+      ${lista.map(op=>`<option value="${op}" ${nome===op?"selected":""}>${op}</option>`).join("")}
       <option value="__outra" ${outra?"selected":""}>Outra (digitar)…</option>
     </select>
-    <input data-fnq="nome" placeholder="Digite a função" value="${esc(outra?f.nome:"")}" style="display:${outra?"block":"none"};margin-top:8px">
+    <input data-fnq="nome" placeholder="Digite a função" value="${esc(outra?nome:"")}" style="display:${outra?"block":"none"};margin-top:8px">
     <div class="grade2 mt">
       <div><label>Próprios</label><input inputmode="numeric" data-fnq="prop" value="${esc(f.prop!==undefined?f.prop:(f.pessoas||""))}" placeholder="0"></div>
       <div><label>Diaristas / terceiros</label><input inputmode="numeric" data-fnq="diar" value="${esc(f.diar||"")}" placeholder="0"></div>
@@ -4819,14 +4875,20 @@ function stepper(rot,campo,val){
     <input inputmode="numeric" data-mo="${campo}" value="${esc(val)}" placeholder="0">
     <button data-step="1" data-alvo="${campo}" aria-label="mais">＋</button></div>`;
 }
+/* Café — 3 passos (v76): ONDE (talhão) → O QUÊ (grupos recolhidos por natureza) → DETALHES.
+   Nada do passo seguinte aparece antes do toque no anterior. */
 function cardAtividade(a){
   return `<div class="subcartao" data-ativ="${a.id}">
     <button class="fechar-sub" data-rm-ativ="${a.id}">remover</button>
     <label>Talhão / área</label>
     <select data-a="talhaoId">${opcoesTalhao(rascunho.fazendaId, a.talhaoId)}</select>
-    <label>Atividade</label>
-    <select data-a="tipo">${opcoesAtiv(rascunho.fazendaId, a.tipo)}</select>
-    <label>Pessoas na atividade</label><input inputmode="numeric" data-a="pessoas" value="${esc(a.pessoas)}">
+    ${a.talhaoId?seletorOperacao(a,{rotulo:"Atividade",grupos:gruposAtivCafe()}):""}
+    ${a.tipo?detalhesAtividade(a):""}
+  </div>`;
+}
+function detalhesAtividade(a){
+  const nome=nomeAtual(a.tipo), rec=(D.ultimasReceitas||{})[nome]||(D.ultimasReceitas||{})[a.tipo];
+  return `<label>Pessoas na atividade</label><input inputmode="numeric" data-a="pessoas" value="${esc(a.pessoas)}">
     <label>Como terminou o dia?</label>
     <div class="chips">
       <button class="chip ${a.status==="concluida"?"on":""}" data-ast="concluida">✔ Concluída</button>
@@ -4835,7 +4897,7 @@ function cardAtividade(a){
     <input data-a="falta" value="${esc(a.falta||"")}" placeholder="O que falta? Ex.: 3 ruas do fundo" style="margin-top:8px;${a.status==="continua"?"":"display:none"}">
     <label>Observação curta</label><input data-a="obs" value="${esc(a.obs)}" placeholder="Opcional">
     <div class="mt"><b class="mut" style="font-size:.8rem">CALDA / RECEITA APLICADA</b>
-      ${(D.ultimasReceitas||{})[a.tipo]?`<button class="btn suave mini" style="display:inline-flex;margin-left:6px" data-ureceita="${a.id}">⚡ usar a última de ${esc(a.tipo)}</button>`:""}
+      ${rec?`<button class="btn suave mini" style="display:inline-flex;margin-left:6px" data-ureceita="${a.id}">⚡ usar a última de ${esc(nome)}</button>`:""}
       <textarea data-a="receita" rows="3" placeholder="Escreva como manda no grupo — ex.: 500ml Mirus, 1,2L Priori Top, 600ml Auto 400, 2,4L Oberom, 1,2L Ochima" style="width:100%;margin-top:6px">${esc(a.receita||"")}</textarea>
       <div class="grade2 mt">
         <div><label>Tanques gastos (batidas)</label><input inputmode="numeric" data-a="tanques" value="${esc(a.tanques||"")}" placeholder="Ex.: 9"></div>
@@ -4851,8 +4913,7 @@ function cardAtividade(a){
           <div><label>Diesel (litros)</label><input inputmode="decimal" data-m="comb" value="${esc(x.comb)}"></div>
         </div>
         <button class="btn suave mini mt" data-rm-maq="${i}">remover esta máquina</button></div>`).join("")}
-      <button class="btn suave mini mt" data-add-maq="${a.id}">＋ máquina</button></div>
-  </div>`;
+      <button class="btn suave mini mt" data-add-maq="${a.id}">＋ máquina</button></div>`;
 }
 function cardColheita(c){
   const soma = n0(c.cereja)+n0(c.verde)+n0(c.seco);
@@ -5233,7 +5294,7 @@ function filtrarBoletins(){
     if(f.atv && atividadeDe(b.fazendaId)!==f.atv) return false;
     if(f.de && b.data<f.de) return false;
     if(f.ate && b.data>f.ate) return false;
-    if(f.atividade && !(b.atividades||[]).some(a=>a.tipo===f.atividade)) return false;
+    if(f.atividade && !(b.atividades||[]).some(a=>nomeAtual(a.tipo)===nomeAtual(f.atividade))) return false;
     if(q){
       const txt = JSON.stringify(b).toLowerCase();
       if(!txt.includes(q)) return false;
@@ -5307,15 +5368,15 @@ function vDetalhe(id){
       ${b.clima.obs?`<dt>Obs.</dt><dd>${esc(b.clima.obs)}</dd>`:""}</dl></div>
     <div class="cartao"><h3>👷 Mão de obra</h3><dl class="dl mt">
       <dt>Próprios</dt><dd>${n0(b.mo.proprios)}</dd><dt>Diaristas</dt><dd>${n0(b.mo.diaristas)}</dd>
-      ${(b.mo.funcoes||[]).length?`<dt>Funções</dt><dd>${(b.mo.funcoes||[]).map(f=>esc(f.nome)+" ("+[(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?" ("+fnPr(f)+"+"+fnDi(f)+"d)":""),n0(f.hx)?n0(f.hx)+"he":""].filter(Boolean).join(" · ")+")").join(" · ")}</dd>`:""}
+      ${(b.mo.funcoes||[]).length?`<dt>Funções</dt><dd>${(b.mo.funcoes||[]).map(f=>esc(nomeAtual(f.nome))+" ("+[(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?" ("+fnPr(f)+"+"+fnDi(f)+"d)":""),n0(f.hx)?n0(f.hx)+"he":""].filter(Boolean).join(" · ")+")").join(" · ")}</dd>`:""}
       <dt>Faltas</dt><dd>${n0(b.mo.faltas)}${b.mo.motivoFaltas?" — "+esc(b.mo.motivoFaltas):""}</dd>
       <dt>Horas extras</dt><dd>${n0(b.mo.horasExtras)}</dd></dl></div>
     ${(b.atividades||[]).length?`<div class="cartao"><h3>🚜 ${atividadeDe(b.fazendaId)==="GRAOS"?"Operações do dia":"Atividades"}</h3>
-      ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${badgeCategoria("GRAOS",{nome:a.tipo})}${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
+      ${b.atividades.map(a=>a.gr?`<div class="mt"><b>${badgeCategoria("GRAOS",{nome:a.tipo})}${esc(nomeAtual(a.tipo))}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)}${(()=>{const i2=infoCiclo(a.talhaoId,b.data);return i2?` <span class="tag amarelo">${esc(rotuloCultura(i2.cultura))}${(i2.dap!==null&&i2.dap>=0)?" · "+i2.dap+" DAP":""}</span>`:"";})()}
         ${(()=>{const ps=resumoOpPartes(b,a);return ps.length?`<br><span class="mut">${esc(ps.join(" · "))}</span>`:"";})()}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
         ${(a.maquinas||[]).filter(x=>x.nome).map(x=>`<br><span class="tag verde">${esc(x.nome)} — ${n0(x.horas)} h${n0(x.comb)?" · "+n0(x.comb)+" L comb.":""}</span>`).join("")}
-      </div>`:`<div class="mt"><b>${badgeCategoria(atividadeDe(b.fazendaId),{nome:a.tipo})}${esc(a.tipo)}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
+      </div>`:`<div class="mt"><b>${badgeCategoria(atividadeDe(b.fazendaId),{nome:a.tipo})}${esc(nomeAtual(a.tipo))}</b> — ${esc(talhao(a.talhaoId).nome==="?"?"Área geral":talhao(a.talhaoId).nome)} · ${n0(a.pessoas)} pessoa(s)
         ${a.status==="concluida"?` <span class="tag verde">✔ concluída</span>`:a.status==="continua"?` <span class="tag terra">⏳ continua amanhã</span>`:""}
         ${a.status==="continua"&&a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
@@ -5495,7 +5556,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v75";
+const APP_VERSAO="v76";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"" };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6137,8 +6198,8 @@ function baixarCSV(){
     const cel=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
     lin.push([fmtData(b.data),cel(fazenda(b.fazendaId).nome),cel(b.responsavel),cel([b.clima.cond,b.clima.florada==="Sim"?"florada aberta":"",b.clima.requeima==="Sim"?"requeima de flores":""].filter(Boolean).join(" · ")),n0(b.clima.chuvaMm),
       n0(b.mo.proprios),n0(b.mo.diaristas),n0(b.mo.faltas),n0(b.mo.horasExtras),
-      cel((b.mo.funcoes||[]).map(f=>f.nome+":"+(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?"("+fnPr(f)+"pr+"+fnDi(f)+"di)":"")+(n0(f.hx)?"/"+n0(f.hx)+"he":"")).join(" | ")),
-      cel((b.atividades||[]).map(a=>a.tipo+" ("+talhao(a.talhaoId).nome+")"
+      cel((b.mo.funcoes||[]).map(f=>nomeAtual(f.nome)+":"+(fnPr(f)+fnDi(f))+"p"+(fnDi(f)?"("+fnPr(f)+"pr+"+fnDi(f)+"di)":"")+(n0(f.hx)?"/"+n0(f.hx)+"he":"")).join(" | ")),
+      cel((b.atividades||[]).map(a=>nomeAtual(a.tipo)+" ("+talhao(a.talhaoId).nome+")"
         +(a.gr&&n0(a.areaHa)?" ["+a.areaHa+" ha]":"")
         +(a.gr&&(a.produtos||[]).some(p=>p.nome)?" {"+a.produtos.filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+p.dose+(p.un||"")+"/ha":"")).join("; ")+"}":"")
         +(a.gr&&(a.produtoAdb||a.formulacao)?" {"+(a.produtoAdb||a.formulacao)+(n0(a.doseKgHa)?" "+a.doseKgHa+" kg/ha":"")+(n0(a.doseTHa)?" "+a.doseTHa+" t/ha":"")+"}":"")
@@ -6278,7 +6339,7 @@ function linhasWhatsOp(b,a){
   const info=infoCiclo(a.talhaoId,b.data);
   const cab="🚜 "+talhao(a.talhaoId).nome
     +(info?" ("+rotuloCultura(info.cultura)+((info.dap!==null&&info.dap>=0)?", "+info.dap+" DAP":"")+")":"")
-    +": "+(a.tipo||"operação").toLowerCase();
+    +": "+(nomeAtual(a.tipo)||"operação").toLowerCase();
   const parts=resumoOpPartes(b,a);
   const maq=(a.maquinas||[]).filter(m=>m.nome).map(m=>m.nome.replace(/\s*\(COD[^)]*\)/,"")+(n0(m.horas)?" "+n0(m.horas)+"h":"")).join(", ");
   if(maq) parts.push(maq);
@@ -6313,13 +6374,13 @@ function resumoWhats(b){
   if(tot) L.push("👥 "+tot+" pessoas ("+n0(mo.proprios)+" próprios + "+n0(mo.diaristas)+" diaristas)"+(n0(mo.faltas)?" · "+n0(mo.faltas)+" falta(s)"+(mo.motivoFaltas?" ("+mo.motivoFaltas+")":""):"")+(n0(mo.horasExtras)?" · "+n0(mo.horasExtras)+" h extras":""));
   const fns=(mo.funcoes||[]).filter(f=>f.nome);
   if(fns.length) L.push("🛠️ "+fns.map(f=>{const p=fnPr(f)+fnDi(f);
-    return (p?p+" ":"")+f.nome+(fnDi(f)?" ("+fnPr(f)+"p+"+fnDi(f)+"d)":"")+(n0(f.hx)?" ["+n0(f.hx)+"h extra]":"");}).join(" · "));
+    return (p?p+" ":"")+nomeAtual(f.nome)+(fnDi(f)?" ("+fnPr(f)+"p+"+fnDi(f)+"d)":"")+(n0(f.hx)?" ["+n0(f.hx)+"h extra]":"");}).join(" · "));
   (b.atividades||[]).forEach(a=>{
     if(a.gr){ L.push(...linhasWhatsOp(b,a)); return; }
     const maq=(a.maquinas||[]).filter(m=>m.nome).map(m=>m.nome.replace(/\s*\(COD[^)]*\)/,"")+" "+n0(m.horas)+"h").join(", ");
     const st=a.status==="concluida"?" ✔":a.status==="continua"?" ⏳":"";
     const cic=cicloAtivo(a.talhaoId);
-    L.push("🔧 "+(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(cic?" ("+rotuloCultura(cic.cultura)+")":"")+(n0(a.pessoas)?" · "+n0(a.pessoas)+"p":"")+(maq?" · "+maq:"")+st+(a.obs?" — "+a.obs:""));
+    L.push("🔧 "+(nomeAtual(a.tipo)||"Atividade")+" — "+talhao(a.talhaoId).nome+(cic?" ("+rotuloCultura(cic.cultura)+")":"")+(n0(a.pessoas)?" · "+n0(a.pessoas)+"p":"")+(maq?" · "+maq:"")+st+(a.obs?" — "+a.obs:""));
     if(a.receita) L.push("🧪 "+a.receita.split(/\n+/).map(s=>s.trim()).filter(Boolean).join(" · "));
     if(n0(a.tanques)) L.push("🛢️ Gastou "+n0(a.tanques)+" tanque"+(n0(a.tanques)>1?"s":"")+(n0(a.ltanque)?" × "+n0(a.ltanque)+" L = "+(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")+" L":""));
   });
@@ -6414,7 +6475,7 @@ function resumoWhats(b){
   }
   if(b.obsGeral) L.push("📝 "+b.obsGeral);
   const cont=(b.atividades||[]).filter(a=>a.status==="continua");
-  if(cont.length) L.push("⏳ *Continua amanhã:* "+cont.map(a=>(a.tipo||"Atividade")+" — "+talhao(a.talhaoId).nome+(a.falta?" ("+a.falta+")":"")).join("; "));
+  if(cont.length) L.push("⏳ *Continua amanhã:* "+cont.map(a=>(nomeAtual(a.tipo)||"Atividade")+" — "+talhao(a.talhaoId).nome+(a.falta?" ("+a.falta+")":"")).join("; "));
   if(b.pendencias) L.push("📌 Ficou para terminar: "+b.pendencias);
   /* v75: a aderência ao plano entra SÓ no resumo de sexta (a primeira linha do resumo não muda) */
   if(new Date(b.data+"T12:00:00").getDay()===5){
@@ -6902,7 +6963,7 @@ async function concluirEnvio(){
   D.ultimasReceitas = D.ultimasReceitas||{};
   D.ultimasFert = D.ultimasFert||{};
   if(r.irr && r.irr.fert==="Sim" && r.irr.fertReceita) D.ultimasFert[r.fazendaId]=r.irr.fertReceita;
-  (r.atividades||[]).forEach(a=>{ if(a.tipo && a.receita) D.ultimasReceitas[a.tipo]={receita:a.receita, ltanque:a.ltanque||""}; });
+  (r.atividades||[]).forEach(a=>{ if(a.tipo && a.receita) D.ultimasReceitas[nomeAtual(a.tipo)]={receita:a.receita, ltanque:a.ltanque||""}; });
   (r.atividades||[]).forEach(a=>(a.insumos||[]).forEach(x=>{
     if(x.nome){ if(x.dose||x.qtd) D.ultimasDoses[x.nome]={dose:x.dose,qtd:x.qtd};
       if(!(D.insumos||[]).some(i=>i.nome===x.nome) && !D.insumosAprendidos.includes(x.nome)) D.insumosAprendidos.push(x.nome); }
@@ -7362,13 +7423,15 @@ function ligarEventos(tela){
       if(d.rmIns!==undefined) a.insumos.splice(parseInt(d.rmIns),1);
       if(d.rmMaq!==undefined) a.maquinas.splice(parseInt(d.rmMaq),1);
       card.outerHTML=cardAtivHtml(a); salvarRascunho(); return; }
-    /* ---- grãos: escolher a operação no seletor por fase (cascata) ---- */
+    /* ---- escolher a operação no seletor agrupado (cascata) — grãos por fase, café por natureza ---- */
     if(d.escop){ const i=d.escop.indexOf("|"); const a=r.atividades.find(x=>x.id===d.escop.slice(0,i));
       if(a){ a.tipo=d.escop.slice(i+1);
-        const t2=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
-        if(t2&&t2.area&&!a.areaHa) a.areaHa=String(t2.area); /* área pré-preenchida com a do talhão */
-        const cat2=opCatDe(a.tipo);
-        if((cat2==="APLICACAO"||cat2==="TRAT_SEMENTES")&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:cat2==="TRAT_SEMENTES"?"mL":"L"}];
+        if(a.gr){
+          const t2=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
+          if(t2&&t2.area&&!a.areaHa) a.areaHa=String(t2.area); /* área pré-preenchida com a do talhão */
+          const cat2=opCatDe(a.tipo);
+          if((cat2==="APLICACAO"||cat2==="TRAT_SEMENTES")&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:cat2==="TRAT_SEMENTES"?"mL":"L"}];
+        }
         const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
     if(d.trocaOp){ const a=r.atividades.find(x=>x.id===d.trocaOp);
       if(a){ limparCamposOp(a);
@@ -7519,7 +7582,7 @@ function ligarEventos(tela){
         salvarRascunho(); }
       return; }
     if(d.ureceita){ const a=rascunho.atividades.find(x=>x.id===d.ureceita);
-      const mem=(D.ultimasReceitas||{})[a.tipo];
+      const mem=(D.ultimasReceitas||{})[nomeAtual(a&&a.tipo)]||(D.ultimasReceitas||{})[a&&a.tipo];
       if(mem){ a.receita=mem.receita; a.ltanque=mem.ltanque||a.ltanque;
         const card=t.closest("[data-ativ]");
         const ta=card.querySelector('textarea[data-a="receita"]'); if(ta) ta.value=a.receita;
@@ -7683,13 +7746,15 @@ function ligarEventos(tela){
       if(e3){ const p=pivosDa(rascunho.fazendaId).find(x=>x.k===el.value);
         e3.k=el.value; e3.nome=p?p.nome:(el.value?e3.nome:"");
         repintarIrg(rascunho); salvarRascunho(); } return; }
-    /* grãos: talhão em cascata — escolher redesenha o cartão (a operação é escolhida por toque nas fases) */
+    /* talhão em cascata — escolher redesenha o cartão (a operação é escolhida por toque nos grupos).
+       v76: vale também para o café, que passou ao mesmo seletor agrupado. */
     if(rascunho && (d.a==="talhaoId"||d.a==="culturaPl")){
       const card=el.closest("[data-ativ]"); const a=card&&rascunho.atividades.find(x=>x.id===card.dataset.ativ);
-      if(a&&a.gr){
-        if(d.a==="talhaoId"){ limparCamposOp(a); a.talhaoId=el.value; }
+      if(a){
+        if(d.a==="talhaoId"){ if(a.gr) limparCamposOp(a); a.talhaoId=el.value; }
+        else if(!a.gr) return;
         else a[d.a]=el.value;
-        card.outerHTML=cardOperacao(a); salvarRascunho(); return; } }
+        card.outerHTML=cardAtivHtml(a); salvarRascunho(); return; } }
     /* pecuária: o tipo do evento decide os campos (dose, peso, valor…) */
     if(rascunho && d.pe==="tipo"){ const c=el.closest("[data-pecev]");
       if(c&&rascunho.pecuaria){ const i=parseInt(c.dataset.pecev); const e3=rascunho.pecuaria.eventos[i];
