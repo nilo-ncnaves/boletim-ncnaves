@@ -617,3 +617,48 @@ conferir — e colar a resposta no resumo:
     plano, por unidade, com % dos lançamentos — e a tela DIZ que não é
     cobrança. O fechamento mensal por unidade traz % do plano executado em
     área, % do esforço fora do plano e as tarefas sem NENHUM lançamento.
+
+## 19. Envio: a tela nunca diz "enviado" antes do banco confirmar (desde a v82)
+
+Origem: 11/09/2026, primeiro dia de preenchimento dos gerentes. Nenhum
+boletim deles chegou ao banco e ninguém tinha como saber por quê — a casa
+do gerente escrevia "Boletim de hoje enviado · Enviado às HH:MM" assim que
+o boletim era gravado no APARELHO, e o erro de rede do envio era engolido
+em silêncio. Num Chromium sem rede nenhuma, a v81 mostrava "✅ Boletim
+enviado!".
+
+Regras que ficam:
+
+1. **Quem responde "enviado" é a FILA, nunca a gravação local.** Registro
+   fora de `syncFila` = o banco confirmou (o recibo fica em `reg.sincEm`,
+   escrito só quando o POST responde ok). Qualquer tela que anuncie envio
+   passa por `estadoEnvio(t, id)` / `naFila(t, id)`.
+2. **Componente ÚNICO `faixaEnvio(fz, {t, rotulo})`** nas três atividades e
+   no pós-colheita, estático (nunca sticky — orçamento de c5/c11), com
+   quatro estados: enviado às HH:MM · Enviando… · Aguardando internet (N na
+   fila) + "🔄 Tentar enviar agora" · Aguardando envio, com o código HTTP da
+   recusa. Some quando não há nada a dizer. `t` é chave substituta
+   ("b"/"p") e o substantivo vem de quem chama — nunca
+   `if(atividade==="…")`.
+3. **Erro de envio nunca é invisível.** Recusa do banco guarda o código
+   (`item.http`) e a tela diz o que houve e que nada se perdeu. Proibido
+   "erro", "falha", "você esqueceu", e proibido culpar quem usa.
+4. **Três chances automáticas de esvaziar a fila:** abrir o app, o evento
+   `online` e voltar ao app (`visibilitychange`). O indicador troca de
+   estado no lugar quando a fila muda; o FORMULÁRIO nunca é redesenhado por
+   isso, para não tirar o foco de quem está digitando.
+5. **Gravação de diagnóstico (carimbo de aparelho, telemetria de uso) vai
+   DIRETO, fora da fila offline.** Tabela que ainda não existe devolve 404
+   e, na fila, o item ficaria preso para sempre acusando "aguardando
+   internet" — foi o que aconteceu com `codigos_acesso`. Sem a tabela, a
+   gravação falha em silêncio e o app fica idêntico.
+6. **O monitor do escritório relata RECEBIMENTO, nunca trabalho.**
+   `cartaoChegadaBoletins()` nasce recolhido (P5), lista UNIDADES (nunca
+   pessoas) e diz "nada recebido" — proibidos "não fez", "pendente",
+   "atrasado" (item 6 deste documento).
+
+Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
+`scripts/regressao_render.cjs` contra `origin/main` — só a casa depois de
+enviar e o painel da Diretoria podem mudar. O cenário `pos-f23` do script
+de regressão vai até o envio (passo `30-enviado`), para o indicador do
+pós-colheita ter prova própria.
