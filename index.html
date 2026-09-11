@@ -6058,6 +6058,13 @@ function cartaoChegadaBoletins(){
   });
   const n=linhas.filter(l=>l.b).length;
   const semAparelho=linhas.every(l=>!l.ap);
+  /* v84: aparelho que sincronizou SEM unidade aberta não cabe em nenhuma linha da lista — e some.
+     Isso engana justamente na situação de 11/09/2026, com os gerentes no código de Administrador:
+     o app abre na tela de escolher atividade, `sessao.fazendaId` é null e o carimbo sobe sem unidade.
+     Sem esta linha, o cartão diria "nada recebido" e nenhum aparelho, igualzinho a um celular que
+     nunca foi aberto. O aparelho está vivo; só não escolheu unidade ainda. */
+  const soltos=chegadaCache.filter(x=>!x.unidade_id)
+    .sort((a,c)=>String(c.visto_em||"").localeCompare(String(a.visto_em||"")));
   const corpo=linhas
     .sort((a,c)=>(a.b?1:0)-(c.b?1:0) || a.f.nome.localeCompare(c.f.nome))
     .map(l=>{
@@ -6078,7 +6085,11 @@ function cartaoChegadaBoletins(){
     <span class="resumo">${n} de ${linhas.length}${n<linhas.length?" · "+(linhas.length-n)+" sem nada recebido":""}</span><span class="seta">›</span></summary>
     <div class="corpo">
       ${corpo||htmlEstado("vazio",{que:"unidade",onde:"neste filtro"})}
-      ${semAparelho?`<p class="mut" style="font-size:.72rem;margin-top:8px">A coluna do aparelho aparece depois de rodar sql/052-aparelho-sync.sql no Supabase; até lá o cartão mostra só a hora de chegada do boletim.</p>`:""}
+      ${soltos.length?`<div style="padding:6px 0;border-top:1px solid var(--linha);margin-top:6px">
+        <b style="font-size:.82rem">${soltos.length} aparelho${soltos.length>1?"s":""} sincroniz${soltos.length>1?"aram":"ou"} sem unidade aberta</b>
+        <p class="mut" style="margin:2px 0 0;font-size:.72rem">${soltos.slice(0,6).map(x=>esc(haQuanto(x.visto_em))+(x.versao?" · "+esc(x.versao):"")+(x.chave?" · código "+esc(rotuloDaChave(x.chave)):"")+(n0(x.na_fila)?" · "+n0(x.na_fila)+" na fila":"")).join("<br>")}${soltos.length>6?"<br>e mais "+(soltos.length-6):""}</p>
+        <p class="mut" style="margin:4px 0 0;font-size:.72rem">O celular falou com o banco, mas parou antes de escolher a unidade. Com o código da própria fazenda o app abre direto no boletim dela.</p></div>`:""}
+      ${semAparelho&&!soltos.length?`<p class="mut" style="font-size:.72rem;margin-top:8px">A coluna do aparelho aparece depois de rodar sql/052-aparelho-sync.sql no Supabase; até lá o cartão mostra só a hora de chegada do boletim.</p>`:""}
       <p class="mut" style="font-size:.72rem;margin-top:8px">Hora em que o boletim entrou no banco. "Nada recebido" é ausência de REGISTRO, nunca afirmação de que não foi feito.</p>
     </div></details>`;
 }
@@ -6614,7 +6625,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v83";
+const APP_VERSAO="v84";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

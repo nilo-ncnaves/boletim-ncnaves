@@ -656,6 +656,15 @@ Regras que ficam:
    `cartaoChegadaBoletins()` nasce recolhido (P5), lista UNIDADES (nunca
    pessoas) e diz "nada recebido" — proibidos "não fez", "pendente",
    "atrasado" (item 6 deste documento).
+7. **Lista agrupada por chave nunca engole a linha cuja chave está vazia
+   (desde a v84).** O carimbo de um aparelho que sincronizou SEM unidade
+   aberta (`unidade_id` null — o que acontece no código de Administrador,
+   que abre na tela de escolher atividade) não cabe em nenhuma linha por
+   unidade e sumiria: o escritório leria "nada recebido" e nenhum aparelho,
+   igual a um celular nunca aberto, quando o celular está vivo. Ou esses
+   registros aparecem num rodapé nomeado, com o que se sabe deles e a frase
+   que explica o que aquilo significa, ou o cartão mente por omissão. Sem
+   nenhum registro órfão, o cartão fica idêntico ao que era.
 
 Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
 `scripts/regressao_render.cjs` contra `origin/main` — só a casa depois de

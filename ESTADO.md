@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v83** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v84** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1503,6 +1503,58 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## Aparelho sem unidade aberta no monitor de chegada (v84)
+Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
+`ADMIN-9561` (o `AMNIN` da mensagem anterior foi erro de digitação dele) —
+os gerentes **entraram** no app.
+
+**Caminho medido em navegador real, dos dois jeitos:**
+
+| código | toques até abrir o boletim | decisões pelo caminho |
+|---|---|---|
+| `ADMIN-9561` | **4** | 8 opções (Café · Grãos · Pecuária · Terreiro · Diretoria · Relatórios · Planejamento · Escritório), depois 10 fazendas de café |
+| `VR-7061` (da unidade) | **2** | nenhuma — cai direto em "Vereda Romaria › Café (164,90 ha)" |
+
+**O envio funciona pelo caminho do Administrador** — testado de ponta a
+ponta com o Supabase simulado respondendo 200: escolher Café → a fazenda →
+Preencher → clima → responder as duas seções eventuais → Enviar produz
+`POST /rest/v1/boletins` com `fazenda_id: f23` correto, e a tela mostra
+"✅ Boletim de hoje enviado às HH:MM — o escritório já recebeu". Nenhum
+erro de página. Ou seja: o app **não** estava barrando ninguém; a porta de
+entrada é que não era a do gerente — em vez da fazenda dele, uma tela de
+administrador que o treinamento não cobriu.
+
+**O furo que isso revelou no monitor da v82.** Com o código de
+Administrador o app abre na tela de escolher atividade, `sessao.fazendaId`
+é `null` e o carimbo de `aparelho_sync` sobe **sem unidade** — foi o que o
+teste mostrou (`unidade_id=null, chave=ADMIN`). O cartão "📡 Chegada dos
+boletins hoje" lista uma linha por unidade, então esse aparelho não cabia
+em linha nenhuma e **sumia**: o escritório veria "nada recebido" e nenhum
+aparelho, exatamente igual a um celular que nunca foi aberto. Justamente na
+situação em que o Nilo está.
+
+**Correção:** o cartão ganhou um rodapé com os aparelhos que sincronizaram
+sem unidade aberta — quantos são, há quanto tempo cada um falou com o
+banco, em que versão, com que código e quantos registros na fila, e a frase
+que explica o que aquilo quer dizer: *"O celular falou com o banco, mas
+parou antes de escolher a unidade. Com o código da própria fazenda o app
+abre direto no boletim dela."* Máximo 6 linhas + "e mais N". Sem aparelho
+solto, o cartão fica **byte a byte igual ao da v83**.
+
+### Provas
+- `scripts/checar-poluicao.cjs`: **589 ✅ · 43 ❌** na v84 e na v83
+  (`origin/main`), medidos na mesma hora — o diff do relatório inteiro é a
+  linha da versão. Nenhum ❌ novo.
+- `scripts/regressao_render.cjs` contra `origin/main`: café, grãos,
+  pecuária e pós-colheita **idênticos em tudo**; o painel da
+  Diretoria/ADMIN muda **uma linha em branco** (sem aparelho solto o bloco
+  novo não desenha nada).
+- Teste do monitor com 5 aparelhos semeados (2 com unidade, 3 no código de
+  Administrador sem unidade): as duas linhas por unidade continuam, e os
+  três soltos aparecem no rodapé com hora, versão, código e fila.
+- Teste de envio ponta a ponta pelo caminho do Administrador (acima).
+- `node scripts/teste_planejamento.cjs` (64 ✅ · 0 ❌) verde.
+
 ## Código errado no aparelho do gerente (v83)
 Continuação direta do diagnóstico de 11/09/2026. Depois da v82, o Nilo
 informou o dado que faltava: **os ~15 gerentes estavam todos com o código
@@ -1515,16 +1567,15 @@ informou o dado que faltava: **os ~15 gerentes estavam todos com o código
 | `VR-7061` (código da unidade) | cai **direto** na casa da unidade: "Vereda Romaria › Café (164,90 ha) · Boletim de hoje pendente" |
 
 `escopoDoCodigo` exige igualdade exata depois de normalizar (maiúsculas,
-sem espaço, traço opcional): `AMNIN-9561` não é `ADMIN-9561`, logo é
-recusado. As duas leituras possíveis explicam o silêncio do dia:
-- **`AMNIN` literal** → nenhum gerente entrou no app. Causa inteira.
-- **`ADMIN` (erro de digitação na mensagem)** → entraram, mas na porta do
-  administrador: para chegar ao boletim teriam de escolher atividade,
-  depois a unidade entre 24, sem nada indicando qual é a deles.
+sem espaço, traço opcional): `AMNIN-9561` não é `ADMIN-9561`, logo seria
+recusado. **Resolvido na mesma tarefa:** o `AMNIN` foi erro de digitação na
+mensagem — o código em uso era `ADMIN-9561`, e os gerentes entraram. O que
+os parou foi a porta do administrador, não a fechadura (medição na seção
+da v84, acima).
 
-Em qualquer das duas, a correção é a mesma e é operacional: **cada gerente
-usa o código da própria unidade** (`CODIGOS_PADRAO`, um por fazenda), que
-abre direto o boletim dela.
+A correção é operacional: **cada gerente usa o código da própria unidade**
+(`CODIGOS_PADRAO`, um por fazenda), que abre direto o boletim dela em 2
+toques, contra 4 e duas decisões pelo caminho do administrador.
 
 **O que a v83 mudou no app** (nada disso substitui a troca dos códigos —
 só faz o app dizer o que está acontecendo):
@@ -2261,8 +2312,8 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   Enquanto não rodar, o espelho da pecuária fica na fila offline e o
   boletim continua subindo normal para a tabela boletins.
 - **Trocar o código de acesso nos celulares dos gerentes** (ação do Nilo,
-  não é código): em 11/09/2026 os ~15 gerentes estavam todos com um código
-  de administrador. Cada um deve usar o código da PRÓPRIA unidade
+  não é código): em 11/09/2026 os ~15 gerentes estavam todos com o código
+  `ADMIN-9561` (confirmado pelo Nilo). Cada um deve usar o código da PRÓPRIA unidade
   (CODIGOS_PADRAO, um por fazenda) — ele abre direto o boletim dela. No
   celular: tela inicial › "Sair" no rodapé › digitar o código novo. Com o
   código de administrador o gerente vê as 24 unidades e pode lançar na

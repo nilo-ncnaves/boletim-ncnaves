@@ -867,6 +867,15 @@ no APARELHO, e o erro de rede do envio era engolido em silêncio.
   `cartaoChegadaBoletins()` nasce recolhido (P5), lista UNIDADES (nunca
   pessoas) e diz "nada recebido" — proibidos "não fez", "pendente",
   "atrasado" (c2).
+- **Carimbo que não cabe em nenhuma linha da lista não pode sumir (desde a
+  v84).** O aparelho que sincronizou SEM unidade aberta (`unidade_id` null
+  — é o que acontece no código de Administrador, que abre na tela de
+  escolher atividade) ganha um rodapé próprio no cartão: quantos são, há
+  quanto tempo falaram com o banco, versão, código e fila. Sem ele o
+  escritório veria "nada recebido" e nenhum aparelho — igualzinho a um
+  celular nunca aberto, quando na verdade o celular está vivo. Regra geral:
+  **lista agrupada por chave nunca engole a linha cuja chave está vazia** —
+  ou ela aparece num rodapé nomeado, ou o cartão mente por omissão.
 - Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
   `scripts/regressao_render.cjs` contra origin/main — só a casa depois de
   enviar e o painel da Diretoria podem mudar; detalhe em
