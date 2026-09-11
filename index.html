@@ -318,6 +318,14 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-exec-vazio{font-size:.8rem;margin:8px 0 0}
 .plan-num{font-size:.82rem}
 .plan-vinc{font-size:.7rem;margin-top:4px;display:inline-block}
+/* v86: insumos — as únicas classes próprias do módulo. O trio recebido × aplicado × saldo,
+   a barra e a lista de lançamentos são os MESMOS componentes do planejado × executado (v78):
+   mesma semântica, mesma tinta, nada de cor nova. */
+.ins-l{display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--linha);font-size:.82rem}
+.ins-l:first-of-type{border-top:none}
+.ins-l .num{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem}
+.ins-nums{font-size:.78rem;line-height:1.45}
+.ins-nums .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .plan-duas{display:grid;gap:12px}
 .plan-notif{margin:0 0 12px;font-size:.82rem}
 @media(min-width:640px){.plan-duas{grid-template-columns:1fr 1fr}}
@@ -1195,6 +1203,11 @@ async function carregarTudo(){
      uma vez só, sem migração geral. Removidas em Cadastros, não voltam (D.talhoesRemovidos). */
   ["t057","t058"].forEach(id=>{ const semente=dadosSemente().talhoes.find(t=>t.id===id);
     if(semente && !(D.talhoes||[]).some(t=>t.id===id) && !((D.talhoesRemovidos||[]).includes(id))) D.talhoes.push({...semente}); });
+  /* v86: nomes novos do de-para da ata (a remessa de insumo usa a MESMA tabela) chegam nos
+     aparelhos que já guardaram a própria cópia — acrescenta só o que falta, sem mexer no que
+     a pessoa ligou. A tela de Cadastros não apaga linha, então nada volta contra a vontade dela. */
+  if(D.deparaAta && D.deparaAta.length) DEPARA_ATA_PADRAO.forEach(x=>{
+    if(!D.deparaAta.some(y=>planChaveAta(y.ata)===planChaveAta(x.ata))) D.deparaAta.push({...x}); });
   (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=tipoPeloPerfil(t.nome, perfilDe(t.fazendaId)); });
   D.ciclos = D.ciclos||[];
   /* milho semente = área arrendada a sementeira: o talhão vira ARRENDADO e o ciclo não se aplica */
@@ -1363,6 +1376,7 @@ const ACOES_PERFIL={
   painel_diretoria:     {pode:()=>podePainel(), visivel:()=>false},
   relatorios_diretoria: {pode:()=>podePainel(), visivel:()=>false},
   planejamento:         {pode:()=>podePainel(), visivel:()=>false},
+  colar_whatsapp:       {pode:()=>podePainel(), visivel:()=>false},
   escritorio:           {pode:()=>podeCadastros(), visivel:()=>false},
   cadastros_painel:     {pode:()=>!!sessao && sessao.papel==="admin", visivel:()=>!!sessao && sessao.papel==="proprietario", papel:"Ação do escritório (administrador)"},
   corrigir_boletim:     {pode:c=>!!sessao && sessao.papel==="gerente" && !!c.prazo, visivel:()=>!!sessao && sessao.papel!=="gerente", papel:"Ação do gerente (até 48 h após o envio)"},
@@ -2156,6 +2170,7 @@ const REL_CATALOGO={
   plano_executado_mes:{nome:"Plano × registrado — mês", per:"mes"},
   plano_x_executado_diario:{nome:"Planejado × executado (plano do dia) — mês", per:"mes"},
   ata_x_executado:{nome:"Ata × executado (planejamento do mês) — mês", per:"mes"},
+  insumos_programado_recebido_aplicado:{nome:"Insumos: programado × recebido × aplicado — mês", per:"mes"},
   /* fase 2 (v57): relatórios narrativos redigidos pelo robô-redator (sql/030) — texto acima dos números,
      marcado "gerado automaticamente — revisar antes de enviar"; só Diretoria/ADMIN, nunca o gerente */
   devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", per:"semana", texto:true},
@@ -3419,7 +3434,7 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","relatorio","historico","relatorios","farois","farol","planejamento"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","relatorio","historico","relatorios","farois","farol","planejamento","colar"].includes(tela) && !podePainel()) tela="entrada";
   /* v77: ritual que se abre sozinho — na sexta (fechar a semana) e do dia 10 em diante (ata da
      reunião), a porta da Diretoria/Escritório é a tela curta do ritual. Pulável; o "pulado" vale
      só para esta sessão, então volta no próximo acesso do MESMO dia (item 9 da tarefa). */
@@ -3443,6 +3458,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="importar") app.innerHTML = vImportar();
   else if(tela==="unidplano") app.innerHTML = vUnidPlano();
   else if(tela==="planejamento") app.innerHTML = vPlanejamento();
+  else if(tela==="colar") app.innerHTML = vColar();   /* v86: porta única "Colar do WhatsApp" */
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="relat") app.innerHTML = vRelat();
   else if(tela==="relatorios") app.innerHTML = vRelatorios();
@@ -3509,6 +3525,8 @@ function vEntrada(){
       <span><b>Relatórios</b><span class="mut">Textos para revisar e números prontos</span></span></button>`:""}
     ${acaoOk("planejamento")?`<button class="perfil-btn" data-perfil="planejamento"><span class="ava">📋</span>
       <span><b>Planejamento</b><span class="mut">Reunião do mês e planejamento da semana</span></span></button>`:""}
+    ${acaoOk("colar_whatsapp")?`<button class="perfil-btn" data-perfil="colar"><span class="ava">📥</span>
+      <span><b>Colar do WhatsApp</b><span class="mut">Ata, remessa de insumo, tarefas ou chuva</span></span></button>`:""}
     ${acaoOk("escritorio")?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
       <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
@@ -4152,6 +4170,8 @@ const DEPARA_ATA_PADRAO=[
   {ata:"FMC Caxico",     unidade:"f14c", area:"Caxico"},
   {ata:"FMC Ernane",     unidade:"f14c", area:"Ernane"},
   {ata:"FMC Arrendo",    unidade:"f14c", area:"José Eustáquio"},
+  {ata:"Faz. Monte Carmelo", unidade:"f14c"},   /* v86: a remessa de insumo usa o nome da fazenda inteira */
+  {ata:"Monte Carmelo",     unidade:"f14c"},
   {ata:"Lagamar (Rodrigo)", unidade:"f20"},
   {ata:"Lagamar (Grupo)",   unidade:"f03c"},
   {ata:"Café 5º",        unidade:"f24"},
@@ -4923,6 +4943,1170 @@ function planFalarComNilo(id){
   abrirTextoZap(linha);
 }
 
+/* ============================================================
+   MÓDULO DE INSUMOS (v86) — programação, recebimento, saldo e consumo
+   ------------------------------------------------------------
+   O PROBLEMA REAL. A entrega de fertilizante é anunciada numa mensagem do
+   WhatsApp ("Relação de NITRATO que a Cooxupé vai entregar nas fazendas:") e
+   depois ninguém sabe o que chegou, quanto foi aplicado e quanto sobrou — e
+   tarefa do planejamento fica parada "aguardando insumo" sem que o escritório
+   saiba que o insumo já chegou.
+
+   CINCO REGRAS QUE NÃO SE DISCUTEM:
+   1. O gerente CONFIRMA a chegada com UM toque. Nunca digita saldo.
+   2. O consumo sai dos lançamentos que ele JÁ faz — nada digitado duas vezes.
+   3. Saldo é sempre CALCULADO (recebido − aplicado), jamais digitado.
+   4. Nada disso bloqueia o boletim: o cartão de chegada é leitura + um toque,
+      e some sozinho quando não há chegada pendente.
+   5. Tudo dentro do app: a mensagem vira dado pela porta única "📥 Colar do
+      WhatsApp", com pré-visualização conferível antes de gravar.
+
+   TOM. O cartão do gerente fala de CHEGADA ("chegou?"), nunca de cobrança.
+   Divergência entre programado e recebido é assunto do ESCRITÓRIO (painel da
+   Diretoria), nunca da tela de quem recebeu. Proibidos "não fez", "pendente",
+   "atrasado", "faltou" (CLAUDE.md, c2).
+
+   IDENTIDADE POR ID, NUNCA POR PEDAÇO DE NOME (regra 3 do plano de safra): a
+   unidade vem do de-para da ata (DEPARA_ATA_PADRAO / D.deparaAta — a MESMA
+   tabela do planejamento, ampliada, nunca uma segunda) e o produto do de-para
+   de produtos (DEPARA_PRODUTOS_PADRAO / D.deparaProdutos). Nome que não casa
+   NÃO é adivinhado: entra na pré-visualização para a pessoa escolher.
+
+   CATÁLOGO DE PRODUTOS = D.insumos, o que já existe em Cadastros › Insumos,
+   agora com categoria e fornecedor. NÃO foi criada uma coleção "D.produtos"
+   em paralelo: duas listas de produto no mesmo app divergem no primeiro mês —
+   e a regra da casa é uma fonte só (ESTADO.md).
+   ============================================================ */
+const INS_CATEGORIAS=[["fertilizante","Fertilizante"],["corretivo","Corretivo"],["defensivo","Defensivo"],["outro","Outro"]];
+const insCatRot = k => (INS_CATEGORIAS.find(([x])=>x===k)||["",""])[1];
+const INS_COBRANCA_DIAS=7;   /* programado e não entregue há mais de N dias: entra na cobrança por fornecedor */
+const INS_DIVERG_PCT=20;     /* kg/ha × dose do plano do agrônomo: diferença acima disso é sinalizada em âmbar */
+const INS_KG_T=1000;
+const INS_PREV_MAX=40;       /* linhas desenhadas na pré-visualização antes do "mostrando N de M" */
+
+/* ---- de-para de produtos: o apelido do grupo → o produto do cadastro ----
+   Igualdade EXATA por chave normalizada (mesma regra do de-para da ata e de
+   operacao_alias). `plano` é a chave do mesmo insumo no plano do agrônomo
+   (PLANO_INSUMOS), usada só na conferência agronômica do escritório — nunca
+   na tela do gerente (regra 2 do plano de safra: kg do plano não aparecem
+   por padrão). Termo novo confirmado na pré-visualização entra em
+   D.deparaProdutos e a próxima colagem não pergunta (aprendizado, item 11.5). */
+const DEPARA_PRODUTOS_PADRAO=[
+  {termo:"Nitrato",             produto:"Nitrato de amônio", categoria:"fertilizante", un:"kg", plano:"nitrato"},
+  {termo:"Nitrato de amônio",   produto:"Nitrato de amônio", categoria:"fertilizante", un:"kg", plano:"nitrato"},
+  {termo:"Ureia",               produto:"Ureia",             categoria:"fertilizante", un:"kg", plano:"ureia"},
+  {termo:"Sulfato de amônio",   produto:"Sulfato de amônio", categoria:"fertilizante", un:"kg", plano:"sulfato_amonio"},
+  {termo:"KCl",                 produto:"KCl",               categoria:"fertilizante", un:"kg", plano:"kcl"},
+  {termo:"Cloreto de potássio", produto:"KCl",               categoria:"fertilizante", un:"kg", plano:"kcl"},
+  {termo:"MAP",                 produto:"MAP",               categoria:"fertilizante", un:"kg"},
+  {termo:"Calcário",            produto:"Calcário",          categoria:"corretivo",    un:"kg"},
+  {termo:"Magnesita",           produto:"Magnesita",         categoria:"corretivo",    un:"kg"},
+  {termo:"Gesso",               produto:"Gesso agrícola",    categoria:"corretivo",    un:"kg"},
+  {termo:"Gesso agrícola",      produto:"Gesso agrícola",    categoria:"corretivo",    un:"kg"},
+  {termo:"Phusion",             produto:"Phusion",           categoria:"defensivo",    un:"L", plano:"phusion"},
+  {termo:"Omite",               produto:"Omite",             categoria:"defensivo",    un:"L"}
+];
+const deparaProdutos = () => (D.deparaProdutos && D.deparaProdutos.length) ? D.deparaProdutos : DEPARA_PRODUTOS_PADRAO;
+const insNorm = s => normTxt(s).replace(/[^a-z0-9]/g,"");
+const insDeparaDe = nome => { const k=insNorm(nome); return k?(deparaProdutos().find(x=>insNorm(x.termo)===k)||null):null; };
+/* aprendizado de formato (item 11.5): o apelido confirmado uma vez entra no de-para */
+function insAprenderProduto(termo, produto){
+  if(!termo || !produto || insNorm(termo)===insNorm(produto)) return;
+  D.deparaProdutos = (D.deparaProdutos && D.deparaProdutos.length) ? D.deparaProdutos : DEPARA_PRODUTOS_PADRAO.map(x=>({...x}));
+  if(D.deparaProdutos.some(x=>insNorm(x.termo)===insNorm(termo))) return;
+  const p=insProduto(produto);
+  D.deparaProdutos.push({termo:String(termo).trim(), produto:String(produto).trim(),
+    categoria:(p&&p.categoria)||"outro", un:(p&&p.un)||"kg", aprendido:hojeBRT()});
+  salvarDados();
+}
+/* ---- coleções ---- */
+const insProdutos     = () => (D.insumos = D.insumos || []);
+const insRemessas     = () => (D.remessasInsumo = D.remessasInsumo || []);
+const insRecebimentos = () => (D.recebimentos = D.recebimentos || []);
+const insMensagens    = () => (D.mensagensImportadas = D.mensagensImportadas || []);
+const insRemessa      = id => insRemessas().find(r=>r.id===id) || null;
+/* nome canônico do produto: o do cadastro, o do de-para, ou o que foi escrito */
+function insProdutoNome(nome){
+  const dp=insDeparaDe(nome); if(dp) return dp.produto;
+  const p=insProdutos().find(x=>insNorm(x.nome)===insNorm(nome));
+  return p?p.nome:String(nome==null?"":nome).trim();
+}
+const insChaveProd = nome => insNorm(insProdutoNome(nome));
+const insProduto   = nome => { const k=insChaveProd(nome); return k?(insProdutos().find(x=>insChaveProd(x.nome)===k)||null):null; };
+/* base de medida do produto: kg (padrão) ou L. "t" no cadastro antigo é kg — a
+   exibição é que troca para toneladas acima de 1.000 kg, nunca o dado guardado. */
+const insBase = nome => { const u=String((insProduto(nome)||{}).un||(insDeparaDe(nome)||{}).un||"kg").toLowerCase();
+  return (u==="l"||u==="ml")?"L":"kg"; };
+const INS_FATOR={kg:1, quilo:1, quilos:1, g:0.001, mg:0.000001, t:1000, ton:1000, tonelada:1000, toneladas:1000, l:1, ml:0.001, litro:1, litros:1};
+/* converte a dose do lançamento para a base do produto; devolve 0 quando as
+   unidades não conversam (nunca inventa equivalência: saca de adubo não é kg) */
+function insConverte(v, un, base){
+  const f=INS_FATOR[normTxt(String(un||"kg")).replace(/[^a-z]/g,"")];
+  if(!f) return 0;
+  const ehLitro=["l","ml","litro","litros"].includes(normTxt(String(un||"")).replace(/[^a-z]/g,""));
+  if((base==="L") !== ehLitro) return 0;
+  return n0(v)*f;
+}
+/* cria o produto no cadastro quando ele ainda não existe (o catálogo aprende com a colagem) */
+function insGarantirProduto(nome, o){
+  o=o||{};
+  const achado=insProduto(nome);
+  if(achado){ if(o.fornecedor && !achado.fornecedor) achado.fornecedor=o.fornecedor;
+    if(o.categoria && !achado.categoria) achado.categoria=o.categoria; return achado; }
+  const dp=insDeparaDe(nome);
+  const p={ id:uid(), nome:insProdutoNome(nome), un:o.un||(dp&&dp.un)||"kg",
+    categoria:o.categoria||(dp&&dp.categoria)||"outro", fornecedor:o.fornecedor||"", criadoEm:hojeBRT() };
+  insProdutos().push(p);
+  return p;
+}
+/* ---- números: kg é a base; acima de 1 t o número em kg deixa de ser legível ---- */
+const insNumTxt = v => n0(v).toLocaleString("pt-BR",{maximumFractionDigits:(Math.abs(n0(v))%1)?1:0});
+function insQtd(kg, base){
+  const b=base||"kg", v=n0(kg);
+  if(b==="kg" && Math.abs(v)>=INS_KG_T) return (v/INS_KG_T).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})+" t";
+  return insNumTxt(v)+" "+b;
+}
+
+/* ---- REMESSA (programação) e RECEBIMENTO ----
+   A remessa é o anúncio: produto + fornecedor + data + origem da mensagem +
+   a lista de alocações (unidade → quantidade programada). O recebimento é a
+   resposta do campo, uma linha por chegada — entrega PARCIAL é só outra linha,
+   e o que falta continua aparecendo. Nada se apaga e nada se sobrescreve. */
+const insAlocacao   = (r, fz) => ((r&&r.alocacoes)||[]).find(a=>a.unidade===fz) || null;
+const insRecDa      = (remessaId, fz) => insRecebimentos().filter(x=>x.remessaId===remessaId && x.unidade===fz);
+const insRecebidoDa = (remessaId, fz) => insRecDa(remessaId,fz).reduce((s,x)=>s+n0(x.kg),0);
+const insAReceber   = (r, fz) => { const a=insAlocacao(r,fz); return a ? Math.max(0, n0(a.kg)-insRecebidoDa(r.id,fz)) : 0; };
+const insProgramadoTotal = r => ((r&&r.alocacoes)||[]).reduce((s,a)=>s+n0(a.kg),0);
+const insRecebidoTotal   = r => insRecebimentos().filter(x=>x.remessaId===r.id).reduce((s,x)=>s+n0(x.kg),0);
+/* "❌ Ainda não chegou" guarda a resposta do dia: o cartão sai da tela de hoje e
+   volta amanhã. É informação para o escritório (dias de espera), nunca cobrança. */
+const insSemChegada = (r, fz) => ((r&&r.semChegada)||{})[fz] || "";
+const insPendentesDa = fz => insRemessas()
+  .filter(r=>insAlocacao(r,fz) && insAReceber(r,fz)>0 && insSemChegada(r,fz)!==hojeBRT())
+  .sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
+/* idempotência (item 2 e 11.3): a MESMA remessa não entra duas vezes */
+const insChaveRemessa = o => [insChaveProd(o.produto), insNorm(o.fornecedor),
+  (o.alocacoes||[]).map(a=>a.unidade+":"+Math.round(n0(a.kg))).sort().join(",")].join("|");
+const insRemessaIgual = o => insRemessas().find(r=>insChaveRemessa(r)===insChaveRemessa(o)) || null;
+const insQuem  = () => (sessao && sessao.nome) || "";
+const insAgora = () => hojeBRT()+" "+agoraHM();
+/* grava a remessa conferida. Devolve {remessa, repetida} — repetida não duplica nada. */
+function insGravarRemessa(o){
+  const alocacoes=(o.alocacoes||[]).filter(a=>a.unidade && n0(a.kg)>0).map(a=>({unidade:a.unidade, kg:n0(a.kg), nomeMsg:a.nomeMsg||""}));
+  if(!alocacoes.length) return {remessa:null, repetida:false};
+  const igual=insRemessaIgual({produto:o.produto, fornecedor:o.fornecedor, alocacoes});
+  if(igual) return {remessa:igual, repetida:true};
+  insGarantirProduto(o.produto, {fornecedor:o.fornecedor, categoria:o.categoria});
+  const r={ id:uid(), produto:insProdutoNome(o.produto), produtoTermo:String(o.produto||"").trim(),
+    fornecedor:String(o.fornecedor||"").trim(), data:o.data||hojeBRT(), origem:o.origem||"",
+    mensagemId:o.mensagemId||"", alocacoes, semChegada:{}, criadoEm:insAgora(), por:insQuem() };
+  insRemessas().push(r);
+  salvarDados(); syncEnfileirar("ins", r.id);
+  return {remessa:r, repetida:false};
+}
+/* UM toque do gerente. `kg` nulo = chegou tudo o que falta. Devolve o recebimento. */
+function insReceber(remessaId, fz, kg, o){
+  o=o||{};
+  const r=insRemessa(remessaId); if(!r) return null;
+  const falta=insAReceber(r,fz);
+  const q=(kg==null||kg==="")?falta:n0(kg);
+  if(q<=0) return null;
+  const rec={ id:uid(), remessaId:r.id, unidade:fz, produto:r.produto, fornecedor:r.fornecedor,
+    kg:q, data:o.data||hojeBRT(), nota:o.nota||"", foto:o.foto||"", obs:o.obs||"",
+    por:insQuem()||o.por||"", em:insAgora() };
+  insRecebimentos().push(rec);
+  if(r.semChegada) delete r.semChegada[fz];
+  salvarDados(); syncEnfileirar("rec", rec.id); syncEnfileirar("ins", r.id);
+  return rec;
+}
+function insNaoChegou(remessaId, fz){
+  const r=insRemessa(remessaId); if(!r) return;
+  r.semChegada=r.semChegada||{}; r.semChegada[fz]=hojeBRT();
+  salvarDados(); syncEnfileirar("ins", r.id);
+}
+function insCompletarRecebimento(recId, campos){
+  const rec=insRecebimentos().find(x=>x.id===recId); if(!rec) return null;
+  Object.assign(rec, campos||{});
+  salvarDados(); syncEnfileirar("rec", rec.id);
+  return rec;
+}
+
+/* ---- DESBLOQUEIO AUTOMÁTICO DO PLANEJAMENTO (item 4) ----
+   Chegou o produto: toda tarefa da unidade parada em AGUARDANDO TERCEIRO cujo
+   bloqueio (ou a própria descrição) cite aquele produto ou fornecedor volta a
+   A INICIAR sozinha, com registro no histórico. É liberação, não cobrança: o
+   texto diz o que chegou e o que foi liberado. */
+function insTarefasDoProduto(fz, produto, fornecedor){
+  const alvo=[insNorm(produto), insNorm(insProdutoNome(produto)), insNorm(fornecedor)].filter(x=>x && x.length>3);
+  const termo=(insDeparaDe(produto)||{}).termo||"";
+  if(termo && insNorm(termo).length>3) alvo.push(insNorm(termo));
+  return planTarefas().filter(t=>t.unidade===fz && t.status==="aguardando_terceiro")
+    .filter(t=>{ const txt=insNorm([t.desc, (t.bloqueio||{}).texto, (t.bloqueio||{}).quem, (t.bloqueio||{}).motivo].join(" "));
+      return alvo.some(a=>txt.includes(a)); });
+}
+function insDestravar(fz, produto, fornecedor){
+  const ls=insTarefasDoProduto(fz, produto, fornecedor);
+  ls.forEach(t=>{ planMudarStatus(t.id, t.statusAntes||"a_iniciar", {texto:"chegou "+insProdutoNome(produto)}); });
+  return ls;
+}
+
+/* ---- CONSUMO: sai do lançamento que o gerente já faz ----
+   Catálogo por atividade (CLAUDE.md, c4: mesma função, o que muda é a chave).
+   Grãos e pecuária já tinham produto, dose e área/quantidade no próprio
+   lançamento; o café não tinha nenhum campo de dose — ganhou, nas operações de
+   adubação e correção de solo, três campos OPCIONAIS no passo DETALHES
+   (INS_OPS_CONSUMO). Em branco, o lançamento vale exatamente como antes.
+   O que este leitor NÃO conta, e diz: a calda do café ("receita") é texto
+   livre, e saca/lata não viram kg sem equivalência declarada. */
+const INS_OPS_CONSUMO={
+  CAFE:["Adubação manual","Adubação via lanço","Adubação orgânica","Adubação via fertirrigação",
+        "Aplicação via drench / via solo","Calagem / gessagem"],
+  GRAOS:[],      /* os campos já existem por categoria de operação (ver abaixo) */
+  PECUARIA:[]    /* produto e dose já existem no evento e no cocho */
+};
+const insAreaDe = (a,fz) => n0(a.insAreaHa) || n0(a.areaHa) ||
+  ((a.talhaoId && a.talhaoId!=="geral") ? n0(talhao(a.talhaoId).area) : 0);
+const INS_ATIVIDADE={
+  CAFE:{ consumos:b=>(b.atividades||[]).filter(a=>a.insProduto && n0(a.insDoseKgHa)>0).map(a=>{
+      const area=insAreaDe(a,b.fazendaId);
+      return { produto:a.insProduto, kg:n0(a.insDoseKgHa)*area, dose:n0(a.insDoseKgHa), area,
+        onde:a.talhaoId||"", op:nomeAtual(a.tipo||"") }; }) },
+  GRAOS:{ consumos:b=>{ const out=[];
+      (b.atividades||[]).forEach(a=>{
+        const cat=opCatDe(a.tipo), area=insAreaDe(a,b.fazendaId), op=nomeAtual(a.tipo||"");
+        const por=(nome,dose,fator)=>{ if(!nome || !(n0(dose)>0) || !(area>0)) return;
+          out.push({produto:nome, kg:n0(dose)*fator*area, dose:n0(dose)*fator, area, onde:a.talhaoId||"", op}); };
+        if(cat==="ADUBO_COBERTURA") por(a.produtoTipo==="Outro"?a.produtoAdb:a.produtoTipo, a.doseKgHa, 1);
+        else if(cat==="ADUBO_PLANTIO") por(a.formulacao, a.doseKgHa, 1);
+        else if(cat==="CALAGEM") por(a.produtoAdb||"Calcário", a.doseTHa, INS_KG_T);
+        else if(cat==="GESSAGEM") por("Gesso agrícola", a.doseTHa, INS_KG_T);
+        else if(cat==="APLICACAO"||cat==="RESTOS") (a.produtos||[]).forEach(p=>{
+          const v=insConverte(p.dose, p.un, insBase(p.nome));
+          if(v>0) por(p.nome, v, 1); });
+        if(a.insProduto && n0(a.insDoseKgHa)>0) por(a.insProduto, a.insDoseKgHa, 1);
+      });
+      return out; } },
+  PECUARIA:{ consumos:b=>{ const p=b.pecuaria||{}, out=[];
+      (p.eventos||[]).forEach(e=>{ if(!e.produto || !(n0(e.qtd)>0)) return;
+        const v=insConverte(e.dose, e.doseUn, insBase(e.produto));
+        if(v>0) out.push({produto:e.produto, kg:v*n0(e.qtd), dose:0, area:0, onde:e.talhaoId||"",
+          op:e.tipo||"", detalhe:insNumTxt(e.qtd)+" cabeças × "+esc(e.dose)+" "+esc(e.doseUn)}); });
+      (p.nut||[]).forEach(u=>{ if(!u.produto || !(n0(u.qtd)>0)) return;
+        const v=insConverte(u.qtd, u.un, insBase(u.produto));
+        if(v>0) out.push({produto:u.produto, kg:v, dose:0, area:0, onde:u.talhaoId||"",
+          op:u.insumo||"Suplementação", detalhe:"reposição de cocho"}); });
+      return out; } }
+};
+/* índice do consumo de uma unidade, uma passada só pelos boletins (mesmo desenho
+   do planLancamentos da v78): refeito quando muda o dia, o nº de boletins ou o
+   nº de recebimentos. */
+let insConsCache={marca:"", uni:{}};
+const insConsMarca = () => hojeBRT()+"|"+((D&&D.boletins)||[]).length+"|"+insRecebimentos().length+"|"+insProdutos().length;
+function insConsumos(fz){
+  if(!fz) return [];
+  const m=insConsMarca();
+  if(insConsCache.marca!==m) insConsCache={marca:m, uni:{}};
+  if(insConsCache.uni[fz]) return insConsCache.uni[fz];
+  const cat=INS_ATIVIDADE[atividadeDe(fz)] || INS_ATIVIDADE.CAFE;
+  const out=[];
+  (D.boletins||[]).filter(b=>b.fazendaId===fz && !b.exemplo).forEach(b=>{
+    (cat.consumos(b)||[]).forEach((c,i)=>{
+      if(!c.produto || !(n0(c.kg)>0)) return;
+      out.push({ id:b.id+":ins"+i, boletimId:b.id, data:b.data, produto:insProdutoNome(c.produto),
+        chave:insChaveProd(c.produto), base:insBase(c.produto), kg:n0(c.kg), dose:n0(c.dose), area:n0(c.area),
+        onde:c.onde||"", nome:(c.onde && c.onde!=="geral")?planoOndeNome(fz,c.onde):"", op:c.op||"",
+        detalhe:c.detalhe||"", por:String(b.responsavel||"").trim() });
+    });
+  });
+  out.sort((a,b)=>a.data<b.data?1:a.data>b.data?-1:0);
+  insConsCache.uni[fz]=out;
+  return out;
+}
+const insAplicadoNa   = (fz,chave) => insConsumos(fz).filter(c=>c.chave===chave).reduce((s,c)=>s+c.kg,0);
+const insRecebidoNa   = (fz,chave) => insRecebimentos().filter(x=>x.unidade===fz && insChaveProd(x.produto)===chave).reduce((s,x)=>s+n0(x.kg),0);
+const insProgramadoNa = (fz,chave) => insRemessas().filter(r=>insChaveProd(r.produto)===chave)
+  .reduce((s,r)=>s+n0((insAlocacao(r,fz)||{}).kg),0);
+/* SALDO É SEMPRE CALCULADO: recebido − aplicado. Uma linha por produto que teve
+   algum movimento na unidade (programado, recebido ou aplicado). */
+let insSaldoCache={marca:"", uni:{}};
+function insSaldos(fz){
+  if(!fz) return [];
+  /* uma volta só por unidade enquanto nada muda: as telas do escritório pedem o saldo de
+     todas as unidades de uma vez (catálogo de produtos, painel, divergências) */
+  const marca=insConsMarca()+"|"+insRemessas().length;
+  if(insSaldoCache.marca!==marca) insSaldoCache={marca, uni:{}};
+  if(insSaldoCache.uni[fz]) return insSaldoCache.uni[fz];
+  const mapa=new Map();
+  const junta=(nome)=>{ const ch=insChaveProd(nome); if(!ch) return null;
+    if(!mapa.has(ch)) mapa.set(ch,{chave:ch, nome:insProdutoNome(nome), base:insBase(nome), programado:0, recebido:0, aplicado:0});
+    return mapa.get(ch); };
+  insRemessas().forEach(r=>{ const a=insAlocacao(r,fz); if(!a) return; const l=junta(r.produto); if(l) l.programado+=n0(a.kg); });
+  insRecebimentos().filter(x=>x.unidade===fz).forEach(x=>{ const l=junta(x.produto); if(l) l.recebido+=n0(x.kg); });
+  insConsumos(fz).forEach(c=>{ const l=junta(c.produto); if(l) l.aplicado+=c.kg; });
+  const out=[...mapa.values()].map(l=>({...l, saldo:l.recebido-l.aplicado,
+    aReceber:Math.max(0,l.programado-l.recebido)}))
+    .sort((a,b)=>b.saldo-a.saldo || a.nome.localeCompare(b.nome));
+  insSaldoCache.uni[fz]=out;
+  return out;
+}
+/* FOTO do aplicado dentro da própria remessa (mesma solução do planejado × executado da
+   v78): quem sabe transformar lançamento em quilos é o APP — o de-para de produtos e as doses
+   moram no index.html. O motor de relatórios (sql/056) só LÊ esta foto; sem ela, o relatório
+   traz programado e recebido e diz que o aplicado ainda não foi fotografado.
+   `apl` e `sal` são do par unidade × produto (acumulados, iguais em toda remessa do mesmo
+   produto na mesma unidade) — por isso o SQL usa o MAIOR valor, nunca a soma. */
+function insFotoRemessas(){
+  let mudou=false;
+  insRemessas().forEach(r=>{
+    const ch=insChaveProd(r.produto);
+    (r.alocacoes||[]).forEach(a=>{
+      if(!a.unidade || !podeVer(a.unidade)) return;
+      const l=insSaldos(a.unidade).find(x=>x.chave===ch);
+      if(!l) return;
+      const apl=Math.round(l.aplicado), sal=Math.round(l.saldo);
+      if(n0(a.apl)===apl && n0(a.sal)===sal) return;
+      a.apl=apl; a.sal=sal; a.em=hojeBRT();
+      mudou=true;
+      if(!syncFila.some(x=>x.t==="ins"&&x.id===r.id)) syncFila.push({t:"ins",id:r.id});
+    });
+  });
+  if(mudou){ syncSalvarFila(); salvarDados(); }
+  return mudou;
+}
+/* "dá para quantos hectares": SÓ a partir da última dose que o próprio gerente
+   usou nesta unidade. Nunca a dose do plano do agrônomo — o app não receita
+   (regra 1 do plano de safra) e não inventa denominador. */
+function insUltimaDose(fz, chave){
+  const c=insConsumos(fz).find(x=>x.chave===chave && x.dose>0);
+  return c?c.dose:0;
+}
+
+/* ---- CONFERÊNCIA AGRONÔMICA (item 6) ----
+   kg/ha = quantidade programada ÷ área da unidade (areaUnidade: soma dos
+   talhões cadastrados, sem estrutura e sem arrendado). Quando existe plano
+   vigente baixado, compara com a dose do plano do agrônomo e sinaliza em
+   âmbar a diferença acima de INS_DIVERG_PCT. É INFORMATIVO e vive só nas
+   telas do escritório e da Diretoria — nunca na tela do gerente (regra 2 do
+   plano de safra: kg do plano não aparecem por padrão). */
+const insKgHa = (fz, kg) => { const a=areaUnidade(fz); return a>0 ? n0(kg)/a : 0; };
+/* dose do plano para o produto, em kg/ha da unidade (só com plano vigente em cache) */
+function insPlanoKgHa(fz, produto){
+  const p=planoDe(fz); if(!p || !(p.adubo||[]).length) return null;
+  const chave=(insDeparaDe(produto)||{}).plano || PLANO_INSUMOS.find(k=>insNorm(PLANO_ROTULO_INSUMO[k])===insChaveProd(produto));
+  if(!chave) return null;
+  const linhas=(p.adubo||[]).filter(x=>x.insumo===chave);
+  if(!linhas.length) return null;
+  const kg=linhas.reduce((s,x)=>s+n0(x.kg),0);
+  const area=(p.unidades||[]).reduce((s,u)=>s+n0(u.area_ha),0) || areaUnidade(fz);
+  if(!(area>0)) return null;
+  return {kgHa:kg/area, versao:p.versao, mes:p.mes};
+}
+function insConferencia(fz, kg, produto){
+  const kgHa=insKgHa(fz,kg);
+  if(!(kgHa>0)) return null;
+  const pl=insPlanoKgHa(fz,produto);
+  const dif=pl ? Math.round(Math.abs(kgHa-pl.kgHa)*100/pl.kgHa) : 0;
+  return {kgHa, area:areaUnidade(fz), plano:pl, dif, alerta:!!(pl && dif>INS_DIVERG_PCT)};
+}
+const insKgHaTxt = c => !c ? "" : insNumTxt(Math.round(c.kgHa))+" kg/ha em "+fmtHa(c.area)+" ha"
+  + (c.plano?" · plano v"+c.plano.versao+" prevê "+insNumTxt(Math.round(c.plano.kgHa))+" kg/ha":"");
+
+/* ---- COBRANÇA POR FORNECEDOR (item 4 e 7) ----
+   Programado, não entregue e anunciado há mais de INS_COBRANCA_DIAS: agrupado
+   por fornecedor, com dias de espera e quais unidades estão paradas por causa
+   disso (tarefa em AGUARDANDO TERCEIRO que cita o produto). */
+const insDiasDe = iso => { if(!iso) return 0;
+  return Math.max(0, Math.round((new Date(hojeBRT()+"T12:00:00")-new Date(String(iso).slice(0,10)+"T12:00:00"))/864e5)); };
+function insACobrar(){
+  const g={};
+  insRemessas().forEach(r=>{
+    const dias=insDiasDe(r.data);
+    (r.alocacoes||[]).forEach(a=>{
+      if(!podeVer(a.unidade)) return;
+      const falta=insAReceber(r,a.unidade);
+      if(!(falta>0) || dias<INS_COBRANCA_DIAS) return;
+      const k=r.fornecedor||"sem fornecedor informado";
+      g[k]=g[k]||{quem:r.fornecedor||"", itens:[], kg:0};
+      g[k].itens.push({remessa:r, unidade:a.unidade, falta, dias,
+        paradas:insTarefasDoProduto(a.unidade, r.produto, r.fornecedor)});
+      g[k].kg+=falta;
+    });
+  });
+  return Object.values(g).map(x=>({...x, dias:Math.max(...x.itens.map(i=>i.dias))}))
+    .sort((a,b)=>b.dias-a.dias);
+}
+/* ---- DIVERGÊNCIAS (item 7): assunto do escritório, nunca do campo ---- */
+function insDivergencias(){
+  const out=[];
+  insRemessas().forEach(r=>{
+    (r.alocacoes||[]).forEach(a=>{
+      if(!podeVer(a.unidade)) return;
+      const rec=insRecebidoDa(r.id,a.unidade);
+      /* sobra é divergência sempre; falta só depois de a espera passar de INS_COBRANCA_DIAS —
+         entrega parcial recém-anunciada não é divergência, é entrega em andamento (e já aparece
+         em "a cobrar"). Assim a mesma carga nunca é relatada duas vezes. */
+      const dif=rec-n0(a.kg);
+      if(rec>0 && (dif>1 || (dif<-1 && insDiasDe(r.data)>=INS_COBRANCA_DIAS)))
+        out.push({tipo:"quantidade", unidade:a.unidade, produto:r.produto, base:insBase(r.produto),
+          texto:"recebido "+insQtd(rec,insBase(r.produto))+" para "+insQtd(a.kg,insBase(r.produto))+" programado"+
+                " ("+(dif>0?"+":"−")+insQtd(Math.abs(dif),insBase(r.produto))+")"});
+    });
+  });
+  unidadesPermitidas().forEach(f=>{
+    insSaldos(f.id).forEach(l=>{
+      if(l.saldo < -1) out.push({tipo:"saldo", unidade:f.id, produto:l.nome, base:l.base,
+        texto:"saldo negativo de "+insQtd(Math.abs(l.saldo),l.base)+" — conferir recebimentos"});
+      else if(l.recebido<=0 && l.aplicado>0) out.push({tipo:"sem_recebimento", unidade:f.id, produto:l.nome, base:l.base,
+        texto:insQtd(l.aplicado,l.base)+" aplicados sem nenhum recebimento registrado"});
+    });
+  });
+  return out;
+}
+/* ---- textos prontos, no molde do módulo de planejamento (botão copiar) ---- */
+function insTextoCobranca(quem){
+  const gs=insACobrar().filter(g=>!quem || g.quem===quem);
+  if(!gs.length) return "";
+  const L=[];
+  gs.forEach(g=>{
+    L.push("*"+(g.quem||"Fornecedor")+"* — entregas programadas e ainda não registradas");
+    g.itens.forEach(i=>{
+      L.push("• "+fazenda(i.unidade).nome+": "+insQtd(i.falta,insBase(i.remessa.produto))+" de "+i.remessa.produto+
+        " — anunciado em "+fmtDataCurta(i.remessa.data)+" ("+i.dias+" dias)");
+      i.paradas.forEach(t=>L.push("   ↳ parada aguardando: "+t.desc));
+    });
+    L.push("");
+  });
+  L.push("Boletim NCNaves · "+fmtData(hojeBRT()));
+  return L.join("\n");
+}
+function insTextoPainel(){
+  const uns=unidadesPermitidas().filter(f=>insSaldos(f.id).length);
+  if(!uns.length) return "";
+  const L=["*Insumos — programado × recebido × aplicado*", fmtData(hojeBRT()), ""];
+  uns.forEach(f=>{
+    L.push("*"+f.nome+"*");
+    insSaldos(f.id).forEach(l=>L.push("• "+l.nome+": programado "+insQtd(l.programado,l.base)+
+      " · recebido "+insQtd(l.recebido,l.base)+" · aplicado "+insQtd(l.aplicado,l.base)+
+      " · saldo "+insQtd(l.saldo,l.base)));
+    L.push("");
+  });
+  return L.join("\n");
+}
+
+/* ============================================================
+   PORTA ÚNICA "📥 COLAR DO WHATSAPP" (item 11)
+   ------------------------------------------------------------
+   Uma tela, um campo: cola a mensagem e o app DIZ o que entendeu, em
+   linguagem simples ("parece uma remessa de insumo — confere?"), deixa
+   trocar o tipo e só então mostra a pré-visualização editável. Quando não
+   reconhece, NÃO adivinha: pergunta o tipo por chips ou descarta.
+   Toda mensagem importada fica guardada inteira em D.mensagensImportadas,
+   com quem colou, quando, o tipo e o que foi criado — é a trilha que
+   responde "quando o Lusmar anunciou o nitrato da Mata Preta?".
+   ============================================================ */
+const INS_TIPOS_MSG=[
+  {id:"remessa", ico:"📦", rot:"Remessa de insumo",  frase:"parece uma remessa de insumo"},
+  {id:"ata",     ico:"📋", rot:"Ata de reunião",     frase:"parece uma ata de reunião"},
+  {id:"tarefas", ico:"🗒️", rot:"Tarefas avulsas",    frase:"parecem tarefas soltas"},
+  {id:"chuva",   ico:"🌧️", rot:"Relato de chuva",    frase:"parece um relato de chuva"}
+];
+const insTipoRot = id => (INS_TIPOS_MSG.find(x=>x.id===id)||{rot:""}).rot;
+/* linha de alocação: "106.000 kg - VEREDA", "106.000kg – VEREDA", "106 t - VEREDA"
+   e também "VEREDA - 106.000 kg". Ponto é separador de milhar, vírgula é decimal. */
+const INS_UN_RE="kgs?|quilos?|t|ton|toneladas?";
+const INS_ALOC_A=new RegExp("^\\s*[-–—•*]?\\s*(\\d[\\d.,]*)\\s*("+INS_UN_RE+")?\\s*[-–—:]\\s*(.+?)\\s*$","i");
+const INS_ALOC_B=new RegExp("^\\s*[-–—•*]?\\s*(.+?)\\s*[-–—:]\\s*(\\d[\\d.,]*)\\s*("+INS_UN_RE+")\\s*$","i");
+const INS_CHUVA_RE=/(\d[\d.,]*)\s*(mm|mil[ií]metros?)\b/i;
+function insNumBR(s){
+  let t=String(s||"").trim().replace(/\s/g,"");
+  if(t.indexOf(",")>=0) t=t.replace(/\./g,"").replace(",",".");
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t=t.replace(/\./g,"");
+  return n0(t);
+}
+const insFatorUn = u => { const k=normTxt(String(u||"kg")).replace(/[^a-z]/g,"");
+  return (k==="t"||k==="ton"||k==="tonelada"||k==="toneladas") ? INS_KG_T : 1; };
+/* lê a linha de alocação; devolve null quando a linha não é alocação */
+function insLerAlocacao(linha){
+  let m=INS_ALOC_A.exec(linha), nome, qtd, un;
+  if(m){ qtd=m[1]; un=m[2]; nome=m[3]; }
+  else { m=INS_ALOC_B.exec(linha); if(!m) return null; nome=m[1]; qtd=m[2]; un=m[3]; }
+  nome=String(nome).replace(/[.;:,]\s*$/,"").trim();
+  if(!nome || /^\d+$/.test(insNorm(nome))) return null;
+  const kg=insNumBR(qtd)*insFatorUn(un);
+  if(!(kg>0)) return null;
+  const dp=deparaAtaDe(nome);
+  return { bruto:linha.trim(), nomeMsg:nome, kg, unMsg:un?String(un).toLowerCase():"",
+    unidade:(dp&&!dp.fora)?dp.unidade:"", fora:!!(dp&&dp.fora), incluir:!(dp&&dp.fora) };
+}
+/* cabeçalho: produto e fornecedor. Sem certeza, devolve "" e a pré-visualização pergunta. */
+function insProdutoDoTexto(txt){
+  const n=" "+insNorm(txt)+" ";
+  const achado=deparaProdutos().find(p=>insNorm(p.termo).length>2 && n.indexOf(insNorm(p.termo))>=0);
+  if(achado) return achado.termo;
+  const m=/rela[çc][ãa]o\s+d[eo]\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\- ]{2,30}?)\s+(?:que|para|a\s+ser)/i.exec(txt);
+  return m?m[1].trim():"";
+}
+function insFornecedorDoTexto(txt){
+  let m=/que\s+[ao]s?\s+(.+?)\s+(?:vai|v[ãa]o|ir[áa]|ir[ãa]o)\s+entregar/i.exec(txt);
+  if(m) return m[1].trim();
+  m=/(?:fornecedor|entrega\s+d[ao]|comprad[oa]\s+d[ao])\s*:?\s*(.+)$/i.exec(txt);
+  return m?m[1].replace(/[.;:]\s*$/,"").trim():"";
+}
+/* mensagem inteira → pré-visualização da remessa */
+function insLerRemessa(texto){
+  const linhas=String(texto||"").split(/\r?\n/);
+  const out={tipo:"remessa", produto:"", produtoTermo:"", fornecedor:"", data:hojeBRT(), itens:[], soltas:[], fora:[]};
+  const cabecalhos=[];
+  linhas.forEach(l=>{
+    const linha=l.replace(/ /g," ").trim();
+    if(!linha) return;
+    const it=insLerAlocacao(linha);
+    if(it){ if(it.fora){ if(!out.fora.includes(it.nomeMsg)) out.fora.push(it.nomeMsg); return; }
+      out.itens.push(it); return; }
+    cabecalhos.push(linha);
+  });
+  const cab=cabecalhos.join(" · ");
+  out.produtoTermo=insProdutoDoTexto(cab);
+  out.produto=out.produtoTermo?insProdutoNome(out.produtoTermo):"";
+  out.fornecedor=insFornecedorDoTexto(cab);
+  out.soltas=cabecalhos;
+  out.origem=(out.fornecedor?"WhatsApp "+out.fornecedor+" ":"WhatsApp ")+fmtDataCurta(hojeBRT());
+  return out;
+}
+/* mensagem inteira → relato de chuva por fazenda (sempre SUGESTÃO) */
+function insLerChuva(texto){
+  const out={tipo:"chuva", itens:[], data:hojeBRT()};
+  String(texto||"").split(/\r?\n/).forEach(l=>{
+    const linha=l.replace(/ /g," ").trim();
+    if(!linha) return;
+    const m=INS_CHUVA_RE.exec(linha);
+    if(!m) return;
+    const nome=linha.replace(INS_CHUVA_RE,"").replace(/[-–—:•*]/g," ").replace(/\s+/g," ").trim();
+    const dp=nome?deparaAtaDe(nome):null;
+    out.itens.push({bruto:linha.trim(), nomeMsg:nome, mm:insNumBR(m[1]),
+      unidade:(dp&&!dp.fora)?dp.unidade:"", incluir:!(dp&&dp.fora)});
+  });
+  return out;
+}
+/* pistas de que a linha é uma pendência, e não conversa do grupo. Sem nenhuma delas o app
+   NÃO chuta que a mensagem é uma lista de tarefas: pergunta o tipo (item 11.2). */
+const INS_PISTAS_TAREFA=["falta","faltou","precisa","preciso","comprar","trocar","fazer","instalar",
+  "consertar","arrumar","montar","levar","buscar","pagar","cobrar","limpar","revisar","terminar",
+  "verificar","ligar","cercar","rocar","plantar","adubar","colher","providenciar","contratar",
+  "reparar","pintar","soldar","abastecer","prazo","pendente","resolver","mandar"];
+const insPedacos = txt => String(txt||"").split(/\r?\n|;/).map(l=>l.trim()).filter(l=>l.length>3);
+const insTemPista = l => { const n=" "+normTxt(l).replace(/[^a-z0-9]+/g," ")+" ";
+  return INS_PISTAS_TAREFA.some(p=>n.indexOf(" "+p)>=0); };
+/* mensagem inteira → tarefas soltas (sem o padrão de blocos da ata) */
+function insLerTarefas(texto){
+  const out={tipo:"tarefas", itens:[]};
+  String(texto||"").split(/\r?\n|;/).forEach(l=>{
+    const linha=l.replace(/ /g," ").replace(/^[-–—•*\d.)\s]+/,"").trim();
+    if(linha.length<4) return;
+    const dp=deparaAtaDe(linha.split(/[,:]/)[0]||"");
+    out.itens.push({bruto:l.trim(), desc:linha, unidade:(dp&&!dp.fora)?dp.unidade:"", incluir:true});
+  });
+  return out;
+}
+/* CLASSIFICAÇÃO (item 11.2): pelo conteúdo, com confiança em linguagem simples.
+   Sem certeza devolve tipo "" — e a tela pergunta em vez de adivinhar. */
+function insClassificar(texto){
+  const linhas=String(texto||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!linhas.length) return {tipo:"", confianca:0, motivo:""};
+  const aloc=linhas.filter(l=>insLerAlocacao(l)).length;
+  const blocos=linhas.filter(l=>ATA_BLOCO.test(l) && !ATA_ITEM.test(l)).length;
+  const itens=linhas.filter(l=>ATA_ITEM.test(l)).length;
+  const chuva=linhas.filter(l=>INS_CHUVA_RE.test(l)).length;
+  if(blocos>=2 && itens>=3) return {tipo:"ata", confianca:90, motivo:blocos+" blocos por fazenda e "+itens+" linhas de tarefa"};
+  if(aloc>=2 && aloc>=chuva) return {tipo:"remessa", confianca: (insProdutoDoTexto(linhas.join(" · "))?90:70),
+    motivo:aloc+" linhas de quantidade por fazenda"};
+  if(chuva>=2) return {tipo:"chuva", confianca:80, motivo:chuva+" linhas com milímetros"};
+  const ped=insPedacos(texto), pistas=ped.filter(insTemPista).length;
+  if(ped.length>=2 && pistas>=1) return {tipo:"tarefas", confianca:pistas>=2?70:50,
+    motivo:ped.length+" linhas soltas de pendência, sem o padrão da ata"};
+  return {tipo:"", confianca:0, motivo:""};
+}
+function insLerPorTipo(tipo, texto){
+  if(tipo==="remessa") return insLerRemessa(texto);
+  if(tipo==="chuva")   return insLerChuva(texto);
+  if(tipo==="tarefas") return insLerTarefas(texto);
+  return null;
+}
+/* ---- trilha de origem (item 11.4) ---- */
+const insMsgChave = t => insNorm(String(t||"")).slice(0,600);
+const insMsgIgual = t => insMensagens().find(m=>m.chave===insMsgChave(t)) || null;
+function insRegistrarMensagem(o){
+  const chave=insMsgChave(o.texto);
+  let m=insMsgIgual(o.texto);
+  if(m){ m.criados=(m.criados||[]).concat(o.criados||[]); m.tipo=o.tipo||m.tipo; }
+  else { m={ id:uid(), chave, tipo:o.tipo||"", texto:String(o.texto||""), criados:o.criados||[],
+      descartados:o.descartados||0, por:insQuem(), em:new Date().toISOString(), data:hojeBRT() };
+    insMensagens().push(m); }
+  salvarDados(); syncEnfileirar("msg", m.id);
+  return m;
+}
+/* sugestão de chuva que chegou pela porta única: aparece no boletim da unidade
+   como uma linha com "usar" (o mesmo mecanismo do relato da estação iCrop) —
+   quem grava é sempre o gerente, no boletim dele. */
+function insChuvaSugerida(fz, data){
+  let achado=null;
+  insMensagens().forEach(m=>(m.criados||[]).forEach(c=>{
+    if(c.tipo==="chuva" && c.unidade===fz && c.data===data && n0(c.mm)>0) achado={mm:n0(c.mm), por:m.por||"", em:m.em};
+  }));
+  return achado;
+}
+
+/* ============================================================
+   TELAS — componentes ÚNICOS nas três atividades (CLAUDE.md, c4)
+   ============================================================ */
+let insUI={ texto:"", tipo:"", auto:null, prev:null, parte:"", nota:"", cons:"", busca:"",
+  prod:"", liberadas:[], flash:"", msg:"", edit:"" };
+let insNav=[], insBuscaTimer=null, insMsgDaAta=null;
+const insIr = (v,id) => { insUI.busca=""; insUI.edit=""; insNav.push({v, id:id||""}); ir("colar"); };
+function insVoltar(){
+  insUI.busca=""; insUI.edit="";
+  if(insNav.length>1){ insNav.pop(); ir("colar"); }
+  else { insNav=[]; ir(podeCadastros()?"entrada":"painel"); }
+}
+const insRender = () => ir("colar",null,true);
+function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.msg=""; }
+
+/* ---- (3) cartão de chegada no topo do boletim: UM toque ----
+   Único elemento novo SEMPRE visível do módulo — e só enquanto houver chegada
+   pendente na unidade. Nunca bloqueia o envio; some sozinho depois da resposta. */
+const INS_CARTAO_MAX=2;
+function cartaoRecebimento(fz){
+  if(!fz) return "";
+  const ps=insPendentesDa(fz);
+  const liberadas=insUI.liberadas||[];
+  const avisoLib=liberadas.length?`<div class="aviso verde" id="ins-liberadas">🔓 ${esc(liberadas.map(x=>x.produto).filter((v,i,a)=>a.indexOf(v)===i).join(" · "))} chegou — ${liberadas.length===1?"a tarefa":"as tarefas"} ${esc(liberadas.map(x=>'"'+x.desc+'"').join(", "))} ${liberadas.length===1?"foi liberada":"foram liberadas"}.</div>`:"";
+  /* a chegada que acabou de ser registrada ainda pede o nº da nota (opcional) mesmo quando a
+     remessa saiu da lista de pendentes — senão o campo sumiria justamente depois do "chegou tudo" */
+  const recAberto=insUI.nota ? insRecebimentos().find(x=>x.id===insUI.nota && x.unidade===fz) : null;
+  if(!ps.length) return avisoLib+(recAberto?`<div class="cartao" style="border-color:var(--verde)">${insBlocoNota(recAberto)}</div>`:"");
+  const mostra=ps.slice(0,INS_CARTAO_MAX), resto=ps.length-mostra.length;
+  return avisoLib+mostra.map(r=>{
+    const base=insBase(r.produto), falta=insAReceber(r,fz), prog=n0((insAlocacao(r,fz)||{}).kg);
+    const javeio=insRecebidoDa(r.id,fz);
+    const rec=(recAberto && recAberto.remessaId===r.id) ? recAberto : null;
+    return `<div class="cartao" data-ins-cartao="${r.id}" style="border-color:var(--verde)">
+      <div class="linha-flex"><span class="cresce">
+        <b>📦 ${esc(r.produto)} — ${esc(insQtd(falta,base))} ${javeio>0?"a receber":"programado"}</b>
+        <span class="mut" style="display:block;font-size:.82rem">${esc([r.fornecedor||"sem fornecedor informado",
+          r.data?"anunciado em "+fmtDataCurta(r.data):"",
+          javeio>0?"já chegaram "+insQtd(javeio,base)+" de "+insQtd(prog,base):""].filter(Boolean).join(" · "))} · chegou?</span>
+      </span></div>
+      <div class="chips mt">
+        <button class="chip" data-ins-rec="${r.id}|tudo">✅ Chegou tudo</button>
+        <button class="chip ${insUI.parte===r.id?"on":""}" data-ins-rec="${r.id}|parte">➗ Chegou parte</button>
+        <button class="chip" data-ins-rec="${r.id}|nao">❌ Ainda não chegou</button>
+      </div>
+      ${insUI.parte===r.id?`<div class="mt"><label>Quanto chegou (${esc(base)})</label>
+        <div class="linha-flex" style="gap:8px"><input inputmode="decimal" id="ins-qtd-${r.id}" placeholder="Ex.: ${insNumTxt(Math.round(falta))}" style="max-width:160px">
+        <button class="btn mini" data-ins-parteok="${r.id}">Registrar chegada</button></div>
+        <p class="mut" style="font-size:.74rem;margin:6px 0 0">O que faltar continua aparecendo aqui até chegar.</p></div>`:""}
+      ${rec?insBlocoNota(rec):""}
+    </div>`;
+  }).join("")+(resto>0?`<p class="mut" style="font-size:.78rem;margin:-6px 0 12px">＋${resto} remessa${resto>1?"s":""} aguardando chegada nesta unidade.</p>`:"");
+}
+/* nº da nota e foto: OPCIONAIS e puláveis — pedidos depois de a chegada já estar gravada */
+function insBlocoNota(rec){
+  return `<div class="mt" style="border-top:1px dashed var(--linha);padding-top:10px">
+    <b style="font-size:.86rem">✅ Chegada registrada: ${esc(insQtd(rec.kg,insBase(rec.produto)))}</b>
+    <label class="mt">Nº da nota ou romaneio (opcional)</label>
+    <input id="ins-nota-campo" value="${esc(rec.nota||"")}" placeholder="Pode pular">
+    <div class="linha-flex mt" style="gap:8px;flex-wrap:wrap">
+      <button class="btn mini" data-ins-notaok="${rec.id}">Guardar nota</button>
+      <button class="btn sec mini" data-ins-notapular="1">Pular</button>
+      <button class="btn suave mini" data-ins-foto="${rec.id}">${rec.foto?"Trocar foto da nota":"📷 Foto da nota"}</button>
+      ${rec.foto?`<img class="foto-mini" src="${rec.foto}" alt="Foto da nota">`:""}
+    </div>
+    <input type="file" accept="image/*" capture="environment" hidden data-ins-foto-input="${rec.id}">
+  </div>`;
+}
+/* ---- (5) seção "📦 Insumos na fazenda" no boletim: fechada por padrão, só leitura ---- */
+function secaoInsumos(r){
+  const fz=r.fazendaId;
+  const ls=insSaldos(fz);
+  if(!ls.length) return "";
+  const neg=ls.filter(l=>l.saldo<-1).length;
+  return `<details class="secao"><summary><span class="ico">📦</span>Insumos na fazenda
+    <span class="resumo">${ls.length} produto${ls.length>1?"s":""}${neg?" · conferir":""}</span><span class="seta">›</span></summary>
+    <div class="corpo">${insCorpoSaldos(fz)}</div></details>`;
+}
+function insCorpoSaldos(fz){
+  const ls=insSaldos(fz);
+  if(!ls.length) return htmlEstado("vazio",{que:"insumo com movimento",unidade:fz,
+    dica:"Aparece aqui quando uma remessa é programada, confirmada ou aplicada no boletim."});
+  return ls.map(l=>{
+    const pct=l.recebido>0?Math.min(100,Math.round(l.aplicado*100/l.recebido)):0;
+    const dose=insUltimaDose(fz,l.chave);
+    const ha=(dose>0 && l.saldo>0)?Math.floor(l.saldo/dose):0;
+    const aberta=insUI.cons===fz+"|"+l.chave;
+    const n=insConsumos(fz).filter(c=>c.chave===l.chave).length;
+    return `<div class="plan-trio" style="border-top:1px solid var(--linha);padding-top:10px">
+      <b style="font-size:.9rem">${esc(l.nome)}</b>
+      <div class="plan-tres mt">
+        <span><i>recebido</i><b class="num">${esc(insQtd(l.recebido,l.base))}</b></span>
+        <span><i>aplicado</i>${n?`<button class="plan-exec" data-ins-cons="${fz}|${l.chave}" aria-expanded="${aberta?"true":"false"}"
+          aria-label="Ver os ${n} lançamento(s) que compõem o aplicado">${esc(insQtd(l.aplicado,l.base))} ›</button>`
+          :`<b class="num">${esc(insQtd(l.aplicado,l.base))}</b>`}</span>
+        <span><i>saldo</i><b class="num">${esc(insQtd(l.saldo,l.base))}</b></span>
+      </div>
+      <div class="plan-barra" role="img" aria-label="${pct}% do recebido tem lançamento no boletim"><span style="width:${pct}%"></span></div>
+      <p class="plan-trio-nota mut">${l.aReceber>0?esc(insQtd(l.aReceber,l.base))+" ainda a receber. ":""}${
+        ha>0?"No ritmo da última aplicação ("+insNumTxt(dose)+" kg/ha), o saldo dá para cerca de "+insNumTxt(ha)+" ha.":
+        (l.saldo<-1?"Saldo ficou negativo — conferir recebimentos com o escritório.":"Saldo = recebido − aplicado, calculado pelo app.")}</p>
+      ${aberta?insListaConsumo(fz,l):""}
+    </div>`;
+  }).join("")+`<p class="mut" style="font-size:.72rem;margin-top:10px">O aplicado sai dos lançamentos do próprio boletim (produto × dose × área). Nada aqui é digitado duas vezes.</p>`;
+}
+function insListaConsumo(fz,l){
+  const cs=insConsumos(fz).filter(c=>c.chave===l.chave);
+  if(!cs.length) return `<p class="mut plan-exec-vazio">${esc(fraseVazio({que:"lançamento deste insumo", unidade:fz}))}</p>`;
+  return `<div class="plan-exec-lista">
+    <p class="mut plan-exec-cab">${cs.length} lançamento${cs.length>1?"s":""} · do mais recente ao mais antigo</p>
+    ${cs.slice(0,20).map(c=>`<div class="plan-exec-l">
+      <span class="num">${esc(fmtDataCurta(c.data))}</span>
+      <span class="cresce">${esc(c.nome||c.op||"—")}<br><span class="mut">${esc([c.op&&c.nome?c.op:"",
+        c.dose>0?insNumTxt(c.dose)+" kg/ha × "+fmtHa(c.area)+" ha":c.detalhe, c.por].filter(Boolean).join(" · "))}</span></span>
+      <span class="num">${esc(insQtd(c.kg,l.base))}</span></div>`).join("")}
+    ${cs.length>20?`<p class="mut plan-exec-cab">mostrando 20 de ${cs.length}</p>`:""}</div>`;
+}
+/* ---- (1/5) campos do lançamento que alimentam o consumo ----
+   Só nas operações que o catálogo da atividade declara (INS_OPS_CONSUMO) e só
+   depois de a operação ter sido escolhida (padrão de 3 passos). Opcionais:
+   em branco, o lançamento continua valendo exatamente como antes. */
+function insCamposLancamento(a, fz){
+  const lista=INS_OPS_CONSUMO[atividadeDe(fz)]||[];
+  if(!a.tipo || !lista.includes(nomeAtual(a.tipo))) return "";
+  const t=(a.talhaoId && a.talhaoId!=="geral")?talhao(a.talhaoId):null;
+  return `<div class="mt"><b class="mut" style="font-size:.8rem">INSUMO APLICADO (opcional)</b>
+    <label>Produto</label>
+    <input data-a="insProduto" list="dl-ins" value="${esc(a.insProduto||"")}" placeholder="Ex.: Nitrato de amônio">
+    <div class="grade2 mt">
+      <div><label>Dose (kg/ha)</label><input inputmode="decimal" data-a="insDoseKgHa" value="${esc(a.insDoseKgHa||"")}" placeholder="Ex.: 400"></div>
+      <div><label>Área (ha)</label><input inputmode="decimal" data-a="insAreaHa" value="${esc(a.insAreaHa||"")}" placeholder="${t&&t.area?String(t.area):""}"></div>
+    </div>
+    <p class="mut" style="font-size:.74rem;margin:4px 0 0">Serve para o app abater do saldo da fazenda sozinho. Em branco, o lançamento vale do mesmo jeito.</p></div>`;
+}
+/* ---- (11.2) relato de chuva colado no escritório vira SUGESTÃO no boletim ----
+   Mesmo mecanismo da linha da estação iCrop: o app oferece, quem grava é o
+   gerente. Componente único nas três atividades. */
+function linhaChuvaRelato(r){
+  const s=insChuvaSugerida(r.fazendaId, r.data);
+  if(!s) return "";
+  if(n0(r.clima&&r.clima.chuvaMm)===s.mm) return `<p class="mut" style="grid-column:1/-1;margin:0;font-size:.78rem">🌧️ Confere com o relato do grupo ✔</p>`;
+  return `<p class="mut" style="grid-column:1/-1;margin:0;font-size:.82rem">🌧️ Relato do grupo: <b>${insNumTxt(s.mm)} mm</b>
+    <button class="btn suave mini" data-ins-chuva="${s.mm}" style="display:inline-flex;margin-left:6px;padding:2px 8px">usar</button></p>`;
+}
+
+/* ---- (7) cartão "📦 Insumos" no painel da Diretoria ----
+   Nasce RECOLHIDO (P5): o painel já passa de duas telas. Relata programado ×
+   recebido × aplicado × saldo por unidade, com a cobrança por fornecedor e as
+   divergências logo abaixo. Saldo é sempre acumulado — recortar por período
+   daria um saldo falso; o período do painel, quando escolhido, entra como uma
+   linha secundária ("no período: recebido X · aplicado Y"). */
+function cartaoInsumosPainel(){
+  if(!podePainel()) return "";
+  const uns=unidadesPermitidas().filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
+  const linhas=uns.map(f=>({f, ls:insSaldos(f.id)})).filter(x=>x.ls.length);
+  const prods=[...new Map(linhas.flatMap(x=>x.ls).map(l=>[l.chave,l])).values()].sort((a,b)=>a.nome.localeCompare(b.nome));
+  if(!linhas.length && !insRemessas().length) return "";
+  const prod=insUI.prod && prods.some(p=>p.chave===insUI.prod) ? insUI.prod : "";
+  const vale=l=>!prod || l.chave===prod;
+  const tot={programado:0, recebido:0, aplicado:0, saldo:0};
+  const corpo=linhas.map(({f,ls})=>{
+    const sel=ls.filter(vale);
+    if(!sel.length) return "";
+    const s=sel.reduce((a,l)=>({programado:a.programado+l.programado, recebido:a.recebido+l.recebido,
+      aplicado:a.aplicado+l.aplicado, saldo:a.saldo+l.saldo}), {programado:0,recebido:0,aplicado:0,saldo:0});
+    tot.programado+=s.programado; tot.recebido+=s.recebido; tot.aplicado+=s.aplicado; tot.saldo+=s.saldo;
+    const base=sel[0].base;
+    const pctR=s.programado>0?Math.min(100,Math.round(s.recebido*100/s.programado)):0;
+    const pctA=s.recebido>0?Math.min(100,Math.round(s.aplicado*100/s.recebido)):0;
+    const per=(filtroPainel.de||filtroPainel.ate)?insNoPeriodo(f.id, prod):null;
+    return `<div style="padding:6px 0;border-top:1px solid var(--linha)">
+      <div class="linha-flex" style="gap:8px"><span class="cresce"><b style="font-size:.86rem">${esc(f.nome)}</b></span>
+        <span class="num mut" style="flex:none;font-size:.76rem">${esc(sel.length===1?sel[0].nome:sel.length+" produtos")}</span></div>
+      <p class="mut ins-nums" style="margin:2px 0 0">programado <b class="num">${esc(insQtd(s.programado,base))}</b> ·
+        recebido <b class="num">${esc(insQtd(s.recebido,base))}</b> ·
+        aplicado <b class="num">${esc(insQtd(s.aplicado,base))}</b> ·
+        saldo <b class="num">${esc(insQtd(s.saldo,base))}</b></p>
+      <div class="plan-barra" role="img" aria-label="${pctR}% do programado foi recebido"><span style="width:${pctR}%"></span></div>
+      <div class="plan-barra" role="img" aria-label="${pctA}% do recebido tem lançamento"><span class="fora" style="width:${pctA}%"></span></div>
+      ${per?`<p class="mut" style="margin:3px 0 0;font-size:.72rem">no período: recebido ${esc(insQtd(per.recebido,base))} · aplicado ${esc(insQtd(per.aplicado,base))}</p>`:""}</div>`;
+  }).join("");
+  const cob=insACobrar(), div=insDivergencias();
+  return `<details class="secao"><summary><span class="ico">📦</span>Insumos
+    <span class="resumo">${linhas.length} unidade${linhas.length===1?"":"s"}${cob.length?" · "+cob.length+" a cobrar":""}${div.length?" · "+div.length+" a conferir":""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      ${prods.length>1?`<div class="cad-saltos"><button class="chip ${prod?"":"on"}" data-ins-prod="">todos</button>
+        ${prods.map(p=>`<button class="chip ${prod===p.chave?"on":""}" data-ins-prod="${esc(p.chave)}">${esc(p.nome)}</button>`).join("")}</div>`:""}
+      ${corpo||htmlEstado("vazio",{que:"insumo com movimento",onde:"nas unidades deste código"})}
+      ${corpo?`<p class="mut" style="margin:6px 0 0;font-size:.78rem;border-top:1px solid var(--linha);padding-top:6px">Grupo: programado <b class="num">${esc(insQtd(tot.programado,"kg"))}</b> ·
+        recebido <b class="num">${esc(insQtd(tot.recebido,"kg"))}</b> · aplicado <b class="num">${esc(insQtd(tot.aplicado,"kg"))}</b> ·
+        saldo <b class="num">${esc(insQtd(tot.saldo,"kg"))}</b></p>`:""}
+      ${insBlocoCobranca(cob)}
+      ${insBlocoDivergencias(div)}
+      <p class="mut" style="font-size:.72rem;margin-top:8px">Saldo = recebido − aplicado, calculado pelo app. "Sem recebimento registrado" é ausência de REGISTRO, nunca afirmação de que a carga não chegou.</p>
+    </div></details>`;
+}
+/* recorte por período do painel: só como linha secundária (o saldo continua acumulado) */
+function insNoPeriodo(fz, chave){
+  const de=filtroPainel.de||"", ate=filtroPainel.ate||"";
+  const dentro=d=>(!de||d>=de)&&(!ate||d<=ate);
+  const rec=insRecebimentos().filter(x=>x.unidade===fz && dentro(x.data) && (!chave||insChaveProd(x.produto)===chave))
+    .reduce((s,x)=>s+n0(x.kg),0);
+  const apl=insConsumos(fz).filter(c=>dentro(c.data) && (!chave||c.chave===chave)).reduce((s,c)=>s+c.kg,0);
+  return {recebido:rec, aplicado:apl};
+}
+function insBlocoCobranca(cob){
+  if(!cob.length) return "";
+  return `<div style="margin-top:10px;border-top:1px solid var(--linha);padding-top:8px">
+    <b style="font-size:.86rem">🔗 A cobrar do fornecedor</b>
+    ${cob.map(g=>`<div style="padding:5px 0">
+      <div class="linha-flex" style="gap:8px"><span class="cresce"><b style="font-size:.84rem">${esc(g.quem||"Fornecedor não informado")}</b>
+        <span class="mut" style="display:block;font-size:.76rem">${esc(insQtd(g.kg,"kg"))} programados sem chegada registrada · maior espera ${g.dias} dias</span></span>
+        <button class="btn suave mini" data-ins-copia="${esc(g.quem||"")}" style="flex:none">📲 copiar</button></div>
+      ${g.itens.slice(0,6).map(i=>`<p class="mut" style="margin:2px 0 0 10px;font-size:.76rem">${esc(fazenda(i.unidade).nome)}: ${esc(insQtd(i.falta,insBase(i.remessa.produto)))} de ${esc(i.remessa.produto)} · ${i.dias} dias${
+        i.paradas.length?" · "+i.paradas.length+" tarefa"+(i.paradas.length>1?"s":"")+" aguardando: "+esc(i.paradas.map(t=>t.desc).slice(0,2).join("; ")):""}</p>`).join("")}
+      ${g.itens.length>6?`<p class="mut" style="margin:2px 0 0 10px;font-size:.72rem">e mais ${g.itens.length-6} unidade(s)</p>`:""}
+    </div>`).join("")}</div>`;
+}
+function insBlocoDivergencias(div){
+  if(!div.length) return "";
+  return `<div style="margin-top:10px;border-top:1px solid var(--linha);padding-top:8px">
+    <b style="font-size:.86rem">⚠️ Divergências</b>
+    ${div.slice(0,10).map(d=>`<p class="mut" style="margin:3px 0;font-size:.78rem"><b>${esc(fazenda(d.unidade).nome)}</b> · ${esc(d.produto)}: ${esc(d.texto)}</p>`).join("")}
+    ${div.length>10?`<p class="mut" style="font-size:.72rem">e mais ${div.length-10}</p>`:""}
+    <p class="mut" style="font-size:.72rem;margin-top:4px">Conferência do escritório: o campo confirma a chegada, quem concilia nota e programação é aqui.</p></div>`;
+}
+
+/* ---- Cadastros › Insumos (nível 2) e Remessas programadas (nível 3) ---- */
+function cadVInsumos(){
+  const q=cadUI.filtro, fm=cadUI.form||{};
+  const ins=insProdutos().filter(i=>cadBate(q,i.nome,i.un,i.fornecedor,insCatRot(i.categoria)));
+  const saldoGrupo=nome=>{ const ch=insChaveProd(nome);
+    return unidadesPermitidas().reduce((s,f)=>s+(insSaldos(f.id).find(l=>l.chave===ch)||{saldo:0}).saldo,0); };
+  return cadTopo("Insumos",insProdutos().length+" produtos · "+insRemessas().length+" remessas")+
+    (insProdutos().length>12?cadBusca("cad-i-busca","Buscar produto, fornecedor ou categoria…"):"")+
+    cadItem("insremessas","","📦 Remessas programadas",insRemessas().length?insRemessas().length+" remessas · "+insQtd(insRemessas().reduce((s,r)=>s+insProgramadoTotal(r),0),"kg")+" programados":"nenhuma remessa importada",insRemessas().length)+
+    (cadUI.novo==="insumo"?`<div class="cartao"><h3>Novo produto</h3>${cadCampo("Nome","inome","",'placeholder="Ex.: Nitrato de amônio"')}
+      ${cadCampo("Unidade (kg, L…)","iun","kg")}
+      ${cadSelect("Categoria","icat",INS_CATEGORIAS,fm.icat||"fertilizante")}
+      ${cadCampo("Fornecedor padrão","iforn","",'placeholder="Ex.: Cooxupé"')}
+      <div class="linha-flex mt" style="gap:8px"><button class="btn mini" data-cadacao="insumo-add">Criar produto</button><button class="btn sec mini" data-cadcancel="1">Cancelar</button></div></div>`:"")+
+    (ins.length?ins.map(i=>{ const s=saldoGrupo(i.nome);
+      return `<div class="cad-item" data-cadfoco="ins:${i.id}" style="cursor:default;flex-wrap:wrap">
+      <span class="cresce"><b>${esc(i.nome)}</b><span class="mut">${esc([insCatRot(i.categoria)||"sem categoria", i.un||"kg",
+        i.fornecedor||"", s?"saldo "+insQtd(s,insBase(i.nome))+" no grupo":""].filter(Boolean).join(" · "))}</span></span>
+      ${cadConfirmar("rm-ins:"+i.id,"remover","Remover o produto "+esc(i.nome)+" do cadastro, mantendo o nome nos boletins e nas remessas antigas?")}</div>`; }).join("")
+      :htmlEstado("vazio",{que:q?"produto":"produto cadastrado",filtro:q},{classe:"mut centro mt"}))+
+    cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-ins-colar">📥 Importar remessa</button>
+      <button class="btn" data-cadnovo="insumo">＋ Novo produto</button></div>`);
+}
+function cadVInsRemessas(){
+  const q=cadUI.filtro;
+  const ls=insRemessas().filter(r=>cadBate(q,r.produto,r.fornecedor,r.origem))
+    .slice().sort((a,b)=>String(b.data||"").localeCompare(String(a.data||"")));
+  return cadTopo("Remessas programadas",insRemessas().length+" importadas")+
+    (insRemessas().length>12?cadBusca("cad-r-busca","Buscar produto ou fornecedor…"):"")+
+    (ls.length?ls.map(r=>{
+      const base=insBase(r.produto), prog=insProgramadoTotal(r), rec=insRecebidoTotal(r);
+      const pct=prog>0?Math.min(100,Math.round(rec*100/prog)):0;
+      const aberta=cadUI.novo==="rem:"+r.id;
+      return `<div class="plan-linha"><div class="cad-item" style="margin:0">
+        <span class="cresce"><b>${esc(r.produto)}</b><span class="mut">${esc([r.fornecedor||"sem fornecedor",
+          fmtDataCurta(r.data), (r.alocacoes||[]).length+" unidades", insQtd(prog,base)+" programados",
+          insQtd(rec,base)+" recebidos"].filter(Boolean).join(" · "))}</span>
+          <div class="plan-barra" role="img" aria-label="${pct}% do programado foi recebido"><span style="width:${pct}%"></span></div></span>
+        <button class="plan-mais" data-cadnovo="rem:${r.id}" aria-label="Detalhe de ${esc(r.produto)}" aria-expanded="${aberta}">⋯</button></div>
+        ${aberta?`<div class="plan-acoes">
+          <p class="mut" style="font-size:.76rem;margin:0 0 6px">Origem: ${esc(r.origem||"colagem no app")} · importada por ${esc(r.por||"—")} em ${esc(r.criadoEm||r.data)}</p>
+          ${(r.alocacoes||[]).map(a=>{ const rr=insRecebidoDa(r.id,a.unidade), conf=insConferencia(a.unidade,a.kg,r.produto);
+            return `<div class="ins-l"><span class="cresce">${esc(fazenda(a.unidade).nome)}<br><span class="mut" style="font-size:.74rem">${esc(insQtd(a.kg,base))} programados · ${esc(insQtd(rr,base))} recebidos${conf?" · "+insKgHaTxt(conf):""}</span></span>
+              <span class="num">${rr>=n0(a.kg)?"✅":rr>0?"◐":"⚪"}</span></div>`; }).join("")}
+          ${insRecebimentos().filter(x=>x.remessaId===r.id).length?`<p class="mut" style="font-size:.74rem;margin:6px 0 0">Chegadas registradas: ${
+            insRecebimentos().filter(x=>x.remessaId===r.id).map(x=>esc(fazenda(x.unidade).nome)+" "+esc(insQtd(x.kg,base))+" em "+esc(fmtDataCurta(x.data))+(x.nota?" · nota "+esc(x.nota):"")+(x.por?" · "+esc(x.por):"")).join("<br>")}</p>`:""}
+        </div>`:""}</div>`;
+    }).join("")
+      :htmlEstado("vazio",{que:q?"remessa":"remessa importada",filtro:q,dica:"Cole a mensagem do grupo em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))+
+    cadRodape(`<button class="btn" id="bt-ins-colar">📥 Importar remessa</button>`);
+}
+
+/* ---- (11) porta única "📥 Colar do WhatsApp" ---- */
+function insTopo(titulo,sub){
+  return `<div class="topo"><button class="btn-topo" data-insvoltar="1">‹ Voltar</button>
+    <h1>${esc(titulo)}<br><span class="sub">${esc(sub||"Colar do WhatsApp")}</span></h1>
+    <button class="btn-topo no-print" id="bt-topo-sair" title="Sair">⇥</button></div>
+    ${insUI.flash?`<div class="aviso verde" id="ins-flash">✔ ${esc(insUI.flash)}</div>`:""}
+    ${insUI.msg?`<div class="aviso">${esc(insUI.msg)}</div>`:""}`;
+}
+function vColar(){
+  const n=insNav[insNav.length-1]||{v:"colar"};
+  if(n.v==="mensagens") return insVMensagens();
+  if(n.v==="mensagem")  return insVMensagem(n.id);
+  return insVColar();
+}
+function insVColar(){
+  if(!insUI.prev && !insUI.prevAta) return insTopo("Colar do WhatsApp","Uma mensagem, um toque")
+    +`<div class="cartao">
+      <label for="ins-texto">Cole aqui a mensagem</label>
+      <textarea id="ins-texto" rows="9" placeholder="Cole a mensagem do grupo: ata da reunião, remessa de insumo, tarefas soltas ou relato de chuva.">${esc(insUI.texto||"")}</textarea>
+      <p class="mut" style="font-size:.78rem;margin-top:6px">O app lê, diz o que entendeu e mostra tudo para conferir — nada é gravado antes de você mandar.</p>
+    </div>`
+    +cadItem("mensagens","","🗂️ Mensagens importadas",insMensagens().length?insMensagens().length+" mensagens guardadas com o texto original":"nenhuma mensagem importada ainda",insMensagens().length)
+    +cadRodape(botaoAvanco("bt-ins-ler",{rotulo:"Ler a mensagem", falta:String(insUI.texto||"").trim()?"":"Cole a mensagem para o app ler"}));
+  const a=insUI.auto||{tipo:"",motivo:""};
+  const tipo=insUI.tipo;
+  const cab=`<div class="aviso">${tipo
+      ? `<b>${esc((INS_TIPOS_MSG.find(x=>x.id===tipo)||{ico:""}).ico)} ${esc(insTipoRot(tipo))}</b> — ${esc(a.tipo===tipo&&a.motivo?a.frase||("o app achou "+a.motivo):"tipo escolhido por você")}. Confere?`
+      : `<b>O app não reconheceu o formato desta mensagem.</b> Escolha o tipo — ele não adivinha.`}
+    <div class="chips mt">${INS_TIPOS_MSG.map(t=>`<button class="chip ${tipo===t.id?"on":""}" data-ins-tipo="${t.id}">${t.ico} ${esc(t.rot)}</button>`).join("")}</div></div>`;
+  return insTopo("Conferir a mensagem", insResumoPrev())+cab+insCorpoPrev()
+    +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-ins-limpar">Descartar</button>
+      ${insBotaoImportar()}</div>`);
+}
+function insResumoPrev(){
+  const p=insUI.prev;
+  if(insUI.prevAta){ const a=insUI.prevAta;
+    return a.blocos.length+" fazendas · "+a.itens.length+" tarefas"; }
+  if(!p) return "escolha o tipo";
+  if(p.tipo==="remessa"){ const ok=p.itens.filter(i=>i.incluir!==false);
+    const kg=ok.reduce((s,i)=>s+n0(i.kg),0);
+    return ok.length+" fazendas · "+insNumTxt(kg)+" kg · "+insQtd(kg,"kg"); }
+  if(p.tipo==="chuva")   return p.itens.filter(i=>i.incluir!==false).length+" unidades com chuva relatada";
+  if(p.tipo==="tarefas") return p.itens.filter(i=>i.incluir!==false).length+" tarefas";
+  return "";
+}
+function insBotaoImportar(){
+  if(insUI.prevAta) return `<button class="btn" id="bt-ins-ata">Conferir e importar a ata ›</button>`;
+  const p=insUI.prev;
+  if(!p) return botaoAvanco("bt-ins-importar",{rotulo:"Importar", falta:"Escolha o tipo da mensagem"});
+  const n=p.itens.filter(i=>i.incluir!==false).length;
+  const falta = !n ? "Deixe pelo menos uma linha marcada"
+    : (p.tipo==="remessa" && !String(p.produto||"").trim()) ? "Escreva qual é o produto"
+    : (p.itens.some(i=>i.incluir!==false && !i.unidade)) ? "Escolha a unidade das linhas em aberto" : "";
+  const que = p.tipo==="remessa" ? (n===1?"alocação":"alocações")
+    : p.tipo==="chuva" ? (n===1?"relato":"relatos") : (n===1?"tarefa":"tarefas");
+  return botaoAvanco("bt-ins-importar",{rotulo:"Importar "+n+" "+que, falta});
+}
+function insCorpoPrev(){
+  if(insUI.prevAta){ const a=insUI.prevAta;
+    return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">A ata usa a pré-visualização do módulo de Planejamento, item a item, com as unidades já ligadas pelo de-para. Nada é gravado antes de você conferir lá.</p>
+      ${a.fora.length?`<p class="mut" style="font-size:.78rem;margin:6px 0 0">Fora do escopo, ignoradas sem perguntar: ${esc(a.fora.join(" · "))}.</p>`:""}</div>`; }
+  const p=insUI.prev;
+  if(!p) return "";
+  const uns=unidadesPermitidas();
+  const selUn=(i,val)=>`<div class="plan-acoes"><label>Qual unidade?</label>
+    <select data-insprev="${i}|unidade" style="width:100%;min-height:44px;padding:8px">
+    <option value="">— escolher unidade —</option>
+    ${uns.map(f=>`<option value="${f.id}" ${val===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}</select></div>`;
+  if(p.tipo==="remessa"){
+    const naoCasa=p.itens.filter(i=>i.incluir!==false && !i.unidade).length;
+    return `<div class="cartao">
+      <label>Produto</label>
+      <input data-insprev="-|produto" list="dl-ins" value="${esc(p.produto||"")}" placeholder="Qual produto chegou?">
+      <label>Fornecedor</label>
+      <input data-insprev="-|fornecedor" value="${esc(p.fornecedor||"")}" placeholder="Quem entrega">
+      <label>Data do anúncio</label>
+      <input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}">
+      <p class="mut" style="font-size:.78rem;margin-top:6px">Lido de: ${esc((p.soltas||[]).slice(0,2).join(" · ")||"—")}</p>
+    </div>
+    ${naoCasa?`<div class="aviso">${naoCasa} linha(ns) sem unidade reconhecida. Escolha a unidade ou deixe de fora — o app não adivinha nome de fazenda.</div>`:""}
+    ${p.fora.length?`<div class="aviso">Fora do escopo, ignoradas sem perguntar: ${esc(p.fora.join(" · "))}.</div>`:""}
+    ${p.itens.slice(0,INS_PREV_MAX).map((it,i)=>{
+      const conf=it.unidade?insConferencia(it.unidade,it.kg,p.produto):null;
+      const sub=[it.unidade?fazenda(it.unidade).nome:"unidade não reconhecida", insQtd(it.kg,"kg"),
+        conf?insKgHaTxt(conf):""].filter(Boolean).join(" · ");
+      return `<div class="plan-linha${it.incluir===false?" fora":""}"><div class="cad-item" style="margin:0">
+        <button class="plan-farol" data-ins-incl="${i}" aria-label="${it.incluir===false?"Incluir":"Deixar de fora"} ${esc(it.nomeMsg)}">${it.incluir===false?"○":"●"}</button>
+        <span class="cresce"><b>${esc(it.nomeMsg)}</b><span class="mut">${esc(sub)}</span>
+          ${conf&&conf.alerta?`<span class="mut" style="color:var(--amarelo);display:block;font-size:.78rem">⚠ ${conf.dif}% acima/abaixo do que o plano do agrônomo prevê — conferir</span>`:""}</span>
+        <span class="num mut" style="flex:none;font-size:.76rem">${esc(insNumTxt(it.kg))} kg</span></div>
+        ${!it.unidade?selUn(i,it.unidade):""}</div>`; }).join("")}
+    ${p.itens.length>INS_PREV_MAX?`<p class="mut centro" style="font-size:.78rem">mostrando ${INS_PREV_MAX} de ${p.itens.length}</p>`:""}`;
+  }
+  if(p.tipo==="chuva") return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Relato de chuva é SUGESTÃO: o app não grava chuva no boletim de ninguém. Confirmado aqui, o número aparece no boletim da unidade com um "usar" — quem registra é o gerente.</p>
+      <label class="mt">Dia do relato</label><input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}"></div>`
+    +p.itens.map((it,i)=>`<div class="plan-linha${it.incluir===false?" fora":""}"><div class="cad-item" style="margin:0">
+      <button class="plan-farol" data-ins-incl="${i}" aria-label="${it.incluir===false?"Incluir":"Deixar de fora"} ${esc(it.nomeMsg||it.bruto)}">${it.incluir===false?"○":"●"}</button>
+      <span class="cresce"><b>${esc(it.nomeMsg||it.bruto)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):"unidade não reconhecida"} · ${insNumTxt(it.mm)} mm</span></span></div>
+      ${!it.unidade?selUn(i,it.unidade):""}</div>`).join("");
+  return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Cada linha vira uma tarefa da semana. A unidade é obrigatória quando a linha não diz de qual fazenda é — o app não chuta.</p></div>`
+    +p.itens.map((it,i)=>`<div class="plan-linha${it.incluir===false?" fora":""}"><div class="cad-item" style="margin:0">
+      <button class="plan-farol" data-ins-incl="${i}" aria-label="${it.incluir===false?"Incluir":"Deixar de fora"} ${esc(it.desc)}">${it.incluir===false?"○":"●"}</button>
+      <span class="cresce"><b>${esc(it.desc)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):"unidade não reconhecida"}</span></span></div>
+      ${!it.unidade?selUn(i,it.unidade):""}</div>`).join("");
+}
+/* ---- (11.4) mensagens importadas: busca por texto, para reconstituir a origem ---- */
+function insVMensagens(){
+  const q=insUI.busca;
+  const ls=insMensagens().filter(m=>cadBate(q,m.texto,insTipoRot(m.tipo),m.por))
+    .slice().sort((a,b)=>String(b.em||"").localeCompare(String(a.em||"")));
+  return insTopo("Mensagens importadas",insMensagens().length+" guardadas")
+    +(insMensagens().length>12?`<input class="cad-busca" id="ins-busca" placeholder="Buscar palavra da mensagem (ex.: nitrato)…" value="${esc(q||"")}" autocomplete="off" autocapitalize="off">`:"")
+    +(ls.length?ls.map(m=>`<button class="cad-item" data-ins-msg="${m.id}">
+      <span class="cresce"><b>${esc((INS_TIPOS_MSG.find(x=>x.id===m.tipo)||{ico:"🗒️"}).ico)} ${esc(insTipoRot(m.tipo)||"mensagem")}</b>
+        <span class="mut">${esc(fmtDataCurta(m.data||String(m.em||"").slice(0,10)))}${m.por?" · "+esc(m.por):""} · ${(m.criados||[]).length} item(ns) criado(s)</span>
+        <span class="mut" style="display:block;font-size:.76rem">${esc(String(m.texto||"").replace(/\s+/g," ").slice(0,80))}…</span></span>
+      <span class="seta">›</span></button>`).join("")
+      :htmlEstado("vazio",{que:"mensagem importada",filtro:q,onde:"neste aparelho"},{classe:"mut centro mt"}));
+}
+function insVMensagem(id){
+  const m=insMensagens().find(x=>x.id===id);
+  if(!m) return insTopo("Mensagem")+htmlEstado("vazio",{que:"mensagem",onde:"neste aparelho"},{classe:"mut centro mt"});
+  return insTopo(insTipoRot(m.tipo)||"Mensagem", fmtData(m.data||String(m.em||"").slice(0,10)))
+    +`<div class="cartao"><p class="mut" style="font-size:.78rem;margin:0 0 6px">Colada por ${esc(m.por||"—")} em ${esc(String(m.em||"").slice(0,10).split("-").reverse().join("/"))}${m.em&&m.em.length>10?" às "+esc(m.em.slice(11,16)):""}</p>
+      <p class="txt-completo" style="white-space:pre-wrap;font-size:.92rem">${esc(m.texto||"")}</p></div>
+    <div class="cartao"><h3>O que esta mensagem criou</h3>
+      ${(m.criados||[]).length?(m.criados||[]).map(c=>`<p class="mut" style="font-size:.8rem;margin:3px 0">${
+        c.tipo==="remessa"?"📦 remessa de "+esc(c.produto||"")+(c.fornecedor?" ("+esc(c.fornecedor)+")":"")+" · "+esc(insQtd(n0(c.kg),"kg"))+" em "+n0(c.unidades)+" unidades"
+        :c.tipo==="chuva"?"🌧️ sugestão de "+insNumTxt(c.mm)+" mm em "+esc(fazenda(c.unidade).nome)+" ("+esc(fmtDataCurta(c.data))+")"
+        :c.tipo==="tarefa"?"🗒️ tarefa "+esc(c.desc||"")+(c.unidade?" · "+esc(fazenda(c.unidade).nome):"")
+        :"📋 "+esc(c.desc||c.tipo||"")}</p>`).join("")
+        :`<p class="mut" style="font-size:.8rem">Nada foi criado a partir desta mensagem.</p>`}
+      ${m.descartados?`<p class="mut" style="font-size:.78rem">${m.descartados} linha(s) deixada(s) de fora na conferência.</p>`:""}</div>`;
+}
+
+/* ---- (11.5) aprendizado de formato: o que foi confirmado uma vez não pergunta de novo ---- */
+function insAprenderUnidade(nomeMsg, unidade){
+  if(!nomeMsg || !unidade) return;
+  D.deparaAta=(D.deparaAta && D.deparaAta.length)?D.deparaAta:DEPARA_ATA_PADRAO.map(x=>({...x}));
+  if(!D.deparaAta.some(x=>planChaveAta(x.ata)===planChaveAta(nomeMsg))) D.deparaAta.push({ata:String(nomeMsg).trim(), unidade});
+}
+/* grava a pré-visualização conferida. Idempotente em todos os tipos (item 11.3). */
+function insImportar(){
+  const p=insUI.prev; if(!p) return;
+  const vao=p.itens.filter(i=>i.incluir!==false && i.unidade);
+  const fora=p.itens.length-vao.length;
+  if(!vao.length){ atualizarAvanco("bt-ins-importar","Deixe pelo menos uma linha marcada"); return; }
+  vao.forEach(i=>insAprenderUnidade(i.nomeMsg, i.unidade));
+  if(p.tipo==="remessa"){
+    if(!String(p.produto||"").trim()){ atualizarAvanco("bt-ins-importar","Escreva qual é o produto"); return; }
+    if(p.produtoTermo) insAprenderProduto(p.produtoTermo, p.produto);
+    const m=insRegistrarMensagem({texto:insUI.texto, tipo:"remessa", criados:[], descartados:fora});
+    const res=insGravarRemessa({ produto:p.produto, fornecedor:p.fornecedor, data:p.data, origem:p.origem,
+      mensagemId:m.id, alocacoes:vao.map(i=>({unidade:i.unidade, kg:i.kg, nomeMsg:i.nomeMsg})) });
+    const kg=vao.reduce((s,i)=>s+n0(i.kg),0);
+    if(res.remessa && !res.repetida) insRegistrarMensagem({texto:insUI.texto, tipo:"remessa",
+      criados:[{tipo:"remessa", id:res.remessa.id, produto:res.remessa.produto, fornecedor:res.remessa.fornecedor, kg, unidades:vao.length}]});
+    insUI.flash = res.repetida ? "Esta remessa já estava importada — nada foi duplicado."
+      : vao.length+" unidades · "+insQtd(kg,"kg")+" programados";
+  } else if(p.tipo==="chuva"){
+    insRegistrarMensagem({texto:insUI.texto, tipo:"chuva", descartados:fora,
+      criados:vao.map(i=>({tipo:"chuva", unidade:i.unidade, data:p.data||hojeBRT(), mm:n0(i.mm)}))});
+    insUI.flash = vao.length+" relato(s) de chuva sugerido(s) — cada gerente confirma no boletim dele.";
+  } else {
+    let novas=0, repetidas=0;
+    const criados=[];
+    vao.forEach(i=>{
+      const igual=planTarefas().some(t=>t.unidade===i.unidade && insNorm(t.desc)===insNorm(i.desc));
+      if(igual){ repetidas++; return; }
+      planSemanaGarantir();
+      const s=planSemanaAtual();
+      const t=planNovaTarefa({ origemTipo:"semana", origemId:s?s.id:"", origemRot:s?planSemanaRot(s):"avulsa",
+        unidade:i.unidade, desc:i.desc, status:"a_iniciar", tipoItem:"tarefa" });
+      planGravar(t); novas++;
+      criados.push({tipo:"tarefa", id:t.id, desc:t.desc, unidade:t.unidade});
+    });
+    insRegistrarMensagem({texto:insUI.texto, tipo:"tarefas", criados, descartados:fora});
+    insUI.flash = novas+" tarefa(s) criada(s)"+(repetidas?" · "+repetidas+" já existia(m)":"");
+  }
+  salvarDados();
+  insLimpar();
+  insRender();
+}
+/* ---- entrada de dados das telas do módulo ---- */
+function insInput(el){
+  const d=el.dataset;
+  if(el.id==="ins-texto"){ insUI.texto=el.value; atualizarAvanco("bt-ins-ler", String(el.value||"").trim()?"":"Cole a mensagem para o app ler"); return true; }
+  if(el.id==="ins-busca"){ insUI.busca=el.value;
+    clearTimeout(insBuscaTimer);
+    insBuscaTimer=setTimeout(()=>{ const pos=el.selectionStart; insRender();
+      const n=document.getElementById("ins-busca"); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } },220);
+    return true; }
+  if(d.insprev!==undefined && insUI.prev){
+    const [i,campo]=d.insprev.split("|");
+    if(i==="-"){ insUI.prev[campo]=el.value; if(campo==="produto"||campo==="fornecedor") insUI.prev.produtoTermo=insUI.prev.produtoTermo||"";
+      atualizarAvanco("bt-ins-importar", String(insUI.prev.produto||"").trim()||insUI.prev.tipo!=="remessa"?"":"Escreva qual é o produto"); return true; }
+    const it=insUI.prev.itens[parseInt(i,10)];
+    if(it){ it[campo]=el.value; if(campo==="unidade") insRender(); }
+    return true; }
+  return false;
+}
+/* ---- cliques do módulo (chamado pelo tratador único de ligarEventos) ---- */
+function insClique(t,d){
+  /* cartão de chegada e seção de saldo: valem no boletim, na casa e onde mais aparecerem */
+  if(d.insRec!==undefined){
+    const [id,modo]=d.insRec.split("|");
+    const fz=(rascunho&&rascunho.fazendaId)||(sessao&&sessao.fazendaId)||"";
+    if(!fz) return true;
+    if(modo==="parte"){ insUI.parte = insUI.parte===id?"":id; ir(telaAtual,null,true); return true; }
+    if(modo==="nao"){ insNaoChegou(id,fz); insUI.parte=""; ir(telaAtual,null,true); return true; }
+    insRegistrarChegada(id, fz, null);
+    return true; }
+  if(d.insParteok!==undefined){
+    const fz=(rascunho&&rascunho.fazendaId)||(sessao&&sessao.fazendaId)||"";
+    const el=document.getElementById("ins-qtd-"+d.insParteok), q=n0(el?el.value:0);
+    if(!fz) return true;
+    if(!(q>0)){ avisoInline('[data-ins-parteok="'+d.insParteok+'"]',"Escreva quanto chegou para o app somar."); return true; }
+    insRegistrarChegada(d.insParteok, fz, q);
+    return true; }
+  if(d.insNotaok!==undefined){ const el=document.getElementById("ins-nota-campo");
+    insCompletarRecebimento(d.insNotaok,{nota:el?el.value.trim():""});
+    insUI.nota=""; ir(telaAtual,null,true); return true; }
+  if(d.insNotapular!==undefined){ insUI.nota=""; ir(telaAtual,null,true); return true; }
+  if(d.insFoto!==undefined){ const inp=document.querySelector('input[data-ins-foto-input="'+d.insFoto+'"]'); if(inp) inp.click(); return true; }
+  if(d.insCons!==undefined){ insUI.cons = insUI.cons===d.insCons?"":d.insCons; ir(telaAtual,null,true); return true; }
+  if(d.insChuva!==undefined && rascunho){ rascunho.clima=rascunho.clima||{}; rascunho.clima.chuvaMm=String(d.insChuva);
+    salvarRascunho(); ir("form",null,true); return true; }
+  if(d.insProd!==undefined){ insUI.prod=d.insProd; ir(telaAtual,null,true); return true; }
+  if(d.insCopia!==undefined){ const txt=insTextoCobranca(d.insCopia); if(txt) abrirTextoZap(txt); return true; }
+  if(t.id==="bt-ins-colar"){ if(!podePainel()) return true; insLimpar(); insNav=[{v:"colar"}]; ir("colar"); return true; }
+  if(d.insvoltar!==undefined){ insVoltar(); return true; }
+  if(telaAtual!=="colar") return false;
+  if(d.cadv!==undefined){ insIr(d.cadv); return true; }
+  if(d.insMsg!==undefined){ insIr("mensagem", d.insMsg); return true; }
+  if(t.id==="bt-ins-ler"){
+    const el=document.getElementById("ins-texto");
+    const txt=el?el.value:(insUI.texto||"");
+    if(!String(txt).trim()){ avisoInline("#bt-ins-ler","Cole a mensagem para o app ler."); return true; }
+    insUI.texto=txt;
+    insUI.auto=insClassificar(txt);
+    insUI.tipo=insUI.auto.tipo;
+    insAbrirPrev();
+    insRender(); return true; }
+  if(d.insTipo!==undefined){ insUI.tipo=d.insTipo; insAbrirPrev(); insRender(); return true; }
+  if(t.id==="bt-ins-limpar"){ insLimpar(); insRender(); return true; }
+  if(d.insIncl!==undefined && insUI.prev){ const it=insUI.prev.itens[parseInt(d.insIncl,10)];
+    if(it) it.incluir = it.incluir===false; insRender(); return true; }
+  if(t.id==="bt-ins-ata"){
+    planUI.ata=insUI.prevAta; planUI.ataTexto=insUI.texto;
+    insMsgDaAta={texto:insUI.texto};
+    planNav=[{v:"menu"},{v:"rodadas"},{v:"importar"}];
+    insUI.prevAta=null; ir("planejamento"); return true; }
+  if(t.id==="bt-ins-importar"){ insImportar(); return true; }
+  return false;
+}
+/* abre a pré-visualização do tipo escolhido (a ata usa a do módulo de Planejamento) */
+function insAbrirPrev(){
+  insUI.prev=null; insUI.prevAta=null;
+  if(insUI.tipo==="ata"){ insUI.prevAta=ataParsear(insUI.texto); return; }
+  insUI.prev=insLerPorTipo(insUI.tipo, insUI.texto);
+}
+/* UM toque do gerente: grava a chegada, destrava o que estava aguardando e pede a nota (pulável) */
+function insRegistrarChegada(remessaId, fz, kg){
+  const r=insRemessa(remessaId); if(!r) return;
+  const rec=insReceber(remessaId, fz, kg);
+  if(!rec) return;
+  const ls=insDestravar(fz, r.produto, r.fornecedor);
+  insUI.liberadas=ls.map(t=>({desc:t.desc, produto:r.produto}));
+  insUI.parte=""; insUI.nota=rec.id;
+  ir(telaAtual,null,true);
+}
+
 /* ---------- Seções multicultura do formulário ---------- */
 function cartaoIcropDia(r){
   const ic=icropDo(r.data,r.fazendaId);
@@ -5672,9 +6856,11 @@ function vForm(){
   +faixaEnvio(r.fazendaId)     /* v82: estado do envio no topo do boletim */
   +faixaTarefas(r.fazendaId)   /* v77: tarefas da reunião no topo do boletim; nunca bloqueia o preenchimento */
   +faixaPlanoHoje(r)   /* v75: o encontro — o plano de ontem para hoje, com status que o app preenche sozinho */
+  +cartaoRecebimento(r.fazendaId)   /* v86: chegou o insumo? UM toque; some sozinho sem chegada pendente */
   +`
   <datalist id="dl-maq">${opcoesDatalistMaq(r.fazendaId)}</datalist>
   ${(soGraos||temPec)?`<datalist id="dl-prod">${[...(D.insumos||[]).map(i2=>i2.nome),...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}
+  <datalist id="dl-ins">${insProdutos().map(i2=>`<option value="${esc(i2.nome)}">`).join("")}</datalist>
   ${soGraos?`<datalist id="dl-adubo">${[...ADUBOS_SUGERIDOS,...(D.insumosAprendidos||[])].map(nm=>`<option value="${esc(nm)}">`).join("")}</datalist>`:""}`+`
   <p class="mut mb" style="font-size:.8rem">⏱️ Leva uns 3 minutos. Preencha só o que teve no dia — o que não teve, deixe em branco.</p>
   <div class="cartao" style="padding:10px 14px"><label>Quem está preenchendo</label>
@@ -5689,6 +6875,7 @@ function vForm(){
       <div class="chips" id="chips-clima">${LISTA_CLIMA.map(c=>`<button class="chip ${r.clima.cond===c?"on":""}" data-clima="${c}">${c}</button>`).join("")}</div>
       <div class="grade3">
         <div><label>Chuva (mm)</label><input inputmode="decimal" data-c="chuvaMm" value="${esc(r.clima.chuvaMm)}" placeholder="0"></div>
+        ${linhaChuvaRelato(r)}
         ${(!temCafe&&!temGraos)?"":(()=>{const ic=icropDo(r.data,r.fazendaId);
           if(!ic) return "";
           let out="";
@@ -5797,6 +6984,8 @@ function vForm(){
     <div class="corpo">${chipsRespostaSecao(r,"res-oc")}<div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
       <button class="btn suave mt" id="bt-add-oc">＋ Adicionar ocorrência</button></div></details>`}
 
+  ${secaoInsumos(r)}
+
   <details class="secao"><summary><span class="ico">📝</span>Observações e pendências<span class="seta">›</span></summary>
     <div class="corpo">
       <label>Observações do dia</label><textarea data-t="obsGeral" placeholder="O que mais vale registrar">${esc(r.obsGeral)}</textarea>
@@ -5874,6 +7063,7 @@ function cardAtividade(a){
     ${a.talhaoId?seletorOperacao(a,{rotulo:"Atividade",grupos:gruposAtivCafe()}):""}
     ${a.tipo?planTagVinculo(rascunho.fazendaId,a.tipo,a.talhaoId,rascunho.data):""}
     ${a.tipo?detalhesAtividade(a):""}
+    ${a.tipo?insCamposLancamento(a, rascunho.fazendaId):""}
   </div>`;
 }
 function detalhesAtividade(a){
@@ -6209,6 +7399,7 @@ function vPainel(){
     ${cartaoFarolBoletins()}
     ${cartaoPlanejamentoPainel()}
     ${cartaoPlanoPainel()}
+    ${cartaoInsumosPainel()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
       const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
@@ -6614,7 +7805,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v85";
+const APP_VERSAO="v86";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6717,7 +7908,8 @@ function cadCatalogosDe(atv){
     ["pastos","Pastos por fazenda (PASTOS_POR_FAZENDA)",Object.keys(PASTOS_POR_FAZENDA).flatMap(k=>PASTOS_POR_FAZENDA[k].map(p=>k+" · "+p)),false],
     ["ocorr:PECUARIA","Ocorrências",[...LISTA_OCORR_PECUARIA,...LISTA_OCORR],false]];
 }
-const cadCatTotal=()=>["CAFE","GRAOS","PECUARIA"].reduce((s,a)=>s+cadCatalogosDe(a).reduce((x,[k,,lista])=>x+lista.length+catExtra(k).length,0),0)+D.insumos.length+D.maquinas.length;
+/* v86: os produtos saíram de Catálogos e viraram item próprio do menu (Insumos e remessas) — a conta segue o menu */
+const cadCatTotal=()=>["CAFE","GRAOS","PECUARIA"].reduce((s,a)=>s+cadCatalogosDe(a).reduce((x,[k,,lista])=>x+lista.length+catExtra(k).length,0),0)+D.maquinas.length;
 
 /* ---- inventário de rebanho (Lotes e inventário) ---- */
 const cadInv=fz=>((D.inventarioPec||{})[fz])||{cats:{},hist:[]};
@@ -6747,7 +7939,8 @@ function cadVMenu(){
     ["lotes","🐂","Lotes e inventário",pec.length+" unidades de pecuária"+(cab?" · "+cadNum(cab)+" cabeças":" · sem inventário"),pec.length],
     ["plano","📅","Plano do mês",planos?planos+" fazendas com plano vigente baixado":"nenhum plano vigente baixado",planos],
     ["codigos","🔐","Códigos de acesso",cods+" códigos · gerar novo · combinados",cods],
-    ["catalogos","📚","Catálogos","funções, operações, pragas, insumos, máquinas",termos],
+    ["catalogos","📚","Catálogos","funções, operações, pragas, máquinas",termos],
+    ["insumos","📦","Insumos e remessas",insProdutos().length+" produtos · "+insRemessas().length+" remessas programadas",insProdutos().length],
     ["deparaata","📋","De-para da ata",deparaAta().filter(x=>!x.fora).length+" nomes ligados · "+deparaAta().filter(x=>x.fora).length+" fora do escopo",deparaAta().length],
     ["integracoes","🔌","Integrações e robôs","Supabase · iCrop · Solinftec · plano de safra",robos+"/3"],
     ["importacoes","📡","Importações manuais","planilha Solinftec / iCrop (plano B do robô)",(D.telemetria||[]).length],
@@ -6769,7 +7962,7 @@ function cadResultadosBusca(q){
   chavesConhecidas().forEach(k=>{ if(cadBate(q,rotuloDaChave(k),codigoDe(k),k)) r.push(cadItem("codigo",k,esc(rotuloDaChave(k)),"código de acesso · "+esc(codigoDe(k)))); });
   ["CAFE","GRAOS","PECUARIA"].forEach(a=>cadCatalogosDe(a).forEach(([k,rot,lista])=>[...lista,...catExtra(k)].forEach(t=>{ if(cadBate(q,t)) r.push(cadItem("catalogo",a,esc(t),"catálogo · "+ROTULO_CULT[a]+" · "+esc(rot))); })));
   D.maquinas.forEach(m=>{ if(cadBate(q,m.nome,m.cat)) r.push(cadItem("maquinas","",esc(m.nome),"máquina · "+esc(m.cat||""))); });
-  D.insumos.forEach(i=>{ if(cadBate(q,i.nome)) r.push(cadItem("insumos","",esc(i.nome),"insumo · "+esc(i.un||""))); });
+  insProdutos().forEach(i=>{ if(cadBate(q,i.nome,i.fornecedor)) r.push(cadItem("insumos","",esc(i.nome),"insumo · "+esc([insCatRot(i.categoria),i.un||"kg",i.fornecedor].filter(Boolean).join(" · ")))); });
   return r.length?`<p class="mut" style="font-size:.78rem">${r.length} resultado(s)</p>`+r.slice(0,40).join("")+(r.length>40?`<p class="mut centro">mostrando 40 — refine a busca</p>`:""):htmlEstado("vazio",{que:"resultado em Cadastros",filtro:q},{classe:"mut centro mt"});
 }
 
@@ -7037,8 +8230,7 @@ function cadVCatalogos(){
     ${cadItem("catalogo","CAFE","☕ Café","funções, operações, pragas, doenças, daninhas, ocorrências",n("CAFE"))}
     ${cadItem("catalogo","GRAOS","🌾 Grãos","funções, operações por fase, pragas, doenças, daninhas, culturas",n("GRAOS"))}
     ${cadItem("catalogo","PECUARIA","🐂 Pecuária","funções, manejos, categorias animais, sanidade, pastos",n("PECUARIA"))}
-    ${cadItem("maquinas","","Máquinas e equipamentos","nome, categoria e fazendas que atende",D.maquinas.length)}
-    ${cadItem("insumos","","Insumos","nome e unidade",D.insumos.length)}`;
+    ${cadItem("maquinas","","Máquinas e equipamentos","nome, categoria e fazendas que atende",D.maquinas.length)}`;
 }
 function cadVCatalogo(atv){
   const cats=cadCatalogosDe(atv), q=cadUI.filtro, editaveis=cats.filter(c=>c[3]);
@@ -7129,7 +8321,8 @@ function cadVImportacoes(){
 /* ================= 10. SINCRONIZAÇÃO E DADOS ================= */
 function cadVSync(){
   const porTipo={}; syncFila.forEach(x=>{ porTipo[x.t]=(porTipo[x.t]||0)+1; });
-  const rot={b:"boletins",p:"pós-colheita",r:"remessas",t:"telemetria",c:"códigos",pec:"pecuária"};
+  const rot={b:"boletins",p:"pós-colheita",r:"remessas",t:"telemetria",c:"códigos",pec:"pecuária",
+    tar:"tarefas",rod:"rodadas",sem:"semanas",ins:"remessas de insumo",rec:"recebimentos",msg:"mensagens coladas"};
   const teste=(D.boletins||[]).filter(b=>b.exemplo).length+(D.posColheitas||[]).filter(p=>p.exemplo).length;
   return cadTopo("Sincronização e dados","Supabase · fila · exportações")+`
     <div class="cartao"><h3>Situação</h3>
@@ -7186,6 +8379,7 @@ function vCadastros(){
     case "catalogo": return cadVCatalogo(a.id);
     case "maquinas": return cadVMaquinas();
     case "insumos": return cadVInsumos();
+    case "insremessas": return cadVInsRemessas();
     case "integracoes": return cadVIntegracoes();
     case "importacoes": return cadVImportacoes();
     case "sync": return cadVSync();
@@ -7265,7 +8459,9 @@ function cadAcao(acao,id){
   if(acao==="termo-add"){ const k=cadVal("catk"), termo=cadVal("termo"); if(!k||!termo){ cadUI.msg="Escolha a lista e escreva o termo."; cadRender(); return; }
     catExtraAdd(k,termo); cadUI.novo=""; cadUI.msg=""; cadSalvo("","Termo acrescentado"); cadRender(); return; }
   if(acao==="maquina-add"){ const nome=cadVal("mnome"); if(!nome){ cadUI.msg="Dê um nome à máquina."; cadRender(); return; } const m={id:uid(),nome,cat:cadVal("mcat")||"Outros",fazendas:[]}; D.maquinas.push(m); salvarDados(); cadUI.novo=""; cadUI.msg=""; cadSalvo("maq:"+m.id,"Máquina criada"); cadRender(); return; }
-  if(acao==="insumo-add"){ const nome=cadVal("inome"); if(!nome){ cadUI.msg="Dê um nome ao insumo."; cadRender(); return; } const i={id:uid(),nome,un:cadVal("iun")}; D.insumos.push(i); salvarDados(); cadUI.novo=""; cadUI.msg=""; cadSalvo("ins:"+i.id,"Insumo criado"); cadRender(); return; }
+  if(acao==="insumo-add"){ const nome=cadVal("inome"); if(!nome){ cadUI.msg="Dê um nome ao produto."; cadRender(); return; }
+    const i={id:uid(), nome, un:cadVal("iun")||"kg", categoria:cadVal("icat")||"outro", fornecedor:cadVal("iforn")||"", criadoEm:hojeBRT()};
+    insProdutos().push(i); salvarDados(); cadUI.novo=""; cadUI.msg=""; cadSalvo("ins:"+i.id,"Produto criado"); cadRender(); return; }
   if(acao==="baixar-agora"||acao==="sync-agora"){ if(!syncAtivo()){ cadUI.msg="Sincronização desligada — configure a conexão em Sincronização e dados."; cadRender(); return; }
     cadRender(); syncTudo().then(()=>{ if(telaAtual==="cadastros"){ cadSalvo("","Sincronizado"); cadRender(); } }); return; }
   if(acao==="abrir-importar"){ impEstado=null; ir("importar"); return; }
@@ -7419,6 +8615,7 @@ function planVMenu(){
   return planTopo("Planejamento", podeCadastros()?"Escritório · administrador":"Diretoria")
     +planCabecalho()
     +planPastilhasHtml()
+    +`<button class="cad-menu" id="bt-ins-colar"><span class="ico">📥</span><span class="txt"><b>Colar do WhatsApp</b><span class="mut">ata, remessa de insumo, tarefas ou chuva — o app identifica</span></span><span class="num">${insMensagens().length}</span></button>`
     +itens.map(([v,ico,nome,sub,n])=>`<button class="cad-menu" data-planv="${v}">
       <span class="ico">${ico}</span><span class="txt"><b>${nome}</b><span class="mut">${esc(sub)}</span></span><span class="num">${n}</span></button>`).join("")
     +cadRodape(`<button class="btn" data-planv="nova">＋ tarefa</button>`);
@@ -8181,6 +9378,12 @@ function planAtaGravar(){
       data:hojeBRT(), criadoEm:hojeBRT(), por:planQuem()}; planRodadas().push(r); }
   r.importadoEm=hojeBRT();
   const res=ataImportar(r, vao);
+  /* v86: se a ata veio pela porta única, a mensagem original fica guardada com o que criou */
+  if(insMsgDaAta && insMsgDaAta.texto){
+    insRegistrarMensagem({texto:insMsgDaAta.texto, tipo:"ata",
+      criados:planTarefas().filter(t=>t.origemId===r.id).map(t=>({tipo:"tarefa", id:t.id, desc:t.desc, unidade:t.unidade}))});
+    insMsgDaAta=null;
+  }
   planUI.ata=null; planUI.ataTexto="";
   planSalvo(res.novas+" tarefa(s) gravada(s)"+(res.repetidas?" · "+res.repetidas+" já existia(m)":""));
   planNav=[{v:"menu"},{v:"rodadas"},{v:"rodada",id:r.id}];
@@ -8568,6 +9771,27 @@ async function syncEnviar(){
       corpo={ id:reg.id, unidade_id:reg.unidade||null, prazo:reg.prazo||null, status:reg.status,
         payload:{...reg, historico:planHistDe(reg.id)} };
       conflito="id";
+    }else if(item.t==="ins"){
+      /* v86: remessa de insumo (sql/054). Mesmo desenho do planejamento: a foto completa
+         viaja no payload e as colunas soltas servem às consultas do escritório. */
+      col="insumo_remessa"; reg=insRemessas().find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, produto:reg.produto, fornecedor:reg.fornecedor||null, data:reg.data||null, payload:reg };
+      conflito="id";
+    }else if(item.t==="rec"){
+      col="insumo_recebimento"; reg=insRecebimentos().find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, remessa_id:reg.remessaId||null, unidade_id:reg.unidade||null, produto:reg.produto,
+        kg:n0(reg.kg), data:reg.data||null, payload:reg };
+      conflito="id";
+    }else if(item.t==="msg"){
+      /* v86: trilha de origem (sql/055) — o texto integral da mensagem colada, para
+         reconstituir depois de onde veio cada dado (e, na fase 3, alimentar a pergunta livre) */
+      col="mensagens_importadas"; reg=insMensagens().find(x=>x.id===item.id);
+      if(!reg) continue;
+      corpo={ id:reg.id, tipo:reg.tipo||null, texto:reg.texto||"", colado_por:reg.por||null,
+        colado_em:reg.em||new Date().toISOString(), criados:reg.criados||[] };
+      conflito="id";
     }else if(item.t==="rod"){
       col="planejamento_rodada"; reg=(D.rodadas||[]).find(x=>x.id===item.id);
       if(!reg) continue;
@@ -8613,6 +9837,7 @@ async function syncBaixar(){
   const soFz = (esc0 && !esc0.tudo) ? unidadesPermitidas().map(f=>f.id) : null;
   const idsFz = soFz ? soFz.concat(Object.keys(FZ_LEGADO).filter(k=>soFz.includes(FZ_LEGADO[k]))) : null;
   await baixarPlanejamento();
+  await baixarInsumos();
   for(const [col,alvo] of [["boletins","boletins"],["pos_colheitas","posColheitas"],["remessas","remessas"],["telemetria","telemetria"]]){
     try{
       /* v82: `atualizado` = hora em que a linha entrou no banco. É o "recebido HH:MM" do monitor de
@@ -8682,6 +9907,39 @@ async function baixarPlanejamento(){
   if(ok) await salvarDados();
   return ok;
 }
+/* v86: insumos (sql/054) e mensagens importadas (sql/055). O app lê e escreve, como o
+   planejamento; edição local ainda na fila vence o que vem do banco. Sem as tabelas
+   (404), nada muda para quem usa — o módulo funciona inteiro no aparelho. */
+async function baixarInsumos(){
+  if(!syncAtivo()) return false;
+  let ok=false;
+  for(const [col,alvo,sel] of [["insumo_remessa","remessasInsumo","payload"],
+      ["insumo_recebimento","recebimentos","payload"],
+      ["mensagens_importadas","mensagensImportadas","id,tipo,texto,colado_por,colado_em,criados"]]){
+    try{
+      const r=await fetch(syncCfg.url+"/rest/v1/"+col+"?select="+sel+"&limit=3000",
+        { headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } });
+      if(!r.ok) continue;
+      const linhas=await r.json(); if(!Array.isArray(linhas)) continue;
+      ok=true;
+      const lista=D[alvo]=D[alvo]||[];
+      linhas.forEach(l=>{
+        const o = col==="mensagens_importadas"
+          ? { id:l.id, tipo:l.tipo||"", texto:l.texto||"", criados:l.criados||[], por:l.colado_por||"",
+              em:l.colado_em||"", data:String(l.colado_em||"").slice(0,10), chave:insMsgChave(l.texto||"") }
+          : l.payload;
+        if(!o || !o.id) return;
+        if(syncFila.some(x=>x.id===o.id)) return;
+        if(o.unidade) o.unidade=fzAtual(o.unidade);
+        if(Array.isArray(o.alocacoes)) o.alocacoes.forEach(a=>{ if(a.unidade) a.unidade=fzAtual(a.unidade); });
+        const i=lista.findIndex(x=>x.id===o.id);
+        if(i>=0) lista[i]=o; else lista.push(o);
+      });
+    }catch(e){}
+  }
+  if(ok) await salvarDados();
+  return ok;
+}
 /* Códigos de acesso atuais (tabela codigos_acesso). Sem internet vale o que o
    aparelho já tem (CODIGOS_PADRAO + últimos baixados). */
 async function baixarCodigos(){
@@ -8704,6 +9962,7 @@ async function syncTudo(){
   const filaAntes=syncFila.length;
   try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); await syncBatida(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes(); await baixarChegada(); } } finally { syncOcupado=false; }
   planMotor(true); planNotifDisparar();   /* v77: farol, dias de chuva e saída da pausa por clima rodam sozinhos */
+  insFotoRemessas();                     /* v86: foto do aplicado dentro da remessa, para o relatório mensal (sql/056) */
   /* v82: a fila esvaziou (ou emperrou) enquanto o gerente olhava a casa? o indicador de envio troca
      sozinho, no lugar — o formulário nunca é redesenhado, para não tirar o foco de quem digita. */
   if(filaAntes!==syncFila.length && sessao && (sessao.papel==="gerente"||sessao.papel==="pos") && telaAtual==="casa")
@@ -9187,6 +10446,8 @@ function ligarEventos(tela){
   const app=$("#app");
   if(tela==="cadastros") cadPosRender();
   if(tela==="planejamento") planUI.flash="";
+  if(tela==="colar"){ insUI.flash=""; insUI.msg=""; }
+  if(tela!=="form") insUI.liberadas=[];
   if(tela==="farois"){ const b=$("#farol-busca"); if(b) b.oninput=()=>{ farolVista.q=b.value;
       app.querySelectorAll("[data-farolun]").forEach(el=>{ el.style.display=cadBate(farolVista.q, el.dataset.nome)?"":"none"; }); }; }
   if(tela==="codigo"){ const cod=$("#cod-acesso");
@@ -9223,6 +10484,8 @@ function ligarEventos(tela){
     if(telaAtual==="cadastros" || d.cadvoltar!==undefined){ if(cadClique(t,d)) return; }
     /* v77: módulo de planejamento — pastilhas, faixa do gerente e a área da Diretoria/Escritório */
     if(planClique(t,d)) return;
+    /* v86: módulo de insumos — cartão de chegada, saldo, painel e a porta única "Colar do WhatsApp" */
+    if(insClique(t,d)) return;
     if(t.id==="bt-planejamento"||t.id==="bt-planejamento2"){ if(!podePainel()) return; planNav=[{v:"menu"}]; ir("planejamento"); return; }
     /* código de acesso */
     if(t.id==="bt-cod-entrar"){
@@ -9262,6 +10525,10 @@ function ligarEventos(tela){
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null;
       planNav=[{v:"menu"}]; ir("planejamento"); return; }
+    if(d.perfil==="colar"){ if(!podePainel()) return;
+      const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
+      sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null;
+      insLimpar(); insNav=[{v:"colar"}]; ir("colar"); return; }
     if(d.perfil==="relatorios"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("relatorios"); return; }
@@ -9800,6 +11067,7 @@ function ligarEventos(tela){
     const el=ev.target, d=el.dataset;
     if(telaAtual==="cadastros" && cadInput(el)) return;
     if(telaAtual==="planejamento" && planInput(el)) return;   /* v77 */
+    if(insInput(el)) return;                                  /* v86: colagem, pré-visualização e busca das mensagens */
     if(el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }   /* v72: colar a tabela ativa "1 · Ler" */
     if(d.r!==undefined && rascunho){ rascunho[d.r]=el.value; salvarRascunho(); return; }
     if(d.pr!==undefined && rascunhoPos){ rascunhoPos[d.pr]=el.value; salvarRascPos(); return; }
@@ -9903,6 +11171,11 @@ function ligarEventos(tela){
     if(sImp&&impEstado){ impEstado.mapa[sImp.dataset.impmapa]=el.value; atualizarAvanco("imp-rodar", faltaImportar(impEstado)); return; }
     if(el.id==="imp-dia" && impEstado){ atualizarAvanco("imp-rodar", faltaImportar(impEstado)); return; }
     if(el.id==="imp-arq"||el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }
+    if(d.insFotoInput && el.files && el.files[0]){
+      const durl=await comprimirFoto(el.files[0]);
+      if(durl){ insCompletarRecebimento(d.insFotoInput,{foto:durl}); ir(telaAtual,null,true); }
+      return;
+    }
     if(d.fotoInput && el.files && el.files[0] && rascunho){
       const durl=await comprimirFoto(el.files[0]);
       if(durl){ const o=rascunho.ocorrencias.find(x=>x.id===d.fotoInput);

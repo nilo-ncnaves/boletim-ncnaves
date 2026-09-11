@@ -12,7 +12,8 @@
    1. Renderiza uma unidade de café (f23), uma de grãos (f33), uma de
       pecuária (f26), o boletim de pós-colheita (f23), o painel da
       Diretoria, a tela Relatórios, os Faróis de registro (v60, com linhas de
-      exemplo, medidos como Cadastros) e TODOS os níveis de Cadastros (ADMIN).
+      exemplo, medidos como Cadastros), a porta única "Colar do WhatsApp"
+      (v86) e TODOS os níveis de Cadastros (ADMIN).
    2. Mede a altura de cada tela ao abrir: no boletim nenhuma seção pode
       nascer aberta; em Cadastros nenhuma tela acima de 2 alturas (2 × 844 px)
       sem campo de busca.
@@ -94,6 +95,17 @@
       corpo do chip não faz nada; remover o último volta ao vazio. Nos grãos a
       única multi-seleção (problemas do pivô) mora no cartão de apontamento e por
       isso NÃO recebe o componente — o script prova a ausência com a seleção feita.
+
+  15. Insumos (v86): a porta única "Colar do WhatsApp" tem uma tela e um campo,
+      com o botão de avanço inativo dizendo a próxima ação (sem nativo e sem sair
+      da tela); a mensagem do grupo é classificada sozinha e o tipo pode ser
+      trocado por chips; a pré-visualização traz os totais de conferência e PEDE a
+      unidade do nome que não casou, em vez de adivinhar; no boletim, o cartão de
+      chegada é o único elemento novo sempre visível, com três respostas de 44 px,
+      um toque que grava no lugar (sem modal e sem nativo) e o desaparecimento
+      depois da resposta; a seção de saldo nasce fechada; e no painel da Diretoria
+      o cartão "Insumos" nasce recolhido, com a cobrança por fornecedor e sem
+      nenhum termo de cobrança ao campo.
 
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
@@ -1116,7 +1128,8 @@ async function cenarioCadastros(browser, base, R) {
     ['Cadastros › Catálogos › Grãos', [{ v: 'catalogos' }, { v: 'catalogo', id: 'GRAOS' }], 'lista'],
     ['Cadastros › Catálogos › Pecuária', [{ v: 'catalogos' }, { v: 'catalogo', id: 'PECUARIA' }], 'lista'],
     ['Cadastros › Catálogos › Máquinas', [{ v: 'catalogos' }, { v: 'maquinas' }], 'lista'],
-    ['Cadastros › Catálogos › Insumos', [{ v: 'catalogos' }, { v: 'insumos' }], 'lista'],
+    ['Cadastros › Insumos e remessas', [{ v: 'insumos' }], 'lista'],
+    ['Cadastros › Insumos › Remessas programadas', [{ v: 'insumos' }, { v: 'insremessas' }], 'lista'],
     ['Cadastros › Integrações e robôs', [{ v: 'integracoes' }], 'detalhe'],
     ['Cadastros › Importações manuais', [{ v: 'importacoes' }], 'lista'],
     ['Cadastros › Sincronização e dados', [{ v: 'sync' }], 'detalhe'],
@@ -1138,6 +1151,97 @@ async function cenarioCadastros(browser, base, R) {
   if (cadTela) cadTela.selecoes = [combo];
   R.errosCadastros = erros.slice();
   await ctx.close();
+}
+
+/* semente do módulo de insumos (v86): a mensagem REAL do grupo, importada pela porta única.
+   f23 (Vereda Romaria) é a unidade medida no boletim do gerente. */
+const MSG_INS = ['Relação de NITRATO que a Cooxupé vai entregar nas fazendas:',
+  '106.000 kg - VEREDA', '50.000 kg - ROMARIA', '44.000 kg - MATA PRETA'].join('\n');
+async function cenarioInsumos(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
+  await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(300);
+
+  /* 1ª tela: um campo só, botão de avanço inativo explicando o que falta */
+  await page.evaluate(() => { insLimpar(); insNav = [{ v: 'colar' }]; ir('colar'); }); await page.waitForTimeout(250);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp — colar a mensagem', 'cadastros', { tipo: 'detalhe', niveis: 1 }));
+  R.colar = await page.evaluate(async () => {
+    const campos = [...document.querySelectorAll('#app textarea, #app input:not([type=hidden])')].length;
+    const bt = document.getElementById('bt-ins-ler');
+    const inativo = !!bt && bt.classList.contains('acao-off');
+    const falta = bt ? bt.getAttribute('data-falta') || '' : '';
+    if (bt) bt.click();
+    await new Promise(r => setTimeout(r, 120));
+    return { campos, inativo, falta, telaDepois: telaAtual, nativos: window.__nativos,
+      alvo: bt ? +bt.getBoundingClientRect().height.toFixed(1) : 0 };
+  });
+  /* pré-visualização da remessa: totais de conferência e nome não casado com escolha */
+  R.prev = await page.evaluate(async ([msg]) => {
+    insUI.texto = msg + '\n30.000 kg - FAZENDA QUE NAO EXISTE';
+    insUI.auto = insClassificar(insUI.texto); insUI.tipo = insUI.auto.tipo; insAbrirPrev(); ir('colar');
+    await new Promise(r => setTimeout(r, 150));
+    const sub = document.querySelector('#app .topo .sub');
+    const bt = document.getElementById('bt-ins-importar');
+    return { tipo: insUI.tipo, resumo: sub ? sub.textContent.trim() : '',
+      chipsTipo: [...document.querySelectorAll('#app [data-ins-tipo]')].map(c => c.textContent.trim()),
+      naoCasado: document.querySelectorAll('#app [data-insprev$="|unidade"]').length,
+      falta: bt ? bt.getAttribute('data-falta') || '' : '', nativos: window.__nativos,
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+  }, [MSG_INS]);
+  await page.waitForTimeout(150);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a remessa', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  /* grava e mede a trilha de origem */
+  await page.evaluate(msg => { insUI.texto = msg; insUI.tipo = 'remessa'; insAbrirPrev(); insImportar();
+    /* anúncio de 10 dias atrás: é assim que a cobrança por fornecedor aparece (INS_COBRANCA_DIAS = 7) */
+    insRemessas().forEach(r => { r.data = diaISO(hojeBRT(), -10); }); }, MSG_INS);
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { insNav = [{ v: 'colar' }, { v: 'mensagens' }]; ir('colar'); }); await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Mensagens importadas', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  const msgId = await page.evaluate(() => (insMensagens()[0] || {}).id || '');
+  await page.evaluate(id => { insNav = [{ v: 'colar' }, { v: 'mensagens' }, { v: 'mensagem', id }]; ir('colar'); }, msgId);
+  await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Mensagem (texto original)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  /* painel da Diretoria: o cartão nasce recolhido */
+  R.insPainel = await page.evaluate(async () => {
+    sessao = { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' }; ritualPuladoSessao = true; ir('painel');
+    await new Promise(r => setTimeout(r, 200));
+    const s = [...document.querySelectorAll('#app details.secao')].find(d => /Insumos/.test(d.querySelector('summary').textContent));
+    if (!s) return { existe: false };
+    const aberto = s.open; s.querySelector('summary').click();
+    await new Promise(r => setTimeout(r, 120));
+    const txt = s.textContent.replace(/\s+/g, ' ');
+    return { existe: true, aberto, txt: txt.slice(0, 400), cobranca: /A cobrar do fornecedor/.test(txt),
+      proibido: /não fez|não realizou|pendente|atrasad|faltou|esqueceu/i.test(txt) };
+  });
+  const estado = await page.evaluate(() => JSON.stringify(D));
+  R.errosInsumos = erros.slice();
+  await ctx.close();
+
+  /* o gerente: cartão de chegada no topo do boletim e a seção de saldo fechada */
+  const g = await novaPagina(browser, base, { codigo: CODIGOS.f23, chave: 'f23' },
+    { userId: 'u1', papel: 'gerente', nome: 'Gerente — Vereda Romaria', atividade: 'CAFE', fazendaId: 'f23' });
+  await g.page.evaluate(x => { D = JSON.parse(x); salvarDados(); }, estado);
+  await g.page.evaluate(() => { rascunho = novoRascunho(); ir('form'); }); await g.page.waitForTimeout(300);
+  R.telas.push(await medirTela(g.page, 'Boletim do gerente com chegada pendente (f23)', 'boletim', { tipo: 'detalhe', niveis: 1 }));
+  R.insBoletim = await g.page.evaluate(async () => {
+    const c = document.querySelector('#app [data-ins-cartao]');
+    if (!c) return { existe: false };
+    const bts = [...c.querySelectorAll('[data-ins-rec]')];
+    const alvo = Math.min(...bts.map(b => b.getBoundingClientRect().height));
+    const sec = [...document.querySelectorAll('#app details.secao')].find(d => /Insumos na fazenda/.test(d.textContent));
+    const antes = telaAtual, altura = document.documentElement.scrollHeight;
+    bts[0].click();
+    await new Promise(r => setTimeout(r, 250));
+    const depois = document.querySelector('#app [data-ins-cartao]');
+    return { existe: true, botoes: bts.map(b => b.textContent.trim()), alvo: +alvo.toFixed(1),
+      altura: +(c.getBoundingClientRect().height).toFixed(0), secaoFechada: !!sec && !sec.open,
+      mesmaTela: telaAtual === antes, modal: !!document.querySelector('dialog[open], .folha'),
+      nativos: window.__nativos, sumiu: !depois, recebido: insRecebimentos().length,
+      texto: c.textContent.replace(/\s+/g, ' ').trim(),
+      cresceu: document.documentElement.scrollHeight - altura };
+  });
+  R.errosInsumos.push(...g.erros);
+  await g.ctx.close();
 }
 
 /* ---------- avaliação: transforma medidas em ✅/❌ ---------- */
@@ -1417,6 +1521,34 @@ function avaliar(R) {
       [...(R.errosPlanejamento || []), ...(R.errosFaixa || [])].join(' | '));
   }
 
+  /* 15. Insumos (v86): porta única, cartão de chegada em um toque e saldo calculado */
+  {
+    const G = '15. Insumos: uma colagem, um toque, saldo calculado';
+    const C = R.colar || {}, P = R.prev || {}, B = R.insBoletim || {}, PA = R.insPainel || {};
+    add(G, 'Colar do WhatsApp — uma tela, um campo', C.campos === 1, (C.campos || 0) + ' campo(s) na tela');
+    add(G, 'Colar do WhatsApp — botão nasce inativo dizendo a próxima ação, sem nativo e sem sair da tela',
+      C.inativo && /Cole a mensagem/.test(C.falta || '') && C.telaDepois === 'colar' && C.nativos === 0 && C.alvo >= TOQUE_MIN,
+      `"${C.falta || ''}" · alvo ${C.alvo} px · ${C.nativos} nativo(s)`);
+    add(G, 'Classificação automática — a mensagem do grupo é reconhecida e o tipo pode ser trocado',
+      P.tipo === 'remessa' && (P.chipsTipo || []).length === 4, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));
+    add(G, 'Pré-visualização — totais de conferência antes de gravar', /fazendas/.test(P.resumo || '') && /kg|t$/.test(P.resumo || ''), P.resumo || '');
+    add(G, 'Pré-visualização — nome não casado NÃO é adivinhado: a tela pede a unidade',
+      P.naoCasado === 1 && /unidade/i.test(P.falta || ''), P.naoCasado + ' linha(s) para decidir · botão: "' + (P.falta || '') + '"');
+    add(G, 'Pré-visualização — sem termo de cobrança', !/não fez|não realizou|faltou|esqueceu/i.test(P.texto || ''), '');
+    add(G, 'Boletim — cartão de chegada é o único elemento novo sempre visível, com três respostas',
+      B.existe && (B.botoes || []).length === 3, (B.botoes || []).join(' · ') || 'cartão não apareceu');
+    add(G, 'Boletim — alvo de toque ≥ 44 px e a seção de saldo nasce fechada',
+      B.alvo >= TOQUE_MIN && B.secaoFechada, `alvo ${B.alvo} px · seção ${B.secaoFechada ? 'fechada' : 'aberta'}`);
+    add(G, 'Boletim — UM toque grava a chegada, no lugar, sem modal e sem nativo',
+      B.recebido === 1 && B.mesmaTela && !B.modal && B.nativos === 0, `${B.recebido} recebimento · tela ${B.mesmaTela ? 'a mesma' : 'trocou'} · ${B.nativos} nativo(s)`);
+    add(G, 'Boletim — respondida a chegada, o cartão sai da tela (nada fica cobrando)', B.sumiu === true, B.sumiu ? 'saiu' : 'continuou na tela');
+    add(G, 'Boletim — o cartão não cobra quem recebe', !/não fez|pendente|atrasad|faltou|esqueceu/i.test(B.texto || ''), (B.texto || '').slice(0, 90));
+    add(G, 'Painel da Diretoria — o cartão "Insumos" nasce recolhido (P5) e traz a cobrança por fornecedor',
+      PA.existe && PA.aberto === false && PA.cobranca, PA.existe ? (PA.aberto ? 'nasceu aberto' : 'recolhido') + (PA.cobranca ? ' · com cobrança' : ' · sem cobrança') : 'cartão não encontrado');
+    add(G, 'Painel da Diretoria — divergência é assunto do escritório, sem termo de cobrança ao campo', PA.existe && !PA.proibido, PA.proibido ? 'termo proibido na tela' : '');
+    add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosInsumos || []).length, (R.errosInsumos || []).join(' | '));
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -1453,6 +1585,7 @@ function relatorio(itens, R) {
     await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
     await cenarioPlanoPainel(browser, base, R);
     await cenarioPlanejamento(browser, base, R);
+    await cenarioInsumos(browser, base, R);
   } finally { await browser.close(); srv.close(); }
   const itens = avaliar(R);
   const md = relatorio(itens, R);

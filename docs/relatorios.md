@@ -65,6 +65,7 @@ semana o que estava previsto e não rodou (item da vistoria semanal em
 | 23 | Painel executivo mensal | 1 página: produção, custo, água, máquinas, rebanho, adesão, 3 decisões | todos | dia 8 | robô-redator (`painel_executivo`, revisar antes de enviar) | EXISTE (v57 — texto redigido no Supabase; custo por saca AGUARDA ERP) — prompt `docs/relatorios/23-painel-executivo.md` |
 | 24 | Fechamento de safra por cultura | produtividade, custo, margem, decisões (renovar/arrancar/rotação/vender lote) | todos | anual | Cowork | AGUARDA fechamento da safra (e ERP para custo/margem) |
 | 25 | Ata × executado | o que a reunião do mês combinou × o que já foi respondido, por unidade (cumprimento, atrasadas, travadas, arrastadas, motivos) | app (planejamento_tarefa, v77) | mensal (dia 9) | motor (`ata_x_executado`) + painel/Planejamento | EXISTE (v77 — precisa de `sql/050` e `sql/051` rodados) |
+| 26 | Insumos: programado × recebido × aplicado | por unidade e produto: o que foi programado na mensagem do grupo, o que o gerente confirmou que chegou, o que os lançamentos consumiram e o saldo; mais dias de espera por fornecedor | app (insumo_remessa, insumo_recebimento, boletins) | mensal (dia 9) | motor (`insumos_programado_recebido_aplicado`) + painel | EXISTE (v86 — precisa de `sql/054` e `sql/056` rodados) |
 
 **Planejado × executado do plano do DIA (v75).** Não confundir com o
 item 4 acima: aquele compara o plano de safra do agrônomo (adubo,
@@ -128,6 +129,49 @@ PRAZO e REGISTRO — nunca "não fez". Regra completa em CLAUDE.md, item c15.
 **Saídas prontas dentro do app (botão copiar, sem ferramenta externa):**
 pauta da sexta por fazenda · cobrança por fornecedor · fechamento mensal
 por unidade · rascunho da próxima ata, já no formato do texto da reunião.
+
+## Insumos: programado × recebido × aplicado — `insumo_remessa` + `insumo_recebimento` (v86)
+
+**O que responde:** por unidade e produto, o que foi programado na
+mensagem do grupo, o que chegou de verdade, o que os lançamentos do
+boletim consumiram e quanto sobrou — e, por fornecedor, o que está
+programado e ainda sem chegada registrada, com os dias de espera.
+
+**De onde vem:** o módulo de insumos do app (sql/054). A mensagem do
+WhatsApp ("Relação de NITRATO que a Cooxupé vai entregar nas fazendas:
+106.000 kg - VEREDA…") é colada na porta única "📥 Colar do WhatsApp",
+conferida na pré-visualização e vira uma REMESSA com as alocações por
+unidade. Cada chegada confirmada pelo gerente (um toque, no topo do
+boletim) vira um RECEBIMENTO; entrega parcial é outra linha.
+
+**Relatório mensal:** `sql/056-insumos-relatorio.sql` grava
+`relatorio = 'insumos_programado_recebido_aplicado'` em
+`relatorios_gerados` — uma linha por unidade e uma linha do grupo
+(unidade_id nulo). Mês corrente na hora pela `rel_rodar_insumos()`;
+agendamento (dia 9, véspera da reunião) comentado no fim do arquivo. O app
+lê pela vitrine de Relatórios (`REL_CATALOGO`, "Insumos: programado ×
+recebido × aplicado — mês").
+
+**Colunas de `dados` (por unidade):** `unidade`, `unidade_nome`,
+`produtos`, `programado`, `recebido`, `a_receber`, `aplicado`, `saldo`,
+`maior_espera_dias` e `detalhe` (uma entrada por produto, com o
+fornecedor).
+
+**Quem calcula o quê.** `programado` e `recebido` saem da visão
+`vw_insumo_saldo`, no banco. `aplicado` e `saldo` saem da FOTO que o app
+grava dentro da própria remessa (`payload.alocacoes[].apl` e `.sal`),
+regravada sozinha a cada sincronização — pelo mesmo motivo do planejado ×
+executado da v78: transformar o lançamento do boletim em quilos depende do
+de-para de produtos e das doses, que moram no index.html. A foto é do par
+unidade × produto (acumulada), então a visão `vw_insumo_aplicado` usa o
+MAIOR valor do par, nunca a soma das remessas. **Sem foto, o relatório traz
+programado e recebido e deixa `aplicado` nulo — nunca estima.**
+
+**Regra que não se discute:** "a receber" e "sem recebimento registrado"
+são ausência de REGISTRO — nunca afirmação de que a carga não saiu nem de
+que o serviço não foi feito. Divergência entre programado e recebido é
+assunto do escritório (painel da Diretoria), nunca cobrança do campo.
+Regra completa em CLAUDE.md, item c18.
 
 ## Calendário resumido (para a vistoria de segunda)
 
