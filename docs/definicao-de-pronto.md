@@ -686,11 +686,14 @@ Regras que ficam:
    código **da própria fazenda**, explicando que ele abre direto o boletim
    dela. Proibido "acesso negado", "não autorizado", "sem permissão"
    (mesmo tom do item 12) e proibido revelar qualquer código.
-2. **Aparelho num escopo amplo demais avisa na porta**, por
-   `avisoEscopoAmplo()`: só o escopo que abre TODAS as unidades **e**
-   preenche boletim (Administrador). Quem só lê (Diretoria) e quem cuida de
-   uma atividade inteira não recebem o aviso — seria ruído. O texto nomeia
-   o escopo de quem já está dentro, nunca um código.
+2. **Aviso só na tela de quem pode agir sobre ele.** A v83 pôs na porta de
+   entrada um aviso dizendo que o aparelho estava no código de
+   Administrador; a v85 o retirou (decisão do Nilo). Quem via o texto todos
+   os dias era justamente o administrador, que já sabia — o gerente com o
+   código da própria unidade nunca passa por aquela tela. Aviso permanente
+   na porta de quem já conhece a situação é ruído, e ruído diário treina a
+   pessoa a não ler. Quem relata "este aparelho está no código errado" é o
+   monitor de chegada (item 19), onde a informação chega a quem age.
 3. **Igualdade exata continua valendo.** Código de acesso não aceita
    aproximação: `escopoDoCodigo` normaliza (maiúsculas, sem espaço, traço
    opcional) e compara igual. Tolerar "quase certo" transformaria a
