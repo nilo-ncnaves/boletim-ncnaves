@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v85** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v86** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1503,6 +1503,91 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## 7 talhões novos na Lagamar do grupo (v86)
+Aquisição de áreas novas na **Rio Preto-Lagamar — Grãos (f03g)**, a
+"Lagamar do grupo". Fonte oficial: relatório *Empreendimentos Agrícolas,
+Sementes e Auxiliares* do ERP AgroGestão, emitido em **11/09/2026**,
+propriedade "FAZENDA RIO PRETO - LAGAMAR", safra 2026/2027, atividade
+SOJA. Só nome, área e vínculo com a unidade entraram: custo, preço de
+venda, faturamento e produtividade prevista do relatório foram
+descartados — o app não tem e não passa a ter esses campos.
+
+**Onde o cadastro mora (levantado antes de mexer):** semente embutida em
+`dadosSemente()` do index.html (listas `fazendas` e `talhoes`) → gravada
+em `localStorage` (`bdf:dados`) na primeira abertura → daí em diante o
+aparelho manda no dado, e o escritório edita em Cadastros › Talhões,
+pivôs e pastos. **Talhão não existe no Supabase**: `syncEnfileirar` só
+enfileira boletim, pós-colheita e remessa; `unidade_manejo` (plano de
+safra) e `rel_unidade` (motor de relatórios) são de UNIDADE, não de
+talhão, e o Solinftec liga por fazenda (`solinftec_depara`) com o nome do
+talhão em texto livre. Por isso **esta tarefa não precisou de SQL**.
+
+**Os 7, na unidade de grãos (528,10 ha):**
+
+| id | nome na tela | área | nome no ERP (`nomeErp`) | o que aconteceu |
+|---|---|---|---|---|
+| t062 | Área 200 — Gleba 1 | 97,00 | `AREA 200 - GLEBA 1` | já existia — **só a área** (era 176,00) |
+| t071 | Pivô 01 | 134,00 | `PIVO 01` | já existia — área confere |
+| t072 | Pivô 02 | 60,10 | `PIVO 02` | já existia — área confere |
+| t073 | Pivô 03 | 50,00 | `PIVO 03` | já existia — área confere |
+| t074 | Pivô 04 | 74,00 | `PIVO 04` | já existia — área confere |
+| t140 | Calcinhas Pivôs | 33,00 | `CALCINHAS PIVOS` | **novo** |
+| t141 | Fazenda Rio Preto (Paulo Rafael) | 80,00 | `FAZENDA RIO PRETO (PAULO RAFAEL)` | **novo** |
+
+**Reconciliação, nunca substituição.** Nenhum id foi reaproveitado,
+nenhum talhão foi apagado e **nenhum foi renomeado**: os 5 que já
+existiam continuam com o nome que o gerente conhece, e os boletins,
+apontamentos e ciclos que apontam para eles seguem valendo. Os 2 que
+faltavam entraram com id novo (t140, t141).
+
+**`nomeErp` — o nome do ERP é chave, não é rótulo.** Campo novo e só de
+leitura no talhão, com o nome EXATO do relatório. É ele que casa o
+cadastro com o ERP e com a telemetria: `acharTalhao` passou a aceitar
+igualdade por `nomeErp` além do nome de tela (o traço de "AREA 200 -
+GLEBA 1" não bate com o travessão de "Área 200 — Gleba 1"). A regra do
+"não chuta" continua: dois candidatos iguais → vínculo manual. Aparece
+em Cadastros › Talhões › item › **Mais opções**, junto do id interno.
+Mesma ideia da regra de nomenclatura da v76: quem traduz é a leitura,
+o passado não se reescreve.
+
+**Cultura não entra no talhão.** "PIVO 01" é chão — pode ser soja hoje e
+milho ou feijão na safra seguinte. A cultura continua no CICLO
+(`D.ciclos`), como já era; os 7 aparecem como "Grão (anual) · em preparo
+/ pousio" até alguém lançar o plantio.
+
+**Homônimos.** "Calcinhas" e pivôs existem também na Capoeira Grande
+(f27), e há pivôs na Vereda (f22g) e na Floramill (f33). Todo vínculo do
+app é `fazendaId` + id do talhão: a busca global de Cadastros mostra a
+fazenda na própria linha, o painel filtra por unidade, e `pivosDa`,
+`areaUnidade` e o seletor de talhão do boletim são todos por unidade.
+Nada passou a agrupar por nome solto.
+
+**Migração (aparelho que já usava o app).** Passo único marcado em
+`D.migracoes.v86lagamar`, dentro de `carregarTudo`: os 5 recebem área e
+`nomeErp`, os 2 novos são acrescentados (respeitando
+`D.talhoesRemovidos`), grava e **não roda de novo** — a partir daí a área
+volta a ser do escritório, em Cadastros.
+
+### Provas
+- Migração v85 → v86 no mesmo navegador e no mesmo `localStorage`,
+  partindo de um aparelho com boletim enviado, ciclo de soja aberto em
+  t062 e talhão criado à mão: **14 ✅ · 0 ❌** — 528,10 ha, os 2 novos
+  chegam, t062 muda só a área, nenhum boletim/ciclo/talhão do gerente se
+  perde, f20 e f03c byte a byte iguais, e a área corrigida depois em
+  Cadastros não é sobrescrita na abertura seguinte.
+- `scripts/checar-poluicao.cjs`: **588 ✅ · 42 ❌** na v86 e na v85
+  (`origin/main`). Nenhum ❌ novo; o diff do relatório inteiro são a linha
+  da versão e os dois contadores de Cadastros (105 → 107 talhões, 30 → 32
+  talhões de grãos).
+- `scripts/regressao_render.cjs` contra `origin/main`: café (f23), grãos
+  (f33), pecuária (f26), pós-colheita e Diretoria **idênticos em todas as
+  telas**; só muda o despejo do `localStorage` (o cadastro em si). Em
+  ADMIN, só os dois contadores do menu de Cadastros.
+- `node scripts/teste_planejamento.cjs` (64 ✅ · 0 ❌),
+  `node scripts/teste_nomenclatura.cjs` e
+  `node scripts/gerar_categorias_operacoes.cjs` verdes.
+- `node --check` no JavaScript extraído do index.html.
+
 ## Aparelho sem unidade aberta no monitor de chegada (v84)
 Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
 `ADMIN-9561` (o `AMNIN` da mensagem anterior foi erro de digitação dele) —
@@ -1729,7 +1814,11 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
-v82, 11/09/2026: **586 ✅ · 46 ❌** — os mesmos 46 ❌ da v81, nenhum novo
+v86, 11/09/2026: **588 ✅ · 42 ❌** — os mesmos 42 ❌ da v85 (`origin/main`),
+nenhum novo: a v86 só acrescenta 2 talhões ao cadastro da Lagamar de grãos,
+e no relatório inteiro mudam apenas os dois contadores do menu de Cadastros
+(105 → 107 talhões, 30 → 32 talhões de grãos). Medição anterior registrada
+aqui, v82, 11/09/2026: **586 ✅ · 46 ❌** — os mesmos 46 ❌ da v81, nenhum novo
 (a v82 acrescentou o cartão "📡 Chegada dos boletins hoje", recolhido, e a
 faixa de estado do envio, que reusa `.aviso`; o painel foi de 4 para 4,15
 telas). Medição anterior registrada aqui, v78, 10/09/2026:

@@ -522,7 +522,12 @@ function dadosSemente(){
       {id:"t057", fazendaId:"f14c", nome:"Igrejinha — Área geral", area:0},
       {id:"t058", fazendaId:"f14c", nome:"Lazaro — Área geral", area:0},
       {id:"t061", fazendaId:"f03c", nome:"Área do Lico", area:10.0},
-      {id:"t062", fazendaId:"f03g", nome:"Área 200 — Gleba 1", area:176.0},
+      /* v86 — aquisição de áreas novas na Lagamar do grupo (relatório "Empreendimentos Agrícolas,
+         Sementes e Auxiliares" do ERP AgroGestão, 11/09/2026, propriedade "FAZENDA RIO PRETO - LAGAMAR",
+         safra 2026/2027, atividade SOJA). nomeErp guarda o nome EXATO do ERP: é a chave de casamento
+         com o ERP e com a telemetria; o nome de tela continua o que o gerente já conhece (nenhum
+         talhão foi renomeado nem teve id reaproveitado). Cultura NÃO entra no talhão — é do ciclo. */
+      {id:"t062", fazendaId:"f03g", nome:"Área 200 — Gleba 1", area:97.0, nomeErp:"AREA 200 - GLEBA 1"},
       {id:"t063", fazendaId:"f03c", nome:"Cascalho", area:48.0},
       {id:"t064", fazendaId:"f03c", nome:"Setor 1 (café grupo)", area:14.54},
       {id:"t065", fazendaId:"f03c", nome:"Setor 2 (café grupo)", area:15.28},
@@ -531,10 +536,10 @@ function dadosSemente(){
       {id:"t068", fazendaId:"f03c", nome:"Setor 5 (café grupo)", area:16.94},
       {id:"t069", fazendaId:"f03c", nome:"Setor 6 (café grupo)", area:10.0},
       {id:"t070", fazendaId:"f03c", nome:"Setor 7 (café grupo)", area:9.0},
-      {id:"t071", fazendaId:"f03g", nome:"Pivô 01", area:134.0},
-      {id:"t072", fazendaId:"f03g", nome:"Pivô 02", area:60.1},
-      {id:"t073", fazendaId:"f03g", nome:"Pivô 03", area:50.0},
-      {id:"t074", fazendaId:"f03g", nome:"Pivô 04", area:74.0},
+      {id:"t071", fazendaId:"f03g", nome:"Pivô 01", area:134.0, nomeErp:"PIVO 01"},
+      {id:"t072", fazendaId:"f03g", nome:"Pivô 02", area:60.1, nomeErp:"PIVO 02"},
+      {id:"t073", fazendaId:"f03g", nome:"Pivô 03", area:50.0, nomeErp:"PIVO 03"},
+      {id:"t074", fazendaId:"f03g", nome:"Pivô 04", area:74.0, nomeErp:"PIVO 04"},
       {id:"t075", fazendaId:"f03c", nome:"Retiro", area:19.4},
       {id:"t076", fazendaId:"f03c", nome:"Sede Abdala — Café Grupo", area:194.0},
       {id:"t077", fazendaId:"f20", nome:"Café Rodrigo — Setor 1", area:24},
@@ -599,7 +604,12 @@ function dadosSemente(){
       {id:"t136", fazendaId:"f33", nome:"Pivô 12", area:57.61},
       {id:"t137", fazendaId:"f33", nome:"Sequeiro", area:80.0},
       {id:"t138", fazendaId:"f34", nome:"Pasto", area:200.0},
-      {id:"t139", fazendaId:"f35", nome:"Área geral (a cadastrar)", area:0, tipo:"GRAO_ANUAL"}
+      {id:"t139", fazendaId:"f35", nome:"Área geral (a cadastrar)", area:0, tipo:"GRAO_ANUAL"},
+      /* v86 — as duas áreas que ainda não existiam no cadastro. Homônimos de propósito em OUTRAS
+         fazendas ("Calcinhas" e os pivôs da Capoeira Grande, pivôs da Vereda e da Floramill): o
+         vínculo é sempre fazendaId + id do talhão, nunca o nome solto. */
+      {id:"t140", fazendaId:"f03g", nome:"Calcinhas Pivôs", area:33.0, nomeErp:"CALCINHAS PIVOS"},
+      {id:"t141", fazendaId:"f03g", nome:"Fazenda Rio Preto (Paulo Rafael)", area:80.0, nomeErp:"FAZENDA RIO PRETO (PAULO RAFAEL)"}
     ],
     maquinas:[
       {id:"m001", cat:"Tratores café", nome:"Trator MF 265 (COD 1)"},
@@ -1195,6 +1205,23 @@ async function carregarTudo(){
      uma vez só, sem migração geral. Removidas em Cadastros, não voltam (D.talhoesRemovidos). */
   ["t057","t058"].forEach(id=>{ const semente=dadosSemente().talhoes.find(t=>t.id===id);
     if(semente && !(D.talhoes||[]).some(t=>t.id===id) && !((D.talhoesRemovidos||[]).includes(id))) D.talhoes.push({...semente}); });
+  /* v86: os 7 talhões de GRÃOS da Lagamar do grupo (f03g), conforme o relatório do ERP AgroGestão
+     de 11/09/2026 (propriedade "FAZENDA RIO PRETO - LAGAMAR", safra 2026/2027, atividade SOJA),
+     chegam nos aparelhos que já tinham dados. Passo de UMA vez só (marca em D.migracoes): nada é
+     apagado, nenhum id é reaproveitado, nenhum talhão é renomeado e boletins, apontamentos e
+     ciclos ficam intactos. Os 5 que já existiam só recebem a área do ERP e o nomeErp; os 2 novos
+     (t140, t141) entram como talhão novo. Removidos em Cadastros, não voltam (D.talhoesRemovidos);
+     depois desta passagem a área volta a ser do Nilo, em Cadastros — a migração não roda de novo. */
+  D.migracoes = D.migracoes||{};
+  if(!D.migracoes.v86lagamar){
+    dadosSemente().talhoes.filter(t=>t.fazendaId==="f03g").forEach(sem=>{
+      const meu=(D.talhoes||[]).find(t=>t.id===sem.id);
+      if(meu){ meu.area=sem.area; if(sem.nomeErp) meu.nomeErp=sem.nomeErp; }   /* reconciliação: só a área e a chave do ERP */
+      else if(!((D.talhoesRemovidos||[]).includes(sem.id)) && D.fazendas.some(f=>f.id==="f03g")) D.talhoes.push({...sem});
+    });
+    D.migracoes.v86lagamar=true;
+    await salvarDados();
+  }
   (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=tipoPeloPerfil(t.nome, perfilDe(t.fazendaId)); });
   D.ciclos = D.ciclos||[];
   /* milho semente = área arrendada a sementeira: o talhão vira ARRENDADO e o ciclo não se aplica */
@@ -1903,7 +1930,9 @@ function acharTalhao(nomePlat){
     if(fzs.length===1) candidatos=D.talhoes.filter(t=>fzs.includes(t.fazendaId));
   }
   const nl=semAcento(resto);
-  const iguais=candidatos.filter(t=>semAcento(t.nome)===nl);
+  /* v86: nomeErp é o nome EXATO do talhão no ERP AgroGestão — vale como igualdade,
+     do lado da leitura, sem renomear nada e sem afrouxar a regra do "não chuta" */
+  const iguais=candidatos.filter(t=>semAcento(t.nome)===nl||(t.nomeErp&&semAcento(t.nomeErp)===nl));
   if(iguais.length===1) return iguais[0].id;
   if(iguais.length>1) return null; /* ambíguo: não chuta — vai para o vínculo manual */
   const parecidos=candidatos.filter(t=>semAcento(t.nome).includes(nl)||nl.includes(semAcento(t.nome)));
@@ -6614,7 +6643,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v85";
+const APP_VERSAO="v86";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -6848,7 +6877,7 @@ function cadVTalhao(id){
       ${cadCampo("Área (ha)","area",t.area,"inputmode=\"decimal\" class=\"num\"")}
       ${cadSelect("Tipo de uso",`tipo`,[["","(pelo perfil da unidade)"],...TIPOS_TALHAO],t.tipo||"")}
     </div>
-    ${novo?"":cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(t.id)}</b>.</p>
+    ${novo?"":cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(t.id)}</b>.${t.nomeErp?` Nome no ERP AgroGestão: <b>${esc(t.nomeErp)}</b> (chave de casamento com o ERP e com a telemetria; só leitura).`:""}</p>
       ${t.tipo==="GRAO_ANUAL"?`<p class="mt">${c?"Ciclo ativo: <b>"+rotuloCultura(c.cultura)+"</b> desde "+fmtData(c.plantio):"Sem ciclo ativo (preparo / pousio)"} · ${hist.length} ciclo(s) no histórico.</p>
       <div class="mt">${cadItem("ciclo",t.id,"Ciclos e plantios deste talhão","novo plantio, encerrar colheita, histórico")}</div>`:""}`)}
     ${novo?"":cadZona(cadConfirmar("rm-talhao:"+t.id,"Remover talhão","Remover o talhão "+esc(t.nome)+" do cadastro, mantendo o nome nos boletins antigos?","sec"))}
