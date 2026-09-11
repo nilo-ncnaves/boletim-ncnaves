@@ -26,6 +26,8 @@
   10. Sexta-feira abre sozinha a tela de fechamento da semana; dia 11 sem ata
       mostra a pastilha da rodada.
   11. Dois toques até qualquer função da área Planejamento.
+  12. v86: a semana é por fazenda — a sexta abre pela porta das unidades, a tela de
+      uma fazenda não mostra tarefa de outra e "assumir" funciona lá dentro.
 
  Uso (na raiz do repositório):
    node scripts/teste_planejamento.cjs
@@ -358,6 +360,46 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
     ok('Tocar em "executado" abre a lista dos lançamentos, no lugar e com alvo ≥ 44 px',
       naTela.linhas > 0 && naTela.alvo >= 44 && naTela.tela === 'planejamento' && naTela.nativos === 0,
       naTela.linhas + ' lançamento(s); alvo ' + naTela.alvo + ' px');
+
+    /* ---------- v86: a semana é POR FAZENDA ---------- */
+    const porFaz = await p2.page.evaluate(async () => {
+      planMotor(true);
+      planUI.ritual = 'semana'; planNav = [{ v: 'ritual' }]; planLimpar(); ir('planejamento');
+      await new Promise(r => setTimeout(r, 250));
+      const app = document.querySelector('#app');
+      const botoes = [...app.querySelectorAll('[data-plan-semun]')];
+      const nomes = botoes.map(b => (b.querySelector('b') || {}).textContent || '');
+      const ritual = app.textContent.replace(/\s+/g, ' ');
+      const todas = planTarefas().filter(t => t.tipoItem === 'tarefa');
+      const outras = todas.filter(t => t.unidade && t.unidade !== 'f22c').map(t => t.desc);
+      const daUnidade = todas.filter(t => t.unidade === 'f22c').map(t => t.desc);
+      const alvo = botoes.find(b => b.dataset.planSemun.split('|')[0] === 'f22c');
+      const alvoNome = alvo ? (alvo.querySelector('b') || {}).textContent : '';
+      if (alvo) alvo.click();
+      await new Promise(r => setTimeout(r, 250));
+      const tela = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      const bt = document.querySelector('#app [data-plan-comp]');
+      const [tid, sid] = bt ? bt.dataset.planComp.split('|') : ['', ''];
+      const antes = tid ? (planTarefa(tid).semanas || []).includes(sid) : null;
+      if (bt) bt.click();
+      await new Promise(r => setTimeout(r, 250));
+      return { nomes, alvoNome, ritualTemTarefa: outras.concat(daUnidade).some(d => d && ritual.includes(d)),
+        vazou: outras.filter(d => d && tela.includes(d)),
+        mostrouDaUnidade: daUnidade.filter(d => d && tela.includes(d)).length,
+        assumir: !!bt, antes, depois: tid ? (planTarefa(tid).semanas || []).includes(sid) : null,
+        tela: telaAtual, vista: (planNav[planNav.length - 1] || {}).v,
+        largura: document.documentElement.scrollWidth, nativos: window.__nativos || 0 };
+    });
+    ok('Sexta-feira abre pela FAZENDA: um botão por unidade, nenhuma tarefa solta na tela',
+      porFaz.nomes.length >= 2 && !porFaz.ritualTemTarefa,
+      porFaz.nomes.length + ' fazenda(s): ' + porFaz.nomes.slice(0, 3).join(' · '));
+    ok('A tela da fazenda mostra só as tarefas dela (zero tarefa de outra unidade)',
+      porFaz.vazou.length === 0 && porFaz.mostrouDaUnidade > 0,
+      porFaz.alvoNome + ' — ' + porFaz.mostrouDaUnidade + ' tarefa(s) da unidade; ' + porFaz.vazou.length + ' de outra');
+    ok('"assumir" na tela da fazenda põe a tarefa na semana sem sair da tela',
+      porFaz.assumir && porFaz.antes === false && porFaz.depois === true
+      && porFaz.vista === 'semanaun' && porFaz.largura <= 390 && porFaz.nativos === 0,
+      'assumida na tela da unidade · página ' + porFaz.largura + ' px');
 
     ok('Nenhum erro de JavaScript na semana e nos textos', p2.erros.length === 0, p2.erros.join(' | '));
     estado = await lerD(p2.page);

@@ -928,9 +928,17 @@ async function cenarioPlanejamento(browser, base, R) {
   await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(300);
   await page.evaluate(SEMEAR_PLAN, ATA_TESTE); await page.waitForTimeout(200);
   const rodada = await page.evaluate(() => (planRodadas()[0] || {}).id || '');
+  /* v86: a semana por fazenda — a porta (Semana/ritual) e a programação de UMA unidade */
+  const semun = await page.evaluate(() => {
+    planMotor(true);
+    const s = planSemanaAtual() || planSemanaCriar(planSegundaDe(hojeBRT()));
+    const ant = planSemanaAnterior();
+    return 'f22c|' + (ant ? ant.id : '') + '|' + s.id;
+  });
   const niveis = [
     ['Planejamento — menu', [{ v: 'menu' }], 'lista', 1],
     ['Planejamento › Semana', [{ v: 'menu' }, { v: 'semana' }], 'lista', 2],
+    ['Planejamento › Semana › fazenda', [{ v: 'menu' }, { v: 'semana' }, { v: 'semanaun', id: semun }], 'detalhe', 3],
     ['Planejamento › Mês por unidade', [{ v: 'menu' }, { v: 'mes' }], 'lista', 2],
     ['Planejamento › Rodadas da reunião', [{ v: 'menu' }, { v: 'rodadas' }], 'lista', 2],
     ['Planejamento › Rodada › fechamento', [{ v: 'menu' }, { v: 'rodadas' }, { v: 'rodada', id: rodada }], 'lista', 3],

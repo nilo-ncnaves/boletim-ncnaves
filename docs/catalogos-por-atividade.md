@@ -751,6 +751,24 @@ que apareceu no dia e não estava na ata — assunto para a próxima reunião.
 **Sem lançamento** = nenhum registro do boletim casou com a tarefa; é
 ausência de REGISTRO, nunca afirmação de que não foi feito.
 
+### A semana por fazenda (v86) — vocabulário da porta e da tela da unidade
+
+A semana (tela 🗓️ Semana e o ritual da sexta) abre por uma PORTA: uma linha
+por fazenda, com o nome da unidade pelo cadastro (`fazenda(id).nome`, nunca
+pedaço de nome). Componente único `planPortaSemana` / `planVSemanaUn`
+(CLAUDE.md, item c18) — igual nas três atividades; o que muda é o recorte.
+
+| onde | texto | regra |
+|---|---|---|
+| Linha da fazenda (porta) | "3 combinados em aberto · 1 travada · 2 sugestões · 1 assumida" | só o que existe entra; sem nada, "nada em aberto" |
+| Farol da linha | 🔴 🟡 ⏸️ 🟢 do pior item da unidade | mesmo catálogo `PLAN_FAROL` das outras telas; sem item, sem ícone |
+| Grupos da porta | "Fazendas com algo nesta semana" · "Fazendas sem nada nesta semana" (atrás de "＋N") · "Sem fazenda no texto da ata" | a unidade sem nada continua alcançável; a tarefa de grupo nunca some (regra da v84) |
+| Tela da unidade | "O que ficou combinado" · "Sugestões para semana dd/mm a dd/mm" · "Já assumidas para semana …" | cartão vazio pela função única: "Sem combinado em Vereda — Café na semana 14/09 a 20/09." |
+| Ações da tela da unidade | "Concluí" · "Travado" · "assumir" · "tirar da semana" | os mesmos verbos das outras telas do módulo (v81: a ação é "assumir") |
+
+Não existe termo de atividade nesta tela: o que aparece é o nome da unidade,
+a descrição que veio da ata e o prazo.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar

@@ -709,3 +709,47 @@ Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo),
 `scripts/regressao_render.cjs` contra `origin/main` (gerente e
 pós-colheita idênticos; só o `00-inicio` do ADMIN muda) e o teste em
 navegador dos códigos de cada escopo.
+
+## 21. Lista de trabalho de campo abre por fazenda (desde a v86)
+
+Origem: 11/09/2026, a primeira sexta com o módulo de planejamento no ar. A
+tela "Fechar a semana e planejar a próxima" — a que a Diretoria encontra ao
+abrir a aba — mostrava "O que ficou combinado" e "Sugestões para a semana"
+de TODAS as unidades numa lista só, com os botões "Concluí", "Travado" e
+"assumir" enfileirados. Quem usa o app é o funcionário de UMA fazenda: ele
+tinha de achar as linhas dele no meio das outras e, com o polegar no sol, um
+toque errado mexia no combinado da fazenda do vizinho.
+
+Regras que ficam:
+
+1. **Toda lista em que alguém do campo AGE sobre itens de várias unidades
+   abre por uma porta de fazendas.** Componente único `planPortaSemana(fech,
+   alvo)` (a porta) + `planVSemanaUn(id)` (a programação de uma unidade) —
+   nunca uma variante por atividade ou por perfil. Lista só de LEITURA
+   (painel, relatório, pauta em texto) continua podendo somar unidades: o
+   problema é o BOTÃO de uma fazenda ao lado do botão de outra.
+2. **Uma linha por fazenda, com estado na própria linha** (P7): nome pelo
+   cadastro por id, farol do pior item (🔴 🟡 ⏸️ 🟢, catálogo `PLAN_FAROL`) e
+   o que há nesta semana — "3 combinados em aberto · 1 travada · 2 sugestões
+   · 1 assumida"; sem nada, "nada em aberto". Nenhum emoji decorativo novo.
+3. **Nenhuma fazenda fica sem botão.** As que não têm nada na semana ficam
+   atrás de um "＋N fazendas sem nada nesta semana" (mesmo mecanismo do "+K"
+   da v74 e do "＋N" da v80) e a busca — obrigatória acima de 12 unidades
+   (P3) — abre todas as que batem, para nada ficar escondido de quem
+   procura. Ordem alfabética: a fazenda de cada um fica sempre no mesmo
+   lugar; o que muda de grupo é a fazenda, nunca a ordem dentro do grupo.
+4. **A chave vazia aparece nomeada** (regra da v84): a tarefa que a ata
+   trouxe sem fazenda vai para o rodapé "Sem fazenda no texto da ata" — uma
+   lista agrupada por chave nunca engole a linha cuja chave está vazia.
+5. **A tela da fazenda não mostra tarefa de outra.** É a prova da regra, e
+   ela é medida: `node scripts/teste_planejamento.cjs`, item 12.
+6. **Vocabulário de sempre:** relata REGISTRO e PRAZO ("nada em aberto",
+   "sem combinado"), nunca "não fez", "pendente", "atrasado", "faltou";
+   verbo no botão (item 13): "assumir", "tirar da semana", "Escolher outra
+   fazenda"; cartão vazio pela função única `htmlEstado`, nomeando a unidade
+   e a semana ("Sem combinado em Vereda — Café na semana 14/09 a 20/09.").
+
+Conferência: `node scripts/teste_planejamento.cjs` (67 ✅ · 0 ❌, com as três
+provas novas), `scripts/checar-poluicao.cjs` (nenhum ❌ novo; tela nova
+"Planejamento › Semana › fazenda") e `scripts/regressao_render.cjs` contra
+`origin/main` (gerente e pós-colheita idênticos nas três atividades).

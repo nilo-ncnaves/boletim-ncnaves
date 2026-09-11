@@ -318,9 +318,7 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-exec-vazio{font-size:.8rem;margin:8px 0 0}
 .plan-num{font-size:.82rem}
 .plan-vinc{font-size:.7rem;margin-top:4px;display:inline-block}
-.plan-duas{display:grid;gap:12px}
 .plan-notif{margin:0 0 12px;font-size:.82rem}
-@media(min-width:640px){.plan-duas{grid-template-columns:1fr 1fr}}
 .sel-box:empty{display:none}
 .sel-box{margin:0 0 10px}
 .cad-item>.sel-box{width:100%}
@@ -6614,7 +6612,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v85";
+const APP_VERSAO="v86";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -7337,7 +7335,7 @@ function planFiltroFila(rot, chips, chave, escolhido){
     + (resto>0?`<button class="chip sal-mais" data-plan-fila="${esc(chave)}" aria-label="Mostrar mais ${resto} filtro(s) de ${esc(rot)}">＋${resto}</button>`:"")
     + `</div>`;
 }
-function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; }
+function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; planUI.unTodas=false; }
 function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
 function planVoltar(){ planLimpar();
   if(planNav.length>1){ planNav.pop(); ir("planejamento"); }
@@ -7690,26 +7688,109 @@ function planVSemana(){
   const s=planSemanaAtual() || planSemanaCriar(planSegundaDe(hojeBRT()));
   const ant=planSemanaAnterior(), fech=ant?planFecharSemana(ant):null;
   const comp=planComprometidas(s.id).sort(planOrdenar);
-  const sug=planSugestoesSemana(s.id).slice(0,8);
   const novas=planTarefas().filter(t=>t.origemTipo==="semana" && t.origemId===s.id);
   return planTopo(planSemanaRot(s), comp.length+" tarefa"+(comp.length===1?"":"s")+" assumida"+(comp.length===1?"":"s"))
     +(fech&&fech.n?`<div class="cartao plan-fecha"><b>Como foi ${esc(planSemanaRot(ant).toLowerCase())}</b>
       <p class="mut" style="margin:2px 0 6px">${esc(fech.placar)} · ${fech.travadas.length} travada(s)</p>
-      ${fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")}
-      ${fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)} <span class="mut">· ${esc((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())}${(t.bloqueio&&t.bloqueio.quem)?" ("+esc(t.bloqueio.quem)+")":""}</span></p>`).join("")}
-      ${fech.abertas.map(t=>`<p class="plan-fecha-l">◻ ${esc(t.desc)} <span class="mut">· ${esc(planLinhaTexto(t))}</span></p>`).join("")}</div>`:"")
+      ${fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)} <span class="mut">· ${esc(planNomeUn(t))}</span></p>`).join("")}
+      ${fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)} <span class="mut">· ${esc(planNomeUn(t))} · ${esc((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())}${(t.bloqueio&&t.bloqueio.quem)?" ("+esc(t.bloqueio.quem)+")":""}</span></p>`).join("")}
+      ${fech.abertas.map(t=>`<p class="plan-fecha-l">◻ ${esc(t.desc)} <span class="mut">· ${esc(planNomeUn(t))} · ${esc(planLinhaTexto(t))}</span></p>`).join("")}</div>`:"")
     +`<div class="cad-grupo">Parte A · tarefas assumidas nesta semana</div>`
     +(comp.length?comp.map(t=>planLinhaTarefa(t)).join("")
-      :`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa assumida ainda. Toque em "assumir" nas sugestões abaixo.</p>`)
-    +(sug.length?`<div class="cad-grupo">Sugestões — prazo próximo, atrasadas e recém-destravadas</div>`
-        +sug.map(t=>`<div class="cad-item"><button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[planFarol(t)].ico}</button>
-          <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(t.unidade?fazenda(t.unidade).nome:"Grupo")} · ${esc(planLinhaTexto(t))}${t.destravadaEm?" · destravada":""}</span></span>
-          <button class="chip plan-comp" data-plan-comp="${t.id}|${s.id}">assumir</button></div>`).join("")
-      :"")
+      :`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa assumida ainda. Abra a fazenda abaixo e toque em "assumir".</p>`)
+    /* v86: assumir é na tela da fazenda — aqui só a porta, uma linha por unidade */
+    +`<div class="cad-grupo">Por fazenda · o que ficou combinado e as sugestões dela</div>`
+    +planPortaSemana(ant, s)
     +`<div class="cad-grupo">Parte B · tarefas novas da semana</div>`
     +(novas.length?novas.map(t=>planLinhaTarefa(t)).join(""):`<p class="mut centro" style="padding:8px 0">Nenhuma tarefa nova nesta semana.</p>`)
     +`<button class="btn suave mt" data-plan-novasem="${s.id}">＋ tarefa da semana</button>`
     +cadRodape(`<button class="btn sec" data-plan-copia="pauta|">📲 copiar pauta da sexta</button>`);
+}
+
+/* ---- (3.3) a semana por FAZENDA (v86) ----
+   Até a v85 a tela da semana e o ritual da sexta misturavam as unidades: "o que ficou
+   combinado" e as sugestões vinham numa lista só, e o funcionário tinha de achar as linhas
+   da fazenda dele no meio das outras. Desde a v86 a semana tem porta: uma linha por
+   fazenda e, no toque, a programação daquela fazenda — o que ficou combinado, as sugestões
+   e o que já foi assumido. Componente ÚNICO nas três atividades (regra c4): o que muda é o
+   RECORTE, nunca a tela. Regra da v84: a tarefa de grupo, sem fazenda no texto da ata, não
+   some — vai para o rodapé nomeado. */
+const planSemanaPorId = id => planSemanas().find(s=>s.id===id) || null;
+/* recorte de uma unidade: `fech` é a semana que se fecha, `alvo` a semana que se assume */
+function planSemanaUn(fz, fech, alvo){
+  const daUn = t => fz ? t.unidade===fz : !t.unidade;
+  const f = fech ? planFecharSemana(fech) : null;
+  return { fz,
+    concluidas: f?f.concluidas.filter(daUn):[],
+    travadas:   f?f.travadas.filter(daUn):[],
+    abertas:    f?f.abertas.filter(daUn):[],
+    sug:  (alvo?planSugestoesSemana(alvo.id):[]).filter(daUn),
+    comp: (alvo?planComprometidas(alvo.id):[]).filter(daUn).sort(planOrdenar) };
+}
+const planSemanaTem = r => !!(r.abertas.length||r.travadas.length||r.concluidas.length||r.sug.length||r.comp.length);
+const planSemanaChave = (fech,alvo) => (fech?fech.id:"")+"|"+(alvo?alvo.id:"");
+function planLinhaUnidadeSemana(nome, fz, r, chave){
+  const partes=[r.abertas.length?r.abertas.length+" combinado"+(r.abertas.length===1?"":"s")+" em aberto":"nada em aberto"];
+  if(r.travadas.length) partes.push(r.travadas.length+" travada"+(r.travadas.length===1?"":"s"));
+  if(r.sug.length) partes.push(r.sug.length+(r.sug.length===1?" sugestão":" sugestões"));
+  if(r.comp.length) partes.push(r.comp.length+" assumida"+(r.comp.length===1?"":"s"));
+  const n=r.abertas.length+r.sug.length;
+  const pior=r.abertas.concat(r.sug).map(planFarol).sort((a,b)=>PLAN_FAROL_ORDEM[a]-PLAN_FAROL_ORDEM[b])[0];
+  return `<button class="cad-menu" data-plan-semun="${esc(fz)}|${esc(chave)}">
+    <span class="ico">${pior?PLAN_FAROL[pior].ico:""}</span>
+    <span class="txt"><b>${esc(nome)}</b><span class="mut">${esc(partes.join(" · "))}</span></span>
+    <span class="num">${n||""}</span></button>`;
+}
+/* a porta: um botão com o nome de cada fazenda. Primeiro as que têm algo nesta semana; as
+   outras entram por "＋N" (mesmo mecanismo do "+K" da v74), para a sexta caber na tela.
+   Com busca escrita, todas as que batem aparecem — nada fica escondido atrás do "＋N". */
+function planPortaSemana(fech, alvo){
+  const chave=planSemanaChave(fech,alvo), q=planUI.busca;
+  const uns=unidadesPermitidas().map(f=>({nome:f.nome, fz:f.id, r:planSemanaUn(f.id,fech,alvo)}))
+    .filter(x=>cadBate(q, x.nome))
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  const com=uns.filter(x=>planSemanaTem(x.r)), sem=uns.filter(x=>!planSemanaTem(x.r));
+  const abrirSem = planUI.unTodas || !!q || !com.length;
+  const grupo=planSemanaUn("",fech,alvo);
+  return (unidadesPermitidas().length>12?planBusca("Buscar fazenda…"):"")
+    +(com.length?`<div class="cad-grupo">Fazendas com algo nesta semana</div>`
+      +com.map(x=>planLinhaUnidadeSemana(x.nome,x.fz,x.r,chave)).join(""):"")
+    +(sem.length?(abrirSem?`<div class="cad-grupo">Fazendas sem nada nesta semana</div>`
+        +sem.map(x=>planLinhaUnidadeSemana(x.nome,x.fz,x.r,chave)).join("")
+      :`<button class="btn suave mt" data-plan-untodas="1">＋${sem.length} fazenda${sem.length===1?"":"s"} sem nada nesta semana</button>`):"")
+    +(!uns.length?planVazio("fazenda",{filtro:q||""}):"")
+    +(planSemanaTem(grupo)?`<div class="cad-grupo">Sem fazenda no texto da ata</div>`
+      +planLinhaUnidadeSemana("Tarefas do grupo","",grupo,chave):"");
+}
+/* a programação de UMA fazenda: conclui, trava e assume sem sair da tela e sem ver as outras */
+function planVSemanaUn(id){
+  const [fz,fid,aid]=String(id||"").split("|");
+  const fech=planSemanaPorId(fid), alvo=planSemanaPorId(aid);
+  const r=planSemanaUn(fz,fech,alvo);
+  const nome=fz?fazenda(fz).nome:"Tarefas do grupo";
+  const rotAlvo=alvo?planSemanaRot(alvo).toLowerCase():"a semana";
+  const n=r.concluidas.length+r.travadas.length+r.abertas.length;
+  const vazio=(que,sem)=>htmlEstado("vazio",{que, unidade:fz||"", onde:fz?"":"nas tarefas sem fazenda",
+    periodo: sem?"na "+planSemanaRot(sem).toLowerCase():""},{classe:"mut"});
+  const linha=(ico,t,acao)=>`<div class="plan-fecha-l"><span>${ico} ${esc(t.desc)}<span class="mut"> · ${esc(planLinhaTexto(t))}</span></span>${acao||""}</div>`;
+  return planTopo(nome, fech?("o que ficou combinado · "+planSemanaRot(fech).toLowerCase()):"Planejamento da semana")
+    +`<div class="cartao"><b>O que ficou combinado</b>
+      ${n?`<p class="mut" style="margin:2px 0 6px">cumprimos ${r.concluidas.length} de ${n}</p>`
+        +r.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")
+        +r.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)}<span class="mut"> · ${esc((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())}${(t.bloqueio&&t.bloqueio.quem)?" ("+esc(t.bloqueio.quem)+")":""}</span></p>`).join("")
+        +r.abertas.map(t=>`<div class="plan-fecha-l"><span>◻ ${esc(t.desc)}<span class="mut"> · ${esc(planLinhaTexto(t))}</span></span>
+          <span class="chips"><button class="chip mini" data-plan-st="${t.id}|finalizado">Concluí</button>
+          <button class="chip mini" data-plan-trava="${t.id}">Travado</button></span>
+          ${planUI.trava===t.id?`<span class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip mini" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</span>`:""}</div>`).join("")
+        :vazio("combinado", fech)}</div>`
+    +`<div class="cartao"><b>Sugestões para ${esc(rotAlvo)}</b>
+      ${r.sug.length?r.sug.map(t=>linha(PLAN_FAROL[planFarol(t)].ico, t,
+          `<button class="chip mini" data-plan-comp="${t.id}|${alvo?alvo.id:""}">assumir</button>`)).join("")
+        :vazio("sugestão", alvo)}</div>`
+    +(r.comp.length?`<div class="cartao"><b>Já assumidas para ${esc(rotAlvo)}</b>
+      ${r.comp.map(t=>linha(PLAN_FAROL[planFarol(t)].ico, t,
+        `<button class="chip mini" data-plan-comp="${t.id}|${alvo?alvo.id:""}">tirar da semana</button>`)).join("")}</div>`:"")
+    +cadRodape(`<button class="btn" data-planvoltar="1">Escolher outra fazenda</button>`);
 }
 
 /* ---- rituais que se abrem sozinhos (item 9) ---- */
@@ -7724,24 +7805,14 @@ function planVRitual(){
         <button class="btn sec mt" data-planv="importar">Colar a ata direto</button>`
       +cadRodape(`<button class="btn sec" id="bt-plan-ritual-pular">Pular por agora</button>`);
   }
+  /* v86: a sexta começa pela FAZENDA. O que ficou combinado e as sugestões de cada uma
+     moram na tela da unidade — nenhuma lista da semana mistura fazendas. */
   const s=planSemanaAtual(), prox=planSemanaProxima()||planSemanaAtual();
-  const ant=planSemanaAnterior(), fech=ant?planFecharSemana(ant):(s?planFecharSemana(s):null);
+  const ant=planSemanaAnterior(), fechS=ant||s, fech=fechS?planFecharSemana(fechS):null;
   return planTopo("Fechar a semana e planejar a próxima","sexta-feira · dois toques resolvem")
-    +`<div class="plan-duas">
-      <div class="cartao"><b>O que ficou combinado</b>
-        ${fech&&fech.n?`<p class="mut" style="margin:2px 0 6px">${esc(fech.placar)}</p>`
-          +fech.concluidas.map(t=>`<p class="plan-fecha-l">✅ ${esc(t.desc)}</p>`).join("")
-          +fech.travadas.map(t=>`<p class="plan-fecha-l">⏸️ ${esc(t.desc)}</p>`).join("")
-          +fech.abertas.map(t=>`<div class="plan-fecha-l"><span>◻ ${esc(t.desc)}</span>
-            <span class="chips"><button class="chip mini" data-plan-st="${t.id}|finalizado">Concluí</button>
-            <button class="chip mini" data-plan-trava="${t.id}">Travado</button></span>
-            ${planUI.trava===t.id?`<span class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip mini" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</span>`:""}</div>`).join("")
-          :`<p class="mut">Nenhuma tarefa assumida na semana que passou.</p>`}</div>
-      <div class="cartao"><b>Sugestões para ${esc(planSemanaRot(prox).toLowerCase())}</b>
-        ${(prox?planSugestoesSemana(prox.id).slice(0,6):[]).map(t=>`<div class="plan-fecha-l"><span>${PLAN_FAROL[planFarol(t)].ico} ${esc(t.desc)}</span>
-          <button class="chip mini" data-plan-comp="${t.id}|${prox.id}">assumir</button></div>`).join("")
-          ||`<p class="mut">Nada com prazo próximo — a semana começa leve.</p>`}</div>
-    </div>`
+    +`<div class="cartao"><b>Escolha a fazenda</b>
+      <p class="mut" style="margin:4px 0 0">${fech&&fech.n?esc(fech.placar)+" na semana que passou. ":""}Cada fazenda abre com o que ficou combinado nela e as sugestões dela.</p></div>`
+    +planPortaSemana(fechS, prox)
     +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-plan-ritual-pular">Pular por agora</button>
       <button class="btn" data-planv="semana">Abrir a semana</button></div>`);
 }
@@ -7824,6 +7895,7 @@ function vPlanejamento(){
   if(v==="revisao") return planVRevisao();
   if(v==="importar") return planVImportar();
   if(v==="semana") return planVSemana();
+  if(v==="semanaun") return planVSemanaUn(n.id);
   if(v==="ritual") return planVRitual();
   if(v==="fora") return planVFora(n.id);
   if(v==="saidas") return planVSaidas();
@@ -8059,6 +8131,9 @@ function planClique(t,d){
   if(d.cadid!==undefined && d.cadv==="rodada"){ planIr("rodada",d.cadid); return true; }
   if(d.planExec!==undefined){ planUI.exec = planUI.exec===d.planExec?"":d.planExec; planRender(); return true; }
   if(d.planFora!==undefined){ planIr("fora", d.planFora); return true; }
+  /* v86: a semana por fazenda — a porta leva à programação de UMA unidade */
+  if(d.planSemun!==undefined){ planIr("semanaun", d.planSemun); return true; }
+  if(d.planUntodas!==undefined){ planUI.unTodas=true; planRender(); return true; }
   if(d.planAcoes!==undefined){ planUI.acoes = planUI.acoes===d.planAcoes?"":d.planAcoes;
     planUI.trava=""; planUI.prazoAb=""; planUI.metaAb=""; planRender(); return true; }
   if(d.planSt!==undefined){ const [id,st]=d.planSt.split("|"); const at=planTarefa(id);

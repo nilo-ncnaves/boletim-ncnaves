@@ -80,6 +80,9 @@ sql/050 e o sql/051 só acrescentam LEITURA dela (area_planejada,
 area_executada, pct_area, tarefas_sem_lancamento). Rodar de novo os dois
 arquivos é seguro: eles substituem a visão e as funções, sem tocar em
 dado nenhum.
+Desde a v86: NENHUMA tabela nova. A semana por fazenda só troca o RECORTE
+de leitura das tarefas que já existem em planejamento_tarefa; o que o app
+grava ao concluir, travar ou assumir continua sendo o mesmo payload da v77.
 Desde a v82: aparelho_sync (sql/052; carimbo de "este aparelho
 sincronizou" — id aleatório do aparelho, unidade aberta, versão do app e
 tamanho da fila; alimenta o cartão "📡 Chegada dos boletins hoje" da
@@ -906,6 +909,36 @@ só "Código inválido.", sem dizer o que fazer.
 - Continua sendo interface, não segurança (c9): a autorização real é das
   políticas RLS do Supabase. Detalhe em docs/definicao-de-pronto.md,
   item 20.
+
+### c18) Lista de trabalho de campo abre por fazenda (desde a v86)
+Lição da primeira sexta com o módulo de planejamento (11/09/2026): a tela
+"Fechar a semana e planejar a próxima" mostrava "O que ficou combinado" e
+"Sugestões para a semana" de TODAS as fazendas numa lista só. Quem usa o app
+é o funcionário de UMA fazenda — ele tinha de achar as linhas dele no meio
+das outras, e um toque errado mudava o combinado da fazenda do vizinho.
+- **Toda lista em que alguém do campo AGE sobre itens de várias unidades abre
+  por uma porta de fazendas**, pelo componente ÚNICO `planPortaSemana(fech,
+  alvo)` + `planVSemanaUn(id)` do index.html — nunca uma variante por
+  atividade nem por perfil. A porta é uma linha por fazenda (nome pelo
+  cadastro por id, farol do pior item, o que há nesta semana); o toque abre a
+  programação daquela fazenda, onde se conclui, trava e assume. Lista só de
+  LEITURA (painel, relatório, pauta em texto) continua podendo somar unidades.
+- **Nenhuma fazenda fica sem botão.** As que não têm nada nesta semana entram
+  atrás de um "＋N fazendas sem nada nesta semana" (mesmo mecanismo do "+K" da
+  v74 e do "＋N" da v80), e a busca abre todas as que batem — chip ou linha
+  escondida atrás do "＋N" nunca some para quem procura. Mais de 12 unidades,
+  busca obrigatória (P3). Ordem alfabética: a fazenda de quem usa fica sempre
+  no mesmo lugar; o que muda de lugar é o grupo, nunca a ordem dentro dele.
+- **A unidade vazia da chave aparece nomeada** (regra da v84): a tarefa que a
+  ata trouxe sem fazenda vai para o rodapé "Sem fazenda no texto da ata".
+- **A tela da fazenda não mostra tarefa de outra** — é a prova da regra, e ela
+  é medida (`node scripts/teste_planejamento.cjs`, item 12).
+- **Vocabulário e proibições de sempre:** relata REGISTRO e PRAZO ("nada em
+  aberto", "sem combinado"), nunca "não fez", "pendente", "atrasado",
+  "faltou"; verbo no botão ("assumir", "tirar da semana", "Escolher outra
+  fazenda"); vazio pela função única `htmlEstado`, nomeando unidade e semana.
+- Conferência: `node scripts/teste_planejamento.cjs` (itens 12) e
+  `scripts/checar-poluicao.cjs` (tela "Planejamento › Semana › fazenda").
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

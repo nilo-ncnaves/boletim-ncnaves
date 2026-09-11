@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v85** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v86** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1421,8 +1421,9 @@ Item de PRIMEIRO NÍVEL, ao lado do Painel — na porta de entrada e por botão
 no painel; nunca dentro de Cadastros. Dois toques até qualquer função. Usa
 as classes de Cadastros (P10). Cabeçalho permanente: "Setembro · 62%
 concluído · 5 atrasadas · 3 travadas · próxima cobrança: Cooxupé". Telas:
-🗓️ Semana · 📅 Mês por unidade (barra, contagem 🔴🟡⏸️✅, atrasadas e linha do
-tempo) · 📥 Rodadas (e o fechamento do mês por unidade) · 🔗 Pendências com
+🗓️ Semana (desde a v86 abre por FAZENDA: uma linha por unidade e, no toque, a
+programação dela) · 📅 Mês por unidade (barra, contagem 🔴🟡⏸️✅, atrasadas e
+linha do tempo) · 📥 Rodadas (e o fechamento do mês por unidade) · 🔗 Pendências com
 terceiros (por fornecedor, desde quando, quantas fazendas paradas) ·
 📌 Arrastadas · 🗒️ Assuntos e investimentos · 🔎 Todas as tarefas (busca +
 filtros de status, farol, unidade e origem) · 📲 Textos prontos. "＋ tarefa"
@@ -1437,9 +1438,9 @@ Travado · Novo prazo (chips +7 · +15 · fim do mês · próxima reunião).
   importada" (do dia 10 em diante). Gerente: "📋 N tarefas vencendo esta
   semana".
 - **Rituais que se abrem sozinhos:** na sexta, a porta da Diretoria/
-  Escritório é "Fechar a semana e planejar a próxima" (esquerda: o
-  comprometido, com Concluí/Travado em um toque; direita: as sugestões da
-  semana nova). Do dia 10 em diante, "Importar a ata da reunião", com atalho
+  Escritório é "Fechar a semana e planejar a próxima" — desde a v86 ela abre
+  com a lista de FAZENDAS (o combinado e as sugestões de cada uma estão na
+  tela da unidade, com Concluí/Travado/assumir em um toque). Do dia 10 em diante, "Importar a ata da reunião", com atalho
   para a revisão das arrastadas. Pulável com um toque — e o "pulado" vale só
   para a sessão, então volta no próximo acesso do MESMO dia.
 - **Notificações** (só se o navegador permitir): oferecidas UMA vez, sem
@@ -1724,11 +1725,57 @@ celulares dos gerentes (a tabela `codigos_acesso` não existe no banco,
 sql/001 nunca rodado), e nesse caso os gerentes nem conseguiram entrar no
 app. As perguntas objetivas estão no resumo do PR.
 
+## A semana por fazenda (v86)
+Correção pedida pelo Nilo em 11/09/2026, na primeira sexta com o módulo no
+ar: a tela "Fechar a semana e planejar a próxima" (e a tela 🗓️ Semana)
+mostrava "O que ficou combinado" e "Sugestões para a semana" de TODAS as
+unidades numa lista só. Quem usa é o funcionário de UMA fazenda — ele tinha
+de achar as linhas dele no meio das outras e um toque errado mexia no
+combinado da fazenda do vizinho. Regra nova no CLAUDE.md, item c18.
+- **A semana abre por uma porta de fazendas** (`planPortaSemana(fech, alvo)`):
+  uma linha por unidade, com o nome pelo cadastro (id, nunca pedaço de nome),
+  o farol do pior item (🔴 🟡 ⏸️ 🟢) e o que há nesta semana — "3 combinados em
+  aberto · 1 travada · 2 sugestões · 1 assumida" ou "nada em aberto".
+- **O toque abre a programação daquela fazenda** (`planVSemanaUn(id)`): três
+  cartões — "O que ficou combinado" (✅ concluídas, ⏸️ travadas e, nas
+  abertas, os chips **Concluí** e **Travado** com os motivos), "Sugestões
+  para semana dd/mm a dd/mm" (chip **assumir**) e "Já assumidas para …"
+  (chip **tirar da semana**). Rodapé fixo: "Escolher outra fazenda".
+  Nenhuma tarefa de outra unidade entra nessa tela — é prova medida.
+- **Nenhuma fazenda fica sem botão:** as que não têm nada nesta semana entram
+  atrás de "＋N fazendas sem nada nesta semana" (mecanismo do "+K" da v74) e a
+  busca (obrigatória acima de 12 unidades) abre todas as que batem. Ordem
+  alfabética, para a fazenda de cada um ficar sempre no mesmo lugar.
+- **A tarefa que a ata trouxe sem fazenda não some:** rodapé nomeado "Sem
+  fazenda no texto da ata" (regra da v84 — lista agrupada por chave nunca
+  engole a linha cuja chave está vazia).
+- Na tela 🗓️ Semana, a Parte A (assumidas) e a Parte B (novas) continuam como
+  eram — cada linha já diz de qual unidade é; o que saiu de lá foi a lista
+  solta de sugestões, que virou a mesma porta por fazenda. O cartão "Como foi
+  a semana passada" passou a nomear a unidade em cada linha.
+- **Nada mudou para o gerente no celular dele:** a faixa de tarefas na casa e
+  no boletim, o envio e o boletim são idênticos (regressão main × v86).
+- **Sem tabela nova:** é recorte de leitura das tarefas que já existem; o que
+  se grava ao concluir, travar ou assumir continua o payload da v77.
+
+**Provas rodadas na v86** (sem rede, 390 px): `node
+scripts/teste_planejamento.cjs` → **67 ✅ · 0 ❌**, com 3 provas novas (a
+sexta abre por fazenda e sem tarefa solta na tela; a tela de uma fazenda não
+mostra tarefa de outra; "assumir" funciona lá dentro sem sair da tela);
+`node scripts/checar-poluicao.cjs` → **594 ✅ · 42 ❌**, os MESMOS 42 ❌ da
+v85 (nenhum novo), com a tela nova "Planejamento › Semana › fazenda" medida
+com as regras de Cadastros (6 itens ✅); regressão main × v86 com as telas do
+gerente e do pós-colheita idênticas nas três atividades.
+
 ## Telas × padrões de tela (checagem de poluição — desde 05/09/2026)
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v86, 11/09/2026: **594 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo (a
+v86 acrescentou a tela "Planejamento › Semana › fazenda", medida com as
+regras de Cadastros, e trocou as duas listas misturadas da semana pela porta
+de unidades). Medição anterior registrada aqui,
 v82, 11/09/2026: **586 ✅ · 46 ❌** — os mesmos 46 ❌ da v81, nenhum novo
 (a v82 acrescentou o cartão "📡 Chegada dos boletins hoje", recolhido, e a
 faixa de estado do envio, que reusa `.aviso`; o painel foi de 4 para 4,15
