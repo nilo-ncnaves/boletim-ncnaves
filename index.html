@@ -144,13 +144,6 @@ h3{font-size:.95rem;font-weight:700}
 /* v69: estado da seção eventual no cabeçalho — "sem resposta" (não respondido, texto desde a v70) e "sem ocorrência" são neutros, sem cor de alerta; só o contador fica verde */
 .secao>summary .resumo.neutro,.subsec>summary .resumo.neutro{color:var(--tinta-2);font-weight:600}
 .resp-secao{margin:6px 0 10px}.resp-secao:empty{display:none}
-/* Seletor de operação por fase (grãos): fases recolhidas, toque para expandir */
-.fase-op{border:1px solid var(--linha);border-radius:10px;margin-top:8px;background:var(--cartao)}
-.fase-op>summary{list-style:none;padding:12px 14px;font-weight:700;cursor:pointer;display:flex;align-items:center}
-.fase-op>summary::-webkit-details-marker{display:none}
-.fase-op>summary::after{content:"›";margin-left:auto;color:var(--tinta-2);transition:transform .15s}
-.fase-op[open]>summary::after{transform:rotate(90deg)}
-.fase-op .chips{padding:0 12px 4px}
 .subcartao{background:var(--papel);border:1px dashed var(--linha);border-radius:10px;padding:12px;margin-top:10px;position:relative}
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
@@ -6198,20 +6191,34 @@ function linhasProdutos(lista,pref,rotDose){
     ${(lista||[]).length>1?`<button class="btn suave mini mt" data-${pref}-rm="${i}">remover produto</button>`:""}
   </div>`).join("");
 }
-/* Seletor de operação AGRUPADO, com os grupos RECOLHIDOS (nada de listona aberta): toca no grupo
-   → ele expande e mostra só as operações dele. Componente ÚNICO das atividades que o usam
-   (CLAUDE.md, c4): o vocabulário — rótulo do passo, nome dos grupos, operações e o grupo em
-   destaque — vem de quem chama, nunca de `if(atividade==="…")`. Grãos agrupa por FASE do ciclo;
-   café, por NATUREZA do serviço (v76). O nome já escolhido aparece pelo termo de hoje (nomeAtual),
-   mesmo que o boletim tenha sido gravado com o nome antigo. */
+/* Seletor de operação AGRUPADO — desde a v87, LISTA NATIVA do celular (a mesma de
+   "Função / serviço" da mão de obra), a pedido dos gerentes: os grupos viram os títulos da
+   lista (<optgroup>) e as operações, as linhas. Antes eram grupos recolhidos com chips, e a
+   turma reclamou de rolar a tela inteira para achar a atividade; na lista nativa o dedo rola
+   dentro da janelinha, sem perder o lugar no boletim. Componente ÚNICO das atividades que o
+   usam (CLAUDE.md, c4): o vocabulário — rótulo do passo, nome dos grupos, operações e o grupo
+   em destaque — vem de quem chama, nunca de `if(atividade==="…")`. Grãos agrupa por FASE do
+   ciclo; café, por NATUREZA do serviço (v76). O nome já escolhido aparece pelo termo de hoje
+   (nomeAtual), mesmo que o boletim tenha sido gravado com o nome antigo. */
 function seletorOperacao(a,{rotulo,grupos,destaque,nota}){
   if(a.tipo) return `<label>${rotulo}</label>
     <div class="linha-flex"><span class="cresce"><b>${esc(nomeAtual(a.tipo))}</b></span>
       <button class="btn suave mini" data-troca-op="${a.id}">trocar</button></div>`;
   return `<label>${rotulo}</label>
-    ${grupos.map(([f,ops])=>`<details class="fase-op"><summary>${esc(f)}${destaque&&destaque===f?` <span class="mut">${esc(nota)}</span>`:""}</summary>
-      <div class="chips" style="margin:6px 0 8px">${ops.map(o=>`<button class="chip" data-escop="${a.id}|${esc(o)}">${esc(o)}</button>`).join("")}</div>
-    </details>`).join("")}`;
+    <select data-opsel="${a.id}">
+      <option value="">— toque para escolher —</option>
+      ${grupos.map(([f,ops])=>`<optgroup label="${esc(f)}${destaque&&destaque===f?" "+esc(nota||""):""}">${ops.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("")}</optgroup>`).join("")}
+    </select>`;
+}
+/* O que a escolha da operação pré-preenche (era do toque no chip, agora é da lista nativa):
+   nos grãos, a área do talhão e a primeira linha de produto das operações de aplicação. */
+function aplicarOperacao(a,tipo){
+  a.tipo=tipo;
+  if(!a.gr) return;
+  const t2=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
+  if(t2&&t2.area&&!a.areaHa) a.areaHa=String(t2.area);   /* área pré-preenchida com a do talhão */
+  const cat2=opCatDe(a.tipo);
+  if((cat2==="APLICACAO"||cat2==="TRAT_SEMENTES")&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:cat2==="TRAT_SEMENTES"?"mL":"L"}];
 }
 function seletorOperacaoGraos(a,data){
   const info=infoCiclo(a.talhaoId,data);
@@ -7805,7 +7812,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v86";
+const APP_VERSAO="v87";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -10863,16 +10870,6 @@ function ligarEventos(tela){
       if(d.rmIns!==undefined) a.insumos.splice(parseInt(d.rmIns),1);
       if(d.rmMaq!==undefined) a.maquinas.splice(parseInt(d.rmMaq),1);
       card.outerHTML=cardAtivHtml(a); salvarRascunho(); return; }
-    /* ---- escolher a operação no seletor agrupado (cascata) — grãos por fase, café por natureza ---- */
-    if(d.escop){ const i=d.escop.indexOf("|"); const a=r.atividades.find(x=>x.id===d.escop.slice(0,i));
-      if(a){ a.tipo=d.escop.slice(i+1);
-        if(a.gr){
-          const t2=(a.talhaoId&&a.talhaoId!=="geral")?talhao(a.talhaoId):null;
-          if(t2&&t2.area&&!a.areaHa) a.areaHa=String(t2.area); /* área pré-preenchida com a do talhão */
-          const cat2=opCatDe(a.tipo);
-          if((cat2==="APLICACAO"||cat2==="TRAT_SEMENTES")&&!(a.produtos||[]).length) a.produtos=[{nome:"",dose:"",un:cat2==="TRAT_SEMENTES"?"mL":"L"}];
-        }
-        const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
     if(d.trocaOp){ const a=r.atividades.find(x=>x.id===d.trocaOp);
       if(a){ limparCamposOp(a);
         const card=t.closest("[data-ativ]"); card.outerHTML=cardAtivHtml(a); salvarRascunho(); } return; }
@@ -11104,6 +11101,9 @@ function ligarEventos(tela){
         const dx=$("#dist-mofn"); if(dx) dx.textContent=distTexto(r.mo); }
       else if(d.p!==undefined) r.pos[d.p]=el.value;
       else if(d.t!==undefined) r[d.t]=el.value;
+      /* ---- v87: escolher a operação na lista nativa (passo O QUÊ) — grãos por fase, café por natureza ---- */
+      else if(d.opsel!==undefined){ const c=el.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===d.opsel);
+        if(a&&el.value){ aplicarOperacao(a,el.value); c.outerHTML=cardAtivHtml(a); } }
       else if(d.a!==undefined){ const c=el.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===c.dataset.ativ); a[d.a]=el.value; }
       else if(d.i!==undefined){ const c=el.closest("[data-ativ]"); const a=r.atividades.find(x=>x.id===c.dataset.ativ);
         const i=parseInt(el.closest("[data-ins]").dataset.ins); a.insumos[i][d.i]=el.value;

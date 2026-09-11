@@ -29,10 +29,11 @@ mesmo pull request (e vice-versa).
 
 ### Princípios de tela
 - Seções nascem FECHADAS.
-- Em "Operações do dia", o funcionário toca "＋ operação" e escolhe
-  num seletor AGRUPADO POR FASE (Pré-plantio / Plantio / Condução /
-  Colheita / Pós-colheita), com as fases recolhidas — toca na fase e
-  ela mostra só as operações dela.
+- Em "Operações do dia", o funcionário toca "＋ operação" e escolhe na
+  LISTA NATIVA do celular AGRUPADA POR FASE (Pré-plantio / Plantio /
+  Condução / Colheita / Pós-colheita — v87; até a v86 eram fases
+  recolhidas com chips). A fase de agora vem primeiro, marcada
+  "· fase de agora" no título do grupo.
 - Escolhida a operação, aparecem SOMENTE os campos daquela operação.
 - O seletor é filtrado pela cultura do ciclo ativo do talhão:
   operação de soja não aparece em milho e vice-versa (marcações
@@ -159,13 +160,15 @@ planejamento. Nada do que já foi lançado é reescrito — quem traduz nome
 antigo para nome de hoje é a leitura (item 17 da definição de pronto).
 
 ### Princípios de tela (café)
-- Atividade por talhão em 3 passos: ONDE (talhão) → O QUÊ (grupos por
-  natureza, RECOLHIDOS; toque no grupo abre só as operações dele) →
-  DETALHES (pessoas, como terminou o dia, calda, máquinas). Nada do
-  passo seguinte aparece antes do toque no anterior; nenhum grupo nasce
-  aberto. O seletor agrupado é o componente ÚNICO `seletorOperacao`, o
-  mesmo dos grãos — lá o grupo é a FASE do ciclo, aqui é a NATUREZA do
-  serviço (CLAUDE.md, c4).
+- Atividade por talhão em 3 passos: ONDE (talhão) → O QUÊ (LISTA NATIVA
+  do celular, agrupada por natureza — v87, a mesma forma da "Função /
+  serviço" da mão de obra, a pedido dos gerentes) → DETALHES (pessoas,
+  como terminou o dia, calda, máquinas). Nada do passo seguinte aparece
+  antes do toque no anterior; a lista abre com "— toque para escolher —"
+  e nada vem escolhido de antemão. O seletor é o componente ÚNICO
+  `seletorOperacao`, o mesmo dos grãos — lá o grupo é a FASE do ciclo,
+  aqui é a NATUREZA do serviço (CLAUDE.md, c4). Até a v86 eram grupos
+  recolhidos com chips dentro; a turma reclamou da rolagem.
 - Irrigação de café é seção própria (💧 gotejo). As operações
   "Irrigação manual", "Irrigação automática" e "Adubação via
   fertirrigação" existem na lista por talhão porque são serviço de gente

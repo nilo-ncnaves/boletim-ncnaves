@@ -121,25 +121,30 @@ async function provaTela(){
   await p.click('#bt-add-ativ'); await p.waitForTimeout(200);
   let passo=await p.evaluate(()=>{const c=document.querySelector('[data-ativ]');
     return {sel:c.querySelectorAll('select').length,inp:c.querySelectorAll('input,textarea').length,
-            grupos:c.querySelectorAll('details.fase-op').length,chips:c.querySelectorAll('.chip').length};});
+            grupos:c.querySelectorAll('select[data-opsel] optgroup').length,chips:c.querySelectorAll('.chip').length};});
   ok(passo.sel===1&&passo.inp===0&&passo.grupos===0,'passo 1 (ONDE): só o talhão, sem campo e sem lista de atividade',JSON.stringify(passo));
   const t=await p.evaluate(()=>{const s=document.querySelector('[data-ativ] select[data-a="talhaoId"]');
     const o=[...s.options].find(x=>x.value&&x.value!=='geral'); return o?o.value:'geral';});
   await p.selectOption('[data-ativ] select[data-a="talhaoId"]',t); await p.waitForTimeout(250);
+  /* v86: o passo O QUÊ é a lista nativa do celular (a mesma da "Função / serviço" da mão de obra) */
   passo=await p.evaluate(()=>{const c=document.querySelector('[data-ativ]');
-    return {grupos:[...c.querySelectorAll('details.fase-op')].map(d=>d.querySelector('summary').textContent),
-            abertos:[...c.querySelectorAll('details.fase-op')].filter(d=>d.open).length,
+    const s=c.querySelector('select[data-opsel]');
+    return {grupos:s?[...s.querySelectorAll('optgroup')].map(g=>g.label):[],
+            listas:c.querySelectorAll('select[data-opsel]').length,
+            primeira:s?s.options[0].text:'',
+            escolhida:s?s.value:'?',
             chipsVisiveis:[...c.querySelectorAll('.chip')].filter(x=>x.checkVisibility({contentVisibilityAuto:true,visibilityProperty:true})).length,
             alturaCartao:Math.round(c.getBoundingClientRect().height),
             inp:c.querySelectorAll('input,textarea').length};});
-  ok(passo.grupos.length===4,'passo 2 (O QUÊ): 4 grupos por natureza',passo.grupos.join(' · '));
-  ok(passo.abertos===0&&passo.chipsVisiveis===0,'nenhum grupo aberto por padrão','abertos: '+passo.abertos+', chips visíveis: '+passo.chipsVisiveis+', cartão de '+passo.alturaCartao+' px');
+  ok(passo.grupos.length===4,'passo 2 (O QUÊ): 4 grupos por natureza, como títulos da lista',passo.grupos.join(' · '));
+  ok(passo.listas===1&&passo.chipsVisiveis===0&&passo.escolhida==='','uma lista só, nada escolhido de antemão e nenhum chip na tela',
+     'listas: '+passo.listas+', chips visíveis: '+passo.chipsVisiveis+', cartão de '+passo.alturaCartao+' px, primeira linha: '+passo.primeira);
   ok(passo.inp===0,'nenhum campo de detalhe antes de escolher a atividade','campos: '+passo.inp);
-  await p.evaluate(()=>{const d=[...document.querySelectorAll('[data-ativ] details.fase-op')].find(x=>/Tratos/.test(x.textContent)); d.open=true;});
-  const chips=await p.evaluate(()=>[...document.querySelectorAll('[data-ativ] details.fase-op[open] .chip')].map(c=>c.textContent));
+  const chips=await p.evaluate(()=>{const g=[...document.querySelectorAll('[data-ativ] select[data-opsel] optgroup')].find(x=>/Tratos/.test(x.label));
+    return g?[...g.querySelectorAll('option')].map(o=>o.textContent):[];});
   ok(chips.includes('Capina mecânica com trincha')&&chips.includes('Levantar café')&&chips.includes('Desbrota manual'),
-     'o funcionário acha as palavras dele no grupo aberto',chips.length+' chips');
-  await p.click('[data-escop$="|Levantar café"]'); await p.waitForTimeout(250);
+     'o funcionário acha as palavras dele dentro do grupo',chips.length+' atividades');
+  await p.selectOption('[data-ativ] select[data-opsel]','Levantar café'); await p.waitForTimeout(250);
   const passo3=await p.evaluate(()=>{const c=document.querySelector('[data-ativ]');
     return {txt:c.innerText.slice(0,60).replace(/\n/g,' | '),inp:c.querySelectorAll('input,textarea').length};});
   ok(passo3.inp>0,'passo 3 (DETALHES): os campos só aparecem depois da escolha',JSON.stringify(passo3));
