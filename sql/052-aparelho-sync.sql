@@ -66,6 +66,10 @@ create policy aparelho_sync_gravar on public.aparelho_sync for insert with check
 drop policy if exists aparelho_sync_atualizar on public.aparelho_sync;
 create policy aparelho_sync_atualizar on public.aparelho_sync for update using (true) with check (true);
 
+-- Avisa o PostgREST (a camada que o app conversa) que existe tabela nova. O Supabase costuma
+-- fazer isso sozinho, mas sem o aviso o app pode continuar recebendo 404 por alguns segundos.
+notify pgrst, 'reload schema';
+
 -- conferência
 select 'aparelho_sync criada' as passo,
        count(*) as aparelhos_registrados,
