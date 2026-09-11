@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v82** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v83** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1503,6 +1503,67 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## Código errado no aparelho do gerente (v83)
+Continuação direta do diagnóstico de 11/09/2026. Depois da v82, o Nilo
+informou o dado que faltava: **os ~15 gerentes estavam todos com o código
+`AMNIN-9561`**. Medido em navegador real (390 × 844, sem rede):
+
+| código digitado | onde o aparelho para |
+|---|---|
+| `AMNIN-9561` | **não entra** — "Código inválido", tela de código |
+| `ADMIN-9561` | entra na tela do **Administrador**, com 8 opções (Café, Grãos, Pecuária, Terreiro, Diretoria, Relatórios, Planejamento, Escritório) e nenhuma delas é a fazenda dele |
+| `VR-7061` (código da unidade) | cai **direto** na casa da unidade: "Vereda Romaria › Café (164,90 ha) · Boletim de hoje pendente" |
+
+`escopoDoCodigo` exige igualdade exata depois de normalizar (maiúsculas,
+sem espaço, traço opcional): `AMNIN-9561` não é `ADMIN-9561`, logo é
+recusado. As duas leituras possíveis explicam o silêncio do dia:
+- **`AMNIN` literal** → nenhum gerente entrou no app. Causa inteira.
+- **`ADMIN` (erro de digitação na mensagem)** → entraram, mas na porta do
+  administrador: para chegar ao boletim teriam de escolher atividade,
+  depois a unidade entre 24, sem nada indicando qual é a deles.
+
+Em qualquer das duas, a correção é a mesma e é operacional: **cada gerente
+usa o código da própria unidade** (`CODIGOS_PADRAO`, um por fazenda), que
+abre direto o boletim dela.
+
+**O que a v83 mudou no app** (nada disso substitui a troca dos códigos —
+só faz o app dizer o que está acontecendo):
+1. **"Código inválido" virou uma frase com saída.** Era um ponto final que
+   não dizia o que fazer. Agora: *"Este código não foi reconhecido. Confira
+   as letras e os 4 números e tente de novo. Se não entrar, peça ao
+   escritório o código da sua fazenda — cada unidade tem o seu, e ele abre
+   direto o boletim dela."* Sem revelar código nenhum.
+2. **`avisoEscopoAmplo()` na porta de entrada**, só para o escopo de
+   **Administrador** (abre todas as unidades E preenche boletim): *"Este
+   aparelho está com o código Administrador — ele abre todas as fazendas do
+   grupo, por isso a tela pergunta a atividade e depois a unidade. Se você
+   é gerente de uma fazenda, peça ao escritório o código da sua unidade."*
+   A Diretoria abre tudo mas só lê (e nem passa por esta tela), e um código
+   por atividade pertence a quem cuida da atividade inteira — nenhum dos
+   dois recebe o aviso. Não revela código (regra c9): nomeia o escopo de
+   quem já está dentro.
+3. **O monitor de chegada (v82) passou a mostrar o código do aparelho:**
+   "aparelho sincronizou há 12 min · v83 · código Administrador · 0 na
+   fila". É assim que o escritório vê, sem perguntar a ninguém, que um
+   aparelho de campo está no código errado. Depende de rodar o sql/052.
+
+### Provas
+- `scripts/checar-poluicao.cjs`: **589 ✅ · 43 ❌** na v83 e **589 ✅ ·
+  43 ❌** na v82 (`origin/main`), medidos na mesma hora — o diff do
+  relatório inteiro é a linha do número da versão. Nenhum ❌ novo.
+  (A contagem oscila com a hora do dia: cenários que dependem do relógio —
+  farol de "espera" depois das 17 h, ritual do dia 10 — mudam de resultado.
+  A medição da v82 registrada acima, 586 ✅ · 43 + 3 ❌, foi feita às 02:10;
+  esta, às 10:00. O que vale para a regra "a lista de ❌ só encolhe" é
+  comparar as duas versões na MESMA hora, que é o que este diff faz.)
+- `scripts/regressao_render.cjs` contra `origin/main`: café, grãos,
+  pecuária e pós-colheita **idênticos em tudo**; Diretoria e ADMIN mudam só
+  o `00-inicio` (a Diretoria, só o número da versão; o ADMIN, o aviso novo).
+- Teste em navegador dos quatro códigos (`AMNIN-9561`, `ADMIN-9561`,
+  `VR-7061`, `DIRETORIA-8034`), que produziu a tabela acima.
+- `node scripts/teste_planejamento.cjs` (64 ✅ · 0 ❌) e
+  `node scripts/teste_nomenclatura.cjs` verdes.
+
 ## Indicador de envio e monitor de chegada (v82)
 Nasceu do diagnóstico de 11/09/2026 (primeiro dia de preenchimento dos
 gerentes; nenhum boletim deles chegou ao banco).
@@ -2199,6 +2260,13 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   (cria a tabela boletim_pecuaria + visão pecuaria_movimentos).
   Enquanto não rodar, o espelho da pecuária fica na fila offline e o
   boletim continua subindo normal para a tabela boletins.
+- **Trocar o código de acesso nos celulares dos gerentes** (ação do Nilo,
+  não é código): em 11/09/2026 os ~15 gerentes estavam todos com um código
+  de administrador. Cada um deve usar o código da PRÓPRIA unidade
+  (CODIGOS_PADRAO, um por fazenda) — ele abre direto o boletim dela. No
+  celular: tela inicial › "Sair" no rodapé › digitar o código novo. Com o
+  código de administrador o gerente vê as 24 unidades e pode lançar na
+  fazenda errada, além de alcançar Cadastros.
 - **Rodar sql/052-aparelho-sync.sql no SQL Editor do Supabase** (cria a
   tabela `aparelho_sync`, o carimbo de "este aparelho sincronizou" que
   alimenta o cartão "📡 Chegada dos boletins hoje"). Enquanto não rodar,

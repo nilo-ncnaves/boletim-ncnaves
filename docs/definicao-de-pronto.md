@@ -662,3 +662,38 @@ Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
 enviar e o painel da Diretoria podem mudar. O cenário `pos-f23` do script
 de regressão vai até o envio (passo `30-enviado`), para o indicador do
 pós-colheita ter prova própria.
+
+## 20. Porta de entrada: código errado nunca é beco sem saída (desde a v83)
+
+Origem: 11/09/2026. Os ~15 gerentes estavam todos com um código de
+administrador. Com ele o app não abre a fazenda de ninguém — pergunta a
+atividade e depois qual das 24 unidades —, e um código com uma letra
+trocada devolvia só "Código inválido.", sem dizer o que fazer.
+
+Regras que ficam:
+
+1. **Código recusado diz o próximo passo, nunca só o veredito.** A frase
+   manda conferir letras e números e, se não entrar, pedir ao escritório o
+   código **da própria fazenda**, explicando que ele abre direto o boletim
+   dela. Proibido "acesso negado", "não autorizado", "sem permissão"
+   (mesmo tom do item 12) e proibido revelar qualquer código.
+2. **Aparelho num escopo amplo demais avisa na porta**, por
+   `avisoEscopoAmplo()`: só o escopo que abre TODAS as unidades **e**
+   preenche boletim (Administrador). Quem só lê (Diretoria) e quem cuida de
+   uma atividade inteira não recebem o aviso — seria ruído. O texto nomeia
+   o escopo de quem já está dentro, nunca um código.
+3. **Igualdade exata continua valendo.** Código de acesso não aceita
+   aproximação: `escopoDoCodigo` normaliza (maiúsculas, sem espaço, traço
+   opcional) e compara igual. Tolerar "quase certo" transformaria a
+   fechadura em sugestão.
+4. **O escritório enxerga o código de cada aparelho sem perguntar a
+   ninguém:** o monitor de chegada (item 19) mostra o escopo junto da
+   última sincronização. É o que torna "o gerente está no código errado"
+   uma observação, e não uma suspeita.
+5. **Isto continua sendo interface, não segurança** (item 12): a
+   autorização real é das políticas RLS do Supabase.
+
+Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo),
+`scripts/regressao_render.cjs` contra `origin/main` (gerente e
+pós-colheita idênticos; só o `00-inicio` do ADMIN muda) e o teste em
+navegador dos códigos de cada escopo.
