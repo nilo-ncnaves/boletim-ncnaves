@@ -3532,21 +3532,22 @@ function vCasaGerente(){
   return cabecalhoContexto(fz,{sub:"Gerente"})
   +`<div style="height:3px;background:${corAtividade(atCasa)};margin:-14px -14px 14px"></div>`
   +reguaDias(fz, dia)
+  +faixaEnvio(fz)                                       /* v82: enviado × aguardando internet — estado REAL, nunca "gravei no aparelho" */
   +faixaTarefas(fz)                                     /* v77: tarefas da reunião; sem tarefa aberta, nada aparece */
   +planSugestaoBoletim(fz, dia)                         /* v77: o app SUGERE concluir, nunca conclui sozinho */
   +linhaPlanoCasa(fz, dia)+linhaPlanoSemana(fz, dia)   /* v75: espelho do plano; sem plano, nada aparece */
   +`
     ${rec?`<div class="cartao" style="border-color:var(--verde)">
-      <h2>✅ Boletim enviado!</h2>
-      <p class="mut">Quer avisar o grupo? Um toque e o resumo já vai pronto.</p>
+      <h2>${naFila("b",rec)?"📝 Boletim guardado":"✅ Boletim enviado!"}</h2>
+      <p class="mut">${naFila("b",rec)?"Está no aparelho e sobe sozinho quando o sinal voltar. ":""}Quer avisar o grupo? Um toque e o resumo já vai pronto.</p>
       <button class="btn mt" data-zap="${rec}">📲 Mandar resumo no WhatsApp</button>
     </div>`:""}
     ${dia===hoje?`<div class="cartao">
       <div class="linha-flex">
         <span class="farol ${st}"></span>
         <div class="cresce">
-          <h2>${b?"Boletim de hoje enviado":"Boletim de hoje pendente"}</h2>
-          <p class="mut">${b?("Enviado às "+esc((b.enviadoEm||"").split(" ")[1]||"")+(b.editadoEm?" · editado":"")):"Preencha até as 19h"}</p>
+          <h2>${b?(naFila("b",b.id)?"Boletim de hoje guardado no aparelho":"Boletim de hoje enviado"):"Boletim de hoje pendente"}</h2>
+          <p class="mut">${b?(naFila("b",b.id)?"Sobe sozinho quando o sinal voltar":("Enviado às "+esc(horaEnvio(b))+(b.editadoEm?" · editado":""))):"Preencha até as 19h"}</p>
         </div>
       </div>
     </div>`:cartaoDiaRegua({dia, reg:bDia, que:"boletim registrado", unidade:fz, rotulo:"Boletim", attr:"data-ver", farol:bDia&&critico(bDia)?"critico":"ok",
@@ -5661,6 +5662,7 @@ function vForm(){
   const atForm=atividadeDe(r.fazendaId);
   return topo(fazenda(r.fazendaId).nome+" — "+fmtData(r.data), emojiAtividade(atForm)+" "+rotuloAtividade(atForm)+" · "+(r.id?"Corrigindo boletim enviado":"Rascunho salvo automaticamente"), true)
   +`<div style="height:3px;background:${corAtividade(atForm)};margin:-14px -14px 14px"></div>`
+  +faixaEnvio(r.fazendaId)     /* v82: estado do envio no topo do boletim */
   +faixaTarefas(r.fazendaId)   /* v77: tarefas da reunião no topo do boletim; nunca bloqueia o preenchimento */
   +faixaPlanoHoje(r)   /* v75: o encontro — o plano de ontem para hoje, com status que o app preenche sozinho */
   +`
@@ -6013,6 +6015,55 @@ function comprimirFoto(arquivo){
 }
 
 /* ---------- Farol de completude: quem mandou boletim nos últimos 7 dias ---------- */
+/* ---------- v82: monitor de chegada dos boletins (ADMIN / Diretoria) ----------
+   Nasceu do diagnóstico de 11/09/2026: o escritório não tinha como saber se o silêncio de uma unidade
+   era "o gerente não preencheu" ou "preencheu e não subiu". Relata RECEBIMENTO, nunca trabalho: diz
+   "nada recebido" e a hora de chegada — proibidos "não fez", "pendente", "atrasado" (c2). Componente
+   ÚNICO, uma linha por unidade, nas três atividades. Sem o carimbo (sql/052 não rodado) a coluna do
+   aparelho simplesmente não aparece — o cartão continua útil só com a hora do boletim. */
+const haQuanto = iso => { if(!iso) return "";
+  const t=new Date(iso); if(isNaN(t)) return "";
+  const min=Math.round((Date.now()-t.getTime())/60000);
+  if(min<2) return "agora há pouco";
+  if(min<60) return "há "+min+" min";
+  if(min<48*60) return "há "+Math.round(min/60)+" h";
+  return "há "+Math.round(min/1440)+" dias"; };
+function cartaoChegadaBoletins(){
+  if(!podePainel()) return "";
+  const hoje=hojeBRT();
+  const uns=D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
+  const linhas=uns.map(f=>{
+    const b=boletimDoDia(hoje,f.id);
+    const ap=chegadaCache.filter(x=>x.unidade_id===f.id)
+      .sort((a,c)=>String(c.visto_em||"").localeCompare(String(a.visto_em||"")))[0];
+    return {f, b, ap};
+  });
+  const n=linhas.filter(l=>l.b).length;
+  const semAparelho=linhas.every(l=>!l.ap);
+  const corpo=linhas
+    .sort((a,c)=>(a.b?1:0)-(c.b?1:0) || a.f.nome.localeCompare(c.f.nome))
+    .map(l=>{
+      const h=l.b?horaChegada(l.b):"";
+      const dir=l.b?`recebido${h?" "+esc(h):""}`:"nada recebido";
+      const ap=l.ap?`aparelho sincronizou ${esc(haQuanto(l.ap.visto_em))}${l.ap.versao?" · "+esc(l.ap.versao):""}${n0(l.ap.na_fila)?" · "+n0(l.ap.na_fila)+" na fila":""}`
+        : (semAparelho?"":"nenhum aparelho sincronizou nesta unidade");
+      return `<div style="padding:5px 0;border-top:1px solid var(--linha)">
+        <div class="linha-flex" style="gap:8px">
+          <span class="farol ${l.b?"ok":"espera"}"></span>
+          <span class="cresce" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.b?esc(l.f.nome):"<b>"+esc(l.f.nome)+"</b>"}</span>
+          <span class="num mut" style="flex:none">${dir}</span></div>
+        ${ap?`<p class="mut" style="margin:2px 0 0 22px;font-size:.72rem">${ap}</p>`:""}</div>`;
+    }).join("");
+  /* nasce RECOLHIDO (P5): o resumo já dá a olhada — "3 de 24 · 21 sem nada recebido" — e a lista
+     inteira não empurra o painel para baixo (o painel já passa de 2 telas; ver c5/P3). */
+  return `<details class="secao"><summary><span class="ico">📡</span>Chegada dos boletins hoje
+    <span class="resumo">${n} de ${linhas.length}${n<linhas.length?" · "+(linhas.length-n)+" sem nada recebido":""}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      ${corpo||htmlEstado("vazio",{que:"unidade",onde:"neste filtro"})}
+      ${semAparelho?`<p class="mut" style="font-size:.72rem;margin-top:8px">A coluna do aparelho aparece depois de rodar sql/052-aparelho-sync.sql no Supabase; até lá o cartão mostra só a hora de chegada do boletim.</p>`:""}
+      <p class="mut" style="font-size:.72rem;margin-top:8px">Hora em que o boletim entrou no banco. "Nada recebido" é ausência de REGISTRO, nunca afirmação de que não foi feito.</p>
+    </div></details>`;
+}
 function cartaoFarolBoletins(){
   const dias=[];
   for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i);
@@ -6136,6 +6187,7 @@ function vPainel(){
     ${planNotifOferta()}
     <button class="btn sec mb no-print" id="bt-planejamento" style="box-shadow:none;border-radius:0;">📋 Planejamento${(()=>{const r=planResumoMes(planMesDe(hojeBRT()));
       return r.n?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${r.pct===null?"":r.pct+"% concluído · "}${r.atrasadas.length} atrasada(s)</span>`:"";})()}</button>
+    ${cartaoChegadaBoletins()}
     ${cartaoFarolBoletins()}
     ${cartaoPlanejamentoPainel()}
     ${cartaoPlanoPainel()}
@@ -6544,7 +6596,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v81";
+const APP_VERSAO="v82";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -8471,7 +8523,7 @@ function syncEnfileirar(t,id){
 }
 async function syncEnviar(){
   if(!syncAtivo()||!syncFila.length) return;
-  const resto=[];
+  const resto=[]; let mudou=false;
   for(const item of syncFila){
     let col, reg, corpo, conflito;
     if(item.t==="r"){
@@ -8526,10 +8578,14 @@ async function syncEnviar(){
       const r=await fetch(syncCfg.url+"/rest/v1/"+col+"?on_conflict="+conflito,{
         method:"POST", headers:syncCab(),
         body:JSON.stringify([corpo])});
-      if(!r.ok) resto.push(item);
-    }catch(e){ resto.push(item); }
+      /* v82: o recibo do banco fica gravado no proprio registro. Antes, "enviado" era so
+         "gravado no aparelho" — e um erro de rede passava batido (ver diagnostico de 11/09). */
+      if(r.ok){ if(reg && (item.t==="b"||item.t==="p")){ reg.sincEm=new Date().toISOString(); mudou=true; } }
+      else { item.http=r.status; item.tent=(item.tent||0)+1; resto.push(item); }
+    }catch(e){ item.http=0; item.tent=(item.tent||0)+1; resto.push(item); }
   }
   syncFila=resto; syncSalvarFila();
+  if(mudou) await salvarDados();
 }
 async function syncBaixar(){
   if(!syncAtivo()) return false;
@@ -8541,7 +8597,9 @@ async function syncBaixar(){
   await baixarPlanejamento();
   for(const [col,alvo] of [["boletins","boletins"],["pos_colheitas","posColheitas"],["remessas","remessas"],["telemetria","telemetria"]]){
     try{
-      let url=syncCfg.url+"/rest/v1/"+col+"?select=payload&order=data.desc&limit=2000";
+      /* v82: `atualizado` = hora em que a linha entrou no banco. É o "recebido HH:MM" do monitor de
+         chegada — diferente de `enviadoEm`, que é a hora em que o gerente terminou o boletim. */
+      let url=syncCfg.url+"/rest/v1/"+col+"?select=payload,atualizado&order=data.desc&limit=2000";
       if(idsFz){
         if(col==="boletins"||col==="pos_colheitas") url+="&fazenda_id=in.("+idsFz.join(",")+")";
         else if(col==="remessas") url+="&or=(origem.in.("+idsFz.join(",")+"),destino.in.("+idsFz.join(",")+"))";
@@ -8553,6 +8611,7 @@ async function syncBaixar(){
       const lista=D[alvo]=D[alvo]||[];
       linhas.forEach(l=>{
         const b=l.payload; if(!b||!b.id) return;
+        if(l.atualizado) b.recebidoEm=l.atualizado;   /* v82: nome próprio — "atualizado" já existe dentro do payload das remessas */
         /* registros gravados por versões antigas chegam com o id antigo da fazenda:
            caem na unidade atual correspondente (Café) */
         if(b.fazendaId) b.fazendaId=fzAtual(b.fazendaId);
@@ -8624,8 +8683,13 @@ async function baixarCodigos(){
 }
 async function syncTudo(){
   if(!syncAtivo()||syncOcupado) return; syncOcupado=true;
-  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes(); } } finally { syncOcupado=false; }
+  const filaAntes=syncFila.length;
+  try{ await syncEnviar(); await syncBaixar(); await baixarCodigos(); conferirAcesso(); await baixarIcrop(); if(SOLINFTEC_AUTO) await baixarSolinftec(); await baixarStatusIntegracoes(); await baixarPlano(); await baixarRelatorios(); await syncBatida(); if(podePainel()){ await baixarFarolRegistro(); await baixarRitmoOperacoes(); await baixarChegada(); } } finally { syncOcupado=false; }
   planMotor(true); planNotifDisparar();   /* v77: farol, dias de chuva e saída da pausa por clima rodam sozinhos */
+  /* v82: a fila esvaziou (ou emperrou) enquanto o gerente olhava a casa? o indicador de envio troca
+     sozinho, no lugar — o formulário nunca é redesenhado, para não tirar o foco de quem digita. */
+  if(filaAntes!==syncFila.length && sessao && (sessao.papel==="gerente"||sessao.papel==="pos") && telaAtual==="casa")
+    ir("casa", null, true);
   if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol","planejamento"].includes(telaAtual))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
@@ -8634,6 +8698,90 @@ function syncStatus(){
   if(syncFila.length) return "📶 "+syncFila.length+" registro(s) aguardando internet — enviam sozinhos quando o sinal voltar";
   if(syncUltima) return "✅ Sincronizado às "+syncUltima.toTimeString().slice(0,5);
   return "";
+}
+
+/* ---------- v82: estado REAL do envio (diagnóstico de 11/09/2026) ----------
+   Até a v81 a casa do gerente dizia "Boletim de hoje enviado" assim que o boletim era gravado no
+   APARELHO: o POST para o banco vinha depois e, se falhasse, o erro era engolido sem nenhum aviso.
+   Quem responde agora é a fila: item fora da fila = o banco confirmou (`reg.sincEm`, gravado em
+   syncEnviar). Função ÚNICA nas três atividades; relata ENVIO, nunca trabalho. */
+const naFila = (t,id) => syncFila.find(x=>x.t===t && x.id===id);
+const filaRecusou = f => !!(f && f.http && f.http>=400 && f.http!==408 && f.http!==429);
+function estadoEnvio(t,id){
+  const f=naFila(t,id);
+  if(!f) return {estado:"enviado"};
+  return {estado: filaRecusou(f)?"recusado":"espera", http:f.http||0};
+}
+const horaEnvio = b => b && b.sincEm ? new Date(b.sincEm).toTimeString().slice(0,5)
+  : ((b&&b.enviadoEm||"").split(" ")[1]||"");
+/* hora em que o registro CHEGOU ao banco (coluna `atualizado`); sem ela, a hora em que o
+   gerente terminou o boletim. Quem lê é o monitor de chegada da Diretoria. */
+const horaChegada = b => { if(b && b.recebidoEm){ const d=new Date(b.recebidoEm);
+    if(!isNaN(d)) return d.toTimeString().slice(0,5); } return horaEnvio(b); };
+
+/* Componente ÚNICO do indicador de envio: casa do gerente e topo do boletim, nas três atividades.
+   Estático (nunca sticky — orçamento de altura de c5/c11), uma linha, sem emoji novo além dos três
+   estados. Some quando não há nada a dizer. */
+function faixaEnvio(fz, o){
+  if(!syncAtivo()) return "";
+  /* `t` é chave substituta, não condicional por atividade: "b" = boletim, "p" = pós-colheita.
+     O vocabulário ("boletim" / "registro") vem de quem chama, como na régua de 7 dias (c11). */
+  const t = (o&&o.t)||"b", rot = (o&&o.rotulo)||"boletim";
+  const b = t==="p" ? posDoDia(hojeBRT(), fz) : boletimDoDia(hojeBRT(), fz);
+  const fila = syncFila.filter(x=>x.t==="b" || x.t==="p");
+  const meu = b ? naFila(t, b.id) : null;
+  if(!b && !fila.length) return "";
+  const nb = fila.filter(x=>x.t===t).length;
+  const botao = `<button class="btn suave mini" id="bt-enviar-agora" style="display:inline-flex;padding:2px 8px;margin-left:6px">🔄 Tentar enviar agora</button>`;
+  const recusado = fila.find(filaRecusou);
+  if(b && !meu){
+    const h=horaEnvio(b);
+    return `<div class="aviso verde" style="margin-bottom:10px"><b>✅ ${esc(rot[0].toUpperCase()+rot.slice(1))} de hoje enviado${h?" às "+esc(h):""}</b>`
+      + (fila.length?`<br><span class="mut">⏳ ainda ${fila.length} registro(s) na fila deste aparelho.</span>${botao}`:` <span class="mut">— o escritório já recebeu.</span>`)
+      + `</div>`;
+  }
+  /* tentativa no ar: não assustar com "sem internet" no segundo em que o envio está acontecendo */
+  if(syncOcupado && navigator.onLine!==false)
+    return `<div class="aviso" style="margin-bottom:10px"><b>⏳ Enviando…</b>
+      <br><span class="mut">Guardado no aparelho enquanto o banco não confirma.</span></div>`;
+  if(recusado)
+    return `<div class="aviso" style="border-color:var(--amarelo);margin-bottom:10px"><b>⏳ Aguardando envio${nb?" ("+nb+" "+esc(rot)+(nb>1?"s":"")+" na fila)":""}</b>
+      <br><span class="mut">O banco respondeu ${recusado.http} e não gravou. Nada se perdeu — está guardado neste aparelho. Avise o escritório.</span>${botao}</div>`;
+  return `<div class="aviso" style="border-color:var(--amarelo);margin-bottom:10px"><b>⏳ Aguardando internet${nb?" ("+nb+" "+esc(rot)+(nb>1?"s":"")+" na fila)":""}</b>
+    <br><span class="mut">Está guardado neste aparelho e sobe sozinho quando o sinal voltar.</span>${botao}</div>`;
+}
+
+/* ---------- v82: carimbo de "este aparelho sincronizou" (sql/052-aparelho-sync.sql) ----------
+   Vai DIRETO, fora da fila, de propósito: tabela que ainda não existe devolve 404 e, na fila, o item
+   ficaria preso para sempre acusando "aguardando internet" (foi o que aconteceu com codigos_acesso).
+   Sem a tabela, falha em silêncio e o app continua idêntico. */
+let aparelhoIdCache=null;
+async function aparelhoId(){
+  if(aparelhoIdCache) return aparelhoIdCache;
+  let v=null; try{ v=await Persist.get("bdf:aparelho"); }catch(e){}
+  if(!v){ v=uid(); try{ await Persist.set("bdf:aparelho", v); }catch(e){} }
+  aparelhoIdCache=v; return v;
+}
+async function syncBatida(){
+  if(!syncAtivo() || !acesso) return;
+  try{
+    const ap=await aparelhoId();
+    await fetch(syncCfg.url+"/rest/v1/aparelho_sync?on_conflict=id",{ method:"POST", headers:syncCab(),
+      body:JSON.stringify([{ id:ap, unidade_id:(sessao&&sessao.fazendaId)||null, chave:(acesso&&acesso.chave)||null,
+        versao:APP_VERSAO, na_fila:syncFila.length, visto_em:new Date().toISOString() }]) });
+  }catch(e){}
+}
+/* Só quem tem painel baixa os carimbos (leitura sob demanda, como o farol de registro). */
+let chegadaCache=[];
+async function baixarChegada(){
+  if(!syncAtivo() || !podePainel()) return false;
+  try{
+    const r=await fetch(syncCfg.url+"/rest/v1/aparelho_sync?select=id,unidade_id,chave,versao,na_fila,visto_em&order=visto_em.desc&limit=300",
+      { headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } });
+    if(!r.ok) return false;
+    const l=await r.json(); if(!Array.isArray(l)) return false;
+    chegadaCache=l; return true;
+  }catch(e){ return false; }
 }
 let envioRecente=null;
 let envioRecentePos=null;
@@ -8659,13 +8807,15 @@ function vCasaPos(){
   const pDia = dia===hoje ? p : posDoDia(dia,fz);
   const rec = envioRecentePos && p && p.id===envioRecentePos ? p.id : null;
   const ult=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz).sort((a,b)=>a.data<b.data?1:-1).slice(0,5);
-  return cabecalhoContexto(fz,{sub:"Terreiro · Secador · Benefício"})+reguaDias(fz, dia)+`
+  return cabecalhoContexto(fz,{sub:"Terreiro · Secador · Benefício"})+reguaDias(fz, dia)
+    +faixaEnvio(fz,{t:"p", rotulo:"registro"})   /* v82: mesmo componente do boletim */
+    +`
     ${cartaoCargas(fz)}
-    ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>✅ Registro enviado!</h2>
-      <p class="mut">Um toque e o resumo vai pro grupo.</p>
+    ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>${naFila("p",rec)?"📝 Registro guardado":"✅ Registro enviado!"}</h2>
+      <p class="mut">${naFila("p",rec)?"Está no aparelho e sobe sozinho quando o sinal voltar. ":""}Um toque e o resumo vai pro grupo.</p>
       <button class="btn mt" data-zappos="${rec}">📲 Mandar resumo no WhatsApp</button></div>`:""}
     ${dia===hoje?`<div class="cartao"><div class="linha-flex"><span class="farol ${p?"ok":(new Date().getHours()>=17?"espera":"vazio")}"></span>
-      <div class="cresce"><h2>${p?"Registro de hoje enviado":"Registro de hoje pendente"}</h2>
+      <div class="cresce"><h2>${p?(naFila("p",p.id)?"Registro de hoje guardado no aparelho":"Registro de hoje enviado"):"Registro de hoje pendente"}</h2>
       <p class="mut">Terreiro, secador e benefício — preencha só o que teve.</p></div></div></div>`
     :cartaoDiaRegua({dia, reg:pDia, que:"registro de pós-colheita", unidade:fz, rotulo:"Registro", attr:"data-verpos", sub:pDia?esc(pDia.responsavel||""):""})}
     ${(()=>{ const ontem=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz&&x.data<hojeISO()).sort((a,b)=>a.data<b.data?1:-1)[0];
@@ -9121,6 +9271,9 @@ function ligarEventos(tela){
       else ir("fazendas");
       return; }
     if(t.id==="bt-sync"){ syncTudo(); return; }
+    /* v82: "Tentar enviar agora" do indicador de envio — redesenha a tela quando a fila mexer */
+    if(t.id==="bt-enviar-agora"){ const antes=syncFila.length;
+      syncTudo().then(()=>{ if(syncFila.length!==antes) ir(telaAtual,null,true); }); return; }
     if(d.sync!==undefined){ syncTudo(); ir(telaAtual,null,true); return; } /* "Tentar de novo" do estado de erro (v61): redesenha já em "carregando" */
     if(d.receber){ confirmarRemessa(d.receber); return; }
     if(d.limparFiltros){ filtroPainel={busca:"", fazenda:"", talhao:"", atividade:"", de:"", ate:"", atv:""}; ir(telaAtual,null,true); return; }
@@ -9877,7 +10030,12 @@ function vHistorico(){ return vPainel(); }
   /* v77: o motor de calendário e os avisos rodam na abertura — nada depende de alguém abrir uma tela */
   try{ planMotor(true); planNotifDisparar(); }catch(e){}
   /* v73: virou o dia com o app aberto? ao voltar ao primeiro plano a régua recalcula "hoje" (Brasília) e a casa redesenha */
-  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && reguaVista.hoje && reguaVista.hoje!==hojeBRT() && telaAtual==="casa") ir("casa",null,true); });
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible") return;
+    if(reguaVista.hoje && reguaVista.hoje!==hojeBRT() && telaAtual==="casa") ir("casa",null,true);
+    /* v82: voltar ao app é a terceira chance de esvaziar a fila (as outras: abrir o app e o evento "online") */
+    if(syncFila.length && navigator.onLine!==false){ const antes=syncFila.length;
+      syncTudo().then(()=>{ if(syncFila.length!==antes && telaAtual==="casa") ir("casa",null,true); }); } });
+      /* o formulário NUNCA é redesenhado por conta disso: quem está digitando perderia o foco */
 })();
 </script>
 <script>

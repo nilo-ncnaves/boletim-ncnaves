@@ -80,6 +80,11 @@ sql/050 e o sql/051 só acrescentam LEITURA dela (area_planejada,
 area_executada, pct_area, tarefas_sem_lancamento). Rodar de novo os dois
 arquivos é seguro: eles substituem a visão e as funções, sem tocar em
 dado nenhum.
+Desde a v82: aparelho_sync (sql/052; carimbo de "este aparelho
+sincronizou" — id aleatório do aparelho, unidade aberta, versão do app e
+tamanho da fila; alimenta o cartão "📡 Chegada dos boletins hoje" da
+Diretoria). O app escreve DIRETO, fora da fila offline, e lê só com
+painel. Não guarda nome, telefone nem localização.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -832,6 +837,40 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
 - Conferência: `node scripts/teste_planejamento.cjs` (a validação da tarefa,
   com o texto real da ata) e `scripts/checar-poluicao.cjs`, grupo "14.
   Planejamento"; detalhe em docs/definicao-de-pronto.md, item 18.
+
+### c16) Envio: a tela nunca diz "enviado" antes do banco confirmar (desde a v82)
+Lição do primeiro dia de preenchimento (11/09/2026): até a v81 a casa do
+gerente escrevia "Boletim de hoje enviado" assim que o boletim era gravado
+no APARELHO, e o erro de rede do envio era engolido em silêncio.
+- **Quem responde "enviado" é a FILA**, nunca a gravação local: registro
+  fora de `syncFila` = o banco confirmou (recibo em `reg.sincEm`, escrito
+  só quando o POST responde ok). Toda tela que anuncie envio passa por
+  `estadoEnvio(t,id)` / `naFila(t,id)`.
+- **Componente ÚNICO `faixaEnvio(fz,{t,rotulo})`** nas três atividades e no
+  pós-colheita, estático (nunca sticky — orçamento de c5/c11), quatro
+  estados: `✅ enviado às HH:MM` · `⏳ Enviando…` · `⏳ Aguardando internet
+  (N na fila)` + "🔄 Tentar enviar agora" · `⏳ Aguardando envio` com o
+  código HTTP da recusa. Some quando não há nada a dizer. `t` é chave
+  substituta ("b"/"p") e o substantivo vem de quem chama — nunca
+  `if(atividade==="…")`.
+- **Erro nunca é invisível, e nunca culpa quem usa:** proibidos "erro",
+  "falha", "você esqueceu"; a frase diz o que houve e que nada se perdeu.
+- **Três chances automáticas** de esvaziar a fila: abrir o app, evento
+  `online` e voltar ao app (`visibilitychange`). O indicador troca no
+  lugar; o FORMULÁRIO nunca é redesenhado por isso (tira o foco de quem
+  digita).
+- **Gravação de diagnóstico vai DIRETO, fora da fila offline.** Tabela que
+  ainda não existe devolve 404 e, na fila, o item ficaria preso para sempre
+  acusando "aguardando internet" — foi o que aconteceu com
+  `codigos_acesso`. Sem a tabela, falha em silêncio e o app fica idêntico.
+- **Monitor do escritório relata RECEBIMENTO, nunca trabalho:**
+  `cartaoChegadaBoletins()` nasce recolhido (P5), lista UNIDADES (nunca
+  pessoas) e diz "nada recebido" — proibidos "não fez", "pendente",
+  "atrasado" (c2).
+- Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
+  `scripts/regressao_render.cjs` contra origin/main — só a casa depois de
+  enviar e o painel da Diretoria podem mudar; detalhe em
+  docs/definicao-de-pronto.md, item 19.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

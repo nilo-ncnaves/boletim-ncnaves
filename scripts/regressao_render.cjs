@@ -158,6 +158,8 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
     ['10-formpos', async p => { await clique(p, '#bt-preencher-pos'); }],
     ['20-terreiro', async p => { await preenche(p, 'input[data-pt="entradaLatas"]', '300'); }],
+    /* v82: envio do registro e volta para a casa — prova do indicador de envio no pós-colheita */
+    ['30-enviado', async p => { await clique(p, '#bt-enviar-pos'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim'); if (cx) { await cx.click(); await pausa(p, 300); } }],
   ]);
 
   /* 📋 diretoria — painel, filtro por fazenda, relatório */

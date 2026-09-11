@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v81** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v82** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1503,11 +1503,119 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## Indicador de envio e monitor de chegada (v82)
+Nasceu do diagnóstico de 11/09/2026 (primeiro dia de preenchimento dos
+gerentes; nenhum boletim deles chegou ao banco).
+
+**O que o banco mostrava naquele dia** (consulta REST com a chave
+publishable, tabela por tabela): 12 boletins no total, os dois mais
+recentes de 10/09 (Mata Preta — Café e Monte Carmelo — Café, o
+treinamento do Nilo); **zero** registros com data de 11/09 em `boletins`,
+`pos_colheitas`, `remessas`, `boletim_pecuaria` e `telemetria`. Ou seja:
+nada foi enviado — não era leitura escondendo registro.
+
+**O que foi descartado com prova:**
+- **Rejeição do banco (RLS, campo obrigatório, id de unidade):** um POST
+  anônimo com a chave publishable, exatamente como o app faz
+  (`on_conflict=fazenda_id,data`), respondeu **HTTP 201** em `boletins`,
+  `pos_colheitas` e `telemetria`. O banco estava recebendo.
+- **Leitura filtrando demais:** o escopo ADMIN cai em `e.tudo`, então
+  `syncBaixar` monta a URL **sem** `fazenda_id=in.(…)`, com `limit=2000`.
+  Nada é escondido do aparelho do Nilo.
+- **Versão presa no celular:** o `sw.js` é *network-first* (tenta a
+  internet primeiro, cache só como reserva), então aparelho com sinal
+  sempre pega a versão nova.
+
+**O defeito real, que era do app:** até a v81 a casa do gerente escrevia
+"Boletim de hoje enviado · Enviado às HH:MM" assim que o boletim era
+gravado no APARELHO. O envio ao banco vinha depois, pela fila, e o erro
+de rede era engolido (`catch(e){ resto.push(item) }`) sem nenhum aviso —
+a prova está na regressão: num Chromium **sem rede nenhuma**, a v81
+mostrava "✅ Boletim enviado!". O único sinal da fila era uma linha
+discreta abaixo de quatro cartões, sem botão de tentar de novo. E não
+havia nada, em lugar nenhum, que dissesse se o aparelho de um gerente
+tinha ao menos conversado com o banco.
+
+### a) Indicador de envio (gerente e pós-colheita, três atividades)
+Componente ÚNICO `faixaEnvio(fz, {t, rotulo})`, estático (nunca sticky —
+orçamento de altura de c5/c11), logo abaixo da régua de 7 dias na casa e
+no topo do formulário do boletim. Quatro estados, todos lidos da FILA, não
+da gravação local:
+- `✅ Boletim de hoje enviado às HH:MM — o escritório já recebeu.`
+- `⏳ Enviando…` (tentativa no ar; não assusta com "sem internet" no
+  segundo do envio).
+- `⏳ Aguardando internet (N boletins na fila)` + botão **🔄 Tentar enviar
+  agora**.
+- `⏳ Aguardando envio (N …)` + `O banco respondeu <código> e não gravou.
+  Nada se perdeu — está guardado neste aparelho. Avise o escritório.`
+Some quando não há nada a dizer. `t` é chave substituta ("b" boletim /
+"p" pós-colheita) e o vocabulário ("boletim" / "registro") vem de quem
+chama, como na régua (c11) — nunca `if(atividade==="…")`.
+
+Junto: `syncEnviar` guarda o recibo do banco no próprio registro
+(`reg.sincEm`, gravado só quando o POST responde ok) e o código HTTP da
+recusa no item da fila (`item.http`, `item.tent`); os títulos "Boletim de
+hoje enviado" e "✅ Boletim enviado!" passaram a dizer "guardado no
+aparelho" enquanto o registro estiver na fila; `syncTudo` redesenha a casa
+do gerente/pós quando a fila muda de tamanho (o FORMULÁRIO nunca é
+redesenhado, para não tirar o foco de quem digita); e voltar ao app
+(`visibilitychange`) virou a terceira chance de esvaziar a fila, junto do
+evento `online` e da abertura do app, que já existiam.
+
+### b) Monitor de chegada (Diretoria / ADMIN)
+`cartaoChegadaBoletins()` no painel, acima do farol de 7 dias, nasce
+RECOLHIDO (P5) com o resumo "3 de 24 · 21 sem nada recebido". Aberto, uma
+linha por unidade: `recebido HH:MM` (hora em que a linha entrou no banco —
+coluna `atualizado`, agora baixada junto do payload como `recebidoEm`) ou
+`nada recebido`, e embaixo, quando existir, `aparelho sincronizou há N min
+· v82 · N na fila`. Relata RECEBIMENTO, nunca trabalho: "nada recebido" é
+ausência de registro; proibidos "não fez", "pendente", "atrasado" (c2).
+Nenhuma pessoa aparece — as linhas são de UNIDADES.
+
+O carimbo por aparelho vem da tabela nova `aparelho_sync`
+(**sql/052-aparelho-sync.sql**, pendente de rodar): id aleatório do
+aparelho, unidade aberta, escopo do código, versão do app, quantos
+registros esperam na fila e a hora. Não guarda nome, telefone, localização
+nem nada digitado. A gravação vai **direto, fora da fila offline**, de
+propósito: se fosse pela fila, tabela inexistente devolveria 404 e o item
+ficaria preso para sempre acusando "aguardando internet" — que é
+exatamente o que acontece hoje com `codigos_acesso` (sql/001 nunca
+rodado). Sem a tabela, o carimbo falha em silêncio e o cartão mostra só a
+hora de chegada do boletim.
+
+### Provas
+- `scripts/checar-poluicao.cjs`: **586 ✅ · 46 ❌**, os mesmos 46 ❌ da
+  v81 — nenhum ❌ novo. O painel da Diretoria foi de 4 para 4,15 telas
+  (por isso o cartão nasce recolhido).
+- `scripts/regressao_render.cjs` contra `origin/main`: as únicas telas que
+  mudaram são a casa depois de enviar (café, grãos, pecuária e
+  pós-colheita) e o painel da Diretoria/ADMIN. Todo o resto ficou idêntico,
+  inclusive o boletim em 3 passos. O cenário do pós-colheita ganhou o passo
+  `30-enviado`, que o script ainda não alcançava.
+- Com o Supabase mockado respondendo 200, a casa troca sozinha para
+  "✅ Boletim de hoje enviado às HH:MM" — e o POST de `aparelho_sync` sai
+  com `{unidade_id, chave, versao, na_fila, visto_em}`.
+- `node scripts/teste_nomenclatura.cjs` e `node scripts/teste_planejamento.cjs`
+  (64 ✅ · 0 ❌) seguem verdes.
+
+### O que ficou por confirmar com os gerentes
+O app não tem como distinguir, sozinho, "o gerente não preencheu" de
+"preencheu e ficou na fila" — é justamente o que a v82 passa a mostrar.
+Uma hipótese permanece aberta e só o Nilo responde: **se ele gerou códigos
+novos em Cadastros para o treinamento**, esses códigos NÃO chegaram aos
+celulares dos gerentes (a tabela `codigos_acesso` não existe no banco,
+sql/001 nunca rodado), e nesse caso os gerentes nem conseguiram entrar no
+app. As perguntas objetivas estão no resumo do PR.
+
 ## Telas × padrões de tela (checagem de poluição — desde 05/09/2026)
 Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
-`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px, v78, 10/09/2026:
+`scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v82, 11/09/2026: **586 ✅ · 46 ❌** — os mesmos 46 ❌ da v81, nenhum novo
+(a v82 acrescentou o cartão "📡 Chegada dos boletins hoje", recolhido, e a
+faixa de estado do envio, que reusa `.aviso`; o painel foi de 4 para 4,15
+telas). Medição anterior registrada aqui, v78, 10/09/2026:
 **589 ✅ · 41 ❌** — os mesmos 41 ❌ da v58;
 a v78 acrescentou 7 itens ao grupo "14. Planejamento" (três números com barra
 na tarefa; toque em "executado" abrindo a rastreabilidade no lugar, com alvo de
@@ -2091,13 +2199,32 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   (cria a tabela boletim_pecuaria + visão pecuaria_movimentos).
   Enquanto não rodar, o espelho da pecuária fica na fila offline e o
   boletim continua subindo normal para a tabela boletins.
+- **Rodar sql/052-aparelho-sync.sql no SQL Editor do Supabase** (cria a
+  tabela `aparelho_sync`, o carimbo de "este aparelho sincronizou" que
+  alimenta o cartão "📡 Chegada dos boletins hoje"). Enquanto não rodar,
+  o cartão mostra só a hora de chegada do boletim e a linha do aparelho
+  não aparece; nada mais muda (o carimbo vai fora da fila e falha em
+  silêncio, de propósito).
+- **Rodar sql/053-limpar-teste-diagnostico.sql no SQL Editor do Supabase**
+  para apagar os três registros do teste de gravação de 11/09/2026
+  (`TESTE-DIAGNOSTICO-1` em boletins, `-p` em pos_colheitas, `-t` em
+  telemetria). Eles já foram marcados `exemplo:true`, então o app não os
+  exibe, mas continuam ocupando a linha f22c/2026-09-11 no banco. A chave
+  publishable **não apaga** (não existe policy de delete — o DELETE volta
+  204 sem remover nada), só o SQL Editor.
 - **Rodar sql/001-codigos-acesso.sql e depois
   sql/002-codigos-escopo.sql no SQL Editor do Supabase** (001 cria a
   tabela codigos_acesso; 002 insere as chaves de escopo por atividade
   e troca DIRETORIA/ADMIN para o formato novo). Sem eles o app
   continua funcionando com os códigos de fábrica, mas "gerar novo
   código" e os combinados criados em Cadastros não alcançam os
-  outros aparelhos.
+  outros aparelhos. **Confirmado em 11/09/2026:** a tabela não existe no
+  banco (a consulta volta PGRST205). Consequência prática, e uma das
+  hipóteses do silêncio do primeiro dia de preenchimento: código novo
+  gerado em Cadastros vale SÓ no aparelho do admin — se ele for repassado
+  aos gerentes, o app deles recusa (só conhece os de fábrica) e eles não
+  entram. Além disso o item fica preso na fila daquele aparelho para
+  sempre (404 a cada tentativa), acusando "aguardando internet".
 - **Limitação conhecida**: o controle de acesso é fechadura de porta,
   não cofre — os códigos de fábrica vivem no código do app (público)
   e um aparelho que nunca sincroniza não fica sabendo de código
