@@ -1809,7 +1809,7 @@ passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
 v86, 11/09/2026: **637 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
-v86 acrescentou o grupo "15. Insumos" (13 itens ✅: a porta única com uma tela
+v86 acrescentou o grupo "15. Insumos" (14 itens ✅: a porta única com uma tela
 e um campo; o botão de avanço inativo dizendo a próxima ação; a classificação
 automática com troca de tipo por chips; totais de conferência na
 pré-visualização; nome não casado pedindo a unidade em vez de adivinhar; o
