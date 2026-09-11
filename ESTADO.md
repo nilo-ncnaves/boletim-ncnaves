@@ -1503,6 +1503,85 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## Módulo de insumos (v86) — da mensagem do grupo ao saldo da fazenda
+
+**O problema real.** A entrega de fertilizante é anunciada numa mensagem do
+WhatsApp ("Relação de NITRATO que a Cooxupé vai entregar nas fazendas:
+106.000 kg - VEREDA…") e depois ninguém sabe o que chegou, quanto foi
+aplicado e quanto sobrou. Várias tarefas do planejamento (v77) ficam paradas
+"aguardando insumo" sem que o escritório saiba que o insumo já chegou.
+
+### O que o app faz agora
+1. **A mensagem vira dado em menos de um minuto.** Em "📥 Colar do WhatsApp"
+   (primeiro nível na Diretoria/Admin, atalho no topo de Planejamento e em
+   Cadastros › Insumos) a pessoa cola o texto; o app diz o que entendeu,
+   mostra a pré-visualização com os totais de conferência ("8 fazendas ·
+   486.000 kg · 486 t") e só grava depois do toque em "Importar".
+2. **O gerente confirma a chegada com UM toque.** Enquanto houver remessa
+   programada e não recebida, o topo do boletim traz "📦 Nitrato de amônio —
+   106 t programado (Cooxupé) · chegou?" com "✅ Chegou tudo" · "➗ Chegou
+   parte" · "❌ Ainda não chegou". Nº da nota e foto vêm depois e são
+   puláveis. Nada bloqueia o boletim; respondida a chegada, o cartão some.
+3. **O saldo é calculado, nunca digitado:** recebido − aplicado. O aplicado
+   sai dos lançamentos que o gerente já faz; um toque nele abre a lista dos
+   lançamentos que o compuseram. A seção "📦 Insumos na fazenda" nasce
+   fechada no boletim das três atividades.
+4. **Chegou o insumo, o planejamento anda sozinho:** tarefa em AGUARDANDO
+   TERCEIRO cujo bloqueio cite o produto ou o fornecedor volta a A INICIAR,
+   com aviso ao gerente e registro no histórico.
+5. **O escritório vê o que falta e cobra:** cartão "📦 Insumos" no painel
+   (recolhido), com programado × recebido × aplicado × saldo por unidade,
+   filtro por produto, "🔗 A cobrar do fornecedor" (com os dias de espera, as
+   fazendas paradas e o texto pronto para copiar) e "⚠️ Divergências".
+
+### Onde mora o dado
+| coleção | o que guarda | sincronização |
+| --- | --- | --- |
+| `D.insumos` | catálogo de produtos (nome, unidade, **categoria**, **fornecedor**) | junto com os dados do aparelho |
+| `D.remessasInsumo` | a remessa programada, com as alocações por unidade | fila offline → `insumo_remessa` (sql/054) |
+| `D.recebimentos` | uma chegada confirmada (quantidade, data, nota, foto, quem conferiu) | fila offline → `insumo_recebimento` (sql/054) |
+| `D.mensagensImportadas` | o texto integral de cada colagem, com o que criou | fila offline → `mensagens_importadas` (sql/055) |
+| `D.deparaProdutos` | apelido do grupo → produto do cadastro (aprendizado) | junto com os dados do aparelho |
+| `D.deparaAta` | nome da mensagem → unidade (a MESMA tabela do planejamento, ampliada) | junto com os dados do aparelho |
+
+**Não existe `D.produtos`.** O catálogo de produtos já existia como
+`D.insumos` (Cadastros › Insumos, agora item de primeiro nível do menu, com
+as remessas por baixo); criar uma segunda lista faria o app ter dois nomes
+para a mesma coisa. A tarefa pedia `D.produtos`: a decisão de reaproveitar
+está registrada aqui e no resumo do PR.
+
+### O que NÃO vira quilos, de propósito
+A calda do café ("receita") é texto livre; saca e lata não têm equivalência
+declarada em kg; dose em litro só conta para produto cuja base é litro. O app
+não estima nada — e a seção diz de onde vem cada número. Por isso o café
+ganhou três campos OPCIONAIS (produto, dose kg/ha, área) apenas nas operações
+de adubação e correção de solo (`INS_OPS_CONSUMO`): sem eles, não havia como
+saber quanto saiu do estoque sem digitar o consumo duas vezes.
+
+### Provas
+`node scripts/teste_insumos.cjs` — **54 ✅ · 0 ❌**, sem rede, a 390 px, com a
+mensagem real do nitrato: 8 alocações casadas pelo de-para e 486.000 kg;
+formatos alternativos ("106.000kg – VEREDA", "106 t - VEREDA", "VEREDA -
+106.000 kg", decimal com vírgula); reimportação sem duplicar; chegada na
+Vereda em um toque liberando a tarefa "Fazer KCL e ferti"; parcial de 20 t na
+Mata Preta com 24 t a receber; adubação de 400 kg/ha em 10 ha virando 4.000 kg
+aplicados e saldo de 102.000 kg; cobrança da Cooxupé com as tarefas paradas;
+classificação dos quatro tipos e o texto sem relação que o app NÃO adivinha.
+`scripts/checar-poluicao.cjs`: **637 ✅ · 42 ❌** — os mesmos 42 ❌ da v85,
+nenhum novo, com 49 itens novos (grupo "15. Insumos" e 6 telas medidas).
+`scripts/regressao_render.cjs` contra `origin/main`: no boletim das três
+atividades só mudam o `datalist` de produtos (elemento invisível) e, no café,
+o bloco opcional "INSUMO APLICADO"; o painel e o pós-colheita ficam idênticos
+sem nenhuma remessa importada.
+
+### Limitação conhecida (item 11.6 da tarefa)
+**Compartilhar direto do WhatsApp não foi implementado.** O Web Share Target
+só existe em PWA no Android/Chrome; o iPhone — o aparelho do Nilo e dos
+gerentes — não o suporta. Declarar o `share_target` no manifesto deixaria no
+código um caminho que ninguém aqui consegue usar, então ficou só a colagem
+manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
+mais o tratamento do parâmetro na abertura do app.
+
 ## Aparelho sem unidade aberta no monitor de chegada (v84)
 Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
 `ADMIN-9561` (o `AMNIN` da mensagem anterior foi erro de digitação dele) —
@@ -1729,6 +1808,20 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v86, 11/09/2026: **637 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
+v86 acrescentou o grupo "15. Insumos" (13 itens ✅: a porta única com uma tela
+e um campo; o botão de avanço inativo dizendo a próxima ação; a classificação
+automática com troca de tipo por chips; totais de conferência na
+pré-visualização; nome não casado pedindo a unidade em vez de adivinhar; o
+cartão de chegada como único elemento novo sempre visível, com três respostas,
+alvo de 46 px, um toque que grava no lugar sem modal nem nativo e o
+desaparecimento depois da resposta; a seção de saldo nascendo fechada; o
+cartão "📦 Insumos" do painel recolhido e com a cobrança por fornecedor; e
+zero termo de cobrança em todas essas telas) e 6 telas novas medidas com as
+MESMAS regras de Cadastros (Colar do WhatsApp — colar, conferir a remessa,
+mensagens importadas, mensagem; Cadastros › Insumos e remessas; Cadastros ›
+Insumos › Remessas programadas), mais o boletim do gerente com chegada
+pendente. Medição anterior registrada aqui,
 v82, 11/09/2026: **586 ✅ · 46 ❌** — os mesmos 46 ❌ da v81, nenhum novo
 (a v82 acrescentou o cartão "📡 Chegada dos boletins hoje", recolhido, e a
 faixa de estado do envio, que reusa `.aviso`; o painel foi de 4 para 4,15
@@ -1971,6 +2064,29 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   avanço, badge e `input type=date` ✅ · termos de outra atividade ✅
   zero · P10 ❌ herdado (`.chip` é pílula de 24 px, `.btn.suave.mini`
   tem 40 px — o mesmo CSS-base de todas as telas).
+- Colar do WhatsApp (v86, 4 telas medidas com as regras de Cadastros):
+  colar a mensagem 1 tela ✅ · um campo só ✅ · botão de avanço inativo com
+  a próxima ação ✅ · conferir a remessa 1,4 telas ✅ · mensagens importadas
+  ✅ (busca a partir de 12) · mensagem (texto original) ✅ · níveis ≤ 3 ✅ ·
+  cabeçalho fixo com voltar ✅ · ação principal fixa no rodapé ✅ · P10 ❌
+  herdado (usa `.cartao`, `.btn` e `.chip` do CSS-base).
+- Cadastros › Insumos e remessas (v86): 1 tela ✅ · busca a partir de 12
+  produtos ✅ · estado na própria linha (categoria, unidade, fornecedor,
+  saldo do grupo) ✅ · Remessas programadas em nível 3, com o detalhe
+  abrindo NO LUGAR (sem quarto nível) ✅ · ação principal fixa no rodapé ✅.
+- Boletim do gerente › cartão "📦 chegou?" (v86, três atividades, medido
+  com remessa pendente semeada): único elemento novo sempre visível ✅ ·
+  três respostas com alvo de 46 px ✅ · um toque grava no lugar, sem modal e
+  sem nativo ✅ · some depois da resposta ✅ · nenhuma seção nasce aberta por
+  causa dele ✅ · zero termo de cobrança ✅ · P10 ❌ herdado (`.cartao` e
+  `.chip` do CSS-base).
+- Boletim do gerente › seção "📦 Insumos na fazenda" (v86): nasce fechada
+  ✅ · só leitura ✅ · recebido/aplicado/saldo com barra ✅ · toque no
+  aplicado abre os lançamentos no lugar ✅ · zero termo de cobrança ✅.
+- Diretoria › painel › cartão "📦 Insumos" (v86): nasce recolhido ✅ · uma
+  linha por unidade, sem nome de pessoa ✅ · filtro por produto em chips que
+  quebram em linhas (sem rolagem lateral) ✅ · cobrança por fornecedor com
+  botão copiar ✅ · divergências sem termo de cobrança ✅ · P10 ❌ herdado.
 - Escritório › Unidades e Plano: precisa de rede — fora da medição
   offline (conferir à mão quando for tocada).
 
@@ -1985,6 +2101,42 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Insumos (v86) — rodar três SQL no Supabase.** Na ordem:
+  `sql/054-insumos.sql` (tabelas `insumo_remessa` e `insumo_recebimento` e a
+  visão `vw_insumo_saldo`), `sql/055-mensagens-importadas.sql` (a trilha das
+  colagens) e, por último, `sql/056-insumos-relatorio.sql` (a visão
+  `vw_insumo_aplicado` e o relatório mensal
+  `insumos_programado_recebido_aplicado`; exige o `sql/020` já rodado).
+  Enquanto não rodarem, o módulo funciona INTEIRO no aparelho (é offline
+  first) — só não sincroniza entre celulares e o relatório não aparece na
+  vitrine. Como no planejamento da v77, uma remessa criada fica na fila até o
+  SQL rodar (o aviso "N registro(s) aguardando internet" aparece; nada se
+  perde).
+- **Pergunta livre (Fase 3) deve incluir `mensagens_importadas` no
+  contexto** — permite perguntas como "quando a Cooxupé prometeu o nitrato da
+  Mata Preta e quanto chegou?". A tabela já guarda o texto integral de cada
+  mensagem colada, quem colou, quando, o tipo e o que foi criado a partir
+  dela (sql/055). Nada do motor de perguntas foi construído na v86.
+- **Insumos (v86) — para o Nilo conferir/decidir:**
+  1. **Sete dias para virar cobrança.** `INS_COBRANCA_DIAS` = 7: remessa
+     programada e sem chegada registrada há mais de 7 dias entra na lista de
+     cobrança por fornecedor. Trocar é uma linha.
+  2. **20 % de diferença para o âmbar.** `INS_DIVERG_PCT` = 20: a
+     pré-visualização compara kg/ha programado com a dose do plano do
+     agrônomo (quando há plano vigente baixado) e sinaliza acima disso.
+     Informativo, nunca bloqueante — e só nas telas do escritório.
+  3. **Área da unidade manda no kg/ha.** O cálculo usa `areaUnidade` (soma
+     dos talhões cadastrados, sem estrutura e sem arrendado). Unidade com
+     talhão faltando no cadastro mostra kg/ha alto — vale conferir o cadastro
+     antes de estranhar o número.
+  4. **Três campos novos no boletim do café.** Produto, dose (kg/ha) e área
+     aparecem SÓ nas operações de adubação e correção de solo e são
+     opcionais. Sem eles, não há como abater do saldo sem digitar o consumo
+     duas vezes. Se o pessoal não preencher, o saldo mostra o recebido e diz
+     que não houve lançamento com dose — nunca inventa.
+  5. **Saca e lata não viram kg.** Se o grupo passar a anunciar entrega em
+     sacas, é preciso declarar a equivalência (kg por saca) no catálogo — o
+     app não a adivinha.
 - **Investigação da cadeia de estados (10/09/2026) —
   `docs/investigacao-cadeia-estados.md`.** Apuração de leitura (nada foi
   alterado no banco) sobre o que a Onda 2 precisa para a cadeia Recomendado →

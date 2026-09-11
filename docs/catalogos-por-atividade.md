@@ -751,6 +751,79 @@ que apareceu no dia e não estava na ata — assunto para a próxima reunião.
 **Sem lançamento** = nenhum registro do boletim casou com a tarefa; é
 ausência de REGISTRO, nunca afirmação de que não foi feito.
 
+## Insumos — produto, consumo e mensagem colada (v86)
+
+Fonte oficial do vocabulário do módulo de insumos. O que muda por
+atividade é este catálogo; a tela é a mesma nas três (CLAUDE.md, c4).
+
+### Categorias de produto (`INS_CATEGORIAS`)
+
+| chave | rótulo | exemplos |
+| --- | --- | --- |
+| `fertilizante` | Fertilizante | Nitrato de amônio, Ureia, KCl, MAP, Sulfato de amônio |
+| `corretivo` | Corretivo | Calcário, Magnesita, Gesso agrícola |
+| `defensivo` | Defensivo | Phusion, Omite |
+| `outro` | Outro | o que não couber acima |
+
+A categoria é atributo do cadastro do produto (Cadastros › Insumos), como
+a letra do badge de operação (v67) — nunca derivada de pedaço de nome.
+
+### De-para de produtos (`DEPARA_PRODUTOS_PADRAO` / `D.deparaProdutos`)
+
+Apelido que o grupo usa → produto do cadastro, por igualdade EXATA da
+chave normalizada. `plano` é a chave do mesmo insumo no plano do agrônomo
+(`PLANO_INSUMOS`), usada só na conferência agronômica do escritório.
+
+| termo na mensagem | produto | categoria | plano |
+| --- | --- | --- | --- |
+| Nitrato · Nitrato de amônio | Nitrato de amônio | fertilizante | `nitrato` |
+| Ureia | Ureia | fertilizante | `ureia` |
+| Sulfato de amônio | Sulfato de amônio | fertilizante | `sulfato_amonio` |
+| KCl · Cloreto de potássio | KCl | fertilizante | `kcl` |
+| MAP | MAP | fertilizante | — |
+| Calcário | Calcário | corretivo | — |
+| Magnesita | Magnesita | corretivo | — |
+| Gesso · Gesso agrícola | Gesso agrícola | corretivo | — |
+| Phusion | Phusion | defensivo | `phusion` |
+| Omite | Omite | defensivo | — |
+
+Apelido novo confirmado na pré-visualização entra em `D.deparaProdutos` e
+a próxima colagem não pergunta (aprendizado de formato).
+
+### De onde sai o CONSUMO, por atividade (`INS_ATIVIDADE`)
+
+| atividade | fonte no boletim | como vira quilos |
+| --- | --- | --- |
+| CAFÉ | atividade por talhão, campos opcionais `insProduto` + `insDoseKgHa` + `insAreaHa` (só nas operações de `INS_OPS_CONSUMO`) | dose × área (área do talhão quando o campo fica em branco) |
+| GRÃOS | adubação de cobertura, adubo de plantio, calagem, gessagem e os produtos da receita de aplicação | dose × área; t/ha × 1.000 |
+| PECUÁRIA | evento com produto + dose por cabeça, e a reposição de cocho em kg | dose × cabeças; cocho em kg direto |
+
+`INS_OPS_CONSUMO.CAFE` = Adubação manual · Adubação via lanço · Adubação
+orgânica · Adubação via fertirrigação · Aplicação via drench / via solo ·
+Calagem / gessagem. Fora dessas operações o café não mostra os campos.
+
+**O que NÃO vira quilos, de propósito:** a calda do café ("receita") é
+texto livre; saca e lata não têm equivalência declarada em kg; dose em
+litro só conta para produto cuja base é litro. Nada é estimado.
+
+### Seção do boletim
+
+"📦 Insumos na fazenda" é seção de LEITURA: nasce fechada, não tem "＋" e
+não recebe os chips de resposta de ausência da v69 (não há nada a
+registrar ali — o que ela mostra é o resultado do que já foi lançado).
+
+### Tipos de mensagem da porta única (`INS_TIPOS_MSG`)
+
+| chave | rótulo | o que o app procura |
+| --- | --- | --- |
+| `remessa` | 📦 Remessa de insumo | 2+ linhas de "quantidade + unidade - FAZENDA" |
+| `ata` | 📋 Ata de reunião | 2+ blocos "N.N – Fazenda" e 3+ linhas iniciadas por "-" |
+| `chuva` | 🌧️ Relato de chuva | 2+ linhas com milímetros |
+| `tarefas` | 🗒️ Tarefas avulsas | 2+ linhas soltas com pista de pendência (`INS_PISTAS_TAREFA`) |
+
+Sem nenhum desses padrões o app NÃO escolhe: mostra os quatro chips para a
+pessoa dizer o tipo, ou descartar.
+
 ## Termos exclusivos por atividade (checagem de poluição)
 
 Lista oficial que `scripts/checar-poluicao.cjs` lê para procurar
