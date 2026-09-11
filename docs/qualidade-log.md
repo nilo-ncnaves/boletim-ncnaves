@@ -6,6 +6,81 @@ cima. Formato: data · versão · entrega · o que foi verificado (como) ·
 o que depende de teste manual · o que NÃO foi tocado. Criado na v59;
 entregas anteriores estão descritas no ESTADO.md e no histórico do git.
 
+## 11/09/2026 · v86 · Módulo de insumos: da mensagem do grupo ao saldo da fazenda
+
+**Entrega.** A entrega de fertilizante é anunciada numa mensagem do WhatsApp e
+depois ninguém sabe o que chegou, quanto foi aplicado e quanto sobrou — e
+tarefa do planejamento fica parada "aguardando insumo". A v86 fecha a volta:
+a mensagem vira remessa pela porta única "📥 Colar do WhatsApp", o gerente
+confirma a chegada com UM toque no topo do boletim, o consumo sai dos
+lançamentos que ele já faz e o saldo é sempre calculado. Regra permanente em
+CLAUDE.md, item c18; catálogo em docs/catalogos-por-atividade.md ("Insumos");
+checagem em docs/definicao-de-pronto.md, item 21.
+
+**As cinco peças.**
+- *Porta única.* Uma tela, um campo. `insClassificar` identifica ata · remessa
+  · tarefas avulsas · relato de chuva pelo conteúdo, diz o que entendeu em
+  linguagem simples e deixa trocar o tipo por chips. **Sem padrão reconhecido
+  o app pergunta em vez de adivinhar.** A ata continua usando a
+  pré-visualização do módulo de Planejamento — nunca uma segunda.
+- *Chegada em um toque.* `cartaoRecebimento` fica no topo do boletim só
+  enquanto houver chegada pendente, com "Chegou tudo" · "Chegou parte" ·
+  "Ainda não chegou". Nº da nota e foto vêm depois e são puláveis; nada
+  bloqueia o envio.
+- *Saldo calculado.* `insSaldos` = recebido − aplicado; o aplicado sai do
+  lançamento pelo catálogo `INS_ATIVIDADE` (por chave de atividade). Um toque
+  no aplicado abre os lançamentos que o compuseram.
+- *Desbloqueio automático.* Confirmada a chegada, a tarefa em AGUARDANDO
+  TERCEIRO que citava o produto ou o fornecedor volta a A INICIAR, com aviso
+  ao gerente e registro no histórico.
+- *Cobrança e divergência no escritório.* Cartão "📦 Insumos" no painel
+  (recolhido), com programado × recebido × aplicado × saldo por unidade,
+  "🔗 A cobrar do fornecedor" (dias de espera, fazendas paradas, texto pronto)
+  e "⚠️ Divergências". O campo nunca é cobrado.
+
+**O que foi verificado (como).**
+- `node scripts/teste_insumos.cjs` — **54 ✅ · 0 ❌**, sem rede, 390 px, com a
+  mensagem REAL do nitrato: produto e fornecedor lidos, 8 alocações casadas
+  pelo de-para, 486.000 kg de total; os quatro formatos de linha exigidos na
+  tarefa ("106.000kg – VEREDA", "106 t - VEREDA", "VEREDA - 106.000 kg" e
+  decimal com vírgula); reimportação sem duplicar remessa nem trilha; chegada
+  na Vereda em um toque (106 t) liberando "Fazer KCL e ferti"; parcial de 20 t
+  na Mata Preta com 24 t a receber; adubação de 400 kg/ha em 10 ha virando
+  4.000 kg e saldo de 102.000 kg; cobrança da Cooxupé com as tarefas paradas;
+  classificação dos quatro tipos e o texto sem relação que o app não adivinha;
+  busca em Mensagens importadas.
+- `node scripts/checar-poluicao.cjs` — **637 ✅ · 42 ❌**, os MESMOS 42 ❌ da
+  v85 (todos herdados do CSS-base, listados no ESTADO.md). 49 itens novos: o
+  grupo "15. Insumos" (13) e 6 telas novas medidas com as regras de Cadastros.
+  Dois defeitos foram encontrados e corrigidos pela própria checagem antes do
+  PR: a pré-visualização rolava de lado (498 px) porque o `<select>` de
+  unidade dentro do `.cad-item` não encolhia — passou a ter linha própria com
+  largura travada; e o rodapé com dois botões estourava a largura por causa de
+  um `flex:0 0 auto` que o padrão da casa não usa.
+- `node scripts/regressao_render.cjs` contra `origin/main` — no boletim das
+  três atividades só mudam o `datalist` de produtos (elemento invisível) e, no
+  café, o bloco opcional "INSUMO APLICADO" das operações de adubação; o
+  pós-colheita fica idêntico; o painel da Diretoria não muda enquanto não
+  houver remessa importada (o cartão só existe com dado). Os erros de página
+  contados são todos `net::ERR_FAILED` — pedidos de rede bloqueados no teste.
+- Sintaxe: `node --check` do JavaScript extraído do index.html.
+
+**O que depende de teste manual (iPhone do Nilo).**
+- Rodar `sql/054`, `sql/055` e `sql/056` no SQL Editor (nessa ordem) e
+  conferir que uma remessa importada no escritório aparece no celular do
+  gerente e que a chegada confirmada por ele aparece no painel.
+- Foto da nota pela câmera (o teste cobre o fluxo, não a câmera).
+- Colar no iPhone uma mensagem real do grupo com emoji e quebra de linha do
+  WhatsApp, para confirmar a leitura das linhas de alocação.
+
+**O que NÃO foi tocado.**
+- Nenhuma tela do pós-colheita; nenhuma regra de envio do boletim; nenhum
+  texto do plano de safra; nenhuma tabela existente do Supabase.
+- Nada do motor de perguntas (fase 3) — só ficou registrada a pendência de
+  incluir `mensagens_importadas` no contexto dele.
+- Web Share Target (compartilhar direto do WhatsApp): não implementado de
+  propósito — o iPhone não o suporta; limitação registrada no ESTADO.md.
+
 ## 10/09/2026 · v78 · Reforço do planejado × executado: três números, rastreabilidade e o que ficou fora do plano
 
 **Entrega.** O módulo de planejamento da v77 dizia o que estava combinado e em

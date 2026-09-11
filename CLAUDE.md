@@ -85,6 +85,14 @@ sincronizou" — id aleatório do aparelho, unidade aberta, versão do app e
 tamanho da fila; alimenta o cartão "📡 Chegada dos boletins hoje" da
 Diretoria). O app escreve DIRETO, fora da fila offline, e lê só com
 painel. Não guarda nome, telefone nem localização.
+Desde a v86: insumo_remessa, insumo_recebimento e a visão vw_insumo_saldo
+(sql/054; o app lê E escreve, na mesma fila offline dos boletins),
+mensagens_importadas (sql/055; texto integral da mensagem colada na porta
+única, com quem colou e o que criou — contexto da pergunta livre da fase 3)
+e, no motor de relatórios, a visão vw_insumo_aplicado mais o relatório
+mensal insumos_programado_recebido_aplicado (sql/056; o app só lê, como os
+outros). O catálogo de produtos continua sendo D.insumos no aparelho — não
+existe tabela "produtos" no banco nem coleção D.produtos no app.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -181,7 +189,7 @@ ocorrência, pivô, função de mão de obra, movimento de rebanho,
 sanidade, cocho, contagem, manejo) segue a mesma sequência:
 1. ONDE — chips de talhão / pivô / lote / pasto;
 2. O QUÊ — chips de fase / tipo / grupo, OU a lista nativa do celular
-   quando o catálogo é longo (v86, item c14);
+   quando o catálogo é longo (v87, item c14);
 3. DETALHES — só os campos pertinentes ao que foi escolhido.
 Nada visível antes do toque anterior: ao tocar em "＋" aparece só o
 ONDE; escolhido o ONDE, só o O QUÊ; escolhido o O QUÊ, só os campos
@@ -190,7 +198,7 @@ compacta do que já foi lançado e o botão "＋". Depois de adicionar, o
 registro vira linha compacta e a seção volta ao estado compacto.
 Chip é a forma padrão de escolha quando as opções são poucas e cabem na
 tela. Onde o catálogo é longo (as atividades do café, as operações dos
-grãos), a escolha é a LISTA NATIVA do celular — decisão do Nilo na v86,
+grãos), a escolha é a LISTA NATIVA do celular — decisão do Nilo na v87,
 a pedido dos gerentes: rolar dezenas de chips fazia perder o lugar no
 boletim, e a lista nativa rola dentro da própria janelinha. O que nunca
 muda: um passo de cada vez, nada visível antes do toque anterior.
@@ -700,7 +708,7 @@ cruza os dois níveis sozinho — nada de status digitado.
   detalhe em docs/definicao-de-pronto.md, item 16. Consolidado mensal
   opcional no Supabase: sql/048 (o app lê pela vitrine de relatórios).
 
-### c14) Catálogo longo de lançamento: a lista nativa do celular (desde a v86; era agrupado e recolhido desde a v76)
+### c14) Catálogo longo de lançamento: a lista nativa do celular (desde a v87; era agrupado e recolhido desde a v76)
 Quando o catálogo de uma seção de lançamento é longo (as atividades do
 café, as operações dos grãos), o passo O QUÊ é a LISTA NATIVA do celular,
 agrupada por natureza, pelo componente ÚNICO `seletorOperacao(a, {rotulo,
@@ -708,7 +716,7 @@ grupos, destaque, nota})` do index.html. Nunca uma variante por atividade:
 o que muda é o CATÁLOGO que quem chama passa (grãos agrupa por fase do
 ciclo, café por natureza do serviço) e o rótulo do passo ("Operação" ·
 "Atividade").
-- **Por que mudou (v86).** Da v76 à v85 o passo O QUÊ eram grupos
+- **Por que mudou (v87).** Da v76 à v86 o passo O QUÊ eram grupos
   recolhidos com chips dentro. Os gerentes reclamaram no primeiro mês de
   uso: abrir um grupo empurrava o boletim para baixo e a pessoa perdia o
   lugar; achar a atividade dava vários toques e muita rolagem. Eles
@@ -925,6 +933,70 @@ só "Código inválido.", sem dizer o que fazer.
 - Continua sendo interface, não segurança (c9): a autorização real é das
   políticas RLS do Supabase. Detalhe em docs/definicao-de-pronto.md,
   item 20.
+
+### c18) Insumo: uma colagem, um toque, saldo calculado (desde a v86)
+O módulo de insumos (programação de entrega, recebimento, saldo e consumo)
+existe porque a entrega de fertilizante é anunciada numa mensagem do
+WhatsApp e depois ninguém sabe o que chegou, quanto foi aplicado e quanto
+sobrou — e tarefa do planejamento fica parada "aguardando insumo".
+- **O gerente confirma a chegada com UM toque e nunca digita saldo.** O
+  cartão `cartaoRecebimento(fz)` fica no topo do boletim SÓ enquanto houver
+  chegada pendente na unidade, com três respostas ("✅ Chegou tudo" · "➗
+  Chegou parte" · "❌ Ainda não chegou"). "Ainda não chegou" vale para o dia
+  e o cartão volta amanhã. Nº da nota e foto são pedidos DEPOIS de a chegada
+  já estar gravada, e são puláveis. Nada bloqueia o envio do boletim.
+- **Saldo é sempre CALCULADO** (`insSaldos`): recebido − aplicado. O
+  aplicado sai dos lançamentos que o gerente já faz (`INS_ATIVIDADE`, por
+  chave de atividade — grãos e pecuária já tinham produto e dose no próprio
+  lançamento; o café ganhou três campos OPCIONAIS nas operações de adubação
+  e correção, listadas em `INS_OPS_CONSUMO`). Um toque no "aplicado" abre os
+  lançamentos que o compuseram. **Nada é digitado duas vezes e nada é
+  estimado:** dose em unidade que não converte (saca, lata, calda de texto
+  livre) simplesmente não entra na conta.
+- **"Dá para quantos hectares" vem da última dose que o PRÓPRIO gerente
+  usou** na unidade, nunca do plano do agrônomo — o app não receita (regra 1
+  do plano de safra). kg/ha do plano só aparece na pré-visualização da
+  remessa e no painel, telas do escritório e da Diretoria (regra 2).
+- **Divergência é assunto do escritório, nunca do campo.** Recebido ≠
+  programado, saldo negativo e consumo sem recebimento aparecem no cartão
+  "📦 Insumos" do painel (nasce recolhido, P5), junto de "🔗 A cobrar do
+  fornecedor" (programado sem chegada registrada há mais de
+  `INS_COBRANCA_DIAS` = 7 dias, com as tarefas paradas por causa disso e
+  botão copiar). Entrega parcial recém-anunciada é entrega em andamento, não
+  divergência. Proibidos "não fez", "pendente", "atrasado", "faltou".
+- **Chegou o insumo, o planejamento anda sozinho:** toda tarefa da unidade
+  em AGUARDANDO TERCEIRO cujo bloqueio cite aquele produto ou fornecedor
+  volta a A INICIAR, com aviso ao gerente ("🔓 … chegou — a tarefa … foi
+  liberada") e registro no histórico (v77, c15).
+- **Porta única "📥 Colar do WhatsApp"** (primeiro nível na Diretoria/Admin,
+  atalho no topo de Planejamento e em Cadastros › Insumos): uma tela, um
+  campo. O app CLASSIFICA a mensagem pelo conteúdo (ata · remessa · tarefas
+  avulsas · relato de chuva), diz o que entendeu em linguagem simples, deixa
+  trocar o tipo por chips e, quando não reconhece, **pergunta em vez de
+  adivinhar**. Todos os tipos passam pela mesma pré-visualização editável,
+  com totais de conferência ("8 fazendas · 486.000 kg · 486 t") e
+  idempotência. A ata usa a pré-visualização que já existia no módulo de
+  Planejamento — nunca uma segunda.
+- **Identidade por id, nunca por pedaço de nome:** a unidade vem do de-para
+  da ata (`DEPARA_ATA_PADRAO` / `D.deparaAta`, a MESMA tabela do
+  planejamento, ampliada) e o produto do de-para de produtos
+  (`DEPARA_PRODUTOS_PADRAO` / `D.deparaProdutos`). Nome que não casa entra na
+  pré-visualização para a pessoa escolher; a escolha confirmada vira de-para
+  e a próxima colagem não pergunta (aprendizado de formato).
+- **Relato de chuva é SUGESTÃO, sempre.** O app nunca grava chuva no boletim
+  de ninguém: o número aparece no boletim da unidade com um "usar", pelo
+  mesmo mecanismo da linha da estação iCrop. Quem registra é o gerente.
+- **Trilha de origem:** toda mensagem colada fica inteira em
+  `D.mensagensImportadas` (espelho em `mensagens_importadas`, sql/055), com
+  quem colou, quando, o tipo e o que criou; a tela "Mensagens importadas" tem
+  busca por texto.
+- **Catálogo de produtos é o que já existia:** `D.insumos` (Cadastros ›
+  Insumos, agora item de primeiro nível), com categoria e fornecedor. NÃO foi
+  criada uma coleção `D.produtos` em paralelo — duas listas de produto no
+  mesmo app divergem no primeiro mês.
+- Conferência: `node scripts/teste_insumos.cjs` (a validação da tarefa, com a
+  mensagem real do nitrato) e `scripts/checar-poluicao.cjs`, grupo "15.
+  Insumos"; detalhe em docs/definicao-de-pronto.md, item 21.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

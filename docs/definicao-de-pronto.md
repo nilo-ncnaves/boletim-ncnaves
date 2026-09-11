@@ -710,7 +710,77 @@ Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo),
 pós-colheita idênticos; só o `00-inicio` do ADMIN muda) e o teste em
 navegador dos códigos de cada escopo.
 
-## 21. Catálogo longo de lançamento: a lista nativa do celular (desde a v86)
+## 21. Insumo: uma colagem, um toque, saldo calculado (desde a v86)
+
+Origem: a entrega de fertilizante é anunciada numa mensagem do grupo
+("Relação de NITRATO que a Cooxupé vai entregar nas fazendas: 106.000 kg -
+VEREDA…") e depois ninguém sabe o que chegou, quanto foi aplicado e quanto
+sobrou. Várias tarefas do planejamento ficam paradas "aguardando insumo"
+sem que o escritório saiba que o insumo já chegou.
+
+Regras que ficam:
+
+1. **O gerente confirma a chegada com UM toque.** `cartaoRecebimento(fz)`
+   fica no topo do boletim — e SÓ enquanto houver chegada pendente na
+   unidade — com três respostas: "✅ Chegou tudo", "➗ Chegou parte" (abre
+   só o campo da quantidade) e "❌ Ainda não chegou" (vale para o dia; o
+   cartão volta amanhã). Nº da nota e foto vêm DEPOIS de a chegada já estar
+   gravada e são puláveis. Nada bloqueia o envio do boletim. Entrega
+   parcial é outra linha de recebimento: o que falta continua aparecendo.
+2. **Saldo é sempre calculado, jamais digitado:** recebido − aplicado
+   (`insSaldos`). O aplicado sai do lançamento que o gerente já faz, pelo
+   catálogo `INS_ATIVIDADE` (por chave de atividade, nunca
+   `if(atividade==="…")`): grãos e pecuária já traziam produto e dose no
+   próprio lançamento; o café ganhou três campos OPCIONAIS (produto, dose
+   kg/ha, área) apenas nas operações de adubação e correção de solo
+   listadas em `INS_OPS_CONSUMO`. Em branco, o lançamento vale como antes.
+3. **O app não estima nada.** Dose em unidade que não converte para a base
+   do produto (saca, lata, a calda de texto livre do café) simplesmente não
+   entra na conta — e a tela diz de onde vem o número. Um toque no
+   "aplicado" abre os lançamentos que o compuseram (data, local, dose ×
+   área, quem lançou), como o "executado" do planejamento (item 18).
+4. **"Dá para quantos hectares" vem da última dose que o próprio gerente
+   usou na unidade** — nunca do plano do agrônomo. Nenhum texto do app pode
+   ser lido como prescrição (plano de safra, regra 1); kg/ha do plano só
+   aparece na pré-visualização da remessa e no painel, telas do escritório
+   e da Diretoria (regra 2), rotulado "plano v_N".
+5. **Divergência é assunto do escritório, nunca do campo.** Recebido ≠
+   programado, saldo negativo e consumo sem recebimento ficam no cartão
+   "📦 Insumos" do painel (nasce recolhido, P5), junto de "🔗 A cobrar do
+   fornecedor" — programado sem chegada registrada há mais de
+   `INS_COBRANCA_DIAS` (7) dias, com as tarefas paradas por causa disso e
+   botão copiar. Entrega parcial recém-anunciada é entrega em andamento,
+   não divergência (senão a mesma carga seria relatada duas vezes).
+   Proibidos "não fez", "pendente", "atrasado", "faltou", "esqueceu".
+6. **Chegou o insumo, o planejamento anda sozinho:** tarefa da unidade em
+   AGUARDANDO TERCEIRO cujo bloqueio cite aquele produto ou fornecedor
+   volta a A INICIAR, com aviso ao gerente e registro no histórico.
+7. **Porta única "📥 Colar do WhatsApp":** uma tela, um campo. O app
+   classifica pelo conteúdo (ata · remessa · tarefas avulsas · relato de
+   chuva), diz o que entendeu em linguagem simples, deixa trocar o tipo por
+   chips e, quando não reconhece, **pergunta em vez de adivinhar**. Todos os
+   tipos passam pela mesma pré-visualização editável, com totais de
+   conferência e idempotência; a ata usa a pré-visualização que já existia
+   no módulo de Planejamento, nunca uma segunda.
+8. **Identidade por id, nunca por pedaço de nome:** unidade pelo de-para da
+   ata (a MESMA tabela do planejamento, ampliada) e produto pelo de-para de
+   produtos. Nome que não casa entra na pré-visualização para a pessoa
+   escolher; a escolha confirmada vira de-para e a próxima colagem não
+   pergunta.
+9. **Relato de chuva é sugestão, sempre.** O app nunca grava chuva no
+   boletim de ninguém: o número aparece no boletim da unidade com um
+   "usar", pelo mesmo mecanismo da linha da estação iCrop.
+10. **Trilha de origem:** toda mensagem colada fica inteira em
+    `D.mensagensImportadas`, com quem colou, quando, o tipo e o que criou.
+    A tela "Mensagens importadas" tem busca por texto.
+
+Conferência: `node scripts/teste_insumos.cjs` (54 provas, com a mensagem
+real do nitrato), `scripts/checar-poluicao.cjs` grupo "15. Insumos"
+(nenhum ❌ novo) e `scripts/regressao_render.cjs` contra `origin/main` —
+no boletim das três atividades só podem mudar o datalist de produtos e, no
+café, o bloco opcional "INSUMO APLICADO" das operações de adubação.
+
+## 22. Catálogo longo de lançamento: a lista nativa do celular (desde a v87)
 
 Origem: 11/09/2026, primeiro mês de preenchimento. Os gerentes reclamaram
 da seção **Atividades por talhão** do café e pediram, com estas palavras, o
