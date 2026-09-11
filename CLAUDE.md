@@ -872,6 +872,31 @@ no APARELHO, e o erro de rede do envio era engolido em silêncio.
   enviar e o painel da Diretoria podem mudar; detalhe em
   docs/definicao-de-pronto.md, item 19.
 
+### c17) Porta de entrada: código errado nunca é beco sem saída (desde a v83)
+Lição de 11/09/2026: os ~15 gerentes estavam todos com um código de
+administrador — que não abre a fazenda de ninguém (pergunta a atividade e
+depois qual das 24 unidades) — e um código com uma letra trocada devolvia
+só "Código inválido.", sem dizer o que fazer.
+- **Código recusado diz o próximo passo, nunca só o veredito:** conferir
+  letras e números e, se não entrar, pedir ao escritório o código **da
+  própria fazenda**, que abre direto o boletim dela. Proibido "acesso
+  negado", "não autorizado", "sem permissão" (mesmo tom de c9) e proibido
+  revelar qualquer código.
+- **Escopo amplo demais avisa na porta** (`avisoEscopoAmplo()`): só o
+  escopo que abre TODAS as unidades **e** preenche boletim (Administrador).
+  Quem só lê (Diretoria) e quem cuida de uma atividade inteira não recebem
+  o aviso — seria ruído. O texto nomeia o escopo de quem já está dentro,
+  nunca um código.
+- **Igualdade exata continua valendo:** `escopoDoCodigo` normaliza
+  (maiúsculas, sem espaço, traço opcional) e compara igual. Tolerar "quase
+  certo" transformaria a fechadura em sugestão.
+- **O escritório enxerga o código de cada aparelho** no monitor de chegada
+  (c16), junto da última sincronização — é o que torna "o gerente está no
+  código errado" uma observação, e não uma suspeita.
+- Continua sendo interface, não segurança (c9): a autorização real é das
+  políticas RLS do Supabase. Detalhe em docs/definicao-de-pronto.md,
+  item 20.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

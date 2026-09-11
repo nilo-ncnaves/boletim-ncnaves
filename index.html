@@ -3467,12 +3467,29 @@ function vCodigo(){
       <label for="cod-acesso">Código</label>
       <input id="cod-acesso" placeholder="XX-0000" autocomplete="off" autocapitalize="characters" spellcheck="false"
         class="num" style="text-transform:uppercase;letter-spacing:.12em;text-align:center;font-weight:700">
-      <p id="cod-erro" class="mut" style="color:var(--cereja);font-weight:600;display:none;margin-top:8px">Código inválido.</p>
+      <p id="cod-erro" class="mut" style="display:none;margin-top:8px"><b style="color:var(--cereja)">Este código não foi reconhecido.</b><br>
+        Confira as letras e os 4 números e tente de novo. Se não entrar, peça ao escritório o código <b>da sua fazenda</b> —
+        cada unidade tem o seu, e ele abre direto o boletim dela.</p>
       <button class="btn mt" id="bt-cod-entrar">Entrar</button>
       <p class="mut mt" style="font-size:.78rem">Não tem código? Peça ao escritório.</p>
     </div>
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO}</p>
   </div>`;
+}
+/* v83: aparelho com código que abre TODAS as fazendas (Administrador ou Diretoria) diz isso na porta
+   de entrada. Nasceu de 11/09/2026: os ~15 gerentes estavam todos com o código de Administrador, então
+   ninguém caía na própria fazenda — a tela pedia "qual é a sua atividade?" e depois "qual fazenda?",
+   com as 24 unidades do grupo. Com o código da unidade, o app abre direto o boletim dela.
+   Não revela código nenhum (regra c9): só nomeia o escopo de quem já está dentro. */
+function avisoEscopoAmplo(){
+  /* só o escopo de Administrador: é o que abre todas as unidades E preenche boletim. A Diretoria
+     abre tudo mas só lê (e nem passa por esta tela), e um código por atividade pertence a quem
+     de fato cuida da atividade inteira. */
+  const e=escopoAtual(); if(!e || !e.tudo || e.soLe) return "";
+  return `<div class="aviso" style="border-color:var(--amarelo)">
+    <b>Este aparelho está com o código ${esc(rotuloDaChave(e.chave))}</b>
+    <p class="mut" style="margin:4px 0 0;font-size:.8rem">Ele abre todas as fazendas do grupo, por isso a tela pergunta a atividade e depois a unidade.
+    Se você é gerente de uma fazenda, peça ao escritório o código da sua unidade: ele abre direto o boletim dela, com o nome da fazenda no topo.</p></div>`;
 }
 /* ---------- Tela: entrada ---------- */
 function vEntrada(){
@@ -3487,6 +3504,7 @@ function vEntrada(){
       <p class="mut">Grupo LGS · informativo diário de campo</p></div>
     ${avisoMem}
     ${planPastilhasHtml()}
+    ${avisoEscopoAmplo()}
     <p class="mut mb centro">Qual é a sua atividade?</p>
     ${temAtv("CAFE")?`<button class="perfil-btn" data-atividade="CAFE" style="border-left:4px solid var(--cereja)"><span class="ava">☕</span>
       <span><b>Café</b><span class="mut">Boletim das lavouras de café</span></span></button>`:""}
@@ -6045,7 +6063,7 @@ function cartaoChegadaBoletins(){
     .map(l=>{
       const h=l.b?horaChegada(l.b):"";
       const dir=l.b?`recebido${h?" "+esc(h):""}`:"nada recebido";
-      const ap=l.ap?`aparelho sincronizou ${esc(haQuanto(l.ap.visto_em))}${l.ap.versao?" · "+esc(l.ap.versao):""}${n0(l.ap.na_fila)?" · "+n0(l.ap.na_fila)+" na fila":""}`
+      const ap=l.ap?`aparelho sincronizou ${esc(haQuanto(l.ap.visto_em))}${l.ap.versao?" · "+esc(l.ap.versao):""}${l.ap.chave?" · código "+esc(rotuloDaChave(l.ap.chave)):""}${n0(l.ap.na_fila)?" · "+n0(l.ap.na_fila)+" na fila":""}`
         : (semAparelho?"":"nenhum aparelho sincronizou nesta unidade");
       return `<div style="padding:5px 0;border-top:1px solid var(--linha)">
         <div class="linha-flex" style="gap:8px">
@@ -6596,7 +6614,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v82";
+const APP_VERSAO="v83";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
