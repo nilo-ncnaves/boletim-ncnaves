@@ -3476,21 +3476,11 @@ function vCodigo(){
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO}</p>
   </div>`;
 }
-/* v83: aparelho com código que abre TODAS as fazendas (Administrador ou Diretoria) diz isso na porta
-   de entrada. Nasceu de 11/09/2026: os ~15 gerentes estavam todos com o código de Administrador, então
-   ninguém caía na própria fazenda — a tela pedia "qual é a sua atividade?" e depois "qual fazenda?",
-   com as 24 unidades do grupo. Com o código da unidade, o app abre direto o boletim dela.
-   Não revela código nenhum (regra c9): só nomeia o escopo de quem já está dentro. */
-function avisoEscopoAmplo(){
-  /* só o escopo de Administrador: é o que abre todas as unidades E preenche boletim. A Diretoria
-     abre tudo mas só lê (e nem passa por esta tela), e um código por atividade pertence a quem
-     de fato cuida da atividade inteira. */
-  const e=escopoAtual(); if(!e || !e.tudo || e.soLe) return "";
-  return `<div class="aviso" style="border-color:var(--amarelo)">
-    <b>Este aparelho está com o código ${esc(rotuloDaChave(e.chave))}</b>
-    <p class="mut" style="margin:4px 0 0;font-size:.8rem">Ele abre todas as fazendas do grupo, por isso a tela pergunta a atividade e depois a unidade.
-    Se você é gerente de uma fazenda, peça ao escritório o código da sua unidade: ele abre direto o boletim dela, com o nome da fazenda no topo.</p></div>`;
-}
+/* v85: a porta de entrada do administrador não avisa mais sobre o escopo do código (decisão do
+   Nilo, 11/09/2026). Quem via o aviso todo dia era justamente ele, que já sabe: o gerente com o
+   código da própria unidade nunca passa por esta tela. Quem continua respondendo "este aparelho
+   está no código errado" é o monitor de chegada da Diretoria, que mostra o código de cada aparelho
+   (c16) — lá a informação serve a quem age, sem cobrar nada de quem abre o app. */
 /* ---------- Tela: entrada ---------- */
 function vEntrada(){
   const avisoMem = Persist.usaMem ? `<div class="aviso">Este dispositivo não liberou o armazenamento permanente. Os dados valem só para esta sessão.</div>` : "";
@@ -3504,7 +3494,6 @@ function vEntrada(){
       <p class="mut">Grupo LGS · informativo diário de campo</p></div>
     ${avisoMem}
     ${planPastilhasHtml()}
-    ${avisoEscopoAmplo()}
     <p class="mut mb centro">Qual é a sua atividade?</p>
     ${temAtv("CAFE")?`<button class="perfil-btn" data-atividade="CAFE" style="border-left:4px solid var(--cereja)"><span class="ava">☕</span>
       <span><b>Café</b><span class="mut">Boletim das lavouras de café</span></span></button>`:""}
@@ -6625,7 +6614,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v84";
+const APP_VERSAO="v85";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

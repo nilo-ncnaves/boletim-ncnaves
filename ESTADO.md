@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v84** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v85** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1584,16 +1584,21 @@ só faz o app dizer o que está acontecendo):
    as letras e os 4 números e tente de novo. Se não entrar, peça ao
    escritório o código da sua fazenda — cada unidade tem o seu, e ele abre
    direto o boletim dela."* Sem revelar código nenhum.
-2. **`avisoEscopoAmplo()` na porta de entrada**, só para o escopo de
-   **Administrador** (abre todas as unidades E preenche boletim): *"Este
-   aparelho está com o código Administrador — ele abre todas as fazendas do
-   grupo, por isso a tela pergunta a atividade e depois a unidade. Se você
-   é gerente de uma fazenda, peça ao escritório o código da sua unidade."*
-   A Diretoria abre tudo mas só lê (e nem passa por esta tela), e um código
-   por atividade pertence a quem cuida da atividade inteira — nenhum dos
-   dois recebe o aviso. Não revela código (regra c9): nomeia o escopo de
-   quem já está dentro.
-3. **O monitor de chegada (v82) passou a mostrar o código do aparelho:**
+2. ~~`avisoEscopoAmplo()` na porta de entrada~~ — **retirado na v85**, por
+   decisão do Nilo. O aviso dizia ao aparelho no código de Administrador
+   que ele abre todas as fazendas e que o gerente devia pedir o código da
+   unidade dele. Só que quem via o texto todos os dias era justamente o
+   administrador, que já sabe: o gerente com o código da própria unidade
+   nunca passa por aquela tela, e o gerente no código de Administrador não
+   é quem resolve o problema — quem resolve é o escritório. Com o aviso
+   fora, a porta de entrada voltou a ter 1.301 px (eram 1.471 px). Fica a
+   regra: **aviso só na tela de quem pode agir sobre ele**; aviso permanente
+   na porta de quem já conhece a situação é ruído, e ruído diário treina a
+   pessoa a não ler. A informação continua existindo onde serve — no item 3
+   abaixo.
+3. **O monitor de chegada (v82) mostra o código do aparelho** — é hoje o
+   único lugar que relata "este aparelho está no código errado", e está na
+   tela de quem age:
    "aparelho sincronizou há 12 min · v83 · código Administrador · 0 na
    fila". É assim que o escritório vê, sem perguntar a ninguém, que um
    aparelho de campo está no código errado. Depende de rodar o sql/052.

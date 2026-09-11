@@ -891,17 +891,18 @@ só "Código inválido.", sem dizer o que fazer.
   própria fazenda**, que abre direto o boletim dela. Proibido "acesso
   negado", "não autorizado", "sem permissão" (mesmo tom de c9) e proibido
   revelar qualquer código.
-- **Escopo amplo demais avisa na porta** (`avisoEscopoAmplo()`): só o
-  escopo que abre TODAS as unidades **e** preenche boletim (Administrador).
-  Quem só lê (Diretoria) e quem cuida de uma atividade inteira não recebem
-  o aviso — seria ruído. O texto nomeia o escopo de quem já está dentro,
-  nunca um código.
 - **Igualdade exata continua valendo:** `escopoDoCodigo` normaliza
   (maiúsculas, sem espaço, traço opcional) e compara igual. Tolerar "quase
   certo" transformaria a fechadura em sugestão.
-- **O escritório enxerga o código de cada aparelho** no monitor de chegada
-  (c16), junto da última sincronização — é o que torna "o gerente está no
-  código errado" uma observação, e não uma suspeita.
+- **Quem relata "este aparelho está no código errado" é o MONITOR, não a
+  porta.** O cartão de chegada da Diretoria (c16) mostra o código de cada
+  aparelho junto da última sincronização: a informação chega a quem age.
+  **Aviso na porta de entrada foi tentado na v83 e retirado na v85** (decisão
+  do Nilo): quem via o texto todos os dias era justamente o administrador,
+  que já sabe — o gerente com o código da própria unidade nunca passa por
+  aquela tela. Regra que fica: **aviso só na tela de quem pode agir sobre
+  ele**; aviso permanente na porta de quem já conhece a situação é ruído, e
+  ruído diário treina a pessoa a não ler.
 - Continua sendo interface, não segurança (c9): a autorização real é das
   políticas RLS do Supabase. Detalhe em docs/definicao-de-pronto.md,
   item 20.
