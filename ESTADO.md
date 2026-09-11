@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v85** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v86** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -89,12 +89,16 @@ e sanidade — oferecem o par de chips "Nada a registrar hoje" ·
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
   irrigação (gotejo), colheita, pós-colheita, fito, ocorrências.
   Desde a v76 a seção **Atividades por talhão** é cascata de 3 passos —
-  talhão → atividade num seletor agrupado por natureza, com os 4 grupos
-  recolhidos → detalhes — e usa a nomenclatura da lavoura (seção
-  "Nomenclatura do café na palavra da lavoura").
+  talhão → atividade → detalhes — e usa a nomenclatura da lavoura (seção
+  "Nomenclatura do café na palavra da lavoura"). Desde a **v86** o passo
+  da atividade é a LISTA NATIVA do celular (a mesma de "Função / serviço"
+  da mão de obra), com as 4 naturezas como títulos da lista: os gerentes
+  reclamaram dos grupos recolhidos com chips (rolagem longa e perda do
+  lugar no boletim) e pediram esta forma.
 - 🌾 Grãos (redesenho v42): clima; mão de obra; **Operações do dia**
-  (registro por talhão + operação escolhida em seletor agrupado por
-  fase, com campos em cascata específicos de cada operação — fonte:
+  (registro por talhão + operação escolhida na lista nativa agrupada por
+  fase — v86, mesmo componente do café —, com campos em cascata
+  específicos de cada operação — fonte:
   docs/catalogos-por-atividade.md); **💧 Irrigação por pivô** (v44,
   ajustada na v45: sem digitação de nome — o seletor "Talhão / pivô"
   aparece só na hora de escolher; pivô escolhido vira LINHA COMPACTA
@@ -1503,6 +1507,55 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## Escolha da atividade/operação na lista nativa do celular (v86)
+Pedido dos gerentes no primeiro mês de uso, trazido pelo Nilo: na seção
+**Atividades por talhão** (café) a lista de opções "não está do jeito que os
+funcionários gostam". Eles pediram, com estas palavras, o jeito da
+**"Função / serviço" da mão de obra** — a lista nativa do celular.
+
+**O que era (v76 → v85):** escolhido o talhão, apareciam os 4 grupos de
+natureza recolhidos (Tratos culturais · Irrigação e fertirrigação · Colheita
+e pós-colheita · Estrutura e apoio); tocar num grupo abria os chips dele
+DENTRO do boletim, empurrando o resto da tela para baixo. Para achar
+"Levantar café" a pessoa tocava no grupo e rolava por 18 chips, perdendo o
+lugar no boletim.
+
+**O que é agora:** o passo O QUÊ é um `<select>` — primeira linha "— toque
+para escolher —", os 4 grupos como títulos da lista (`<optgroup>`) e as
+atividades como linhas. A rolagem acontece dentro da janelinha do iPhone, o
+boletim não se mexe, e é exatamente o gesto que a turma já faz na mão de
+obra. Escolhida a atividade, ela vira a linha com "trocar" e só então os
+DETALHES aparecem — os 3 passos continuam iguais.
+
+**Vale também para os grãos**, porque é o MESMO componente
+(`seletorOperacao`) desde a v76: as operações do dia agora saem na lista
+nativa agrupada por fase do ciclo, com a fase de agora em primeiro e marcada
+"· fase de agora" no título. Manter chip nos grãos e lista no café criaria
+uma variante por atividade, proibida pelo CLAUDE.md (c4).
+
+**O que NÃO mudou:** chip continua sendo a forma de escolha onde as opções
+são poucas e cabem na tela (clima, "como terminou o dia", gravidade, status
+do pivô, chips de resposta "Nada a registrar hoje"); o ONDE (talhão) segue
+no seletor nativo, ❌ herdado de sempre; nenhum boletim já gravado muda;
+nenhum termo de catálogo muda; pecuária e pós-colheita, intocados.
+
+**Onde mexe no código:** `seletorOperacao` (lista no lugar dos
+`<details class="fase-op">` + chips), `aplicarOperacao` (o que a escolha
+pré-preenche nos grãos: área do talhão e a 1ª linha de produto das
+aplicações — era o tratador do chip `data-escop`, agora é o `data-opsel` do
+seletor) e o CSS `.fase-op`, removido por ter ficado sem uso.
+
+### Provas (v86)
+- `node scripts/teste_nomenclatura.cjs` → **25 ✅ · 0 ❌**: passo 1 só o
+  talhão; passo 2 com os 4 grupos como títulos, nada escolhido de antemão,
+  zero chip e cartão de **192 px**; as palavras da lavoura todas dentro do
+  grupo; passo 3 só depois da escolha; e o de-para antigo → novo intacto.
+- `scripts/checar-poluicao.cjs` → **588 ✅ · 42 ❌**, idêntico ao main
+  medido na mesma hora (o diff é só a linha da versão): nenhum ❌ novo.
+- `scripts/regressao_render.cjs` main × v86: café, grãos, pecuária,
+  pós-colheita, Diretoria e ADMIN **idênticos em todas as telas** (só o
+  minuto do relógio no localStorage difere).
+
 ## Aparelho sem unidade aberta no monitor de chegada (v84)
 Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
 `ADMIN-9561` (o `AMNIN` da mensagem anterior foi erro de digitação dele) —
@@ -1852,9 +1905,10 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   - Mão de obra: fechada ✅ · ao abrir ❌ (5 totais com ＋/− visíveis
     antes do "＋ função") · "＋ função" ❌ (seletor + 3 campos de uma vez).
   - Atividades por talhão: fechada ✅ · ao abrir ✅ · "＋" ❌ parcial
-    (v76: só o ONDE aparece — progressivo ✓ —, mas em seletor, não
-    chips; O QUÊ por natureza em grupos recolhidos ✓; DETALHES só depois
-    da escolha ✓ — mesmo retrato do "＋ operação" dos grãos).
+    (só o ONDE aparece — progressivo ✓ —, mas em seletor, não chips;
+    O QUÊ na lista nativa agrupada por natureza ✓ (v86, a pedido dos
+    gerentes); DETALHES só depois da escolha ✓ — mesmo retrato do
+    "＋ operação" dos grãos).
   - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
     rótulos de uma vez).
   - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v69: só o par

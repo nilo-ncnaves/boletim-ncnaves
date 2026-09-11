@@ -709,3 +709,44 @@ Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo),
 `scripts/regressao_render.cjs` contra `origin/main` (gerente e
 pós-colheita idênticos; só o `00-inicio` do ADMIN muda) e o teste em
 navegador dos códigos de cada escopo.
+
+## 21. Catálogo longo de lançamento: a lista nativa do celular (desde a v86)
+
+Origem: 11/09/2026, primeiro mês de preenchimento. Os gerentes reclamaram
+da seção **Atividades por talhão** do café e pediram, com estas palavras, o
+jeito da **"Função / serviço" da mão de obra**. Da v76 à v85 o passo O QUÊ
+eram quatro grupos recolhidos; tocar num deles abria os chips DENTRO do
+boletim e empurrava a tela para baixo — achar uma atividade custava vários
+toques e muita rolagem.
+
+Regras que ficam:
+
+1. **Catálogo longo escolhe na lista nativa.** O passo O QUÊ das seções
+   com catálogo grande (atividades do café, operações dos grãos) é um
+   `<select>` pelo componente ÚNICO `seletorOperacao`: primeira linha
+   "— toque para escolher —", grupos como títulos (`<optgroup>`),
+   operações como linhas. Nada vem escolhido de antemão.
+2. **Catálogo curto continua em chips.** Clima, "como terminou o dia",
+   gravidade, status do pivô, "Nada a registrar hoje": 2 a 6 opções que
+   cabem na tela e custam UM toque. A troca vale só onde a listona
+   existe — trocar chip por lista em campo curto seria perder um toque.
+3. **Os 3 passos não mudam.** Ao tocar em "＋" aparece só o ONDE;
+   escolhido o ONDE, só o O QUÊ; escolhida a operação, ela vira a linha
+   com "trocar" e só então os DETALHES. Nenhuma métrica, nenhuma
+   navegação, nenhum chip removível entram no cartão de apontamento.
+4. **Um componente só, nunca uma variante por atividade** (c4): o café e
+   os grãos usam a MESMA função; o que muda é o catálogo que quem chama
+   passa (natureza do serviço × fase do ciclo) e o rótulo do passo
+   ("Atividade" × "Operação"). Mudança pedida numa atividade que caia no
+   componente compartilhado vale para as duas.
+5. **A forma de escolher é a que a turma consegue usar** de pé, no sol,
+   com uma mão. Padrão de tela rejeitado no campo não se defende no
+   papel: ganha o gesto que a pessoa já faz em outra seção do mesmo app.
+6. **Nada do passado muda:** nenhum boletim gravado é reescrito, nenhum
+   termo de catálogo é renomeado, nenhum campo novo aparece.
+
+Conferência: `node scripts/teste_nomenclatura.cjs` (passos 1, 2 e 3 do
+café: só o talhão, depois os grupos como títulos da lista sem nada
+escolhido e sem chip, depois os detalhes), `scripts/checar-poluicao.cjs`
+(nenhum ❌ novo) e `scripts/regressao_render.cjs` contra `origin/main`
+(gerente, pós-colheita, Diretoria e ADMIN idênticos).

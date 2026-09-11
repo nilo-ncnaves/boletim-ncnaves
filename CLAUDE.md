@@ -180,15 +180,20 @@ Toda seção de lançamento (atividade, operação, colheita, praga,
 ocorrência, pivô, função de mão de obra, movimento de rebanho,
 sanidade, cocho, contagem, manejo) segue a mesma sequência:
 1. ONDE — chips de talhão / pivô / lote / pasto;
-2. O QUÊ — chips de fase / tipo / grupo;
+2. O QUÊ — chips de fase / tipo / grupo, OU a lista nativa do celular
+   quando o catálogo é longo (v86, item c14);
 3. DETALHES — só os campos pertinentes ao que foi escolhido.
-Nada visível antes do toque anterior: ao tocar em "＋" aparecem só os
-chips do ONDE; escolhido o ONDE, só os chips do O QUÊ; escolhido o
-O QUÊ, só os campos daquela escolha. Seção fechada por padrão. Ao
-abrir, mostra só a lista compacta do que já foi lançado e o botão
-"＋". Depois de adicionar, o registro vira linha compacta e a seção
-volta ao estado compacto. Seletor (select) não substitui chip no
-ONDE nem no O QUÊ.
+Nada visível antes do toque anterior: ao tocar em "＋" aparece só o
+ONDE; escolhido o ONDE, só o O QUÊ; escolhido o O QUÊ, só os campos
+daquela escolha. Seção fechada por padrão. Ao abrir, mostra só a lista
+compacta do que já foi lançado e o botão "＋". Depois de adicionar, o
+registro vira linha compacta e a seção volta ao estado compacto.
+Chip é a forma padrão de escolha quando as opções são poucas e cabem na
+tela. Onde o catálogo é longo (as atividades do café, as operações dos
+grãos), a escolha é a LISTA NATIVA do celular — decisão do Nilo na v86,
+a pedido dos gerentes: rolar dezenas de chips fazia perder o lugar no
+boletim, e a lista nativa rola dentro da própria janelinha. O que nunca
+muda: um passo de cada vez, nada visível antes do toque anterior.
 
 ### b) Cadastros e telas administrativas — padrões P1 a P10
 - P1 Uma tela, um propósito.
@@ -695,25 +700,39 @@ cruza os dois níveis sozinho — nada de status digitado.
   detalhe em docs/definicao-de-pronto.md, item 16. Consolidado mensal
   opcional no Supabase: sql/048 (o app lê pela vitrine de relatórios).
 
-### c14) Lista longa de lançamento nasce agrupada e recolhida (desde a v76)
-Quando o catálogo de uma seção de lançamento cresce a ponto de virar
-listona, o passo O QUÊ passa a ser agrupado por natureza, com os grupos
-RECOLHIDOS, pelo componente ÚNICO `seletorOperacao(a, {rotulo, grupos,
-destaque, nota})` do index.html — o mesmo dos grãos desde a v58, agora
-também do café. Nunca uma variante por atividade: o que muda é o
-CATÁLOGO que quem chama passa (grãos agrupa por fase do ciclo, café por
-natureza do serviço) e o rótulo do passo ("Operação" · "Atividade").
-- **Nenhum grupo aberto por padrão.** Ao escolher o ONDE aparecem só os
-  nomes dos grupos; o toque num deles revela as operações daquele grupo,
-  em chips. Escolhida a operação, ela vira uma linha com "trocar" e só
-  então os DETALHES aparecem.
+### c14) Catálogo longo de lançamento: a lista nativa do celular (desde a v86; era agrupado e recolhido desde a v76)
+Quando o catálogo de uma seção de lançamento é longo (as atividades do
+café, as operações dos grãos), o passo O QUÊ é a LISTA NATIVA do celular,
+agrupada por natureza, pelo componente ÚNICO `seletorOperacao(a, {rotulo,
+grupos, destaque, nota})` do index.html. Nunca uma variante por atividade:
+o que muda é o CATÁLOGO que quem chama passa (grãos agrupa por fase do
+ciclo, café por natureza do serviço) e o rótulo do passo ("Operação" ·
+"Atividade").
+- **Por que mudou (v86).** Da v76 à v85 o passo O QUÊ eram grupos
+  recolhidos com chips dentro. Os gerentes reclamaram no primeiro mês de
+  uso: abrir um grupo empurrava o boletim para baixo e a pessoa perdia o
+  lugar; achar a atividade dava vários toques e muita rolagem. Eles
+  pediram, com estas palavras, "do jeito da Função / serviço da mão de
+  obra" — a lista nativa. Regra que fica: **a forma de escolher é a que a
+  turma consegue usar de pé, no sol, com uma mão** — quando uma delas é
+  rejeitada no campo, ganha a que a pessoa já sabe usar.
+- **Grupo vira título da lista** (`<optgroup>`), operação vira linha
+  (`<option>`); a primeira linha é sempre "— toque para escolher —", igual
+  à mão de obra. Nada vem escolhido de antemão. Escolhida a operação, ela
+  vira uma linha com "trocar" e só então os DETALHES aparecem.
 - **Máximo 5 grupos**, os mesmos de `OP_CATEGORIAS` (o badge da c6 e o
-  grupo do seletor são a MESMA coisa — uma fonte só).
-- **Seletor nativo continua valendo no ONDE** enquanto o talhão/pivô/
-  pasto não virar chip; isso é ❌ herdado listado no ESTADO.md, igual nas
-  três atividades, e sai numa tarefa própria (mexeria nas três).
-- Conferência: `scripts/checar-poluicao.cjs`, item 4 (depois do "＋", só
-  o ONDE; nenhum campo e nenhum chip antes da escolha).
+  grupo da lista são a MESMA coisa — uma fonte só).
+- **Onde a lista nativa NÃO entra:** escolha de poucas opções (clima,
+  status, gravidade, "como terminou o dia") continua em chips — lá o chip
+  mostra tudo de uma vez e custa um toque só. A troca vale para catálogo
+  longo, nunca para campo de 2 a 6 opções.
+- **O ONDE continua no seletor nativo** enquanto o talhão/pivô/pasto não
+  virar chip; isso é ❌ herdado listado no ESTADO.md, igual nas três
+  atividades, e sai numa tarefa própria (mexeria nas três).
+- Conferência: `node scripts/teste_nomenclatura.cjs` (passos 1, 2 e 3 do
+  café) e `scripts/checar-poluicao.cjs`, item 4 (depois do "＋", só o
+  ONDE; nenhum campo e nenhuma escolha de atividade antes disso); detalhe
+  em docs/definicao-de-pronto.md, item 21.
 
 ### c15) Planejamento: um toque no campo, cobrança no escritório (desde a v77)
 O módulo de planejamento (reunião mensal + planejamento semanal) é a MESMA
