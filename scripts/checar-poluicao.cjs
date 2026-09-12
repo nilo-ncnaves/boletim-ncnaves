@@ -129,6 +129,7 @@ const saida = argv.find(a => !a.startsWith('--')) || null;
 const VP = { width: 390, height: 844 };   /* iPhone 12–14: largura ≤ 400 px */
 const ALVO_TELAS = 2;                       /* altura-alvo: 2 telas */
 const TOQUE_MIN = 44;                       /* alvo de toque mínimo, px */
+const ALVO_PAINEL = 4;                      /* v88: teto de altura do painel da Diretoria ao abrir, em telas (era 4,15 na v87) */
 const LISTA_MAX_SEM_BUSCA = 12;
 const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
 
@@ -630,13 +631,18 @@ async function cenarioPlanoPainel(browser, base, R) {
     { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' });
   await pularRitual(page);
   await page.evaluate(() => ir('painel')); await page.waitForTimeout(300);
+  /* v88: o cartão nasce fechado e só lista unidades; a descrição mora na tela da unidade */
   const cartao = () => page.evaluate(() => {
-    const h = [...document.querySelectorAll('#app .cartao h3')].find(x => /Planejado × Executado/.test(x.textContent));
-    if (!h) return { existe: false };
-    const c = h.closest('.cartao');
-    return { existe: true, unidades: [...c.querySelectorAll('.plano-un > b')].map(b => b.textContent.trim()),
-      vazio: ((c.querySelector('.plano-un') ? null : c.querySelector('p.mut:not([style])')) || {}).textContent || '',
-      texto: c.textContent.replace(/\s+/g, ' ').trim() };
+    const det = [...document.querySelectorAll('#app details.secao')]
+      .find(d => /Planejado × Executado/.test((d.querySelector('summary') || {}).textContent || ''));
+    if (!det) return { existe: false, unidades: [], vazio: '', texto: '' };
+    const fechado = !det.open;
+    det.open = true;
+    const uns = [...det.querySelectorAll('[data-painelun]')];
+    const vazio = uns.length ? '' : ((det.querySelector('.corpo p.mut:not([style])') || {}).textContent || '');
+    return { existe: true, fechado,
+      unidades: uns.map(b => (b.querySelector('b') || {}).textContent.trim()),
+      vazio, texto: det.textContent.replace(/\s+/g, ' ').trim() };
   });
   R.planoPainel = await cartao();                                  /* sem plano nenhum: só o vazio */
   const semeado = await page.evaluate(() => {
@@ -658,10 +664,178 @@ async function cenarioPlanoPainel(browser, base, R) {
   });
   await page.waitForTimeout(400);
   const cheio = await cartao();
+  /* v88: a descrição inteira (7 e 30 dias, motivos, esforço) está na TELA da unidade, a um toque */
+  const detalhe = await page.evaluate(() => {
+    const b = document.querySelector('[data-painelun^="plano|"]'); if (!b) return null;
+    b.click(); return null;
+  });
+  await page.waitForTimeout(300);
+  const tela = await page.evaluate(() => ({ tela: telaAtual,
+    ctx: (document.querySelector('.topo.ctx h1') || {}).textContent || '',
+    texto: (document.getElementById('app') || {}).textContent.replace(/\s+/g, ' ').trim(),
+    voltar: [...document.querySelectorAll('[data-voltar]')].map(x => x.textContent.trim()).join(' | ') }));
+  await page.evaluate(() => { const v = [...document.querySelectorAll('[data-voltar]')].pop(); if (v) v.click(); });
+  await page.waitForTimeout(300);
+  const devolveu = await page.evaluate(() => telaAtual);
   R.planoPainel = Object.assign(cheio, { vazio: R.planoPainel.vazio,
     ordemOk: cheio.unidades[0] === 'Floramill',                    /* 1 evitável × 1 evitável: empate desfeito pela aderência (17 % × 67 %) */
     evitaveis: semeado.r23.evitaveis, clima: semeado.r23.clima,
-    nomes: /Gerente|João|Jo[aã]o Batista/.test(cheio.texto) });
+    nomes: /Gerente|João|Jo[aã]o Batista/.test(cheio.texto + ' ' + tela.texto),
+    un: tela, devolveu });
+  void detalhe;
+  await ctx.close();
+}
+
+/* v88: cartão do painel em DUAS ETAPAS — nasce fechado, abre em lista de unidades e a descrição
+   inteira mora na tela da unidade. Cinco cartões pelo MESMO componente (cartaoUnidades). */
+const PAINEL_CARTOES_CHK = [
+  ['planejamento', 'Planejamento do mês'],
+  ['plano', 'Planejado × Executado'],
+  ['solinftec', 'Solinftec — medição de ontem'],
+  ['remessas', 'Café em trânsito'],
+  ['boletins', 'Boletins do período'],
+];
+async function cenarioPainelCartoes(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' },
+    { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' });
+  await pularRitual(page);
+  /* dados para os cinco cartões terem o que mostrar, offline */
+  await page.evaluate(() => {
+    const ontem = ontemISO(), hoje = hojeBRT();
+    D.solinftecDados = [
+      { fazenda_id: 'f33', data: ontem, equipamento: 'Trator 01', operacao: 'Plantio', talhao: 'T1', horas: 3.2, area_ha: 12, consumo_l: 40 },
+      { fazenda_id: 'f33', data: ontem, equipamento: 'Pulverizador 02', operacao: 'Pulverização', talhao: 'T2', horas: 2.5, area_ha: 9, consumo_l: 22 },
+      { fazenda_id: 'f23', data: ontem, equipamento: 'Trator 07', operacao: 'Roçada', talhao: '', horas: 5, area_ha: 4, consumo_l: 30 }];
+    const cafes = D.fazendas.filter(f => atividadeDe(f.id) === 'CAFE').map(f => f.id);
+    const tal = fz => (talhoesDa(fz).find(t => t.fazendaId === fz) || {}).id || '';
+    D.remessas = [
+      { id: 'rchk1', status: 'enviada', data: hoje, origem: cafes[0], destino: cafes[1], talhaoId: tal(cafes[0]), carretas: '2' },
+      { id: 'rchk2', status: 'enviada', data: hoje, origem: cafes[2] || cafes[0], destino: cafes[1], talhaoId: tal(cafes[2] || cafes[0]), carretas: '1' }];
+    /* uma tarefa da reunião e um plano do dia, para "Planejamento do mês" e "Planejado × Executado" */
+    salvarDados();
+  });
+  /* tarefas da reunião (Planejamento do mês) e plano do dia fechado (Planejado × Executado) */
+  await page.evaluate(SEMEAR_PLAN, ATA_TESTE); await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    const hoje = hojeBRT();
+    const itens = [{ op: 'Colheita', ondes: ['t101'], pessoas: '5', status: 'feito' },
+      { op: 'Capina manual', ondes: ['t102'], pessoas: '5', status: 'nao_feito' }];
+    D.boletins.push({ id: 'chkpc1', fazendaId: 'f23', data: diaISO(hoje, -1), responsavel: 'Gerente',
+      clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '10', diaristas: '', funcoes: [] },
+      atividades: [], colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {},
+      plano: { data: diaISO(hoje, -1), criadoEm: diaISO(hoje, -2), por: 'Gerente', obs: '', replanejado: false,
+        itens, clima: { cond: 'Ensolarado', chuvaMm: '', impedido: false }, motivo: { id: 'maquina' },
+        pessoasPrev: 10, pessoasReal: 10 } });
+    salvarDados(); ir('painel');
+  }); await page.waitForTimeout(400);
+  const P = { cartoes: {}, erros: [] };
+  P.altura = await page.evaluate(() => document.documentElement.scrollHeight);
+  P.abertas = await page.evaluate(() => [...document.querySelectorAll('#app details.secao[open]')]
+    .map(d => d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim().slice(0, 40)));
+  for (const [chave, titulo] of PAINEL_CARTOES_CHK) {
+    const c = await page.evaluate(t => {
+      const det = [...document.querySelectorAll('#app details.secao')]
+        .find(d => ((d.querySelector('summary') || {}).textContent || '').includes(t));
+      if (!det) return null;
+      const r = { fechado: !det.open, resumo: ((det.querySelector('summary .resumo') || {}).textContent || '').trim() };
+      det.open = true;
+      const corpo = det.querySelector('.corpo');
+      const uns = [...corpo.querySelectorAll('[data-painelun]')];
+      r.unidades = uns.map(b => ((b.querySelector('b') || {}).textContent || '').trim());
+      r.alvo = uns.length ? Math.min(...uns.map(b => b.getBoundingClientRect().height)) : 0;
+      r.campos = corpo.querySelectorAll('input,select,textarea').length;
+      r.cartoes = corpo.querySelectorAll('.cartao').length;
+      /* fora das linhas de unidade só pode existir a nota e o rodapé (ambos com style próprio) */
+      r.extras = [...corpo.children].filter(el => !el.hasAttribute('data-painelun')
+        && !(el.tagName === 'P' && el.classList.contains('mut'))          /* nota e rodapé do cartão */
+        && !(el.tagName === 'DIV' && el.className === 'mt')               /* embrulho do vazio da função única */
+      ).map(el => el.tagName + '.' + el.className);
+      r.texto = corpo.textContent.replace(/\s+/g, ' ').trim();
+      return r;
+    }, titulo);
+    if (!c) { P.cartoes[chave] = null; continue; }
+    /* toque na primeira unidade: tem de abrir a TELA da unidade, com cabeçalho contextual */
+    await page.evaluate(ch => { const b = document.querySelector(`[data-painelun^="${ch}|"]`); if (b) b.click(); }, chave);
+    await page.waitForTimeout(300);
+    c.un = await page.evaluate(() => ({
+      tela: telaAtual,
+      ctx: ((document.querySelector('.topo.ctx h1') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
+      cartoes: document.querySelectorAll('#app .cartao').length,
+      voltar: [...document.querySelectorAll('#app [data-voltar]')].map(x => x.textContent.trim()).filter(Boolean),
+      nativos: window.__nativos,
+      texto: (document.getElementById('app') || {}).textContent.replace(/\s+/g, ' ').trim(),
+    }));
+    await page.evaluate(() => { const v = [...document.querySelectorAll('#app [data-voltar]')].pop(); if (v) v.click(); });
+    await page.waitForTimeout(300);
+    c.devolveu = await page.evaluate(() => telaAtual);
+    P.cartoes[chave] = c;
+  }
+  P.erros = erros.slice();
+  R.painelCartoes = P;
+  await ctx.close();
+}
+
+/* v89: o "‹ Voltar" do primeiro nível de um módulo devolve para a tela de ONDE ele foi aberto,
+   nunca para uma tela fixa. O caminho relatado pelo Nilo (painel → Planejamento → Voltar) é o
+   terceiro caso; os outros provam que a mesma regra vale para as outras portas e módulos. */
+const ONDE_ESTOU = () => {
+  const t = (document.getElementById('app') || {}).textContent || '';
+  if (/Qual é a sua atividade\?/.test(t)) return 'entrada';
+  if (/unidades enviaram hoje/.test(t)) return 'painel';
+  if (/^\s*Planejamento/m.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'planejamento';
+  if (/Colar do WhatsApp/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'colar';
+  if (/Cadastros/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'cadastros';
+  if (/Relatórios/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'relatorios';
+  return telaAtual;
+};
+async function cenarioVoltar(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
+  const onde = () => page.evaluate(ONDE_ESTOU);
+  const toca = async sel => { await page.click(sel, { timeout: 4000 }).catch(() => {}); await page.waitForTimeout(350); };
+  const V = {};
+  /* (1) tela inicial → Planejamento → Voltar devolve à tela inicial */
+  await toca('[data-perfil="planejamento"]');
+  V.dePlanejamentoEntrada = { abriu: await onde() };
+  await toca('[data-planvoltar]');
+  V.dePlanejamentoEntrada.voltou = await onde();
+  /* (2) dentro do módulo o Voltar sobe UM degrau, sem sair dele */
+  await toca('[data-perfil="planejamento"]');
+  await toca('[data-planv="semana"]');
+  V.dentroDoModulo = { abriu: await page.evaluate(() => (planNav[planNav.length - 1] || {}).v) };
+  await toca('[data-planvoltar]');
+  V.dentroDoModulo.voltou = await page.evaluate(() => ({ tela: telaAtual, v: (planNav[planNav.length - 1] || {}).v }));
+  await toca('[data-planvoltar]');
+  /* (3) painel → Planejamento → Voltar devolve ao PAINEL (o caminho relatado em 12/09/2026:
+     código de Administrador, painel aberto, Planejamento aberto pelo botão do painel) */
+  await toca('[data-perfil="admin"]');
+  await pularRitual(page);
+  V.painel = await onde();
+  await toca('#bt-planejamento');
+  V.dePlanejamentoPainel = { abriu: await onde() };
+  await toca('[data-planvoltar]');
+  V.dePlanejamentoPainel.voltou = await onde();
+  /* (4) painel → Cadastros → Voltar devolve ao painel */
+  await toca('#bt-cad');
+  V.deCadastros = { abriu: await onde() };
+  await toca('[data-cadvoltar]');
+  V.deCadastros.voltou = await onde();
+  /* (5) tela inicial → Relatórios → Voltar devolve à tela inicial (tela sem pilha própria) */
+  await toca('#bt-sair');
+  await toca('[data-perfil="relatorios"]');
+  V.deRelatorios = { abriu: await onde() };
+  await toca('[data-voltar]');
+  V.deRelatorios.voltou = await onde();
+  await toca('[data-perfil="admin"]');
+  await pularRitual(page);
+  /* (6) Planejamento → Colar do WhatsApp → Voltar devolve ao Planejamento */
+  await toca('#bt-planejamento');
+  await toca('#bt-ins-colar');
+  V.deColar = { abriu: await onde() };
+  await toca('[data-insvoltar]');
+  V.deColar.voltou = await onde();
+  V.erros = erros.slice();
+  R.voltar = V;
   await ctx.close();
 }
 
@@ -1463,8 +1637,8 @@ function avaliar(R) {
     /* cartão da Diretoria */
     if (R.planoPainel) {
       const C = R.planoPainel;
-      add(g, 'Diretoria — cartão "📋 Planejado × Executado" com aderência 7 e 30 dias por unidade', C.existe && C.unidades.length === 2 && /aderência/.test(C.texto), `${C.unidades.length} unidade(s): ${C.unidades.join(', ')}`);
-      add(g, 'Diretoria — ordem por unidades com mais desvios evitáveis (apoio, não ranking de gerente)', C.ordemOk && /desvios evitáveis/.test(C.texto) && !/pior|ranking|gerente [A-Z]/.test(C.texto), C.unidades.join(' → '));
+      add(g, 'Diretoria — cartão "📋 Planejado × Executado" lista as unidades e a aderência abre na tela da unidade', C.existe && C.unidades.length === 2 && /aderência/.test(C.texto) && !!C.un && /em 7 dias/.test(C.un.texto) && /em 30 dias/.test(C.un.texto), `${C.unidades.length} unidade(s): ${C.unidades.join(', ')}`);
+      add(g, 'Diretoria — ordem por unidades com mais desvios evitáveis (apoio, não ranking de gerente)', C.ordemOk && !!C.un && /desvios evitáveis/.test(C.un.texto) && !/pior|ranking|gerente [A-Z]/.test(C.texto), C.unidades.join(' → '));
       add(g, 'Diretoria — desvio de dia de chuva conta como clima, não como evitável', C.evitaveis === 1 && C.clima === 1, `evitáveis ${C.evitaveis} · clima ${C.clima}`);
       add(g, 'Diretoria — sem plano no período, o vazio nomeia o recorte pela função única', /^Sem plano do dia registrado/.test(C.vazio) && !PLANO_PROIBIDO.test(C.vazio), `"${C.vazio.slice(0, 100)}"`);
       add(g, 'Diretoria — o cartão não mostra um gerente para outro (nenhum nome de pessoa)', !C.nomes, C.nomes ? 'achou nome de pessoa' : 'só nome de unidade');
@@ -1549,6 +1723,64 @@ function avaliar(R) {
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosInsumos || []).length, (R.errosInsumos || []).join(' | '));
   }
 
+  /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */
+  if (R.painelCartoes) {
+    const G = '16. Painel: cartão fecha, lista unidades, descrição na tela da unidade';
+    const P = R.painelCartoes;
+    add(G, 'Painel da Diretoria — nenhum dos cinco cartões em duas etapas nasce aberto (P5)',
+      PAINEL_CARTOES_CHK.every(([k]) => P.cartoes[k] && P.cartoes[k].fechado),
+      PAINEL_CARTOES_CHK.filter(([k]) => !(P.cartoes[k] || {}).fechado).map(([, t]) => t).join(' · ') || 'todos recolhidos');
+    add(G, `Painel da Diretoria — a altura ao abrir cabe em ${ALVO_PAINEL} telas`,
+      P.altura / VP.height <= ALVO_PAINEL, `${(P.altura / VP.height).toFixed(2)} telas`);
+    PAINEL_CARTOES_CHK.forEach(([chave, titulo]) => {
+      const c = P.cartoes[chave];
+      add(G, `"${titulo}" — o cartão aparece no painel, fechado, com o resumo na própria linha`,
+        !!c && c.fechado && !!c.resumo, c ? (c.fechado ? 'fechado' : 'NASCEU ABERTO') + ` · resumo "${c.resumo}"` : 'cartão não encontrado');
+      add(G, `"${titulo}" — ao abrir mostra SÓ a lista de unidades (nenhum campo, nenhuma descrição solta)`,
+        !!c && c.unidades.length > 0 && c.campos === 0 && c.cartoes === 0 && c.extras.length === 0,
+        c ? `${c.unidades.length} unidade(s): ${c.unidades.slice(0, 3).join(', ')}${c.unidades.length > 3 ? '…' : ''}; ${c.campos} campo(s); extras: ${c.extras.join(', ') || 'nenhum'}` : '');
+      add(G, `"${titulo}" — cada unidade é um alvo de toque ≥ ${TOQUE_MIN} px, com o estado na própria linha (P7)`,
+        !!c && c.alvo >= TOQUE_MIN, c ? `menor linha ${Math.round(c.alvo)} px` : '');
+      add(G, `"${titulo}" — o toque abre a TELA da unidade, com cabeçalho contextual e a descrição`,
+        !!c && !!c.un && c.un.tela === 'painelun' && /›/.test(c.un.ctx) && c.un.cartoes > 0 && c.un.nativos === 0,
+        c && c.un ? `tela ${c.un.tela} · cabeçalho "${c.un.ctx}" · ${c.un.cartoes} cartão(ões) · ${c.un.nativos} nativo(s)` : '');
+      add(G, `"${titulo}" — a tela da unidade tem "‹ Voltar ao painel" e devolve ao painel`,
+        !!c && !!c.un && c.un.voltar.some(v => /Voltar ao painel/.test(v)) && c.devolveu === 'painel',
+        c && c.un ? `${c.un.voltar.join(' | ')} → ${c.devolveu}` : '');
+      /* "atrasada" é o rótulo de PRAZO do módulo de planejamento (c15) — nunca julgamento de pessoa */
+      const proib = chave === 'planejamento' ? /n[ãa]o fez|n[ãa]o realizou|faltou(?! gente| insumo)|esqueceu/i : PLANO_PROIBIDO;
+      add(G, `"${titulo}" — relata registro e prazo, nunca "não fez" nem cobrança ao campo`,
+        !!c && !proib.test(c.texto) && !!c.un && !proib.test(c.un.texto),
+        c ? 'só unidade e registro' : '');
+    });
+    add(G, 'Nenhum erro de JavaScript no painel em duas etapas', !P.erros.length, P.erros[0] || 'sem erro');
+  }
+
+  /* 17. Voltar (v89): o "‹ Voltar" do primeiro nível devolve para a tela de onde o módulo foi aberto */
+  if (R.voltar) {
+    const G = '17. Voltar devolve para a tela de onde se veio';
+    const V = R.voltar;
+    add(G, 'Painel → Planejamento → "‹ Voltar" devolve ao PAINEL (não à tela inicial do app)',
+      V.dePlanejamentoPainel.abriu === 'planejamento' && V.dePlanejamentoPainel.voltou === 'painel',
+      `${V.painel} → ${V.dePlanejamentoPainel.abriu} → ${V.dePlanejamentoPainel.voltou}`);
+    add(G, 'Tela inicial → Planejamento → "‹ Voltar" devolve à TELA INICIAL',
+      V.dePlanejamentoEntrada.abriu === 'planejamento' && V.dePlanejamentoEntrada.voltou === 'entrada',
+      `entrada → ${V.dePlanejamentoEntrada.abriu} → ${V.dePlanejamentoEntrada.voltou}`);
+    add(G, 'Painel → Cadastros → "‹ Voltar" devolve ao painel',
+      V.deCadastros.abriu === 'cadastros' && V.deCadastros.voltou === 'painel',
+      `painel → ${V.deCadastros.abriu} → ${V.deCadastros.voltou}`);
+    add(G, 'Planejamento → Colar do WhatsApp → "‹ Voltar" devolve ao Planejamento',
+      V.deColar.abriu === 'colar' && V.deColar.voltou === 'planejamento',
+      `planejamento → ${V.deColar.abriu} → ${V.deColar.voltou}`);
+    add(G, 'Tela inicial → Relatórios → "‹ Voltar" devolve à tela inicial',
+      V.deRelatorios.abriu === 'relatorios' && V.deRelatorios.voltou === 'entrada',
+      `entrada → ${V.deRelatorios.abriu} → ${V.deRelatorios.voltou}`);
+    add(G, 'Dentro do módulo o "‹ Voltar" sobe UM degrau, sem sair dele',
+      V.dentroDoModulo.abriu === 'semana' && V.dentroDoModulo.voltou.tela === 'planejamento' && V.dentroDoModulo.voltou.v === 'menu',
+      `${V.dentroDoModulo.abriu} → ${V.dentroDoModulo.voltou.tela}/${V.dentroDoModulo.voltou.v}`);
+    add(G, 'Nenhum erro de JavaScript na navegação de volta', !V.erros.length, V.erros[0] || 'sem erro');
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -1584,6 +1816,8 @@ function relatorio(itens, R) {
     await medirPlano(browser, base, R, 'Pecuária (f26 Água Santa)', 'f26', 'PECUARIA', false, termos);
     await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
     await cenarioPlanoPainel(browser, base, R);
+    await cenarioPainelCartoes(browser, base, R);
+    await cenarioVoltar(browser, base, R);
     await cenarioPlanejamento(browser, base, R);
     await cenarioInsumos(browser, base, R);
   } finally { await browser.close(); srv.close(); }

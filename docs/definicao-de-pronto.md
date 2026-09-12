@@ -820,3 +820,86 @@ café: só o talhão, depois os grupos como títulos da lista sem nada
 escolhido e sem chip, depois os detalhes), `scripts/checar-poluicao.cjs`
 (nenhum ❌ novo) e `scripts/regressao_render.cjs` contra `origin/main`
 (gerente, pós-colheita, Diretoria e ADMIN idênticos).
+
+## 23. Cartão do painel em duas etapas: unidades primeiro (desde a v88)
+
+Origem: 12/09/2026, o Nilo com as telas do painel na mão. Cada cartão do
+painel da Diretoria despejava TODAS as unidades com TODAS as descrições,
+uma embaixo da outra: para achar a fazenda que interessa era preciso rolar
+por cima da vida de todas as outras. O painel media 4,15 telas de iPhone.
+
+Regras que ficam:
+
+1. **No painel, cartão que fala de várias unidades nasce fechado**, abre em
+   LISTA DE UNIDADES e a descrição inteira mora na TELA da unidade. Três
+   níveis, como manda o P2: painel → lista → tela da unidade.
+2. **Componente ÚNICO** `cartaoUnidades(chave)` + a tela `vPainelUn()`,
+   alimentados pelo catálogo `PAINEL_CARTOES` — nunca uma variante por
+   cartão, por perfil ou por atividade. O que muda é o catálogo (quem são
+   as unidades, o que a linha diz, o que a tela mostra).
+3. **A linha do cartão fechado já responde a olhada** ("4 unidades · 1
+   atrasada", "2 cargas em trânsito"), em tipografia neutra: contador de
+   cartão não é farol, então sem verde nem vermelho (regra 4 do plano de
+   safra).
+4. **A lista é só a lista (P7):** uma linha por unidade, nome + estado
+   naquela linha, alvo de toque ≥ 44 px, seta à direita. Nenhum campo,
+   nenhum cartão, nenhum parágrafo de descrição solto. Sem unidade nenhuma,
+   o vazio sai pela função única (`htmlEstado`, item 6); cartão que já sumia
+   sem dado continua sumindo.
+5. **A tela da unidade usa o cabeçalho contextual** (item 8:
+   `cabecalhoContexto(unidade,{sub, voltar:true})`) e termina em "‹ Voltar
+   ao painel". Folha que já existia (o boletim) continua a um toque e o "‹"
+   dela devolve à tela da unidade de onde veio, nunca ao painel.
+6. **A conta é a mesma.** Reorganizar a navegação não pode mudar nenhum
+   número, nenhum critério de ordem e nenhum filtro. Agrupamento por id,
+   nunca por pedaço de nome.
+7. **Vocabulário:** a lista relata REGISTRO e PRAZO. Proibidos "não fez",
+   "não realizou", "faltou", "esqueceu"; "atrasada" só como rótulo de prazo
+   do módulo de planejamento (item 18). Nenhuma tela lista pessoas — só
+   unidades.
+
+Conferência: `scripts/checar-poluicao.cjs`, grupo "16. Painel: cartão fecha,
+lista unidades, descrição na tela da unidade" (os cinco cartões fechados,
+lista sem campo, alvo ≥ 44 px, toque abrindo `painelun` com cabeçalho
+contextual e sem nativo, voltar devolvendo ao painel, altura do painel ≤ 4
+telas) e `scripts/regressao_render.cjs` contra `origin/main` (gerente e
+pós-colheita idênticos; só o painel da Diretoria e o do ADMIN mudam).
+
+Dois acertos que vieram junto e viraram regra: o cabeçalho de QUALQUER
+acordeão (`.secao > summary`) quebra em duas linhas — título em cima, resumo
+embaixo — em vez de o resumo sair pela direita da tela; e título que não
+cabe sozinho na linha do cartão é título para encurtar (o nome completo fica
+no cabeçalho da tela da unidade). Cartão vazio mostra só a frase do vazio,
+sem nota de explicação e sem linha de fonte.
+
+## 24. "‹ Voltar" devolve para a tela de onde se veio (desde a v89)
+
+Origem: 12/09/2026, o Nilo com o app aberto. Do painel da Diretoria ele abriu
+Planejamento e tocou em "‹ Voltar" — e caiu na tela inicial do app ("Qual é a
+sua atividade?"), não no painel de onde tinha vindo. O voltar do primeiro
+nível do módulo tinha destino FIXO no código.
+
+Regras que ficam:
+
+1. **Botão de voltar diz "volte um passo", nunca "vá para a tela X".** Tela
+   alcançável por mais de um caminho não pode ter o destino de volta escrito
+   no código: ela lembra por onde a pessoa entrou.
+2. **Quem ABRE registra de onde veio.** Mecanismo ÚNICO
+   `abrirModulo(tela, preparar)` + `voltarDoModulo(tela)` (registro em
+   `telaDeOnde`), para os três módulos com navegação própria — Planejamento,
+   Cadastros e Colar do WhatsApp. Nunca uma variante por módulo ou por
+   perfil, e nenhum `ir("…")` solto abrindo módulo. Tela sem pilha própria
+   (Relatórios, Faróis de registro) usa o mesmo registro: o `data-voltar`
+   genérico o consulta antes de cair no destino fixo.
+3. **Dentro do módulo, um degrau por vez.** A pilha própria de cada módulo
+   (`planNav`, `cadNav`, `insNav`) continua mandando nos níveis internos; o
+   registro é só do degrau que SAI do módulo.
+4. **Destino fixo só como último recurso**, quando não há registro (aparelho
+   reaberto direto no módulo).
+5. **Tela que se abre sozinha no lugar de outra** (o ritual da v77, que
+   substitui o painel) registra como origem a tela que a pessoa PEDIU — é
+   para lá que "Pular" e "‹ Voltar" devolvem.
+
+Conferência: `scripts/checar-poluicao.cjs`, grupo "17. Voltar devolve para a
+tela de onde se veio" — os quatro caminhos de entrada e a prova de que, dentro
+do módulo, o voltar sobe um degrau e não sai dele.

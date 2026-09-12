@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v87** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v89** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1507,6 +1507,135 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## "‹ Voltar" devolve para a tela de onde se veio (v89)
+
+**O problema real.** 12/09/2026, o Nilo com o app aberto no código de
+Administrador: do painel da Diretoria ele abriu "📋 Planejamento" e tocou em
+"‹ Voltar" — e caiu na tela inicial do app ("Qual é a sua atividade?"), não no
+painel de onde tinha acabado de vir.
+
+**A causa.** O voltar do PRIMEIRO nível dos módulos com navegação própria
+tinha destino fixo escrito no código:
+`planVoltar`/`insVoltar` iam para `podeCadastros()?"entrada":"painel"` e
+`cadVoltar` ia sempre para `"painel"`. Destino fixo só funciona quando existe
+UMA porta — e esses módulos têm várias: Planejamento e Colar do WhatsApp abrem
+do painel E da tela inicial; Colar abre também de dentro do Planejamento;
+Cadastros abre do painel. Com o código de Administrador (`podeCadastros()`
+verdadeiro), o destino escolhido era sempre a tela inicial.
+
+**O que é agora.** Mecanismo ÚNICO para os três módulos: quem ABRE registra de
+onde veio (`abrirModulo(tela, preparar)`, registro em `telaDeOnde`) e o voltar
+do primeiro nível devolve para lá (`voltarDoModulo(tela)`). Os níveis de
+DENTRO continuam com a pilha própria de cada módulo (`planNav`, `cadNav`,
+`insNav`) — o registro é só do degrau que SAI do módulo. Sem registro
+(aparelho reaberto direto no módulo) vale o destino de sempre.
+
+Caminhos cobertos:
+
+| de onde abriu | módulo | "‹ Voltar" devolve para |
+| --- | --- | --- |
+| painel da Diretoria | Planejamento | painel |
+| tela inicial | Planejamento | tela inicial |
+| painel da Diretoria | Cadastros | painel |
+| Planejamento | Colar do WhatsApp | Planejamento |
+| tela inicial | Colar do WhatsApp | tela inicial |
+| tela inicial | Relatórios | tela inicial |
+| painel da Diretoria | Relatórios | painel |
+| painel (ritual que se abre sozinho) | Planejamento | painel |
+
+**Regra que fica** (CLAUDE.md, c20): botão de voltar diz "volte um passo",
+nunca "vá para a tela X". Tela alcançável por mais de um caminho não pode ter
+o destino de volta escrito no código.
+
+**Onde mexe no código:** bloco novo logo depois de `ir()` (`telaDeOnde`,
+`telaCasaPadrao`, `abrirModulo`, `voltarDoModulo`); as três funções de voltar
+de primeiro nível (`planVoltar`, `cadVoltar`, `insVoltar`), o "Pular" do
+ritual, o `data-voltar` genérico (que consulta o registro antes de cair no
+destino fixo) e as dez portas de entrada. Telas sem pilha própria —
+Relatórios e Faróis de registro — entram pelo mesmo registro. Nenhuma tela
+mudou de aparência.
+
+### Provas (v89)
+- `scripts/checar-poluicao.cjs` → **677 ✅ · 42 ❌**: os MESMOS 42 ❌, nenhum
+  novo; 7 checagens novas, todas ✅, no grupo "17. Voltar devolve para a tela
+  de onde se veio".
+- `scripts/regressao_render.cjs` main × v89: café, grãos, pecuária e
+  pós-colheita **idênticos em todas as telas**.
+
+## Painel da Diretoria em duas etapas (v88) — unidades primeiro, descrição na tela da unidade
+
+**O problema real.** 12/09/2026, com as telas na mão: o painel da Diretoria
+virou uma parede de texto. "📋 Planejamento do mês" despejava as 24 unidades
+com quatro linhas de descrição cada; "📋 Planejado × Executado", "📡
+Solinftec — medição de ontem", "🚚 Café em trânsito entre fazendas" e a lista
+"Boletins (23)" faziam o mesmo. Para achar a fazenda que interessa era
+preciso rolar por cima da vida de todas as outras. O painel media **4,15
+telas de iPhone**.
+
+**O que é agora.** Os cinco cartões passaram pelo componente ÚNICO
+`cartaoUnidades(chave)`, alimentado pelo catálogo `PAINEL_CARTOES`:
+
+1. **Nível 1 — o cartão, fechado.** Nasce recolhido (P5). A linha já responde
+   a olhada: "4 unidades · 1 atrasada", "2 cargas em trânsito", "7 boletins ·
+   2 unidades", "2 fazendas · 10,7 h". Tipografia neutra: contador de cartão
+   não é farol, então sem verde nem vermelho (regra 4 do plano de safra).
+2. **Nível 2 — só a lista de unidades.** Uma linha por unidade, nome + o
+   estado naquela linha (P7), alvo de toque ≥ 44 px, seta à direita. Nenhum
+   campo, nenhum cartão, nenhum parágrafo de descrição solto.
+3. **Nível 3 — a tela da unidade** (`vPainelUn`, tela `painelun`), com o
+   cabeçalho contextual da v66 (`Fazenda › Unidade (área ha)`) e a descrição
+   inteira daquele cartão, só daquela unidade, terminando em "‹ Voltar ao
+   painel".
+
+Os números são **exatamente os de antes**: a v88 mudou onde eles aparecem,
+nunca a conta. Cartão sem unidade nenhuma mostra o vazio pela função única
+(`htmlEstado`); os dois que já sumiam sem dado (Solinftec, café em trânsito)
+continuam sumindo.
+
+**Detalhes que ficam como regra** (CLAUDE.md, c19):
+- O café em trânsito é agrupado pela fazenda que **recebe** — é ela que
+  confirma a chegada — e a tela diz isso com todas as letras.
+- A lista "Boletins (23)" virou o cartão **"Boletins do período"** (o nome
+  antigo colidia com "Boletins dos últimos 7 dias"). Os filtros de busca,
+  atividade e período continuam acima, intocados.
+- O boletim continua a um toque a partir da tela da unidade, e o "‹" dele
+  devolve à tela da unidade de onde veio, nunca ao painel.
+- O cartão "📡 Chegada dos boletins hoje" (v82) e "📋 Boletins dos últimos 7
+  dias" já eram recolhidos e não mudaram.
+- **Consertado de quebra, no mesmo CSS:** a linha de cabeçalho de QUALQUER
+  acordeão (`.secao > summary`) agora quebra — título em cima, resumo
+  embaixo — em vez de o título se espremer em quatro linhas e o resumo sair
+  pela direita da tela. Era o que acontecia com "📡 Chegada dos boletins
+  hoje · 0 de 24 · 24 sem nada recebido" desde a v82 (visível na foto que o
+  Nilo mandou). Só CSS: nenhum HTML mudou.
+- O título do cartão do café em trânsito ficou **"Café em trânsito"** (sem
+  "entre fazendas"): o título inteiro não cabe na linha do cartão a 390 px e
+  empurrava o caminhãozinho para uma linha só dele. A tela da unidade mantém
+  o título completo, "🚚 Café em trânsito entre fazendas".
+- **Cartão vazio diz só a frase do vazio** — sem a explicação do cartão e sem
+  a linha de fonte: explicar o que não existe é ruído.
+
+**Onde mexe no código:** bloco novo antes de `vPainel` (`painelVista`,
+`cartaoUnidades`, `vPainelUn`, `PAINEL_CARTOES`); `vPainel` passou a chamar
+`cartaoUnidades` cinco vezes; `ir()` ganhou a tela `painelun`; o clique ganhou
+`data-painelun` e o retorno do boletim para a tela da unidade. As quatro
+funções antigas (`cartaoPlanejamentoPainel`, `cartaoPlanoPainel`,
+`cartaoSolinftecPainel`, `cartaoRemessasPainel`) saíram — o componente único
+ficou no lugar delas. Nada do gerente, do pós-colheita ou dos Cadastros foi
+tocado.
+
+### Provas (v88)
+- `scripts/checar-poluicao.cjs` → **670 ✅ · 42 ❌**: os MESMOS 42 ❌ da v87,
+  nenhum novo; 33 checagens novas, todas ✅, no grupo "16. Painel: cartão
+  fecha, lista unidades, descrição na tela da unidade". O painel da Diretoria
+  caiu de **4,15 para 3,55 telas**.
+- `scripts/regressao_render.cjs` main × v88: café, grãos, pecuária e
+  pós-colheita **idênticos em todas as telas** (só o minuto do relógio no
+  localStorage difere). Mudaram apenas o painel da Diretoria e o painel do
+  ADMIN — exatamente o que a tarefa pediu.
+- `node scripts/teste_nomenclatura.cjs`, `node scripts/teste_planejamento.cjs`
+  e `node scripts/teste_insumos.cjs` continuam sem ❌.
+
 ## Escolha da atividade/operação na lista nativa do celular (v87)
 Pedido dos gerentes no primeiro mês de uso, trazido pelo Nilo: na seção
 **Atividades por talhão** (café) a lista de opções "não está do jeito que os
@@ -1865,6 +1994,23 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v89, 12/09/2026: **677 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
+v89 acrescentou o grupo "17. Voltar devolve para a tela de onde se veio"
+(7 itens ✅: painel → Planejamento → painel, que é o caminho relatado pelo
+Nilo; tela inicial → Planejamento → tela inicial; painel → Cadastros →
+painel; Planejamento → Colar do WhatsApp → Planejamento; tela inicial →
+Relatórios → tela inicial; dentro do módulo o voltar sobe um degrau sem sair
+dele; e zero erro de JavaScript na navegação). Medição anterior registrada aqui,
+v88, 12/09/2026: **670 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
+v88 acrescentou o grupo "16. Painel: cartão fecha, lista unidades, descrição
+na tela da unidade" (33 itens ✅: os cinco cartões do painel nascendo
+fechados, com o resumo na própria linha; ao abrir, só a lista de unidades —
+zero campo, zero cartão, zero descrição solta; cada unidade como alvo de
+toque ≥ 44 px com o estado na linha; o toque abrindo a tela `painelun` com
+cabeçalho contextual e sem nenhum diálogo nativo; "‹ Voltar ao painel"
+devolvendo ao painel; e nenhum termo de cobrança em nenhuma dessas telas),
+mais o teto novo de altura do painel (≤ 4 telas): o painel caiu de **4,15
+para 3,55 telas**. Medição anterior registrada aqui,
 v87, 11/09/2026: **637 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo (a
 v87, que trocou os chips da atividade pela lista nativa, saiu com checklist
 idêntico ao da v86, medido na mesma hora). A
