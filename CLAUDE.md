@@ -1051,6 +1051,40 @@ lista de unidades e a descrição inteira mora na tela da unidade.**
   cabeçalho contextual, voltar devolve ao painel, altura do painel ≤ 4
   telas); detalhe em docs/definicao-de-pronto.md, item 23.
 
+### c20) "‹ Voltar" devolve para a tela de onde se veio (desde a v89)
+Relatado pelo Nilo em 12/09/2026: com o código de Administrador, o "‹ Voltar"
+da tela de Planejamento jogava a pessoa na tela inicial do app ("Qual é a sua
+atividade?") em vez de devolvê-la ao painel de onde ela tinha acabado de
+entrar. A causa: o voltar do primeiro nível do módulo tinha destino FIXO
+(`podeCadastros()?"entrada":"painel"`) — e destino fixo está errado sempre que
+o módulo tem mais de uma porta. Planejamento, Cadastros e Colar do WhatsApp
+abrem do painel E da tela inicial; Colar abre também de dentro do
+Planejamento.
+- **Quem abre registra de onde veio.** Mecanismo ÚNICO
+  `abrirModulo(tela, preparar)` / `voltarDoModulo(tela)` do index.html, com o
+  registro em `telaDeOnde` — nunca uma variante por módulo, por perfil ou por
+  atividade. Toda porta de módulo passa por `abrirModulo`; nenhum `ir("…")`
+  solto abre módulo. Tela sem pilha própria (Relatórios, Faróis de registro)
+  usa o mesmo registro: o `data-voltar` genérico o consulta antes de cair no
+  destino fixo.
+- **Os níveis de DENTRO continuam com a pilha própria** de cada módulo
+  (`planNav`, `cadNav`, `insNav`): o registro é só do degrau que SAI do
+  módulo. Voltar dentro do módulo sobe um degrau e nunca sai dele.
+- **Destino fixo só como último recurso:** sem registro (aparelho reaberto
+  direto no módulo) vale o de sempre, `telaCasaPadrao()`.
+- **O ritual que se abre sozinho no lugar do painel** (v77) registra "painel"
+  como origem: a pessoa pediu o painel, é para lá que "Pular" e "‹ Voltar"
+  devolvem.
+- **Regra geral que fica:** botão de voltar diz "volte um passo", não "vá para
+  a tela X". Tela alcançável por mais de um caminho nunca tem destino de
+  volta escrito no código — ela lembra por onde a pessoa entrou.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "17. Voltar devolve para
+  a tela de onde se veio" (painel → Planejamento → painel; tela inicial →
+  Planejamento → tela inicial; painel → Cadastros → painel; Planejamento →
+  Colar → Planejamento; tela inicial → Relatórios → tela inicial; e, dentro
+  do módulo, um degrau por vez); detalhe em docs/definicao-de-pronto.md,
+  item 24.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v88** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v89** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1507,6 +1507,61 @@ Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
 
+## "‹ Voltar" devolve para a tela de onde se veio (v89)
+
+**O problema real.** 12/09/2026, o Nilo com o app aberto no código de
+Administrador: do painel da Diretoria ele abriu "📋 Planejamento" e tocou em
+"‹ Voltar" — e caiu na tela inicial do app ("Qual é a sua atividade?"), não no
+painel de onde tinha acabado de vir.
+
+**A causa.** O voltar do PRIMEIRO nível dos módulos com navegação própria
+tinha destino fixo escrito no código:
+`planVoltar`/`insVoltar` iam para `podeCadastros()?"entrada":"painel"` e
+`cadVoltar` ia sempre para `"painel"`. Destino fixo só funciona quando existe
+UMA porta — e esses módulos têm várias: Planejamento e Colar do WhatsApp abrem
+do painel E da tela inicial; Colar abre também de dentro do Planejamento;
+Cadastros abre do painel. Com o código de Administrador (`podeCadastros()`
+verdadeiro), o destino escolhido era sempre a tela inicial.
+
+**O que é agora.** Mecanismo ÚNICO para os três módulos: quem ABRE registra de
+onde veio (`abrirModulo(tela, preparar)`, registro em `telaDeOnde`) e o voltar
+do primeiro nível devolve para lá (`voltarDoModulo(tela)`). Os níveis de
+DENTRO continuam com a pilha própria de cada módulo (`planNav`, `cadNav`,
+`insNav`) — o registro é só do degrau que SAI do módulo. Sem registro
+(aparelho reaberto direto no módulo) vale o destino de sempre.
+
+Caminhos cobertos:
+
+| de onde abriu | módulo | "‹ Voltar" devolve para |
+| --- | --- | --- |
+| painel da Diretoria | Planejamento | painel |
+| tela inicial | Planejamento | tela inicial |
+| painel da Diretoria | Cadastros | painel |
+| Planejamento | Colar do WhatsApp | Planejamento |
+| tela inicial | Colar do WhatsApp | tela inicial |
+| tela inicial | Relatórios | tela inicial |
+| painel da Diretoria | Relatórios | painel |
+| painel (ritual que se abre sozinho) | Planejamento | painel |
+
+**Regra que fica** (CLAUDE.md, c20): botão de voltar diz "volte um passo",
+nunca "vá para a tela X". Tela alcançável por mais de um caminho não pode ter
+o destino de volta escrito no código.
+
+**Onde mexe no código:** bloco novo logo depois de `ir()` (`telaDeOnde`,
+`telaCasaPadrao`, `abrirModulo`, `voltarDoModulo`); as três funções de voltar
+de primeiro nível (`planVoltar`, `cadVoltar`, `insVoltar`), o "Pular" do
+ritual, o `data-voltar` genérico (que consulta o registro antes de cair no
+destino fixo) e as dez portas de entrada. Telas sem pilha própria —
+Relatórios e Faróis de registro — entram pelo mesmo registro. Nenhuma tela
+mudou de aparência.
+
+### Provas (v89)
+- `scripts/checar-poluicao.cjs` → **677 ✅ · 42 ❌**: os MESMOS 42 ❌, nenhum
+  novo; 7 checagens novas, todas ✅, no grupo "17. Voltar devolve para a tela
+  de onde se veio".
+- `scripts/regressao_render.cjs` main × v89: café, grãos, pecuária e
+  pós-colheita **idênticos em todas as telas**.
+
 ## Painel da Diretoria em duas etapas (v88) — unidades primeiro, descrição na tela da unidade
 
 **O problema real.** 12/09/2026, com as telas na mão: o painel da Diretoria
@@ -1939,6 +1994,13 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v89, 12/09/2026: **677 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
+v89 acrescentou o grupo "17. Voltar devolve para a tela de onde se veio"
+(7 itens ✅: painel → Planejamento → painel, que é o caminho relatado pelo
+Nilo; tela inicial → Planejamento → tela inicial; painel → Cadastros →
+painel; Planejamento → Colar do WhatsApp → Planejamento; tela inicial →
+Relatórios → tela inicial; dentro do módulo o voltar sobe um degrau sem sair
+dele; e zero erro de JavaScript na navegação). Medição anterior registrada aqui,
 v88, 12/09/2026: **670 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
 v88 acrescentou o grupo "16. Painel: cartão fecha, lista unidades, descrição
 na tela da unidade" (33 itens ✅: os cinco cartões do painel nascendo

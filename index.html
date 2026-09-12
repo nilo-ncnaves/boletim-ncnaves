@@ -3409,7 +3409,7 @@ function ir(tela, arg, manterScroll){
      reunião), a porta da Diretoria/Escritório é a tela curta do ritual. Pulável; o "pulado" vale
      só para esta sessão, então volta no próximo acesso do MESMO dia (item 9 da tarefa). */
   if(tela==="painel" && !ritualPuladoSessao){ const rit=planRitualPendente();
-    if(rit){ planUI.ritual=rit; planNav=[{v:"ritual"}]; tela="planejamento"; } }
+    if(rit){ planUI.ritual=rit; planNav=[{v:"ritual"}]; telaDeOnde.planejamento="painel"; tela="planejamento"; } }
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
   const app = $("#app");
@@ -3439,6 +3439,29 @@ function ir(tela, arg, manterScroll){
   ligarEventos(tela, arg);
   ajustarTextosLongos();   /* v68: prévia dos textos longos (reticências e "ler texto completo" só se transbordar) */
   pintarSelecoes();        /* v74: chips removíveis das multi-seleções, a partir do estado dos chips de opção */
+}
+
+/* ---- (v89) "‹ Voltar" do primeiro nível devolve para a tela de onde o módulo foi aberto ----
+   Relatado pelo Nilo em 12/09/2026: com o código de Administrador, o "‹ Voltar" da tela de
+   Planejamento jogava a pessoa na tela inicial do app ("Qual é a sua atividade?") em vez de
+   devolvê-la ao painel de onde ela tinha acabado de entrar. O destino era FIXO
+   (podeCadastros()?"entrada":"painel") — e destino fixo está errado sempre que o módulo tem mais
+   de uma porta: Planejamento, Cadastros e Colar do WhatsApp abrem do painel E da tela inicial.
+   Regra que fica: quem ABRE o módulo registra de onde veio (`abrirModulo`) e o voltar do primeiro
+   nível devolve para lá (`voltarDoModulo`). Mecanismo ÚNICO para os três módulos — nunca uma
+   variante por módulo ou por perfil. Os níveis de dentro continuam com a pilha própria de cada um
+   (planNav, cadNav, insNav): este registro é só do degrau que sai do módulo. */
+let telaDeOnde={};
+/* sem registro (aparelho reaberto direto no módulo), o destino é o de sempre */
+const telaCasaPadrao = () => podeCadastros()?"entrada":"painel";
+function abrirModulo(tela, preparar){
+  telaDeOnde[tela] = (telaAtual && telaAtual!==tela) ? telaAtual : telaCasaPadrao();
+  if(preparar) preparar();
+  ir(tela);
+}
+function voltarDoModulo(tela){
+  const de=telaDeOnde[tela]; delete telaDeOnde[tela];
+  ir(de && de!==tela ? de : telaCasaPadrao());
 }
 
 /* ---------- Tela: código de acesso ---------- */
@@ -5509,7 +5532,7 @@ const insIr = (v,id) => { insUI.busca=""; insUI.edit=""; insNav.push({v, id:id||
 function insVoltar(){
   insUI.busca=""; insUI.edit="";
   if(insNav.length>1){ insNav.pop(); ir("colar"); }
-  else { insNav=[]; ir(podeCadastros()?"entrada":"painel"); }
+  else { insNav=[]; voltarDoModulo("colar"); }
 }
 const insRender = () => ir("colar",null,true);
 function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.msg=""; }
@@ -6007,7 +6030,7 @@ function insClique(t,d){
     salvarRascunho(); ir("form",null,true); return true; }
   if(d.insProd!==undefined){ insUI.prod=d.insProd; ir(telaAtual,null,true); return true; }
   if(d.insCopia!==undefined){ const txt=insTextoCobranca(d.insCopia); if(txt) abrirTextoZap(txt); return true; }
-  if(t.id==="bt-ins-colar"){ if(!podePainel()) return true; insLimpar(); insNav=[{v:"colar"}]; ir("colar"); return true; }
+  if(t.id==="bt-ins-colar"){ if(!podePainel()) return true; abrirModulo("colar",()=>{ insLimpar(); insNav=[{v:"colar"}]; }); return true; }
   if(d.insvoltar!==undefined){ insVoltar(); return true; }
   if(telaAtual!=="colar") return false;
   if(d.cadv!==undefined){ insIr(d.cadv); return true; }
@@ -6028,8 +6051,8 @@ function insClique(t,d){
   if(t.id==="bt-ins-ata"){
     planUI.ata=insUI.prevAta; planUI.ataTexto=insUI.texto;
     insMsgDaAta={texto:insUI.texto};
-    planNav=[{v:"menu"},{v:"rodadas"},{v:"importar"}];
-    insUI.prevAta=null; ir("planejamento"); return true; }
+    abrirModulo("planejamento",()=>{ planNav=[{v:"menu"},{v:"rodadas"},{v:"importar"}]; insUI.prevAta=null; });
+    return true; }
   if(t.id==="bt-ins-importar"){ insImportar(); return true; }
   return false;
 }
@@ -7929,13 +7952,13 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v88";
+const APP_VERSAO="v89";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
 function cadLimpar(){ cadUI.confirma=""; cadUI.form=null; cadUI.novo=""; cadUI.mais=false; cadUI.zona=false; cadUI.filtro=""; cadUI.msg=""; cadUI.saltos=false; }
 function cadIr(tela){ cadLimpar(); cadNav.push(tela); ir("cadastros"); }
-function cadVoltar(){ cadLimpar(); if(cadNav.length>1){ cadNav.pop(); ir("cadastros"); } else { cadNav=[]; ir("painel"); } }
+function cadVoltar(){ cadLimpar(); if(cadNav.length>1){ cadNav.pop(); ir("cadastros"); } else { cadNav=[]; voltarDoModulo("cadastros"); } }
 function cadRender(){ ir("cadastros",null,true); }
 function cadSalvo(foco,msg){ cadUI.flash=msg||"Salvo"; cadUI.foco=foco||""; }
 function cadPosRender(){
@@ -8661,7 +8684,7 @@ function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.
 function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
 function planVoltar(){ planLimpar();
   if(planNav.length>1){ planNav.pop(); ir("planejamento"); }
-  else { planNav=[]; ir(podeCadastros()?"entrada":"painel"); } }
+  else { planNav=[]; voltarDoModulo("planejamento"); } }
 function planRender(){ ir("planejamento",null,true); }
 function planSalvo(msg){ planUI.flash=msg||"Salvo"; }
 function planTopo(titulo,sub){
@@ -9253,9 +9276,9 @@ function planPastilhaTocar(i){
   const p=planPastilhas()[parseInt(i,10)];
   if(!p) return;
   if(p.v==="faixa"){ abrirFolhaTarefas(p.arg); return; }
-  if(p.v==="ritual"){ planUI.ritual=p.arg; planNav=[{v:"ritual"}]; ir("planejamento"); return; }
+  if(p.v==="ritual"){ abrirModulo("planejamento",()=>{ planUI.ritual=p.arg; planNav=[{v:"ritual"}]; }); return; }
   if(p.filtro==="atrasadas"){ planUI.filtroStatus=""; planUI.filtroFarol="vermelho"; }
-  planNav=[{v:"menu"},{v:p.v}]; ir("planejamento");
+  abrirModulo("planejamento",()=>{ planNav=[{v:"menu"},{v:p.v}]; });
 }
 /* ---- rituais que se abrem sozinhos: sexta (fechar a semana) e do dia 10 em diante (ata) ----
    Pulável; o "pulado" vale só para esta sessão, então volta no próximo acesso do MESMO dia. */
@@ -9350,7 +9373,7 @@ function planClique(t,d){
     ir(telaAtual,null,true); return true; }
   if(d.tarAdiar!==undefined){ planSugestaoAdiada[d.tarAdiar]=hojeBRT(); ir(telaAtual,null,true); return true; }
   if(t.id==="bt-plan-notif"){ planNotifPedir(); return true; }
-  if(t.id==="bt-plan-ritual-pular"){ ritualPuladoSessao=true; planNav=[]; ir(podeCadastros()?"entrada":"painel"); return true; }
+  if(t.id==="bt-plan-ritual-pular"){ ritualPuladoSessao=true; planNav=[]; voltarDoModulo("planejamento"); return true; }
   if(d.planRevisar!==undefined){ planRevisaoAbrir(); return true; }
   if(telaAtual!=="planejamento") return false;
   if(d.planvoltar!==undefined){ planVoltar(); return true; }
@@ -10588,7 +10611,7 @@ function ligarEventos(tela){
     if(planClique(t,d)) return;
     /* v86: módulo de insumos — cartão de chegada, saldo, painel e a porta única "Colar do WhatsApp" */
     if(insClique(t,d)) return;
-    if(t.id==="bt-planejamento"||t.id==="bt-planejamento2"){ if(!podePainel()) return; planNav=[{v:"menu"}]; ir("planejamento"); return; }
+    if(t.id==="bt-planejamento"||t.id==="bt-planejamento2"){ if(!podePainel()) return; abrirModulo("planejamento",()=>{ planNav=[{v:"menu"}]; }); return; }
     /* código de acesso */
     if(t.id==="bt-cod-entrar"){
       const el=$("#cod-acesso"), cod=el?el.value:"";
@@ -10626,16 +10649,16 @@ function ligarEventos(tela){
     if(d.perfil==="planejamento"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null;
-      planNav=[{v:"menu"}]; ir("planejamento"); return; }
+      abrirModulo("planejamento",()=>{ planNav=[{v:"menu"}]; }); return; }
     if(d.perfil==="colar"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
       sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null;
-      insLimpar(); insNav=[{v:"colar"}]; ir("colar"); return; }
+      abrirModulo("colar",()=>{ insLimpar(); insNav=[{v:"colar"}]; }); return; }
     if(d.perfil==="relatorios"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
-      sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("relatorios"); return; }
-    if(t.id==="bt-relatorios-tela"){ ir("relatorios"); return; }
-    if(t.id==="bt-farois-tela"){ ir("farois"); return; }
+      sessao={userId:u?u.id:"u2", papel, nome:u?u.nome:"Diretoria"}; Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; abrirModulo("relatorios"); return; }
+    if(t.id==="bt-relatorios-tela"){ abrirModulo("relatorios"); return; }
+    if(t.id==="bt-farois-tela"){ abrirModulo("farois"); return; }
     if(d.perfil){ const u=D.usuarios.find(x=>x.papel===d.perfil); if(!u) return;
       if(d.perfil==="admin" && !podeCadastros()) return;
       if(d.perfil==="proprietario" && !podePainel()) return;
@@ -10775,9 +10798,12 @@ function ligarEventos(tela){
     if(d.voltar && telaAtual==="painelun"){ ir("painel"); return; }
     /* boletim aberto pela tela da unidade volta para ela, não para o painel */
     if(d.voltar && telaAtual==="detalhe" && painelVoltaDetalhe){ painelVoltaDetalhe=false; ir("painelun"); return; }
+    /* v89: tela aberta por abrirModulo devolve para onde a pessoa estava; o destino fixo abaixo
+       vale só para tela que não foi registrada (casa do gerente, escolha de unidade…) */
+    if(d.voltar && telaDeOnde[telaAtual]){ voltarDoModulo(telaAtual); return; }
     if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
-    if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }
+    if(t.id==="bt-cad"){ abrirModulo("cadastros",()=>{ cadNav=[]; }); return; }
     if(d.ver){ painelVoltaDetalhe = telaAtual==="painelun"; ir("detalhe", d.ver); return; }
     /* relatórios automáticos (v55) */
     if(d.relab){ const [rel,ini,fim]=d.relab.split("|"); relVista={rel,ini,fim}; ir("relat"); return; }

@@ -871,3 +871,35 @@ embaixo — em vez de o resumo sair pela direita da tela; e título que não
 cabe sozinho na linha do cartão é título para encurtar (o nome completo fica
 no cabeçalho da tela da unidade). Cartão vazio mostra só a frase do vazio,
 sem nota de explicação e sem linha de fonte.
+
+## 24. "‹ Voltar" devolve para a tela de onde se veio (desde a v89)
+
+Origem: 12/09/2026, o Nilo com o app aberto. Do painel da Diretoria ele abriu
+Planejamento e tocou em "‹ Voltar" — e caiu na tela inicial do app ("Qual é a
+sua atividade?"), não no painel de onde tinha vindo. O voltar do primeiro
+nível do módulo tinha destino FIXO no código.
+
+Regras que ficam:
+
+1. **Botão de voltar diz "volte um passo", nunca "vá para a tela X".** Tela
+   alcançável por mais de um caminho não pode ter o destino de volta escrito
+   no código: ela lembra por onde a pessoa entrou.
+2. **Quem ABRE registra de onde veio.** Mecanismo ÚNICO
+   `abrirModulo(tela, preparar)` + `voltarDoModulo(tela)` (registro em
+   `telaDeOnde`), para os três módulos com navegação própria — Planejamento,
+   Cadastros e Colar do WhatsApp. Nunca uma variante por módulo ou por
+   perfil, e nenhum `ir("…")` solto abrindo módulo. Tela sem pilha própria
+   (Relatórios, Faróis de registro) usa o mesmo registro: o `data-voltar`
+   genérico o consulta antes de cair no destino fixo.
+3. **Dentro do módulo, um degrau por vez.** A pilha própria de cada módulo
+   (`planNav`, `cadNav`, `insNav`) continua mandando nos níveis internos; o
+   registro é só do degrau que SAI do módulo.
+4. **Destino fixo só como último recurso**, quando não há registro (aparelho
+   reaberto direto no módulo).
+5. **Tela que se abre sozinha no lugar de outra** (o ritual da v77, que
+   substitui o painel) registra como origem a tela que a pessoa PEDIU — é
+   para lá que "Pular" e "‹ Voltar" devolvem.
+
+Conferência: `scripts/checar-poluicao.cjs`, grupo "17. Voltar devolve para a
+tela de onde se veio" — os quatro caminhos de entrada e a prova de que, dentro
+do módulo, o voltar sobe um degrau e não sai dele.

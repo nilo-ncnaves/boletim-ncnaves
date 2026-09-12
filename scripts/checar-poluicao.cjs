@@ -775,6 +775,70 @@ async function cenarioPainelCartoes(browser, base, R) {
   await ctx.close();
 }
 
+/* v89: o "‹ Voltar" do primeiro nível de um módulo devolve para a tela de ONDE ele foi aberto,
+   nunca para uma tela fixa. O caminho relatado pelo Nilo (painel → Planejamento → Voltar) é o
+   terceiro caso; os outros provam que a mesma regra vale para as outras portas e módulos. */
+const ONDE_ESTOU = () => {
+  const t = (document.getElementById('app') || {}).textContent || '';
+  if (/Qual é a sua atividade\?/.test(t)) return 'entrada';
+  if (/unidades enviaram hoje/.test(t)) return 'painel';
+  if (/^\s*Planejamento/m.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'planejamento';
+  if (/Colar do WhatsApp/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'colar';
+  if (/Cadastros/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'cadastros';
+  if (/Relatórios/.test((document.querySelector('#app .topo h1') || {}).textContent || '')) return 'relatorios';
+  return telaAtual;
+};
+async function cenarioVoltar(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
+  const onde = () => page.evaluate(ONDE_ESTOU);
+  const toca = async sel => { await page.click(sel, { timeout: 4000 }).catch(() => {}); await page.waitForTimeout(350); };
+  const V = {};
+  /* (1) tela inicial → Planejamento → Voltar devolve à tela inicial */
+  await toca('[data-perfil="planejamento"]');
+  V.dePlanejamentoEntrada = { abriu: await onde() };
+  await toca('[data-planvoltar]');
+  V.dePlanejamentoEntrada.voltou = await onde();
+  /* (2) dentro do módulo o Voltar sobe UM degrau, sem sair dele */
+  await toca('[data-perfil="planejamento"]');
+  await toca('[data-planv="semana"]');
+  V.dentroDoModulo = { abriu: await page.evaluate(() => (planNav[planNav.length - 1] || {}).v) };
+  await toca('[data-planvoltar]');
+  V.dentroDoModulo.voltou = await page.evaluate(() => ({ tela: telaAtual, v: (planNav[planNav.length - 1] || {}).v }));
+  await toca('[data-planvoltar]');
+  /* (3) painel → Planejamento → Voltar devolve ao PAINEL (o caminho relatado em 12/09/2026:
+     código de Administrador, painel aberto, Planejamento aberto pelo botão do painel) */
+  await toca('[data-perfil="admin"]');
+  await pularRitual(page);
+  V.painel = await onde();
+  await toca('#bt-planejamento');
+  V.dePlanejamentoPainel = { abriu: await onde() };
+  await toca('[data-planvoltar]');
+  V.dePlanejamentoPainel.voltou = await onde();
+  /* (4) painel → Cadastros → Voltar devolve ao painel */
+  await toca('#bt-cad');
+  V.deCadastros = { abriu: await onde() };
+  await toca('[data-cadvoltar]');
+  V.deCadastros.voltou = await onde();
+  /* (5) tela inicial → Relatórios → Voltar devolve à tela inicial (tela sem pilha própria) */
+  await toca('#bt-sair');
+  await toca('[data-perfil="relatorios"]');
+  V.deRelatorios = { abriu: await onde() };
+  await toca('[data-voltar]');
+  V.deRelatorios.voltou = await onde();
+  await toca('[data-perfil="admin"]');
+  await pularRitual(page);
+  /* (6) Planejamento → Colar do WhatsApp → Voltar devolve ao Planejamento */
+  await toca('#bt-planejamento');
+  await toca('#bt-ins-colar');
+  V.deColar = { abriu: await onde() };
+  await toca('[data-insvoltar]');
+  V.deColar.voltou = await onde();
+  V.erros = erros.slice();
+  R.voltar = V;
+  await ctx.close();
+}
+
 async function medirTela(page, nome, grupo, extra) {
   const m = await page.evaluate(NA_PAGINA.medir);
   const v = await page.evaluate(NA_PAGINA.visual);
@@ -1692,6 +1756,31 @@ function avaliar(R) {
     add(G, 'Nenhum erro de JavaScript no painel em duas etapas', !P.erros.length, P.erros[0] || 'sem erro');
   }
 
+  /* 17. Voltar (v89): o "‹ Voltar" do primeiro nível devolve para a tela de onde o módulo foi aberto */
+  if (R.voltar) {
+    const G = '17. Voltar devolve para a tela de onde se veio';
+    const V = R.voltar;
+    add(G, 'Painel → Planejamento → "‹ Voltar" devolve ao PAINEL (não à tela inicial do app)',
+      V.dePlanejamentoPainel.abriu === 'planejamento' && V.dePlanejamentoPainel.voltou === 'painel',
+      `${V.painel} → ${V.dePlanejamentoPainel.abriu} → ${V.dePlanejamentoPainel.voltou}`);
+    add(G, 'Tela inicial → Planejamento → "‹ Voltar" devolve à TELA INICIAL',
+      V.dePlanejamentoEntrada.abriu === 'planejamento' && V.dePlanejamentoEntrada.voltou === 'entrada',
+      `entrada → ${V.dePlanejamentoEntrada.abriu} → ${V.dePlanejamentoEntrada.voltou}`);
+    add(G, 'Painel → Cadastros → "‹ Voltar" devolve ao painel',
+      V.deCadastros.abriu === 'cadastros' && V.deCadastros.voltou === 'painel',
+      `painel → ${V.deCadastros.abriu} → ${V.deCadastros.voltou}`);
+    add(G, 'Planejamento → Colar do WhatsApp → "‹ Voltar" devolve ao Planejamento',
+      V.deColar.abriu === 'colar' && V.deColar.voltou === 'planejamento',
+      `planejamento → ${V.deColar.abriu} → ${V.deColar.voltou}`);
+    add(G, 'Tela inicial → Relatórios → "‹ Voltar" devolve à tela inicial',
+      V.deRelatorios.abriu === 'relatorios' && V.deRelatorios.voltou === 'entrada',
+      `entrada → ${V.deRelatorios.abriu} → ${V.deRelatorios.voltou}`);
+    add(G, 'Dentro do módulo o "‹ Voltar" sobe UM degrau, sem sair dele',
+      V.dentroDoModulo.abriu === 'semana' && V.dentroDoModulo.voltou.tela === 'planejamento' && V.dentroDoModulo.voltou.v === 'menu',
+      `${V.dentroDoModulo.abriu} → ${V.dentroDoModulo.voltou.tela}/${V.dentroDoModulo.voltou.v}`);
+    add(G, 'Nenhum erro de JavaScript na navegação de volta', !V.erros.length, V.erros[0] || 'sem erro');
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -1728,6 +1817,7 @@ function relatorio(itens, R) {
     await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
     await cenarioPlanoPainel(browser, base, R);
     await cenarioPainelCartoes(browser, base, R);
+    await cenarioVoltar(browser, base, R);
     await cenarioPlanejamento(browser, base, R);
     await cenarioInsumos(browser, base, R);
   } finally { await browser.close(); srv.close(); }
