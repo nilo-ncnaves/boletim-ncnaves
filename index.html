@@ -126,7 +126,10 @@ h3{font-size:.95rem;font-weight:700}
 .mat-seco{background:var(--terra)}
 /* Acordeão do formulário */
 .secao{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio);margin-bottom:10px;overflow:hidden}
-.secao>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px;font-weight:700;cursor:pointer;min-height:56px}
+/* v88: título e resumo dividem a linha; quando não cabem a 390 px o resumo desce para a linha
+   de baixo INTEIRO, em vez de o título quebrar em quatro linhas e o resumo sair da tela
+   (defeito visível no cartão "Chegada dos boletins hoje" desde a v82) */
+.secao>summary{list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:14px;font-weight:700;cursor:pointer;min-height:56px}
 .secao>summary::-webkit-details-marker{display:none}
 .secao>summary .ico{width:34px;height:34px;border-radius:9px;background:var(--verde-claro);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex:none}
 .secao>summary .seta{margin-left:auto;color:var(--tinta-2);transition:transform .15s;flex:none}
@@ -140,7 +143,7 @@ h3{font-size:.95rem;font-weight:700}
 .subsec>summary .seta{color:var(--tinta-2);transition:transform .15s;flex:none}
 .subsec[open]>summary .seta{transform:rotate(90deg)}
 .subsec .corpo{padding:0 12px 14px;border-top:1px solid var(--linha)}
-.secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap}
+.secao>summary .resumo{margin-left:auto;margin-right:8px;font-size:.78rem;color:var(--verde);font-weight:700;white-space:nowrap;max-width:calc(100% - 44px)}
 /* v69: estado da seção eventual no cabeçalho — "sem resposta" (não respondido, texto desde a v70) e "sem ocorrência" são neutros, sem cor de alerta; só o contador fica verde */
 .secao>summary .resumo.neutro,.subsec>summary .resumo.neutro{color:var(--tinta-2);font-weight:600}
 .resp-secao{margin:6px 0 10px}.resp-secao:empty{display:none}
@@ -2071,20 +2074,6 @@ function cartaoSolinftecGerente(fz, dia){
     ${linhas.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")}
     <p class="mut" style="font-size:.75rem">Medição automática das máquinas. Só confira — não precisa digitar.</p>${linhaOrigemDado("solinftec")}</div>`;
 }
-function cartaoSolinftecPainel(){
-  if(!SOLINFTEC_AUTO) return "";
-  const ontem=ontemISO(), porFaz={};
-  (D.solinftecDados||[]).filter(l=>l.data===ontem && l.fazenda_id).forEach(l=>{
-    const o=porFaz[fzAtual(l.fazenda_id)]=porFaz[fzAtual(l.fazenda_id)]||{horas:0,area:0};
-    o.horas+=n0(l.horas); o.area+=n0(l.area_ha);
-  });
-  const ks=Object.keys(porFaz);
-  if(!ks.length) return "";
-  const num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
-  return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
-    ${ks.map(k=>`<p style="font-size:.85rem;margin:4px 0">${esc(fazenda(k).nome)}: <b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""}</p>`).join("")}
-    <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p>${linhaOrigemDado("solinftec")}</div>`;
-}
 /* ---- Estado das integrações (v63): leitura da visão vw_status_integracoes (sql/045) ----
    Uma linha por fonte externa (icrop, solinftec) com três horários que NÃO se misturam:
    ultima_execucao_em (última TENTATIVA do robô), ultima_execucao_ok_em (último SUCESSO: a API de
@@ -3240,18 +3229,6 @@ function gerarRemessasDe(b){
   });
   if(alguma) salvarDados();
 }
-function cartaoRemessasPainel(){
-  const rs=(D.remessas||[]);
-  const transito=rs.filter(r=>r.status!=="recebida");
-  const diverg=rs.filter(r=>r.status==="recebida"&&n0(r.carretas)&&n0(r.recebidoQtd)&&Math.abs(n0(r.recebidoQtd)-n0(r.carretas))>0.01).slice(0,5);
-  if(!transito.length&&!diverg.length) return "";
-  return `<div class="cartao"><h3>🚚 Café em trânsito entre fazendas</h3>
-    ${transito.length?`<ul class="lista-limpa">${transito.map(r=>`<li style="padding:6px 0;border-bottom:1px solid var(--linha)">
-      <b>${fmtData(r.data)}</b> ${esc(fazenda(r.origem).nome)} → <b>${esc(fazenda(r.destino).nome)}</b><br>
-      <span class="mut">${esc(talhao(r.talhaoId).nome)} · ${qtdRemessa(r)} · aguardando confirmação do destino</span></li>`).join("")}</ul>`:htmlEstado("vazio",{que:"carga de café aguardando confirmação do destino"})}
-    ${diverg.length?`<p class="mt" style="color:var(--vermelho,#a33)"><b>⚠️ Divergências:</b></p><ul class="lista-limpa">${diverg.map(r=>`<li class="mut" style="padding:4px 0">${fmtData(r.data)} ${esc(fazenda(r.origem).nome)}→${esc(fazenda(r.destino).nome)}: enviou ${r.carretas}, chegou ${r.recebidoQtd}${r.obsReceb?" — "+esc(r.obsReceb):""}</li>`).join("")}</ul>`:""}
-  </div>`;
-}
 function cartaoCargas(fz){
   const pend=remessasPara(fz);
   if(!pend.length) return "";
@@ -3427,7 +3404,7 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","relatorio","historico","relatorios","farois","farol","planejamento","colar"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","painelun","relatorio","historico","relatorios","farois","farol","planejamento","colar"].includes(tela) && !podePainel()) tela="entrada";
   /* v77: ritual que se abre sozinho — na sexta (fechar a semana) e do dia 10 em diante (ata da
      reunião), a porta da Diretoria/Escritório é a tela curta do ritual. Pulável; o "pulado" vale
      só para esta sessão, então volta no próximo acesso do MESMO dia (item 9 da tarefa). */
@@ -3444,6 +3421,7 @@ function ir(tela, arg, manterScroll){
   else if(tela==="formpos") app.innerHTML = vFormPos();
   else if(tela==="detalhepos") app.innerHTML = vDetalhePos(arg);
   else if(tela==="painel") app.innerHTML = vPainel();
+  else if(tela==="painelun") app.innerHTML = vPainelUn();   /* v88: cartão do painel › tela da unidade */
   else if(tela==="form") app.innerHTML = vForm();
   else if(tela==="detalhe") app.innerHTML = vDetalhe(arg);
   else if(tela==="historico") app.innerHTML = vHistorico();
@@ -3914,34 +3892,6 @@ function linhaPlanoSemana(fz, dia){
   const res=planoResumo(fz,7);
   if(!res.diasComPlano || res.ader===null) return "";
   return `<p class="mut plano-linha-casa">📋 Você cumpriu ${res.ader}% do que planejou nesta semana.</p>`;
-}
-
-/* ---- cartão da Diretoria "📋 Planejado × Executado" (componente ÚNICO, três atividades) ----
-   Ordenado por quem mais precisa de apoio — mais desvios EVITÁVEIS primeiro (o desvio de clima
-   nunca sobe a unidade na lista). Rótulo neutro; nenhuma tela mostra um gerente para outro
-   (a lista é de unidades, sem nome de pessoa). */
-function cartaoPlanoPainel(){
-  const uns=D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
-      && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
-    .map(f=>({f, r7:planoResumo(f.id,7), r30:planoResumo(f.id,30)}))
-    .filter(x=>x.r30.diasComPlano>0)
-    .sort((a,b)=>(b.r7.evitaveis-a.r7.evitaveis)||(a.r7.ader??101)-(b.r7.ader??101));
-  const corpo = uns.length
-    ? uns.map(({f,r7,r30})=>{
-        const mot=planoMotivosTexto(r7,2)||planoMotivosTexto(r30,2);
-        return `<div class="plano-un"><b>${esc(f.nome)}</b>
-          <p class="mut" style="margin:2px 0 0">aderência <b class="num">${r7.ader===null?"—":r7.ader+"%"}</b> em 7 dias · <b class="num">${r30.ader===null?"—":r30.ader+"%"}</b> em 30 dias
-            <span class="mut">(${r30.n} linha${r30.n===1?"":"s"} planejada${r30.n===1?"":"s"} em ${r30.diasComPlano} dia${r30.diasComPlano===1?"":"s"})</span></p>
-          ${mot?`<p class="mut" style="margin:2px 0 0">motivos: ${esc(mot)}</p>`:""}
-          <p class="mut" style="margin:2px 0 0">desvios evitáveis <b class="num">${r7.evitaveis}</b> · de clima <b class="num">${r7.clima}</b> · dias trabalháveis <b class="num">${r7.diasTrab}</b> de <b class="num">${r7.diasReg}</b> com boletim${r7.replan?" · "+r7.replan+" replanejado"+(r7.replan>1?"s":""):""}</p>
-          ${r7.precisao!==null?`<p class="mut" style="margin:2px 0 0">esforço: previu <b class="num">${r7.pessoasPrev}</b> pessoas, lançou <b class="num">${r7.pessoasReal}</b> (${r7.precisao}%)</p>`:""}</div>`;
-      }).join("")
-    : htmlEstado("vazio",{que:"plano do dia registrado", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
-        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:periodoVazio(diaISO(hojeBRT(),-29),hojeBRT())},{classe:"mut"});
-  return `<div class="cartao"><h3>📋 Planejado × Executado</h3>
-    <p class="mut" style="font-size:.78rem;margin:0 0 8px">O que o gerente planejou para o dia seguinte × o que o boletim daquele dia registrou. Ordem: unidades com mais desvios evitáveis.</p>
-    ${corpo}
-    <p class="mut" style="font-size:.72rem;margin-top:8px">Fonte: o próprio boletim (plano e registros do dia). O cruzamento com as metas do mês entra quando o módulo de programação/metas existir.</p></div>`;
 }
 
 /* ---- folha "📋 Amanhã" (v75) ----
@@ -7378,13 +7328,186 @@ function cartaoGraosPainel(){
     <p class="mut" style="font-size:.75rem;margin-top:6px">Hectares por operação, lâmina informado × medido (iCrop) e colheita acumulada do ciclo.</p></div>`;
 }
 
+/* ---------- Cartão do painel em duas etapas: unidades, depois a tela da unidade (v88) ----------
+   Pedido do Nilo em 12/09/2026: o painel da Diretoria virou uma parede de texto — cada cartão
+   despejava TODAS as unidades com TODAS as descrições, uma embaixo da outra, e achar a fazenda que
+   interessa custava rolagem. Padrão que fica (P1, P2, P5, P7): o cartão nasce FECHADO; ao abrir,
+   mostra SÓ a lista de unidades, uma linha cada, com o estado na própria linha; a descrição
+   inteira fica na TELA da unidade, a um toque. Três níveis, como manda o P2: painel → lista de
+   unidades → tela da unidade.
+   Componente ÚNICO — nunca uma variante por cartão, por perfil ou por atividade: o que muda é o
+   CATÁLOGO PAINEL_CARTOES (quem são as unidades, o que a linha diz, o que a tela mostra). Nenhuma
+   conta nova é feita aqui: os números são exatamente os de antes, só mudou onde aparecem.
+   Documentação: CLAUDE.md, c19; docs/definicao-de-pronto.md, item 22. */
+let painelVista={chave:"",unidade:""}, painelVoltaDetalhe=false;
+/* o "resumo" de cada unidade e o "detalhe" já vêm escapados por quem os monta (são HTML) */
+function cartaoUnidades(chave){
+  const c=PAINEL_CARTOES[chave]; if(!c) return "";
+  const uns=c.uns();
+  /* cartão que já sumia quando não havia nada continua sumindo (Solinftec, café em trânsito) */
+  if(!uns.length && c.some) return "";
+  const linhas=uns.map(u=>`<button class="cad-item" data-painelun="${chave}|${esc(u.id)}">
+      <span class="cresce"><b>${esc(u.nome)}</b><span class="mut">${u.resumo}</span></span>
+      <span class="seta">›</span></button>`).join("");
+  return `<details class="secao"><summary><span class="ico">${c.ico}</span>${esc(c.titulo)}
+    <span class="resumo neutro">${uns.length?c.resumo(uns):"nada a mostrar"}</span><span class="seta">›</span></summary>
+    <div class="corpo">
+      ${uns.length?`${c.nota?`<p class="mut" style="font-size:.78rem;margin:10px 0 8px">${esc(c.nota)}</p>`:""}
+      ${linhas}
+      ${c.rodape?`<p class="mut" style="font-size:.72rem;margin-top:10px">${esc(c.rodape)}</p>`:""}`
+      /* cartão vazio diz só a frase do vazio: explicação e fonte sem nada para explicar é ruído */
+      :`<div class="mt">${c.vazio()}</div>`}
+    </div></details>`;
+}
+/* tela da unidade: cabeçalho contextual (c5) + a descrição inteira daquele cartão, só dela */
+function vPainelUn(){
+  const c=PAINEL_CARTOES[painelVista.chave], un=painelVista.unidade;
+  const voltar=`<button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar ao painel</button>`;
+  if(!c || !un || !D.fazendas.some(f=>f.id===un))
+    return topo("Painel", sessao&&sessao.papel==="admin"?"Administrador":"Diretoria", true)
+      +`<div class="cartao">${htmlEstado("vazio",{que:"unidade"})}</div>`+voltar;
+  const u=c.uns().find(x=>x.id===un);
+  return cabecalhoContexto(un,{sub:c.titulo, voltar:true})
+    +(u?c.detalhe(u):`<div class="cartao">${c.vazio()}</div>`)
+    +(c.rodape?`<p class="mut" style="font-size:.72rem;margin-top:10px">${esc(c.rodape)}</p>`:"")
+    +voltar;
+}
+const PAINEL_CARTOES={
+  /* (1) Planejamento do mês — lista UNIDADES, nunca pessoas (regra de justiça do plano do dia, v75) */
+  planejamento:{
+    ico:"📋", titulo:"Planejamento do mês",
+    nota:"O que a reunião combinou × o que já foi respondido. Ordem: unidades com mais tarefas atrasadas. Travada por terceiro ou por chuva não conta como atraso.",
+    uns(){
+      planMotor();
+      const ref=planMesDe(hojeBRT());
+      return D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
+          && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
+        .map(f=>({f, r:planResumoMes(ref,f.id)}))
+        .filter(x=>x.r.n>0)
+        .sort((a,b)=>(b.r.atrasadas.length-a.r.atrasadas.length)||((a.r.pct??101)-(b.r.pct??101)))
+        .map(({f,r})=>({id:f.id, nome:f.nome, dados:r,
+          resumo:`cumprimento <b class="num">${r.pct===null?"—":r.pct+"%"}</b> · ${r.n} tarefa${r.n===1?"":"s"}${r.atrasadas.length?` · atrasadas <b class="num">${r.atrasadas.length}</b>`:""}${r.travadas.length?` · travadas <b class="num">${r.travadas.length}</b>`:""}`}));
+    },
+    resumo(uns){ const a=uns.reduce((s,u)=>s+u.dados.atrasadas.length,0);
+      return `${uns.length} unidade${uns.length>1?"s":""}${a?" · "+a+" atrasada"+(a>1?"s":""):""}`; },
+    vazio:()=>htmlEstado("vazio",{que:"tarefa da reunião", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
+        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:"em "+planMesRot(planMesDe(hojeBRT()))},{classe:"mut"}),
+    detalhe(u){ const r=u.dados;
+      return `<div class="cartao"><h3>📋 Planejamento do mês</h3>
+        <p class="mut" style="font-size:.78rem;margin:0 0 8px">O que a reunião combinou × o que já foi respondido. Travada por terceiro ou por chuva não conta como atraso.</p>
+        <p class="mut" style="margin:2px 0 0">cumprimento <b class="num">${r.pct===null?"—":r.pct+"%"}</b> (${r.finalizadas} de ${r.n-r.canceladas}) · atrasadas <b class="num">${r.atrasadas.length}</b> · travadas <b class="num">${r.travadas.length}</b> · arrastadas <b class="num">${r.arrastadas.length}</b></p>
+        <p class="mut" style="margin:2px 0 0">${r.metaHa?`planejado <b class="num">${esc(planHa(r.metaHa))} ha</b> · executado <b class="num">${esc(planHa(r.execHa))} ha</b> · restante <b class="num">${esc(planHa(r.restaHa))} ha</b> (${r.pctArea}%)`:"sem meta em ha no mês"}${r.semLancamento.length?` · <b class="num">${r.semLancamento.length}</b> sem lançamento`:""}${(r.fora&&r.fora.fora)?` · fora do plano <b class="num">${r.fora.pct}%</b>`:""}</p>
+        ${r.atrasadas.length?`<p class="mut" style="margin:6px 0 0"><b>Atrasadas:</b> ${esc(r.atrasadas.map(t=>t.desc).join(" · "))}</p>`:""}
+        <button class="btn sec mt no-print" id="bt-planejamento2" style="box-shadow:none;border-radius:0;">Abrir Planejamento</button></div>`; }
+  },
+  /* (2) Planejado × Executado — ordem por quem mais precisa de apoio (desvios EVITÁVEIS primeiro) */
+  plano:{
+    ico:"📋", titulo:"Planejado × Executado",
+    nota:"O que o gerente planejou para o dia seguinte × o que o boletim daquele dia registrou. Ordem: unidades com mais desvios evitáveis.",
+    rodape:"Fonte: o próprio boletim (plano e registros do dia). O cruzamento com as metas do mês entra quando o módulo de programação/metas existir.",
+    uns(){
+      return D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
+          && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
+        .map(f=>({f, r7:planoResumo(f.id,7), r30:planoResumo(f.id,30)}))
+        .filter(x=>x.r30.diasComPlano>0)
+        .sort((a,b)=>(b.r7.evitaveis-a.r7.evitaveis)||(a.r7.ader??101)-(b.r7.ader??101))
+        .map(({f,r7,r30})=>({id:f.id, nome:f.nome, dados:{r7,r30},
+          resumo:`aderência <b class="num">${r7.ader===null?"—":r7.ader+"%"}</b> em 7 dias${r7.evitaveis?` · desvios evitáveis <b class="num">${r7.evitaveis}</b>`:""}`}));
+    },
+    resumo(uns){ const e=uns.reduce((s,u)=>s+u.dados.r7.evitaveis,0);
+      return `${uns.length} unidade${uns.length>1?"s":""}${e?" · "+e+" desvio"+(e>1?"s":"")+" evitáve"+(e>1?"is":"l"):""}`; },
+    vazio:()=>htmlEstado("vazio",{que:"plano do dia registrado", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
+        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:periodoVazio(diaISO(hojeBRT(),-29),hojeBRT())},{classe:"mut"}),
+    detalhe(u){ const r7=u.dados.r7, r30=u.dados.r30, mot=planoMotivosTexto(r7,2)||planoMotivosTexto(r30,2);
+      return `<div class="cartao"><h3>📋 Planejado × Executado</h3>
+        <p class="mut" style="margin:2px 0 0">aderência <b class="num">${r7.ader===null?"—":r7.ader+"%"}</b> em 7 dias · <b class="num">${r30.ader===null?"—":r30.ader+"%"}</b> em 30 dias
+          <span class="mut">(${r30.n} linha${r30.n===1?"":"s"} planejada${r30.n===1?"":"s"} em ${r30.diasComPlano} dia${r30.diasComPlano===1?"":"s"})</span></p>
+        ${mot?`<p class="mut" style="margin:2px 0 0">motivos: ${esc(mot)}</p>`:""}
+        <p class="mut" style="margin:2px 0 0">desvios evitáveis <b class="num">${r7.evitaveis}</b> · de clima <b class="num">${r7.clima}</b> · dias trabalháveis <b class="num">${r7.diasTrab}</b> de <b class="num">${r7.diasReg}</b> com boletim${r7.replan?" · "+r7.replan+" replanejado"+(r7.replan>1?"s":""):""}</p>
+        ${r7.precisao!==null?`<p class="mut" style="margin:2px 0 0">esforço: previu <b class="num">${r7.pessoasPrev}</b> pessoas, lançou <b class="num">${r7.pessoasReal}</b> (${r7.precisao}%)</p>`:""}</div>`; }
+  },
+  /* (3) Solinftec — medição de ontem: a lista soma por fazenda; a tela abre máquina por máquina */
+  solinftec:{
+    ico:"📡", titulo:"Solinftec — medição de ontem", some:true,
+    uns(){
+      if(!SOLINFTEC_AUTO) return [];
+      const ontem=ontemISO(), porFaz={};
+      (D.solinftecDados||[]).filter(l=>l.data===ontem && l.fazenda_id).forEach(l=>{
+        const o=porFaz[fzAtual(l.fazenda_id)]=porFaz[fzAtual(l.fazenda_id)]||{horas:0,area:0,n:0};
+        o.horas+=n0(l.horas); o.area+=n0(l.area_ha); o.n++;
+      });
+      const num=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:1});
+      return Object.keys(porFaz).filter(k=>D.fazendas.some(f=>f.id===k)).map(k=>({id:k, nome:fazenda(k).nome, dados:porFaz[k],
+        resumo:`<b class="num">${num(porFaz[k].horas)} h</b>${porFaz[k].area?" · "+num(porFaz[k].area)+" ha":""} · ${porFaz[k].n} registro${porFaz[k].n>1?"s":""}`}));
+    },
+    resumo(uns){ const h=uns.reduce((s,u)=>s+u.dados.horas,0);
+      return `${uns.length} fazenda${uns.length>1?"s":""} · ${h.toLocaleString("pt-BR",{maximumFractionDigits:1})} h`; },
+    vazio:()=>htmlEstado("vazio",{que:"medição da Solinftec", periodo:"ontem"},{classe:"mut"}),
+    detalhe(u){
+      const num=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
+      const ls=(D.solinftecDados||[]).filter(l=>l.data===ontemISO() && l.fazenda_id && fzAtual(l.fazenda_id)===u.id);
+      return `<div class="cartao"><h3>📡 Solinftec — medição de ontem</h3>
+        ${ls.map(l=>`<p style="font-size:.85rem;margin:4px 0"><b>${esc(l.equipamento||"Equipamento")}</b> — ${esc(l.operacao||"—")}${l.talhao?" · "+esc(l.talhao):""}${n0(l.horas)?" · <b class='num'>"+num(l.horas)+" h</b>":""}${n0(l.area_ha)?" · "+num(l.area_ha)+" ha":""}${n0(l.consumo_l)?" · "+num(l.consumo_l)+" L":""}</p>`).join("")
+          ||htmlEstado("vazio",{que:"medição da Solinftec", unidade:u.id, periodo:"ontem"},{classe:"mut"})}
+        <p class="mut" style="font-size:.75rem">Fonte: robô Solinftec (grava toda madrugada)</p>${linhaOrigemDado("solinftec")}</div>`; }
+  },
+  /* (4) Café em trânsito — agrupado pela fazenda que RECEBE: é quem tem de confirmar a carga */
+  remessas:{
+    /* título curto: "Café em trânsito entre fazendas" não cabe na linha do cartão a 390 px e
+       empurrava o ícone para uma linha só dele; a tela da unidade mantém o título inteiro */
+    ico:"🚚", titulo:"Café em trânsito", some:true,
+    nota:"Agrupado pela fazenda que recebe — é ela que confirma a chegada.",
+    uns(){
+      const rs=(D.remessas||[]);
+      const transito=rs.filter(r=>r.status!=="recebida");
+      const diverg=rs.filter(r=>r.status==="recebida"&&n0(r.carretas)&&n0(r.recebidoQtd)&&Math.abs(n0(r.recebidoQtd)-n0(r.carretas))>0.01);
+      const m={};
+      transito.forEach(r=>{ const o=m[r.destino]=m[r.destino]||{transito:[],diverg:[]}; o.transito.push(r); });
+      diverg.forEach(r=>{ const o=m[r.destino]=m[r.destino]||{transito:[],diverg:[]}; o.diverg.push(r); });
+      return Object.keys(m).filter(k=>D.fazendas.some(f=>f.id===k)).map(k=>({id:k, nome:fazenda(k).nome, dados:m[k],
+        resumo:`${m[k].transito.length?m[k].transito.length+" carga"+(m[k].transito.length>1?"s":"")+" aguardando confirmação":""}${m[k].transito.length&&m[k].diverg.length?" · ":""}${m[k].diverg.length?m[k].diverg.length+" divergência"+(m[k].diverg.length>1?"s":""):""}`}));
+    },
+    resumo(uns){ const t=uns.reduce((s,u)=>s+u.dados.transito.length,0), d=uns.reduce((s,u)=>s+u.dados.diverg.length,0);
+      return `${t} carga${t===1?"":"s"} em trânsito${d?" · "+d+" divergência"+(d>1?"s":""):""}`; },
+    vazio:()=>htmlEstado("vazio",{que:"carga de café aguardando confirmação do destino"},{classe:"mut"}),
+    detalhe(u){ const t=u.dados.transito, d=u.dados.diverg;
+      return `<div class="cartao"><h3>🚚 Café em trânsito entre fazendas</h3>
+        ${t.length?`<ul class="lista-limpa">${t.map(r=>`<li style="padding:6px 0;border-bottom:1px solid var(--linha)">
+          <b>${fmtData(r.data)}</b> ${esc(fazenda(r.origem).nome)} → <b>${esc(fazenda(r.destino).nome)}</b><br>
+          <span class="mut">${esc(talhao(r.talhaoId).nome)} · ${qtdRemessa(r)} · aguardando confirmação do destino</span></li>`).join("")}</ul>`
+        :htmlEstado("vazio",{que:"carga de café aguardando confirmação do destino", unidade:u.id},{classe:"mut"})}
+        ${d.length?`<p class="mt" style="color:var(--vermelho,#a33)"><b>⚠️ Divergências:</b></p><ul class="lista-limpa">${d.map(r=>`<li class="mut" style="padding:4px 0">${fmtData(r.data)} ${esc(fazenda(r.origem).nome)}→${esc(fazenda(r.destino).nome)}: enviou ${r.carretas}, chegou ${r.recebidoQtd}${r.obsReceb?" — "+esc(r.obsReceb):""}</li>`).join("")}</ul>`:""}
+      </div>`; }
+  },
+  /* (5) Boletins — a lista filtrada do painel, agrupada por unidade; o boletim em si continua a um toque */
+  boletins:{
+    ico:"📄", titulo:"Boletins do período",
+    uns(){
+      const m={}, ordem=[];
+      filtrarBoletins().forEach(b=>{ if(!m[b.fazendaId]){ m[b.fazendaId]=[]; ordem.push(b.fazendaId); } m[b.fazendaId].push(b); });
+      return ordem.filter(k=>D.fazendas.some(f=>f.id===k)).map(k=>({id:k, nome:fazenda(k).nome, dados:m[k],
+        resumo:`<b class="num">${m[k].length}</b> ${m[k].length===1?"boletim":"boletins"} · último ${fmtDataCurta(m[k][0].data)}`}));
+    },
+    resumo(uns){ const n=uns.reduce((s,u)=>s+u.dados.length,0);
+      return `${n} ${n===1?"boletim":"boletins"} · ${uns.length} unidade${uns.length>1?"s":""}`; },
+    vazio:()=>msgVazio(),
+    detalhe(u){
+      return `<div class="cartao"><h3>Boletins (${u.dados.length})</h3>
+        <ul class="lista-limpa">${u.dados.map(x=>`
+          <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
+            <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou")))?"critico":"ok"}"></span>
+            <span class="cresce"><b>${fmtData(x.data)}</b><br><span class="mut">${resumo1linha(x)}</span></span>
+            ${x.visto?'<span class="tag verde">visto</span>':""}<span class="mut">›</span></button></li>`).join("")}
+        </ul></div>`; }
+  }
+};
+
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
   const unidadesAtv = D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
   const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
   const i7 = indicadores(7), i30 = indicadores(30);
-  const lista = filtrarBoletins();
   return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
     <div class="chips no-print mb">
       <button class="chip ${!filtroPainel.atv?"on":""}" data-atv-filtro="">Todas</button>
@@ -7404,8 +7527,8 @@ function vPainel(){
       return r.n?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${r.pct===null?"":r.pct+"% concluído · "}${r.atrasadas.length} atrasada(s)</span>`:"";})()}</button>
     ${cartaoChegadaBoletins()}
     ${cartaoFarolBoletins()}
-    ${cartaoPlanejamentoPainel()}
-    ${cartaoPlanoPainel()}
+    ${cartaoUnidades("planejamento")}
+    ${cartaoUnidades("plano")}
     ${cartaoInsumosPainel()}
     ${(()=>{ if(!syncAtivo()) return "";
       const dados=D.icropDados||[];
@@ -7468,8 +7591,8 @@ function vPainel(){
             <p class="mut" style="font-size:.72rem;margin-top:4px">Quem resolve: agrônomo (Salvino) cadastrando o plantio na Vision.</p></div>`;})()}
         <p class="mut" style="font-size:.75rem">Fonte: robô iCrop (grava toda madrugada)</p>${linhaOrigemDado("icrop")}</div>`;})()}
     ${cartaoGraosPainel()}
-    ${cartaoSolinftecPainel()}
-    ${cartaoRemessasPainel()}
+    ${cartaoUnidades("solinftec")}
+    ${cartaoUnidades("remessas")}
     <div class="no-print" style="display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px">
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
@@ -7518,13 +7641,7 @@ function vPainel(){
       <button class="btn sec mini" id="bt-rel">📈 Resumo do período</button>
       ${botaoAcao("cadastros_painel",null,{classe:"btn sec mini",attrs:'id="bt-cad"',rotulo:"⚙ Cadastros",aria:"Cadastros"})}
     </div>
-    <div class="cartao"><h3>Boletins (${lista.length})${filtroPainel.fazenda?" — "+esc(fazenda(filtroPainel.fazenda).nome):""}</h3>
-      <ul class="lista-limpa">${lista.map(x=>`
-        <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
-          <span class="farol ${((x.ocorrencias||[]).some(o=>o.grav==="Alta")||(x.fito||[]).some(f=>f.nivel==="Alto")||(x.irr&&(["Baixo","Crítica"].includes(x.irr.agua)||x.irr.status==="Não rodou")))?"critico":"ok"}"></span>
-          <span class="cresce"><b>${fmtData(x.data)}</b> — ${esc(fazenda(x.fazendaId).nome)}<br><span class="mut">${resumo1linha(x)}</span></span>
-          ${x.visto?'<span class="tag verde">visto</span>':""}<span class="mut">›</span></button></li>`).join("")||msgVazio()}
-      </ul></div>
+    ${cartaoUnidades("boletins")}
     <button class="btn sec mt no-print" id="bt-sair">Sair</button>`;
 }
 const escopoKpi=()=>filtroPainel.fazenda?esc(fazenda(filtroPainel.fazenda).nome):"grupo";
@@ -7812,7 +7929,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v87";
+const APP_VERSAO="v88";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -8991,28 +9108,6 @@ function planVSaidas(){
     +`<p class="mut" style="font-size:.76rem;margin-top:10px">Os textos saem do que já está no app — nenhuma planilha, nenhum programa de fora.</p>`;
 }
 
-/* ---- (12) cartão "📋 Planejamento do mês" no painel da Diretoria ----
-   Componente ÚNICO; lista UNIDADES, nunca pessoas (mesma regra de justiça do plano do dia, v75). */
-function cartaoPlanejamentoPainel(){
-  planMotor();
-  const ref=planMesDe(hojeBRT());
-  const uns=D.fazendas.filter(f=>(!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv)
-      && (!filtroPainel.fazenda || f.id===filtroPainel.fazenda) && podeVer(f.id))
-    .map(f=>({f, r:planResumoMes(ref,f.id)}))
-    .filter(x=>x.r.n>0)
-    .sort((a,b)=>(b.r.atrasadas.length-a.r.atrasadas.length)||((a.r.pct??101)-(b.r.pct??101)));
-  const corpo = uns.length
-    ? uns.map(({f,r})=>`<div class="plano-un"><b>${esc(f.nome)}</b>
-        <p class="mut" style="margin:2px 0 0">cumprimento <b class="num">${r.pct===null?"—":r.pct+"%"}</b> (${r.finalizadas} de ${r.n-r.canceladas}) · atrasadas <b class="num">${r.atrasadas.length}</b> · travadas <b class="num">${r.travadas.length}</b> · arrastadas <b class="num">${r.arrastadas.length}</b></p>
-        <p class="mut" style="margin:2px 0 0">${r.metaHa?`planejado <b class="num">${esc(planHa(r.metaHa))} ha</b> · executado <b class="num">${esc(planHa(r.execHa))} ha</b> · restante <b class="num">${esc(planHa(r.restaHa))} ha</b> (${r.pctArea}%)`:"sem meta em ha no mês"}${r.semLancamento.length?` · <b class="num">${r.semLancamento.length}</b> sem lançamento`:""}${(r.fora&&r.fora.fora)?` · fora do plano <b class="num">${r.fora.pct}%</b>`:""}</p>
-        ${r.atrasadas.length?`<p class="mut" style="margin:2px 0 0">${esc(r.atrasadas.slice(0,2).map(t=>t.desc).join(" · "))}${r.atrasadas.length>2?" · ＋"+(r.atrasadas.length-2):""}</p>`:""}</div>`).join("")
-    : htmlEstado("vazio",{que:"tarefa da reunião", atividade:filtroPainel.atv||"", unidade:filtroPainel.fazenda||"",
-        onde:filtroPainel.fazenda?"":"nas unidades deste código", periodo:"em "+planMesRot(ref)},{classe:"mut"});
-  return `<div class="cartao"><h3>📋 Planejamento do mês</h3>
-    <p class="mut" style="font-size:.78rem;margin:0 0 8px">O que a reunião combinou × o que já foi respondido. Ordem: unidades com mais tarefas atrasadas. Travada por terceiro ou por chuva não conta como atraso.</p>
-    ${corpo}
-    <button class="btn sec mt no-print" id="bt-planejamento2" style="box-shadow:none;border-radius:0;">Abrir Planejamento</button></div>`;
-}
 function vPlanejamento(){
   planMotor();
   const n=planNav[planNav.length-1]||{v:"menu"};
@@ -10675,10 +10770,15 @@ function ligarEventos(tela){
     if(d.voltar && telaAtual==="relat" && sessao && sessao.papel!=="gerente"){ ir("relatorios"); return; }
     if(d.voltar && telaAtual==="farol"){ ir("farois"); return; }
     if(d.farolun){ ir("farol", d.farolun); return; }
+    /* v88: cartão do painel em duas etapas — a lista de unidades abre a tela da unidade */
+    if(d.painelun){ const [ch,un]=d.painelun.split("|"); painelVista={chave:ch, unidade:un}; ir("painelun"); return; }
+    if(d.voltar && telaAtual==="painelun"){ ir("painel"); return; }
+    /* boletim aberto pela tela da unidade volta para ela, não para o painel */
+    if(d.voltar && telaAtual==="detalhe" && painelVoltaDetalhe){ painelVoltaDetalhe=false; ir("painelun"); return; }
     if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
     if(t.id==="bt-cad"){ cadNav=[]; ir("cadastros"); return; }
-    if(d.ver){ ir("detalhe", d.ver); return; }
+    if(d.ver){ painelVoltaDetalhe = telaAtual==="painelun"; ir("detalhe", d.ver); return; }
     /* relatórios automáticos (v55) */
     if(d.relab){ const [rel,ini,fim]=d.relab.split("|"); relVista={rel,ini,fim}; ir("relat"); return; }
     if(d.relper!==undefined){ relFiltro.per=d.relper; ir(telaAtual,null,true); return; }

@@ -281,8 +281,9 @@ Toda tela de leitura com unidade escolhida mostra onde a pessoa está
 pelo componente ÚNICO `cabecalhoContexto(fazendaId, {sub, voltar})`
 do index.html — nunca uma variante por atividade e nunca `topo()` com
 o nome da fazenda montado à mão. Telas: casa do gerente, boletim
-enviado, casa e registro do pós-colheita, relatório do gerente e
-Diretoria › Faróis › unidade, nas três atividades. Fora, por desenho:
+enviado, casa e registro do pós-colheita, relatório do gerente,
+Diretoria › Faróis › unidade e, desde a v88, Diretoria › <cartão do
+painel> › unidade (item c19), nas três atividades. Fora, por desenho:
 a home das três abas e a escolha de unidade (contexto ainda não
 escolhido), a tela de apontamento em 3 passos e o formulário do
 pós-colheita (entrada), e as telas de grupo da Diretoria (painel,
@@ -997,6 +998,58 @@ sobrou — e tarefa do planejamento fica parada "aguardando insumo".
 - Conferência: `node scripts/teste_insumos.cjs` (a validação da tarefa, com a
   mensagem real do nitrato) e `scripts/checar-poluicao.cjs`, grupo "15.
   Insumos"; detalhe em docs/definicao-de-pronto.md, item 21.
+
+### c19) Cartão do painel em duas etapas: unidades primeiro, descrição só na tela da unidade (desde a v88)
+Pedido do Nilo em 12/09/2026, com as telas na mão: o painel da Diretoria
+virou uma parede de texto. Cada cartão despejava TODAS as unidades com
+TODAS as descrições, uma embaixo da outra — para achar a fazenda que
+interessa era preciso rolar por cima da vida de todas as outras. Regra que
+fica: **no painel, cartão que fala de várias unidades nasce fechado, abre em
+lista de unidades e a descrição inteira mora na tela da unidade.**
+- **Componente ÚNICO `cartaoUnidades(chave)`** + a tela `vPainelUn()` do
+  index.html, alimentados pelo catálogo `PAINEL_CARTOES` — nunca uma variante
+  por cartão, por perfil ou por atividade. O que muda por cartão é o catálogo
+  (quem são as unidades, o que a linha diz, o que a tela mostra), nunca o
+  componente. Cartões hoje: "📋 Planejamento do mês", "📋 Planejado ×
+  Executado", "📡 Solinftec — medição de ontem", "🚚 Café em trânsito entre
+  fazendas" e "Boletins do período".
+- **Três níveis, como manda o P2:** painel → lista de unidades → tela da
+  unidade. Nenhum nível novo: o boletim, que já era a folha da árvore,
+  continua a um toque a partir da lista da unidade, e o "‹" dele devolve à
+  tela da unidade de onde veio, nunca ao painel.
+- **Nasce fechado (P5)** e a linha do `summary` já responde a pergunta de
+  olhada ("7 boletins · 2 unidades", "2 cargas em trânsito", "4 unidades · 1
+  atrasada"), em tipografia neutra — **contador de cartão não é farol**, então
+  sem verde nem vermelho (regra 4 do plano de safra; `.resumo.neutro`).
+- **A lista é só a lista (P7):** uma linha por unidade, nome + o estado
+  naquela linha, alvo de toque ≥ 44 px, seta à direita. Nenhum campo, nenhum
+  cartão, nenhum parágrafo de descrição solto — a descrição é o que a pessoa
+  vai buscar na tela seguinte. Cartão sem unidade nenhuma mostra o vazio pela
+  função única (`htmlEstado`, item c2); os dois cartões que já sumiam sem dado
+  (Solinftec, café em trânsito) continuam sumindo.
+- **A tela da unidade usa o cabeçalho contextual (c5)** —
+  `cabecalhoContexto(unidade,{sub:<título do cartão>, voltar:true})`, como
+  Diretoria › Faróis › unidade — e termina em "‹ Voltar ao painel". A conta
+  mostrada é exatamente a de antes: a v88 mudou ONDE o número aparece, nunca
+  o número.
+- **Agrupamento por id, nunca por pedaço de nome** (mesma regra 3 do plano de
+  safra). O café em trânsito agrupa pela fazenda que RECEBE — é ela que
+  confirma a chegada — e a tela diz isso com todas as letras.
+- **Cabeçalho de acordeão quebra em duas linhas** (`.secao > summary`,
+  CSS da v88): título em cima, resumo embaixo, quando os dois não cabem a
+  390 px. Título que não cabe sozinho na linha é título para encurtar — o
+  nome completo fica no cabeçalho da tela da unidade.
+- **Cartão vazio diz só a frase do vazio** — sem nota de explicação e sem
+  linha de fonte: explicar o que não existe é ruído.
+- **Vocabulário:** a lista relata REGISTRO e PRAZO. Proibidos "não fez", "não
+  realizou", "faltou", "esqueceu"; "atrasada" continua valendo só como rótulo
+  de prazo do módulo de planejamento (c15). Nenhuma tela lista pessoas — só
+  unidades (regra de justiça da v75).
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "16. Painel: cartão
+  fecha, lista unidades, descrição na tela da unidade" (os cinco cartões
+  fechados, lista sem campo, alvo ≥ 44 px, toque abre `painelun` com
+  cabeçalho contextual, voltar devolve ao painel, altura do painel ≤ 4
+  telas); detalhe em docs/definicao-de-pronto.md, item 23.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
