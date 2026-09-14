@@ -1370,7 +1370,9 @@ NADA aparece. O toque abre a folha com ações de UM TOQUE — Comecei · Conclu
 Travado (chips: falta insumo · falta peça · falta gente · falta máquina ·
 chuva · outro) · "💬 Falar com o Nilo" (uma linha pronta). Zero campo de
 digitação, zero diálogo, e nada bloqueia o boletim. O gerente vê só a
-unidade dele.
+unidade dele. Desde a v91 a fileira é o componente único das listas
+(seção "Ações da tarefa no lugar (v91)"): o toque deixa "✔ Salvo · … ·
+desfazer" na folha e o chip aceso não desfaz.
 
 ### Planejado × executado × restante (v78, forma revista na v79)
 Na folha do gerente e nas listas da área Planejamento — componente ÚNICO
@@ -1436,7 +1438,10 @@ terceiros (por fornecedor, desde quando, quantas fazendas paradas) ·
 filtros de status, farol, unidade e origem) · 📲 Textos prontos. "＋ tarefa"
 fixo no rodapé (4 campos: unidade, descrição, prazo, área; o resto em "Mais
 opções"). Nas listas, o "⋯" abre a ação rápida NO LUGAR: Comecei · Concluí ·
-Travado · Novo prazo (chips +7 · +15 · fim do mês · próxima reunião).
+Travado · Novo prazo (chips +7 · +15 · fim do mês · próxima reunião) ·
+Definir meta — desde a v91 pelo componente único, com o 2º nível embaixo do
+chip, "Salvo · … · desfazer" no cartão e a lista que não redesenha (seção
+"Ações da tarefa no lugar (v91)").
 
 ### Interface que não deixa esquecer
 - **Pastilhas na porta de entrada**, tocáveis; nenhuma aparece sem
@@ -1511,6 +1516,127 @@ Planejamento" (10 itens ✅) e 16 telas do módulo medidas com as regras de
 Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
+
+## Ações da tarefa no lugar (v91) — Comecei · Concluí · Travado · Novo prazo · Definir meta
+
+**O pedido.** 14/09/2026, o Nilo com o iPhone (390 px) em Planejamento › 📅 Mês
+por unidade › "ver todas as tarefas". No "⋯" de cada cartão, três defeitos:
+**D1** "Comecei" só acendia o chip — o farol do cartão não mudava (tarefa sem
+prazo é ⏸️ com ou sem execução), a linha de estado continuava "Vereda — Café ·
+sem prazo · Reunião…" e o "✔ Salvo" nascia no TOPO da página (`planTopo`),
+fora da vista de quem estava rolado na lista. Gravava de verdade (`D.tarefas`
++ `D.tarefaHistorico` + fila), mas a tela não dizia. **D2** "Concluí" fazia a
+tarefa sumir: a lista inteira redesenhava (`planRender`) e reordenava pelo
+farol (`planOrdenar` — ✅ vai para o fim); e, no aparelho com internet, a
+sincronização que roda logo depois de gravar (`syncTudo`) redesenhava a tela de
+Planejamento mais uma vez. Sem retorno e sem caminho de volta. **D3** o 2º
+nível ("Travado", "Novo prazo", "Definir meta") abria sem rótulo, sem o chip-pai
+aceso e com a lista inteira redesenhada — lia-se como "as outras opções
+sumiram". Regra do Nilo, com as palavras dele: "clicar em uma opção não
+deveria excluir as outras, apesar de que as antagônicas sim".
+
+**O que encontrei no código (item 2.4 do prompt).** A fileira estava desenhada
+em QUATRO lugares: `planLinhaTarefa` (Todas as tarefas, Semana, Rodada,
+Pendências com terceiros, Arrastadas), `planVAssuntos` (cópia com 3 chips), o
+ritual "Fechar a semana" (chips mini Concluí · Travado) e a folha do gerente
+`planFolhaCorpo` (com tratador próprio `data-tar-*`, `tarUI.trava` booleano e
+`podePrazo` decidido por `if(papel)`). Tocar no chip aceso DESFAZIA o status
+(voltava para "a iniciar"). A fileira já refletia o status ao abrir; o que não
+refletia era o cartão em volta.
+
+**O que é agora.** Componente ÚNICO `planAcoesTarefa(t, ui, ctx)` + tratador
+único `planAcaoClique(d, ui, repintar)` + `planDesfazer` + `planRepintar`, nas
+listas de Planejamento e na folha do gerente, três atividades (o ritual da
+sexta continua com os chips mini, agora passando pelo MESMO tratador).
+- **Dois grupos de natureza diferente.** SITUAÇÃO (excludente): Comecei → EM
+  EXECUÇÃO · Concluí → FINALIZADO · Travado → AGUARDANDO TERCEIRO / CLIMA (o
+  motivo decide). Um aceso (`aria-pressed`), tocar noutro troca, **tocar no
+  aceso não desfaz**. ATRIBUTOS (independentes): Novo prazo · Definir meta —
+  convivem com qualquer situação e entre si ("Comecei" + "Novo prazo +15" +
+  "Meta 96 ha" na mesma abertura). Quem os vê é o catálogo
+  `ACOES_PERFIL.tarefa_prazo` / `tarefa_meta` (c9; o gerente continua sem os
+  dois — sem mudança de quem pode o quê).
+- **A fileira nunca some.** O 2º nível abre EMBAIXO do chip tocado, com rótulo
+  ("Por quê?" · "Novo prazo" · "Meta em ha"), um aberto por vez, quebrando em
+  linhas (`.plan-sub`, largura da página 390 px). Tocar o mesmo chip recolhe
+  sem gravar. A escolha grava na hora, recolhe, e o chip-pai fica aceso com a
+  escolha no rótulo: "Travado · falta peça", "Novo prazo · 05/10", "Meta · 96
+  ha" (`aria-expanded` no pai).
+- **Todo toque tem retorno visível NO LUGAR.** A gravação redesenha SÓ o
+  cartão (`planRepintar`, por `data-plan-linha`) ou a folha — nunca a lista; a
+  rolagem não pula e `syncTudo` deixou de redesenhar Planejamento enquanto um
+  "⋯" está aberto. Farol, linha de estado e trio atualizam, e abaixo da
+  fileira fica "✔ Salvo · em execução | finalizada | travada: falta peça |
+  prazo 05/10 | meta 96 ha · desfazer" enquanto a ação rápida estiver aberta
+  (desfazer alcançável, alvo 44 px). **"Concluí" não é diálogo, é desfazer:**
+  o cartão permanece na lista, na mesma posição, com ✅ e "finalizado hoje"; sai
+  só no próximo redesenho natural (trocar filtro, sair e voltar, fechar o "⋯").
+  "desfazer" devolve a foto de antes (status, bloqueio, prazo, meta) e entra
+  em `D.tarefaHistorico` como reversão — "status: finalizado → em execução
+  (desfeito)" — nunca delete. Zero confirmação nova (c10).
+- **A linha de estado do cartão diz o status** (`planEstadoTexto`: "em
+  execução", "finalizado hoje", "finalizado em DD/MM", "cancelado") antes do
+  placar e do prazo; tarefa finalizada lê "prazo 20/09" em vez de "vence
+  20/09". Relata REGISTRO e PRAZO — nada de "não fez", "pendente", "faltou".
+- **"Definir meta"** continua o campo numérico inline do escritório (v78), agora
+  dentro do 2º nível "Meta em ha" e com `botaoAvanco` "Gravar meta" — inativo
+  até haver número ("Informe a área planejada em ha"), ativa NO LUGAR ao
+  digitar, um id por cartão (`plan-meta-ok-<id>`). Nenhum `prompt()` novo.
+- **P10 na fileira:** `.plan-acoes .chip` ganhou `border-radius:0` — a classe
+  é própria da fileira (mesma decisão dos filtros da v80). Os chips do
+  BOLETIM continuam pílula de 24 px pela classe global `.chip` (❌ herdado de
+  P10, decisão do Nilo pendente — não foi tocado).
+- **Medidas a 390 px** (tarefa de 96 ha, ADMIN): cartão fechado 192,5 px;
+  "⋯" aberto 309,5 px (fileira 117 px: 5 chips de 44 px de altura em 2
+  linhas — 93,9 · 85,4 · 90,1 · 115,5 · 124,5 px de largura); com "Salvo ·
+  desfazer" 169 px (a linha tem 44 px); "Travado" aberto 364,2 px (2º nível
+  187,2 px, 6 motivos); "Meta em ha" aberto 315,9 px (138,9 px); largura da
+  página 390 px em todos os estados, nenhum chip com raio.
+
+**Antes → depois dos três defeitos.**
+| | antes (v90) | depois (v91) |
+|---|---|---|
+| D1 Comecei | chip acende; farol e linha iguais; "✔ Salvo" no topo da página; tocar de novo desfazia | chip aceso com `aria-pressed`; linha "em execução"; "✔ Salvo · em execução · desfazer" no cartão; tocar de novo não faz nada |
+| D2 Concluí | lista inteira redesenha e reordena (e a sincronização redesenha de novo): tarefa "some" | cartão permanece na posição, ✅ · "finalizado hoje", "Salvo · finalizada · desfazer"; só ele redesenha |
+| D3 Travado / Novo prazo / Definir meta | 2º nível sem rótulo, chip-pai apagado, lista inteira redesenhada | 2º nível embaixo com rótulo, um por vez; fileira sempre visível; chip-pai aceso com a escolha ("Travado · falta peça", "Novo prazo · 05/10", "Meta · 96 ha") |
+
+**Onde mexe no código:** CSS `.plan-acoes .chip` (raio 0), `.plan-sub`,
+`.plan-salvo`, `.plan-acoes-folha`; `ACOES_PERFIL.tarefa_prazo/tarefa_meta`;
+`planLinhaTarefa` (casca `data-plan-linha`, `planEstadoTexto`), novo bloco
+`planLinhaAssunto` · `planEstadoTexto` · `planAcoesTarefa` · `planAcaoClique`
+· `planDesfazer` · `planRepintar` · `PLAN_META_FALTA`; `planVAssuntos` usa
+`planLinhaAssunto`; `planClique` ("⋯" repinta só os cartões envolvidos +
+tratador único); `planInput` (campo da meta ativa o botão no lugar);
+`planFolhaCorpo` / `planFolhaAbrir` (componente único, `tarUI` com
+trava/prazoAb/metaAb/salvo, `f.oninput`); `planLinhaTexto` ("prazo" na
+finalizada); `planHistTexto` (prazo → "sem prazo", campo `meta`); `planLimpar`
+(`salvo`); `syncTudo` (não redesenha Planejamento com "⋯" aberto). Contagem
+de confirmações do app: **20, igual à da v72** (nenhuma nova). `prompt()`
+restantes: **4** (recebimento de carga ×2; novo plantio ×2 — os mesmos da
+pendência da v72).
+
+### Provas (v91)
+- `node scripts/teste_planejamento.cjs` → **124 ✅ · 0 ❌** (os 111 da v90 mais
+  13: (a) tarefa em execução abre com "Comecei" aceso; (b) "Concluí" mantém o
+  cartão na mesma posição com ✅ e "finalizado hoje", só ele redesenha, rolagem
+  parada, "Salvo · finalizada · desfazer" com alvo 44 px e 1 entrada no
+  histórico; (c) "desfazer" volta o status com 2 entradas e "desfeito"; (d)
+  "Travado" aberto mantém os 5 chips e abre "Por quê?" com 6 motivos; (e)
+  "Comecei" + "Novo prazo +15" convivem, um 2º nível por vez, chip-pai com a
+  data; chip aceso não desfaz; (f) 390 px, zero pílula, alvo 44 px; "Gravar
+  meta" inativo → ativa no lugar → grava → desfaz; zero nativo, zero diálogo,
+  sem termo de cobrança; gerente vê "Salvo · desfazer" na folha e continua sem
+  prazo/meta; zero erro de JavaScript).
+- `scripts/checar-poluicao.cjs` → **693 ✅ · 41 ❌**: os MESMOS 41 ❌ herdados
+  (o main da v90 mede 690 ✅ · 41 ❌ com o mesmo script), nenhum novo; 3
+  checagens ✅ novas no grupo "14. Planejamento" ("Ações da tarefa (v91)").
+- `scripts/regressao_render.cjs` main × v91: boletim das três atividades,
+  pós-colheita, Diretoria e Admin com TODAS as telas idênticas fora a versão do
+  rodapé (a única diferença nos dumps é o minuto de `enviadoEm` no
+  localStorage, gerado na hora da rodada). A casa do gerente não muda: a
+  folha da tarefa só aparece depois de um toque.
+- `node scripts/teste_nomenclatura.cjs` → "Tudo certo"; `node
+  scripts/teste_insumos.cjs` → 54 ✅ · 0 ❌; `node --check` no JS extraído ✅.
 
 ## Quadro "Planejamento cafeicultura" (v90) — a matriz do escritório por cima da ata
 
@@ -2107,8 +2233,15 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
-v90, 14/09/2026: **690 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o main da v89
-mede hoje 678 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v90 acrescentou
+v91, 14/09/2026: **693 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o main da v90
+mede hoje 690 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v91 acrescentou 3
+checagens ✅ ao grupo "14. Planejamento" ("Ações da tarefa (v91)": depois do
+toque o cartão permanece com "Salvo · … · desfazer" e o estado na linha;
+"Travado" aberto mantém os 5 chips e abre "Por quê?" embaixo sem rolar de lado
+e sem pílula; "desfazer" volta o status no lugar sem diálogo); a tela "Todas
+as tarefas" não tinha ❌ herdado próprio (os ❌ de P10 são do CSS-base). Medição
+anterior, v90, 14/09/2026: **690 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o main
+da v89 mede 678 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v90 acrescentou
 a tela "Planejamento › Conferir o quadro" (medida com as regras de
 Cadastros: 390 px, 4,5 telas com busca, 31 itens com busca, "Recomeçar" fixo
 no rodapé, nível 3) e 5 checagens ✅ no grupo "14. Planejamento" (bloco ❓ com
@@ -2431,6 +2564,15 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Ações da tarefa no lugar (v91) — para o Nilo testar no iPhone**, em
+  Planejamento › Todas as tarefas: (1) "⋯" numa tarefa e "Comecei" — o
+  cartão deve dizer "em execução" e mostrar "✔ Salvo · em execução ·
+  desfazer" embaixo dos chips, sem a lista pular; (2) "Concluí" — o cartão
+  fica onde está, com ✅ e "finalizado hoje", e "desfazer" volta; (3)
+  "Travado" — os cinco chips continuam na tela e "Por quê?" abre embaixo;
+  (4) "Novo prazo" com "Comecei" aceso — os dois ficam gravados. Decisão em
+  aberto: os chips do BOLETIM continuam pílula (classe global `.chip`, ❌
+  herdado de P10); só a fileira de ações perdeu o raio nesta entrega.
 - **Insumos (v86) — rodar três SQL no Supabase.** Na ordem:
   `sql/054-insumos.sql` (tabelas `insumo_remessa` e `insumo_recebimento` e a
   visão `vw_insumo_saldo`), `sql/055-mensagens-importadas.sql` (a trilha das

@@ -656,6 +656,23 @@ amarelo é de 3 a 7 dias; verde é mais de 7 dias.
 `+7 dias` · `+15 dias` · `fim do mês` · `próxima reunião` (dia 10).
 Nunca calendário nem teclado: quem está no campo não digita.
 
+### Ações da tarefa no lugar (v91) — rótulos do componente único
+Fileira (`planAcoesTarefa`, listas e folha do gerente, três atividades):
+- grupo SITUAÇÃO (excludente): `Comecei` · `Concluí` · `Travado` — o chip-pai
+  mostra o motivo escolhido: "Travado · falta peça";
+- grupo ATRIBUTOS (independentes; só escritório/Diretoria, por
+  `ACOES_PERFIL.tarefa_prazo` / `tarefa_meta`): `Novo prazo` ("Novo prazo ·
+  30/09" quando repactuado) · `Definir meta` / `Meta · 96 ha`.
+Rótulos do 2º nível: `Por quê?` · `Novo prazo` · `Meta em ha`. Botão de
+avanço `Gravar meta`; o que falta: "Informe a área planejada em ha".
+Retorno no lugar: `✔ Salvo · em execução` · `finalizada` · `travada: <motivo>`
+· `prazo DD/MM` · `meta N ha` · `meta retirada` — sempre seguido de
+`desfazer`. Linha de estado do cartão (`planEstadoTexto`): `em execução` ·
+`finalizado hoje` · `finalizado em DD/MM` · `cancelado`; tarefa finalizada lê
+`prazo DD/MM` no lugar de `vence DD/MM`. Histórico: a reversão grava o motivo
+`desfeito` ("status: finalizado → em execução (desfeito)") e o campo `meta`
+lê "meta: sem meta → 96 ha".
+
 ### Origem da tarefa (`PLAN_ORIGENS`)
 `mensal` = rodada da reunião · `semana` = tarefa nova da semana ·
 `avulsa` = criada no escritório fora dos dois ritos.

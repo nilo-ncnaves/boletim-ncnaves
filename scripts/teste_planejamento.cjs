@@ -26,6 +26,12 @@
   10. Sexta-feira abre sozinha a tela de fechamento da semana; dia 11 sem ata
       mostra a pastilha da rodada.
   11. Dois toques até qualquer função da área Planejamento.
+  13. (v91) Ações da tarefa no lugar (Todas as tarefas, ADMIN, 390 px): "⋯" de tarefa em
+      execução abre com "Comecei" aceso; "Concluí" mantém o cartão na lista (✅, "finalizado
+      hoje", só ele redesenha, rolagem parada) com "Salvo · finalizada · desfazer"; "desfazer"
+      volta o status e fica no histórico; "Travado" aberto mantém os 5 chips e abre "Por quê?"
+      embaixo; "Comecei" + "Novo prazo +15" convivem; chip aceso não desfaz; nenhuma fileira
+      passa de 390 px, sem pílula, alvo ≥ 44 px; "Gravar meta" é botão de avanço.
   12. (v90) O QUADRO "Planejamento cafeicultura" do escritório (matriz fazenda ×
       insumo, 14/09/2026) colado por cima da ata de 10/09: detecção nos três
       separadores, data, 62 + 18 = 80 células, coluna inteira vazia, 2 linhas fora
@@ -634,21 +640,28 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
       document.querySelector('#tar-faixa [data-tar]').click();
       await new Promise(r => setTimeout(r, 150));
       const folha = !!document.getElementById('folha-tarefa');
-      const bt = document.querySelector('#folha-tarefa [data-tar-st="' + st + '"]');
+      const bt = document.querySelector('#folha-tarefa [data-plan-st="' + id + '|' + st + '"]');
       if (bt) bt.click();
       await new Promise(r => setTimeout(r, 150));
       const campos = document.querySelectorAll('#folha-tarefa input, #folha-tarefa select, #folha-tarefa textarea').length;
-      return { folha, de, esperado: st, para: planTarefa(id).status, campos, tela: telaAtual, nativos: window.__nativos || 0 };
+      /* v91: o retorno "Salvo · … · desfazer" aparece na folha; prazo e meta continuam fora para o gerente (catálogo c9) */
+      const salvo = ((document.querySelector('#folha-tarefa .plan-salvo') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+      return { folha, de, esperado: st, para: planTarefa(id).status, campos, tela: telaAtual, nativos: window.__nativos || 0, salvo,
+        prazoChip: !!document.querySelector('#folha-tarefa [data-plan-prazoab]'), metaChip: !!document.querySelector('#folha-tarefa [data-plan-metaab]'),
+        fileira: document.querySelectorAll('#folha-tarefa .plan-acoes > .chips:not(.plan-sub) > .chip').length };
     });
     ok('Gerente muda o status em UM toque, sem digitar', toque.folha && toque.para === toque.esperado && toque.campos === 0,
       toque.de + ' → ' + toque.para + '; ' + toque.campos + ' campo(s) de digitação');
     ok('O toque não tira o gerente da tela nem abre diálogo nativo', toque.tela === 'casa' && toque.nativos === 0, toque.tela);
+    ok('(v91) Gerente vê "Salvo · … · desfazer" na folha e continua sem "Novo prazo" / "Definir meta" (3 chips)',
+      /^✔ Salvo · (finalizada|em execução)/.test(toque.salvo) && !toque.prazoChip && !toque.metaChip && toque.fileira === 3,
+      '"' + toque.salvo + '" · ' + toque.fileira + ' chips');
 
     /* travar por falta de insumo continua em cinza, nunca vermelho */
     const trava = await page.evaluate(async () => {
-      document.querySelector('#folha-tarefa [data-tar-trava]').click();
+      document.querySelector('#folha-tarefa [data-plan-trava]').click();
       await new Promise(r => setTimeout(r, 120));
-      document.querySelector('#folha-tarefa [data-tar-mot="insumo"]').click();
+      document.querySelector('#folha-tarefa [data-plan-mot$="|insumo"]').click();
       await new Promise(r => setTimeout(r, 120));
       const t = planAbertasDa('f22c').find(x => x.status === 'aguardando_terceiro');
       return t ? { farol: planFarol(t), texto: planLinhaTexto(t) } : null;
@@ -705,6 +718,136 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
       ger78.cel.join(' · ') + ' · ' + ger78.linhas + ' lançamento(s) · ' + ger78.campos + ' campo(s)');
     ok('O lançamento do boletim mostra que abateu a tarefa (📋)', /^📋 abate:/.test(ger78.vinc), ger78.vinc);
     ok('Nenhum erro de JavaScript na tela do gerente', erros.length === 0, erros.join(' | '));
+    await ctx.close();
+  }
+
+  /* ---------- 13. (v91) ações da tarefa no lugar — Todas as tarefas, 390 px (segunda, 14/09/2026) ---------- */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-14T14:30:00-03:00');
+    await porD(page, estado);
+    await page.evaluate(() => { ritualPuladoSessao = true; ir('entrada'); });
+    await page.click('[data-perfil="admin"]').catch(() => {}); await page.waitForTimeout(300);   /* o escritório entra como administrador, como no aparelho */
+    await page.evaluate(() => { planNav = [{ v: 'menu' }, { v: 'lista' }]; planLimpar(); planUI.filtroUnid = 'f22c'; ir('planejamento'); });
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      const espera = ms => new Promise(x => setTimeout(x, ms));
+      const toca = sel => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
+      const out = { nativos0: window.__nativos || 0 };
+      /* (a) tarefa EM EXECUÇÃO: "Comecei" já aceso ao abrir o "⋯" */
+      const emEx = planTarefas().find(t => t.unidade === 'f22c' && t.status === 'em_execucao' && t.tipoItem === 'tarefa');
+      out.temEmEx = !!emEx;
+      if (emEx) {
+        toca('#app [data-plan-acoes="' + emEx.id + '"]'); await espera(150);
+        const c = document.querySelector('#app [data-plan-st="' + emEx.id + '|em_execucao"]');
+        out.a = { aceso: !!c && c.classList.contains('on'), pressed: c && c.getAttribute('aria-pressed') };
+        toca('#app [data-plan-acoes="' + emEx.id + '"]'); await espera(150);
+      }
+      /* (b) "Concluí" na tarefa de 96 ha: o cartão PERMANECE, ✅, "finalizado hoje", "desfazer" */
+      const t96 = planTarefas().find(t => t.unidade === 'f22c' && /varrição/i.test(t.desc));
+      const id = t96.id, hist0 = planHistDe(id).length, statusAntes = t96.status;
+      const ids = () => [...document.querySelectorAll('#app [data-plan-linha]')].map(e => e.dataset.planLinha);
+      const pos0 = ids().indexOf(id);
+      document.querySelectorAll('#app [data-plan-linha]').forEach(e => { e.__marca = 1; });
+      const scroll0 = window.scrollY;
+      toca('#app [data-plan-acoes="' + id + '"]'); await espera(150);
+      toca('#app [data-plan-st="' + id + '|finalizado"]'); await espera(200);
+      const cartao = document.querySelector('#app [data-plan-linha="' + id + '"]');
+      const outros = [...document.querySelectorAll('#app [data-plan-linha]')].filter(e => e.dataset.planLinha !== id);
+      const bd = cartao && cartao.querySelector('[data-plan-desfazer]');
+      out.b = { permanece: !!cartao, status: planTarefa(id).status, hist: planHistDe(id).length - hist0,
+        farol: cartao ? (cartao.querySelector('.plan-farol') || {}).textContent.trim() : '',
+        estado: cartao ? ((cartao.querySelector('.cad-item .mut') || {}).textContent || '') : '',
+        salvo: cartao ? ((cartao.querySelector('.plan-salvo') || {}).textContent || '').replace(/\s+/g, ' ').trim() : '',
+        desfazer: !!bd, alvoDesfazer: bd ? +bd.getBoundingClientRect().height.toFixed(1) : 0,
+        posicao: pos0 === ids().indexOf(id), soOCartao: outros.length > 0 && outros.every(e => e.__marca === 1),
+        scroll: window.scrollY === scroll0, modal: !!document.querySelector('dialog[open], .dialogo, .folha') };
+      /* (c) "desfazer": status anterior de volta, histórico com a reversão */
+      toca('#app [data-plan-desfazer="' + id + '"]'); await espera(200);
+      const h = planHistDe(id);
+      out.c = { status: planTarefa(id).status, esperado: statusAntes, hist: h.length - hist0, ultimo: h.map(planHistTexto).find(x => /desfeito/.test(x)) || h.map(planHistTexto).join(' | '),
+        semSalvo: !document.querySelector('#app [data-plan-linha="' + id + '"] .plan-salvo'), cartao: !!document.querySelector('#app [data-plan-linha="' + id + '"]') };
+      /* (d) "Travado" aberto: a fileira principal continua com os 5 chips visíveis, subgrupo com rótulo */
+      toca('#app [data-plan-trava="' + id + '"]'); await espera(150);
+      const ac = document.querySelector('#app [data-plan-linha="' + id + '"] .plan-acoes');
+      const fileira = ac ? [...ac.querySelectorAll(':scope > .chips:not(.plan-sub) > .chip')].filter(c => c.offsetParent !== null) : [];
+      out.d = { chips: fileira.map(c => c.textContent.trim()), n: fileira.length,
+        rotulo: ac && ac.querySelector('.plan-sub .cad-filtro-rot') ? ac.querySelector('.plan-sub .cad-filtro-rot').textContent.trim() : '',
+        motivos: ac ? ac.querySelectorAll('.plan-sub [data-plan-mot]').length : 0,
+        expanded: ac && ac.querySelector('[data-plan-trava]') ? ac.querySelector('[data-plan-trava]').getAttribute('aria-expanded') : '',
+        larguraOk: document.documentElement.scrollWidth <= 390 };
+      /* (e) "Comecei" + "Novo prazo +15": os dois gravados, nenhum apagou o outro */
+      toca('#app [data-plan-st="' + id + '|em_execucao"]'); await espera(150);
+      const prazoAntes = planTarefa(id).prazo;
+      toca('#app [data-plan-prazoab="' + id + '"]'); await espera(150);
+      const subs = document.querySelectorAll('#app [data-plan-linha="' + id + '"] .plan-sub').length;
+      const rotPrazo = ((document.querySelector('#app [data-plan-linha="' + id + '"] .plan-sub .cad-filtro-rot') || {}).textContent || '').trim();
+      toca('#app [data-plan-prazo="' + id + '|d15"]'); await espera(200);
+      const t2 = planTarefa(id);
+      const chipCom = document.querySelector('#app [data-plan-st="' + id + '|em_execucao"]');
+      const chipPrazo = document.querySelector('#app [data-plan-prazoab="' + id + '"]');
+      out.e = { status: t2.status, prazoAntes, prazo: t2.prazo, dias: planDiasEntre(prazoAntes, t2.prazo), comeceiAceso: !!chipCom && chipCom.classList.contains('on'),
+        prazoAceso: !!chipPrazo && chipPrazo.classList.contains('on'), rotuloPrazo: chipPrazo ? chipPrazo.textContent.trim() : '', subs, rotPrazo,
+        salvo: ((document.querySelector('#app [data-plan-linha="' + id + '"] .plan-salvo') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
+        fileiraVisivel: document.querySelectorAll('#app [data-plan-linha="' + id + '"] .plan-acoes > .chips:not(.plan-sub) > .chip').length, hist: planHistDe(id).length };
+      /* tocar no chip aceso NÃO desfaz */
+      toca('#app [data-plan-st="' + id + '|em_execucao"]'); await espera(150);
+      out.aceso = { status: planTarefa(id).status, hist: planHistDe(id).length };
+      /* (f) nenhuma fileira mais larga que a tela, chips sem pílula, alvo ≥ 44 px */
+      const chips = [...document.querySelectorAll('#app .plan-acoes .chip')];
+      out.f = { scrollW: document.documentElement.scrollWidth, fora: chips.filter(c => c.getBoundingClientRect().right > 390).length,
+        raio: chips.filter(c => parseFloat(getComputedStyle(c).borderTopLeftRadius) > 0).length,
+        alvo: chips.length ? +Math.min(...chips.map(c => c.getBoundingClientRect().height)).toFixed(1) : 0, tela: telaAtual };
+      /* "Definir meta": botão de avanço inativo até haver número; ativa no lugar; grava e desfaz */
+      const semMeta = planTarefas().find(t => t.unidade === 'f22c' && t.tipoItem === 'tarefa' && !planMeta(t) && planAberta(t));
+      if (semMeta) {
+        toca('#app [data-plan-acoes="' + semMeta.id + '"]'); await espera(150);
+        toca('#app [data-plan-metaab="' + semMeta.id + '"]'); await espera(150);
+        const bt = document.getElementById('plan-meta-ok-' + semMeta.id), campo = document.getElementById('plan-meta-campo-' + semMeta.id);
+        const inativo = !!bt && bt.classList.contains('acao-off'), falta = bt ? bt.getAttribute('data-falta') : '';
+        const antesMeta = planMeta(semMeta), hAntes = planHistDe(semMeta.id).length;
+        if (bt) bt.click(); await espera(100);
+        const gravouSem = planMeta(planTarefa(semMeta.id)) !== antesMeta || planHistDe(semMeta.id).length !== hAntes;
+        if (campo) { campo.value = '40'; campo.dispatchEvent(new Event('input', { bubbles: true })); }
+        await espera(100);
+        const ativou = !!bt && !bt.classList.contains('acao-off') && document.getElementById('plan-meta-ok-' + semMeta.id) === bt;
+        if (bt) bt.click(); await espera(200);
+        const meta = planMeta(planTarefa(semMeta.id));
+        const trio = document.querySelectorAll('#app [data-plan-linha="' + semMeta.id + '"] .plan-tres > span').length;
+        const rotMeta = ((document.querySelector('#app [data-plan-metaab="' + semMeta.id + '"]') || {}).textContent || '').trim();
+        toca('#app [data-plan-desfazer="' + semMeta.id + '"]'); await espera(200);
+        out.meta = { inativo, falta, gravouSem, ativou, meta, trio, rotMeta, desfeita: planMeta(planTarefa(semMeta.id)) === antesMeta,
+          fileira: document.querySelectorAll('#app [data-plan-linha="' + semMeta.id + '"] .plan-acoes > .chips:not(.plan-sub) > .chip').length };
+      }
+      out.nativos = (window.__nativos || 0) - out.nativos0;
+      out.dialogos = document.querySelectorAll('.dialogo').length;
+      out.texto = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      return out;
+    });
+    ok('(a) Tarefa em execução abre o "⋯" com "Comecei" já aceso (aria-pressed)', r.temEmEx && r.a && r.a.aceso && r.a.pressed === 'true',
+      r.temEmEx ? JSON.stringify(r.a) : 'nenhuma tarefa em execução na unidade');
+    ok('(b) "Concluí": o cartão PERMANECE na lista, na mesma posição, com ✅ e "finalizado hoje"',
+      r.b.permanece && r.b.posicao && r.b.farol === '✅' && /finalizado hoje/.test(r.b.estado) && r.b.status === 'finalizado', `${r.b.farol} · ${r.b.estado.slice(0, 70)}`);
+    ok('(b) Só o cartão redesenhou (os outros ficaram no lugar), rolagem parada, nenhum diálogo',
+      r.b.soOCartao && r.b.scroll && !r.b.modal, `outros intactos: ${r.b.soOCartao} · rolagem parada: ${r.b.scroll} · diálogo: ${r.b.modal}`);
+    ok('(b) Linha "Salvo · finalizada · desfazer" no lugar, histórico com 1 entrada, alvo do desfazer ≥ 44 px',
+      /Salvo · finalizada/.test(r.b.salvo) && r.b.desfazer && r.b.hist === 1 && r.b.alvoDesfazer >= 44, `"${r.b.salvo}" · ${r.b.hist} entrada(s) · ${r.b.alvoDesfazer} px`);
+    ok('(c) "desfazer" devolve o status anterior e fica no histórico como reversão (2 entradas, "desfeito")',
+      r.c.status === r.c.esperado && r.c.hist === 2 && /desfeito/.test(r.c.ultimo) && r.c.semSalvo && r.c.cartao, `${r.c.status} · ${r.c.hist} entrada(s) · "${r.c.ultimo}"`);
+    ok('(d) "Travado" aberto: a fileira continua com os 5 chips e o 2º nível abre embaixo com rótulo "Por quê?" (6 motivos), sem passar de 390 px',
+      r.d.n === 5 && r.d.rotulo === 'Por quê?' && r.d.motivos === 6 && r.d.expanded === 'true' && r.d.larguraOk, r.d.chips.join(' · ') + ' · ' + r.d.motivos + ' motivos');
+    ok('(e) "Comecei" + "Novo prazo +15": os dois gravados, nenhum apagou o outro; um 2º nível por vez, rótulo "Novo prazo", chip-pai com a data',
+      r.e.status === 'em_execucao' && r.e.dias === 15 && r.e.comeceiAceso && r.e.prazoAceso && /^Novo prazo · \d\d\/\d\d$/.test(r.e.rotuloPrazo)
+      && r.e.subs === 1 && r.e.rotPrazo === 'Novo prazo' && /Salvo · prazo \d\d\/\d\d/.test(r.e.salvo) && r.e.fileiraVisivel === 5,
+      `${r.e.status} · ${r.e.prazoAntes} → ${r.e.prazo} · "${r.e.rotuloPrazo}" · "${r.e.salvo}"`);
+    ok('Tocar no chip já aceso não desfaz o status e não grava nada', r.aceso.status === 'em_execucao' && r.aceso.hist === r.e.hist, r.aceso.status + ' · histórico ' + r.aceso.hist);
+    ok('(f) Nenhuma fileira mais larga que 390 px; chips da fileira sem pílula; alvo ≥ 44 px',
+      r.f.scrollW <= 390 && r.f.fora === 0 && r.f.raio === 0 && r.f.alvo >= 44 && r.f.tela === 'planejamento', `${r.f.scrollW} px · ${r.f.fora} fora · ${r.f.raio} com raio · alvo ${r.f.alvo} px`);
+    ok('"Definir meta": "Gravar meta" nasce inativo dizendo a próxima ação, nada grava antes, ativa no lugar com o número, grava (trio aparece, chip "Meta · 40 ha") e "desfazer" volta',
+      r.meta && r.meta.inativo && /Informe a área planejada/.test(r.meta.falta) && !r.meta.gravouSem && r.meta.ativou && r.meta.meta === 40 && r.meta.trio === 3
+      && r.meta.rotMeta === 'Meta · 40 ha' && r.meta.desfeita && r.meta.fileira === 5, r.meta ? `"${r.meta.falta}" · meta ${r.meta.meta} · ${r.meta.trio} colunas · "${r.meta.rotMeta}"` : 'nenhuma tarefa sem meta');
+    ok('Nenhum diálogo nativo, nenhum diálogo do app e nenhum termo de cobrança em toda a sequência',
+      r.nativos === 0 && r.dialogos === 0 && !/não fez|não realizou|pendente|faltou|esqueceu/i.test(r.texto), `${r.nativos} nativo(s) · ${r.dialogos} diálogo(s)`);
+    ok('Nenhum erro de JavaScript nas ações da tarefa no lugar', erros.length === 0, erros.join(' | '));
     await ctx.close();
   }
 

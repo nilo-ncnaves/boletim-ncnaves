@@ -78,7 +78,9 @@
       MESMAS regras de Cadastros (altura, busca em lista longa, ação principal fixa no
       rodapé, níveis, cabeçalho com voltar, padrão visual) porque usa as classes de
       Cadastros (P10); além disso a ação rápida "⋯" abre no lugar (sem tela nova, sem
-      modal, alvo ≥ 44 px) e um toque muda o status; travada por chuva ou por terceiro
+      modal, alvo ≥ 44 px) e um toque muda o status; desde a v91 o toque redesenha SÓ o
+      cartão (a tarefa não some), deixa "Salvo · … · desfazer" no lugar e o 2º nível
+      ("Travado") abre embaixo sem esconder a fileira; travada por chuva ou por terceiro
       fica ⏸️ e NUNCA vermelha; nenhuma pastilha aparece sem pendência; desde a v90 a
       pré-visualização do QUADRO do escritório (matriz fazenda × insumo, o segundo
       formato da mesma colagem) é medida como tela ("Planejamento › Conferir o quadro")
@@ -1205,6 +1207,27 @@ async function cenarioPlanejamento(browser, base, R) {
     const b2 = document.querySelector('#app [data-plan-st="' + id + '|' + alvoSt + '"]');
     if (b2) b2.click();
     await new Promise(r => setTimeout(r, 200));
+    /* v91: o cartão permanece e só ele redesenha, com "Salvo · … · desfazer"; "Travado" aberto mantém a fileira;
+       "desfazer" volta o status no lugar */
+    const cartao = document.querySelector('#app [data-plan-linha="' + id + '"]');
+    const bd = cartao && cartao.querySelector('[data-plan-desfazer]');
+    const v91 = { permanece: !!cartao, salvo: cartao ? ((cartao.querySelector('.plan-salvo') || {}).textContent || '').replace(/\s+/g, ' ').trim() : '',
+      desfazer: bd ? +bd.getBoundingClientRect().height.toFixed(1) : 0,
+      estado: cartao ? ((cartao.querySelector('.cad-item .mut') || {}).textContent || '') : '' };
+    const bt3 = cartao && cartao.querySelector('[data-plan-trava]'); if (bt3) bt3.click();
+    await new Promise(r => setTimeout(r, 200));
+    const ac = document.querySelector('#app [data-plan-linha="' + id + '"] .plan-acoes');
+    v91.fileira = ac ? ac.querySelectorAll(':scope > .chips:not(.plan-sub) > .chip').length : 0;
+    v91.rotulo = ac && ac.querySelector('.plan-sub .cad-filtro-rot') ? ac.querySelector('.plan-sub .cad-filtro-rot').textContent.trim() : '';
+    v91.motivos = ac ? ac.querySelectorAll('.plan-sub [data-plan-mot]').length : 0;
+    v91.scrollW = document.documentElement.scrollWidth;
+    v91.raio = ac ? [...ac.querySelectorAll('.chip')].filter(c => parseFloat(getComputedStyle(c).borderTopLeftRadius) > 0).length : 0;
+    const bd2 = document.querySelector('#app [data-plan-desfazer="' + id + '"]'); if (bd2) bd2.click();
+    await new Promise(r => setTimeout(r, 200));
+    v91.desfez = !!bd2 && planTarefa(id).status === de;
+    v91.cartaoDepois = !!document.querySelector('#app [data-plan-linha="' + id + '"]');
+    /* devolve o status ao esperado da prova anterior (o "um toque muda o status") */
+    if (bd2) planMudarStatus(id, alvoSt);
     /* travar por chuva: status próprio, nunca vermelho */
     const t2 = planTarefas().filter(t => planAberta(t))[0];
     planMudarStatus(t2.id, 'aguardando_clima', { motivo: 'chuva', texto: 'aguardando o tempo firmar' });
@@ -1213,7 +1236,7 @@ async function cenarioPlanejamento(browser, base, R) {
       de, para: id ? planTarefa(id).status : '', esperado: alvoSt,
       modal: !!document.querySelector('dialog[open], .folha'), nativos: window.__nativos,
       farolClima: planFarol(planTarefa(t2.id)), farolTerceiro: b3 ? planFarol(b3) : '',
-      crescimento: document.documentElement.scrollHeight - antesAltura,
+      crescimento: document.documentElement.scrollHeight - antesAltura, v91,
       pastilhasSemPendencia: (() => { const g = D.tarefas; D.tarefas = []; const n = planPastilhas().length; D.tarefas = g; return n; })() };
   });
   /* v78: três números + barra na lista, e o toque em "executado" abrindo a rastreabilidade no lugar */
@@ -1272,7 +1295,7 @@ async function cenarioPlanejamento(browser, base, R) {
     r.campos = folha ? folha.querySelectorAll('input, select, textarea').length : -1;
     const alvoT = planAbertasDa('f23')[0];
     const st = alvoT.status === 'em_execucao' ? 'finalizado' : 'em_execucao';
-    const bt = folha && folha.querySelector('[data-tar-st="' + st + '"]');
+    const bt = folha && folha.querySelector('[data-plan-st="' + alvoT.id + '|' + st + '"]');
     if (bt) bt.click();
     await new Promise(x => setTimeout(x, 200));
     r.mudou = planTarefa(alvoT.id).status === st;
@@ -1745,6 +1768,16 @@ function avaliar(R) {
       (Q.grupos || []).some(g => /^Criar · \d+/.test(g)) && (Q.grupos || []).some(g => /^Só na ata · \d+/.test(g)) && Q.soma === Q.preenchidas && Q.preenchidas + Q.vazias === Q.total,
       `${(Q.grupos || []).join(' · ')} · ${Q.soma}/${Q.preenchidas} · ${Q.preenchidas}+${Q.vazias}=${Q.total}`);
     add(G, 'Conferir o quadro — sem termo de cobrança e sem exclamação', Q.cobranca === false && Q.exclamacao === false, Q.cobranca ? 'termo de cobrança na tela' : (Q.exclamacao ? 'exclamação na tela' : 'sem cobrança'));
+    /* v91: ações da tarefa no lugar — fileira que não some, retorno visível, desfazer no lugar de diálogo */
+    const N = P.v91 || {};
+    add(G, 'Ações da tarefa (v91) — depois do toque o cartão PERMANECE na lista, com a linha "Salvo · … · desfazer" (alvo ≥ 44 px) e o estado na própria linha',
+      N.permanece && /Salvo · (finalizada|em execução)/.test(N.salvo || '') && N.desfazer >= TOQUE_MIN && /(finalizado hoje|em execução)/.test(N.estado || ''),
+      `"${N.salvo || ''}" · ${N.desfazer || 0} px · ${(N.estado || '').slice(0, 60)}`);
+    add(G, 'Ações da tarefa (v91) — "Travado" aberto mantém a fileira inteira (5 chips) e abre o 2º nível embaixo, com rótulo "Por quê?", sem rolar de lado e sem pílula',
+      N.fileira === 5 && N.rotulo === 'Por quê?' && N.motivos === 6 && N.scrollW <= VP.width && N.raio === 0,
+      `${N.fileira || 0} chips · "${N.rotulo || ''}" · ${N.motivos || 0} motivos · ${N.scrollW || 0} px · ${N.raio || 0} com raio`);
+    add(G, 'Ações da tarefa (v91) — "desfazer" devolve o status anterior no lugar, sem diálogo (nenhuma confirmação nova)',
+      N.desfez && N.cartaoDepois && P.nativos === 0, N.desfez ? 'status de volta, cartão no lugar' : 'não desfez');
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosPlanejamento || []).length && !(R.errosFaixa || []).length,
       [...(R.errosPlanejamento || []), ...(R.errosFaixa || [])].join(' | '));
   }
