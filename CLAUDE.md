@@ -93,6 +93,11 @@ e, no motor de relatórios, a visão vw_insumo_aplicado mais o relatório
 mensal insumos_programado_recebido_aplicado (sql/056; o app só lê, como os
 outros). O catálogo de produtos continua sendo D.insumos no aparelho — não
 existe tabela "produtos" no banco nem coleção D.produtos no app.
+Desde a v90: NENHUMA tabela nova. O quadro "Planejamento cafeicultura"
+do escritório (matriz fazenda × insumo) alimenta as mesmas
+planejamento_tarefa da rodada do mês; a resposta do bloco "❓ é a mesma
+tarefa?" viaja dentro do payload da tarefa (quadroRotulo / quadroNao) e
+o produto da coluna entra no catálogo D.insumos que já existe.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -862,9 +867,37 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
   prazo vencido, nunca julgamento de pessoa; proibidos "não fez", "não
   realizou", "pendente", "faltou", "esqueceu". Nenhuma tela expõe um
   gerente para outro: as listas da Diretoria são de UNIDADES.
+- **O quadro do escritório é o segundo formato da MESMA colagem (desde a
+  v90).** A matriz "Planejamento cafeicultura" (linha = fazenda, coluna =
+  insumo, célula = OK / REALIZANDO / REALIZAR / vazia) entra por
+  Planejamento › Importar ata e pela porta única, detectada sozinha
+  (`quadroDetectar`: 3+ rótulos de coluna conhecidos + linha com 2+ status;
+  tab, "|" ou espaço), na MESMA pré-visualização — o parser da ata em blocos
+  não muda. OK → finalizado · REALIZANDO → em execução · REALIZAR → a
+  iniciar; **célula vazia não cria nem altera nada** (ausência de informação
+  nunca é informação); o quadro não traz prazo, então a tarefa criada nasce
+  ⏸️ cinza. Entra na rodada do mês da DATA do quadro (nunca rodada paralela;
+  sem rodada no aparelho, a gravação a cria). **Concilia antes de gravar**
+  (`quadroConciliar`), por unidade: Atualiza · Sem mudança · Criar · Só na
+  ata, cada grupo contável e editável; semelhança forte sem casamento exato
+  vai para "❓ Confirmar se é a mesma tarefa" (É a mesma · São diferentes ·
+  Decidir depois) — **o app sugere, nunca funde por palpite**, e o Gravar
+  fica inativo até a resposta; a escolha fica NA TAREFA (`quadroRotulo` /
+  `quadroNao`). O STATUS do quadro vence a ata, inclusive voltando
+  (registrado no histórico com a origem "quadro do escritório de DD/MM");
+  prazo, área, responsável e bloqueio da ata ficam. Exceção declarada na
+  tela: REALIZAR sobre AGUARDANDO TERCEIRO / CLIMA fica "sem mudança" — o
+  quadro não diz que a espera acabou. Duas naturezas, duas regras: nutrição
+  casa o produto pelo de-para e a tarefa leva `produto`; "Pulverização" é
+  fitossanitária, sem produto, casa com a operação pelo `PLAN_SINONIMOS`.
+  Identidade = rodada + unidade + descrição normalizada, com a área da
+  unidade no início ("Ernane — Uréia" ≠ "Uréia"); reimportar não cria nem
+  altera nada. Fora do escopo descarta com aviso; nome desconhecido e coluna
+  de produto desconhecida PARAM na pré-visualização — nunca adivinhados.
 - Conferência: `node scripts/teste_planejamento.cjs` (a validação da tarefa,
-  com o texto real da ata) e `scripts/checar-poluicao.cjs`, grupo "14.
-  Planejamento"; detalhe em docs/definicao-de-pronto.md, item 18.
+  com o texto real da ata e, desde a v90, o quadro real de 14/09/2026) e
+  `scripts/checar-poluicao.cjs`, grupo "14. Planejamento"; detalhe em
+  docs/definicao-de-pronto.md, item 18.
 
 ### c16) Envio: a tela nunca diz "enviado" antes do banco confirmar (desde a v82)
 Lição do primeiro dia de preenchimento (11/09/2026): até a v81 a casa do

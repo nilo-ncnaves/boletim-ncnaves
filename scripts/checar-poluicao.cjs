@@ -79,7 +79,12 @@
       rodapé, níveis, cabeçalho com voltar, padrão visual) porque usa as classes de
       Cadastros (P10); além disso a ação rápida "⋯" abre no lugar (sem tela nova, sem
       modal, alvo ≥ 44 px) e um toque muda o status; travada por chuva ou por terceiro
-      fica ⏸️ e NUNCA vermelha; nenhuma pastilha aparece sem pendência; e na casa do
+      fica ⏸️ e NUNCA vermelha; nenhuma pastilha aparece sem pendência; desde a v90 a
+      pré-visualização do QUADRO do escritório (matriz fazenda × insumo, o segundo
+      formato da mesma colagem) é medida como tela ("Planejamento › Conferir o quadro")
+      e provada: o bloco "❓ Confirmar se é a mesma tarefa" tem três chips e nenhum
+      campo, o Gravar nasce inativo dizendo a próxima ação e ativa no lugar depois da
+      resposta, sem nativo, sem sair da tela e sem termo de cobrança; e na casa do
       gerente a faixa "Tarefas da reunião" traz no máximo 3 linhas, cada uma em UMA
       linha visual a 360 px, na ordem 🔴 → 🟡 → ⏸️ → 🟢, sem termo de cobrança, com um
       toque abrindo a folha e outro mudando o status — sem campo de digitação e sem
@@ -1067,6 +1072,16 @@ const ATA_TESTE = [
   'Necessidades de investimento',
   '- MIAC novo para a Vereda'
 ].join('\n');
+/* v90: o quadro do escritório (matriz fazenda × insumo) colado por cima da ata acima — três células de KCl parecidas */
+const QUADRO_TESTE = [
+  'PLANEJAMENTO CAFEICULTURA 14/09/2026',
+  'Fazenda | Uréia | Nitrato | KCl | Phusion | Sulf. Manganês | Ácido Bórico | Sulf. Zinco | Pulverização',
+  'MATA PRETA | OK | — | OK | — | OK | OK | OK | REALIZAR',
+  'RIO PRETO CAFÉ GRUPO | REALIZANDO | — | REALIZANDO | — | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'VEREDA 365 | REALIZAR | — | REALIZAR | — | REALIZAR | REALIZAR | REALIZAR | REALIZAR',
+  'ROMARIA | REALIZANDO | — | REALIZANDO | — | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'MARIMBONDO | OK | — | OK | — | OK | OK | OK | REALIZAR'
+].join('\n');
 /* prazos relativos a hoje, para o farol ter as quatro cores em qualquer dia em que o script rodar */
 const SEMEAR_PLAN = txt => {
   planNav = [{ v: 'menu' }, { v: 'importar' }];
@@ -1138,6 +1153,32 @@ async function cenarioPlanejamento(browser, base, R) {
   await page.evaluate(txt => { planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.ata = ataParsear(txt); ir('planejamento'); }, ATA_TESTE);
   await page.waitForTimeout(200);
   R.telas.push(await medirTela(page, 'Planejamento › Conferir a ata', 'cadastros', { tipo: 'lista', niveis: 3 }));
+  /* v90: pré-visualização do quadro (segundo formato da mesma colagem), com o bloco ❓ e a conciliação */
+  await page.evaluate(txt => { planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.ata = null; planUI.quadro = quadroParsear(txt); ir('planejamento'); }, QUADRO_TESTE);
+  await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Planejamento › Conferir o quadro', 'cadastros', { tipo: 'lista', niveis: 3 }));
+  R.quadro = await page.evaluate(async () => {
+    const antes = telaAtual, nat0 = window.__nativos || 0;
+    const q = planUI.quadro, c = quadroConciliar(q);
+    const perg = [...document.querySelectorAll('#app .plan-perg')];
+    const chips = perg.map(p => [...p.querySelectorAll('.chip')].map(b => b.textContent.trim()));
+    const campos = perg.reduce((s, p) => s + p.querySelectorAll('input, select, textarea').length, 0);
+    const alvo = Math.min(...perg.flatMap(p => [...p.querySelectorAll('.chip')].map(b => b.getBoundingClientRect().height)), ...[...document.querySelectorAll('#app [data-plan-qincl]')].map(b => b.getBoundingClientRect().height));
+    const bt = document.getElementById('bt-plan-quadro-ok');
+    const inativo = !!bt && bt.classList.contains('acao-off'), falta = bt ? bt.getAttribute('data-falta') || '' : '';
+    const grupos = [...document.querySelectorAll('#app .cad-grupo')].map(e => e.textContent.trim());
+    const texto = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+    const tAntes = planTarefas().length, hAntes = planHist().length;
+    /* responde as perguntas num toque cada: nada é gravado antes disso */
+    c.perguntas.forEach(p => { const b = document.querySelector('[data-plan-qresp="' + p.cel.k + ':mesma:' + p.t.id + '"]'); if (b) b.click(); });
+    await new Promise(r => setTimeout(r, 200));
+    const bt2 = document.getElementById('bt-plan-quadro-ok');
+    const c2 = quadroConciliar(planUI.quadro);
+    return { perguntas: c.perguntas.length, chips, campos, alvo: +alvo.toFixed(1), inativo, falta, grupos, cobranca: /(não fez|não realizou|pendente|faltou|esqueceu|campo obrigatório)/i.test(texto),
+      exclamacao: /!/.test(texto), ativou: !!bt2 && !bt2.classList.contains('acao-off'), mesmaTela: telaAtual === antes, nativos: (window.__nativos || 0) - nat0,
+      gravouAntes: planTarefas().length !== tAntes || planHist().length !== hAntes, soma: c2.atualiza.length + c2.sem.length + c2.criar.length, preenchidas: c2.preenchidas, total: c2.total, vazias: c2.vazias };
+  });
+  await page.evaluate(() => { planUI.quadro = null; planUI.quadroEdit = ''; });
   /* revisão das arrastadas */
   await page.evaluate(() => { planRevisaoAbrir(); }); await page.waitForTimeout(250);
   R.telas.push(await medirTela(page, 'Planejamento › Revisão das arrastadas', 'cadastros', { tipo: 'lista', niveis: 3 }));
@@ -1691,6 +1732,19 @@ function avaliar(R) {
       (F.trio || []).join(' · ') + ' · ' + F.rastreio + ' lançamento(s) · ' + F.camposDepois + ' campo(s)');
     add(G, 'Gerente — o lançamento do boletim mostra que abateu a tarefa (📋), como etiqueta e não como botão',
       V.existe && /^📋 abate:/.test(V.texto || '') && V.botao === false, V.texto || 'sem etiqueta');
+    /* v90: o quadro do escritório — segundo formato da mesma colagem, conciliado antes de gravar */
+    const Q = R.quadro || {};
+    add(G, 'Conferir o quadro — "❓ Confirmar se é a mesma tarefa" com três chips por pergunta e nenhum campo de digitação',
+      Q.perguntas >= 1 && (Q.chips || []).every(c => c.join('·') === 'É a mesma·São diferentes·Decidir depois') && Q.campos === 0 && Q.alvo >= TOQUE_MIN,
+      `${Q.perguntas || 0} pergunta(s) · ${Q.campos || 0} campo(s) · alvo ${Q.alvo || 0} px`);
+    add(G, 'Conferir o quadro — Gravar nasce inativo dizendo a próxima ação, e nada é gravado antes da resposta',
+      Q.inativo && /Responda as \d+ pergunta/.test(Q.falta || '') && Q.gravouAntes === false, `"${Q.falta || ''}"`);
+    add(G, 'Conferir o quadro — respondidas as perguntas, o Gravar ativa no lugar, sem nativo e sem sair da tela',
+      Q.ativou && Q.mesmaTela && Q.nativos === 0, `${Q.nativos || 0} nativo(s); tela ${Q.mesmaTela ? 'a mesma' : 'trocou'}`);
+    add(G, 'Conferir o quadro — grupos contáveis (Atualiza · Sem mudança · Criar · Só na ata) e a soma fecha com as células preenchidas',
+      (Q.grupos || []).some(g => /^Criar · \d+/.test(g)) && (Q.grupos || []).some(g => /^Só na ata · \d+/.test(g)) && Q.soma === Q.preenchidas && Q.preenchidas + Q.vazias === Q.total,
+      `${(Q.grupos || []).join(' · ')} · ${Q.soma}/${Q.preenchidas} · ${Q.preenchidas}+${Q.vazias}=${Q.total}`);
+    add(G, 'Conferir o quadro — sem termo de cobrança e sem exclamação', Q.cobranca === false && Q.exclamacao === false, Q.cobranca ? 'termo de cobrança na tela' : (Q.exclamacao ? 'exclamação na tela' : 'sem cobrança'));
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosPlanejamento || []).length && !(R.errosFaixa || []).length,
       [...(R.errosPlanejamento || []), ...(R.errosFaixa || [])].join(' | '));
   }

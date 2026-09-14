@@ -26,6 +26,17 @@
   10. Sexta-feira abre sozinha a tela de fechamento da semana; dia 11 sem ata
       mostra a pastilha da rodada.
   11. Dois toques até qualquer função da área Planejamento.
+  12. (v90) O QUADRO "Planejamento cafeicultura" do escritório (matriz fazenda ×
+      insumo, 14/09/2026) colado por cima da ata de 10/09: detecção nos três
+      separadores, data, 62 + 18 = 80 células, coluna inteira vazia, 2 linhas fora
+      do escopo, de-para por id (Café 5º e 6º, Vereda 365, Ernane/Caxico como
+      áreas), as três traduções de status, o bloco ❓ que não grava nada antes da
+      resposta, os quatro grupos com contagem (A = 1 · B = 1 · C = 60 · 9 só na
+      ata), tarefa nova sem prazo e ⏸️, produto pelo de-para, Pulverização sem
+      produto, histórico com a origem, reimportação sem duplicar, status voltando,
+      célula vazia que não altera, exceção do "aguardando", nome desconhecido e
+      produto desconhecido parando na pré-visualização, rodada criada quando não
+      existe, e a porta única classificando o quadro como ata.
 
  Uso (na raiz do repositório):
    node scripts/teste_planejamento.cjs
@@ -72,6 +83,32 @@ const ATA = [
   '- MIAC novo para a Vereda',
   '- Trator para a Mata Preta'
 ].join('\n');
+
+/* v90: o QUADRO "Planejamento cafeicultura" de 14/09/2026 — transcrição conferida célula a célula
+   (10 linhas × 8 colunas; "—" = célula vazia; Marimbondo e Cristo Redentor são fora do escopo) */
+const QUADRO = [
+  'PLANEJAMENTO CAFEICULTURA',
+  'Mês: 09/2026 · 14/09/2026',
+  'Fazenda | Uréia | Nitrato | KCl | Phusion | Sulf. Manganês | Ácido Bórico | Sulf. Zinco | Pulverização',
+  'RIO PRETO CAFÉ RODRIGO | REALIZAR | — | REALIZAR | — | REALIZAR | REALIZAR | REALIZAR | REALIZAR',
+  'MATA PRETA | OK | — | OK | — | OK | OK | OK | REALIZAR',
+  'ÁGUA LIMPA | REALIZANDO | — | REALIZANDO | REALIZAR | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'CAXICO | OK | — | OK | REALIZAR | OK | OK | OK | REALIZAR',
+  'MONTE CARMELO | REALIZANDO | — | OK | — | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'MONTE CARMELO - ERNANE | REALIZAR | — | OK | — | REALIZAR | REALIZAR | REALIZAR | REALIZAR',
+  'RIO PRETO CAFÉ GRUPO | REALIZANDO | — | REALIZANDO | — | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'VEREDA 365 | REALIZAR | — | REALIZAR | — | REALIZAR | REALIZAR | REALIZAR | REALIZAR',
+  'ROMARIA | REALIZANDO | — | REALIZANDO | — | REALIZANDO | REALIZANDO | REALIZANDO | REALIZAR',
+  'CAFÉ 5º e 6º | REALIZAR | — | REALIZAR | — | REALIZAR | REALIZAR | REALIZAR | REALIZAR',
+  'MARIMBONDO | OK | — | REALIZANDO | — | OK | OK | OK | REALIZAR',
+  'CRISTO REDENTOR | OK | — | OK | — | OK | OK | OK | REALIZAR'
+].join('\n');
+/* quadro reemitido em 20/09: Mata Preta KCl VOLTA para REALIZANDO, Vereda 365 perde a célula Uréia
+   (vazia não altera) e Rio Preto Café Grupo KCl continua REALIZAR (exceção do "aguardando") */
+const QUADRO_2 = QUADRO.replace('14/09/2026', '20/09/2026')
+  .replace('MATA PRETA | OK | — | OK |', 'MATA PRETA | OK | — | REALIZANDO |')
+  .replace('VEREDA 365 | REALIZAR | —', 'VEREDA 365 | — | —')
+  .replace('RIO PRETO CAFÉ GRUPO | REALIZANDO | — | REALIZANDO |', 'RIO PRETO CAFÉ GRUPO | REALIZANDO | — | REALIZAR |');
 
 const provas = [];
 const ok = (nome, passou, detalhe) => provas.push({ nome, ok: !!passou, detalhe: detalhe == null ? '' : String(detalhe) });
@@ -202,6 +239,199 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
 
     ok('Nenhum erro de JavaScript na importação e na navegação', erros.length === 0, erros.join(' | '));
     estado = await lerD(page);
+    await ctx.close();
+  }
+
+  /* ---------- 12. (v90) o quadro do escritório por cima da ata (segunda, 14/09/2026) ---------- */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-14T09:00:00-03:00');
+    await porD(page, estado);
+    const lerQuadro = (txt) => page.evaluate(q => {
+      const d = quadroDetectar(q); const p = d ? quadroParsear(q) : null; if (!p) return { detecta: d };
+      const c = quadroConciliar(p);
+      return { detecta: d, data: p.data, ref: p.ref, semData: p.semData, fora: p.fora, colunas: p.colunas.map(x => x.rot + (x.conhecida ? '' : '?')),
+        linhas: p.linhas.map(l => l.nome + '→' + (l.unidade || '?') + (l.area ? '/' + l.area : '')),
+        preenchidas: c.preenchidas, vazias: c.vazias, total: c.total, perguntas: c.perguntas.map(x => x.cel.desc + ' × ' + x.t.desc),
+        A: c.atualiza.length, B: c.sem.length, C: c.criar.length, D: c.soAta.length, falta: quadroFalta(p, c),
+        semUnidade: c.semUnidade.length, semProduto: c.semProduto.length,
+        nitrato: p.linhas.filter(l => l.valores[p.colunas.findIndex(x => x.chave === 'nitrato')]).length,
+        phusion: p.linhas.filter(l => l.valores[p.colunas.findIndex(x => x.chave === 'phusion')]).map(l => l.nome) };
+    }, txt);
+    const detAta = await page.evaluate(a => quadroDetectar(a), ATA);
+    ok('Quadro — a ata em blocos NÃO é reconhecida como quadro (o parser da ata continua sendo o dela)', detAta === false, String(detAta));
+    const q1 = await lerQuadro(QUADRO);
+    ok('Quadro — texto com "|" é reconhecido como quadro (3+ colunas conhecidas, linha com 2+ status)', q1.detecta === true, '');
+    ok('Quadro — data 14/09/2026 lida do cabeçalho; rodada do mês = setembro/2026', q1.data === '2026-09-14' && q1.ref === '2026-09', q1.data + ' · ' + q1.ref);
+    ok('Quadro — conferência: 10 linhas × 8 colunas = 80 células, 62 preenchidas e 18 vazias', q1.preenchidas === 62 && q1.vazias === 18 && q1.total === 80, `${q1.preenchidas} + ${q1.vazias} = ${q1.total}`);
+    ok('Quadro — as 8 colunas reconhecidas na ordem do escritório', q1.colunas.join('|') === 'Uréia|Nitrato|KCl|Phusion|Sulf. Manganês|Ácido Bórico|Sulf. Zinco|Pulverização', q1.colunas.join(' | '));
+    ok('Quadro — coluna Nitrato inteira vazia: coluna existe, zero célula (coluna vazia não é coluna ausente)', q1.colunas.includes('Nitrato') && q1.nitrato === 0, q1.nitrato + ' célula(s)');
+    ok('Quadro — Phusion só em Água Limpa e Caxico', q1.phusion.length === 2 && /GUA LIMPA/.test(q1.phusion[0]) && /CAXICO/.test(q1.phusion[1]), q1.phusion.join(' · '));
+    ok('Quadro — Marimbondo e Cristo Redentor descartados como "fora do escopo" (nunca "unidade não reconhecida")',
+      q1.fora.length === 2 && q1.linhas.length === 10 && q1.semUnidade === 0, q1.fora.join(' · ') + ' · ' + q1.linhas.length + ' linha(s)');
+    ok('Quadro — de-para por id: Café 5º e 6º → f24, Vereda 365 → f22c, Rio Preto Café Grupo → f03c, Rio Preto Café Rodrigo → f20, Romaria → f23',
+      ['CAFÉ 5º e 6º→f24', 'VEREDA 365→f22c', 'RIO PRETO CAFÉ GRUPO→f03c', 'RIO PRETO CAFÉ RODRIGO→f20', 'ROMARIA→f23'].every(x => q1.linhas.includes(x)), q1.linhas.join(' · '));
+    ok('Quadro — Monte Carmelo, Ernane e Caxico são a MESMA unidade (f14c) com área diferente',
+      q1.linhas.includes('MONTE CARMELO→f14c') && q1.linhas.includes('MONTE CARMELO - ERNANE→f14c/Ernane') && q1.linhas.includes('CAXICO→f14c/Caxico'), '');
+    ok('Quadro — três células em ❓ (as três de KCl), por semelhança forte com a ata', q1.perguntas.length === 3 && q1.perguntas.every(x => /^KCl × /.test(x)) && q1.perguntas.some(x => /Fazer KCL e ferti/.test(x)) && q1.perguntas.some(x => /Kcl em andamento/.test(x)) && q1.perguntas.some(x => /Kcl falta chegar/.test(x)), q1.perguntas.join(' · '));
+    ok('Quadro — Gravar inativo enquanto há ❓ sem resposta, dizendo a próxima ação', q1.falta === "Responda as 3 pergunta(s) de 'é a mesma tarefa?'", q1.falta);
+
+    /* a tela: pré-visualização, resposta num toque, nada gravado antes */
+    const tela = await page.evaluate(async q => {
+      planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.quadro = quadroParsear(q); planUI.ata = null; ir('planejamento');
+      const tAntes = planTarefas().length, hAntes = planHist().length;
+      const bt = document.getElementById('bt-plan-quadro-ok');
+      const out = { titulo: (document.querySelector('#app .topo h1') || {}).textContent.replace(/\s+/g, ' ').trim(),
+        grupos: [...document.querySelectorAll('#app .cad-grupo')].map(e => e.textContent.trim()),
+        inativo: !!bt && bt.classList.contains('acao-off'),
+        chips: [...document.querySelectorAll('#app .plan-perg')].map(p => [...p.querySelectorAll('.chip')].map(b => b.textContent.trim()).join('·')),
+        campos: document.querySelectorAll('#app .plan-perg input, #app .plan-perg select, #app .plan-perg textarea').length,
+        texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+      const c = quadroConciliar(planUI.quadro);
+      c.perguntas.forEach(p => { const r = p.cel.linha.unidade === 'f03c' ? 'dif' : 'mesma'; document.querySelector('[data-plan-qresp="' + p.cel.k + ':' + r + ':' + p.t.id + '"]').click(); });
+      await new Promise(r => setTimeout(r, 200));
+      const c2 = quadroConciliar(planUI.quadro);
+      out.depois = { A: c2.atualiza.length, B: c2.sem.length, C: c2.criar.length, D: c2.soAta.length, perg: c2.perguntas.length,
+        grupos: [...document.querySelectorAll('#app .cad-grupo')].map(e => e.textContent.trim()),
+        ativo: !document.getElementById('bt-plan-quadro-ok').classList.contains('acao-off'),
+        A_txt: c2.atualiza.map(x => x.desc + ' · ' + planStatusRot(x.tarefa.status) + ' → ' + planStatusRot(x.status)),
+        B_txt: c2.sem.map(x => x.desc + ' · ' + planStatusRot(x.status)),
+        gravouAntes: planTarefas().length !== tAntes || planHist().length !== hAntes, tela: telaAtual };
+      return out;
+    }, QUADRO);
+    ok('Tela "Conferir o quadro" — bloco ❓ com três chips por pergunta (É a mesma · São diferentes · Decidir depois), nenhum campo',
+      tela.chips.length === 3 && tela.chips.every(c => c === 'É a mesma·São diferentes·Decidir depois') && tela.campos === 0, tela.chips.join(' | '));
+    ok('Tela — ordem: o que pede resposta primeiro, depois os grupos contáveis', /^❓ Confirmar se é a mesma tarefa · 3$/.test(tela.grupos[0] || '') && tela.inativo, tela.grupos.join(' · '));
+    ok('Tela — sem termo de cobrança nem exclamação', !/(não fez|não realizou|pendente|faltou|esqueceu|campo obrigatório)/i.test(tela.texto) && !/!/.test(tela.texto), '');
+    ok('Respostas num toque (mesma, mesma, diferentes): A = 1 · B = 1 · C = 60 (soma 62) · 9 só na ata, e nada foi gravado ainda',
+      tela.depois.A === 1 && tela.depois.B === 1 && tela.depois.C === 60 && tela.depois.D === 9 && tela.depois.perg === 0 && tela.depois.gravouAntes === false && tela.depois.tela === 'planejamento',
+      `A ${tela.depois.A} · B ${tela.depois.B} · C ${tela.depois.C} · D ${tela.depois.D} · ❓ ${tela.depois.perg}`);
+    ok('Grupos na tela: "Atualiza · 1", "Sem mudança · 1", "Criar · 60", "Só na ata · 9"; Gravar ativa no lugar',
+      ['Atualiza · 1', 'Sem mudança · 1', 'Criar · 60', 'Só na ata · 9'].every(g => tela.depois.grupos.includes(g)) && tela.depois.ativo, tela.depois.grupos.join(' · '));
+    ok('Atualiza — "KCl · Em execução → Finalizado" (Mata Preta: o status do quadro vence)', tela.depois.A_txt[0] === 'KCl · Em execução → Finalizado', tela.depois.A_txt.join(' · '));
+    ok('Sem mudança — "KCl · A iniciar" (Vereda: a ata já dizia a iniciar)', tela.depois.B_txt[0] === 'KCl · A iniciar', tela.depois.B_txt.join(' · '));
+
+    /* gravar */
+    const grav = await page.evaluate(async () => {
+      const tAntes = planTarefas().length, hAntes = planHist().length;
+      document.getElementById('bt-plan-quadro-ok').click();
+      await new Promise(r => setTimeout(r, 200));
+      const mp = planTarefas().find(t => t.unidade === 'f13c' && /kcl em andamento/i.test(t.desc));
+      const lg = planTarefas().find(t => t.unidade === 'f03c' && /kcl falta chegar/i.test(t.desc));
+      const ver = planTarefas().find(t => t.unidade === 'f22c' && /fazer kcl/i.test(t.desc));
+      const novas = planTarefas().filter(t => /quadro do escritório/.test(t.origemRot || ''));
+      const ern = novas.find(t => t.unidade === 'f14c' && t.desc === 'Ernane — Uréia');
+      const cax = novas.find(t => t.unidade === 'f14c' && t.desc === 'Caxico — Uréia');
+      const mc = novas.find(t => t.unidade === 'f14c' && t.desc === 'Uréia');
+      const pulv = novas.find(t => t.unidade === 'f22c' && t.desc === 'Pulverização');
+      const mn = novas.find(t => t.desc === 'Sulf. Manganês');
+      return { flash: (document.getElementById('plan-flash') || {}).textContent || '', tela: telaAtual, nav: planNav.map(n => n.v).join('>'),
+        criadas: planTarefas().length - tAntes, hist: planHist().length - hAntes,
+        mp: mp && { status: mp.status, rot: mp.quadroRotulo, hist: planHistDe(mp.id).map(planHistTexto) },
+        lg: lg && { status: lg.status, nao: lg.quadroNao }, ver: ver && { status: ver.status, rot: ver.quadroRotulo, prazo: ver.prazo },
+        novas: novas.length, semPrazo: novas.every(t => !t.prazo), cinza: novas.every(t => planFarol(t) === 'cinza' || t.status === 'finalizado'),
+        statusNovas: { a: novas.filter(t => t.status === 'a_iniciar').length, e: novas.filter(t => t.status === 'em_execucao').length, f: novas.filter(t => t.status === 'finalizado').length },
+        tres: !!(ern && cax && mc), ernProd: ern && ern.produto, pulv: pulv && { produto: pulv.produto || '', ops: planOperacoesDe(pulv) },
+        mn: mn && { produto: mn.produto, cadastro: !!insProduto('Sulf. Manganês'), cat: (insProduto('Sulf. Manganês') || {}).categoria },
+        nitrato: planTarefas().filter(t => /nitrato/i.test(t.desc)).length, depara: deparaAta().filter(x => !x.fora).length };
+    });
+    ok('Gravar — resumo de uma linha no flash: "Quadro de 14/09 importado · 1 tarefa atualizada · 60 criadas · 1 sem mudança · 9 só na ata · 2 linhas fora do escopo"',
+      grav.flash.includes('Quadro de 14/09 importado · 1 tarefa atualizada · 60 criadas · 1 sem mudança · 9 só na ata · 2 linhas fora do escopo'), grav.flash);
+    ok('Gravar — o app volta para a rodada (Reunião 10/09/26), sem rodada paralela', grav.tela === 'planejamento' && grav.nav === 'menu>rodadas>rodada' && (await page.evaluate(() => planRodadas().length)) === 1, grav.nav);
+    ok('Criar — 60 tarefas novas, todas sem prazo (⏸️ cinza, nunca vermelho), com origem "quadro do escritório de 14/09"',
+      grav.criadas === 60 && grav.novas === 60 && grav.semPrazo && grav.cinza, `${grav.criadas} criada(s)`);
+    ok('Status — as três traduções: REALIZAR → a iniciar, REALIZANDO → em execução, OK → finalizado (nas 60 novas: 30 · 19 · 11)',
+      grav.statusNovas.a === 30 && grav.statusNovas.e === 19 && grav.statusNovas.f === 11, JSON.stringify(grav.statusNovas));
+    ok('Atualiza — Mata Preta "Kcl em andamento" ficou finalizado, com histórico "em execução → finalizado (quadro do escritório de 14/09)"',
+      grav.mp && grav.mp.status === 'finalizado' && grav.mp.hist.some(h => /em execução → finalizado \(quadro do escritório de 14\/09\)/.test(h)), grav.mp && grav.mp.hist.join(' | '));
+    ok('❓ "É a mesma" fica NA TAREFA (t.quadroRotulo = "KCl"), sem coleção nova', grav.mp && grav.mp.rot === 'KCl' && grav.ver && grav.ver.rot === 'KCl', '');
+    ok('❓ "São diferentes" fica NA TAREFA (t.quadroNao = ["kcl"]) e a tarefa da ata não muda', grav.lg && grav.lg.status === 'aguardando_terceiro' && (grav.lg.nao || []).join() === 'kcl', JSON.stringify(grav.lg));
+    ok('Sem mudança — Vereda "Fazer KCL e ferti" continua a iniciar e mantém o prazo da ata (25/09)', grav.ver && grav.ver.status === 'a_iniciar' && grav.ver.prazo === '2026-09-25', JSON.stringify(grav.ver));
+    ok('Área na chave: "Ernane — Uréia", "Caxico — Uréia" e "Uréia" são três tarefas distintas de Monte Carmelo — Café', grav.tres, '');
+    ok('Nutrição — a tarefa leva o produto pelo de-para ("Uréia" → Ureia) e "Sulf. Manganês" passa a existir em D.insumos como fertilizante',
+      grav.ernProd === 'Ureia' && grav.mn && grav.mn.produto === 'Sulf. Manganês' && grav.mn.cadastro && grav.mn.cat === 'fertilizante', JSON.stringify(grav.mn));
+    ok('Fitossanitário — "Pulverização" nasce SEM produto e casa com "Pulverização manual" pelo PLAN_SINONIMOS',
+      grav.pulv && grav.pulv.produto === '' && grav.pulv.ops.includes('Pulverização manual'), JSON.stringify(grav.pulv));
+    ok('Coluna vazia — zero tarefa de nitrato', grav.nitrato === 0, grav.nitrato + '');
+    ok('De-para da ata — 22 nomes ligados (16 + 6 do quadro)', grav.depara === 22, grav.depara + '');
+
+    /* reimportação: nada cria, nada altera */
+    const re = await page.evaluate(async q => {
+      const tAntes = planTarefas().length, hAntes = planHist().length;
+      planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.quadro = quadroParsear(q); ir('planejamento');
+      const c = quadroConciliar(planUI.quadro);
+      document.getElementById('bt-plan-quadro-ok').click(); await new Promise(r => setTimeout(r, 200));
+      return { A: c.atualiza.length, B: c.sem.length, C: c.criar.length, D: c.soAta.length, perg: c.perguntas.length,
+        tarefas: planTarefas().length - tAntes, hist: planHist().length - hAntes, flash: (document.getElementById('plan-flash') || {}).textContent || '' };
+    }, QUADRO);
+    ok('Reimportar o MESMO quadro: 0 ❓, 62 sem mudança, nada criado, nada no histórico', re.perg === 0 && re.A === 0 && re.C === 0 && re.B === 62 && re.tarefas === 0 && re.hist === 0, `A ${re.A} · B ${re.B} · C ${re.C} · +${re.tarefas} tarefa(s) · +${re.hist} no histórico`);
+
+    /* quadro mais novo: status volta (finalizado → em execução), célula vazia não altera, exceção do "aguardando" */
+    const novo = await page.evaluate(async q2 => {
+      const kclGrupo = planTarefas().find(t => t.unidade === 'f03c' && t.desc === 'KCl');
+      planMudarStatus(kclGrupo.id, 'aguardando_terceiro', { motivo: 'falta insumo', texto: 'aguardando insumo', quem: 'Cooxupé' });
+      const ureiaVer = planTarefas().find(t => t.unidade === 'f22c' && t.desc === 'Uréia');
+      const stAntes = ureiaVer.status;
+      planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.quadro = quadroParsear(q2); ir('planejamento');
+      const c = quadroConciliar(planUI.quadro);
+      const mp = c.atualiza.find(x => x.linha.unidade === 'f13c' && x.coluna.chave === 'kcl');
+      const exc = c.sem.find(x => x.linha.unidade === 'f03c' && x.coluna.chave === 'kcl');
+      const tAntes = planTarefas().length, mpTxt = mp && (mp.tarefa.status + '→' + mp.status);
+      document.getElementById('bt-plan-quadro-ok').click(); await new Promise(r => setTimeout(r, 200));
+      const mpT = planTarefas().find(t => t.unidade === 'f13c' && /kcl em andamento/i.test(t.desc));
+      return { A: c.atualiza.length, C: c.criar.length, mp: mpTxt, exc: exc && exc.nota,
+        mpDepois: mpT.status, hist: planHistDe(mpT.id).map(planHistTexto)[0], ureia: stAntes + '→' + planTarefas().find(t => t.id === ureiaVer.id).status,
+        ureiaN: planTarefas().filter(t => t.unidade === 'f22c' && t.desc === 'Uréia').length, criadas: planTarefas().length - tAntes,
+        kclGrupo: planTarefas().find(t => t.id === kclGrupo.id).status, flash: (document.getElementById('plan-flash') || {}).textContent || '' };
+    }, QUADRO_2);
+    ok('Quadro mais novo — status VOLTA (finalizado → em execução) no grupo Atualiza, e o histórico registra a origem',
+      novo.mp === 'finalizado→em_execucao' && novo.mpDepois === 'em_execucao' && /finalizado .* em execu.*quadro do escritório de 20\/09/.test(novo.hist || ''),
+      novo.mp + ' · depois ' + novo.mpDepois + ' · ' + novo.hist);
+    ok('Célula vazia — Uréia da Vereda 365 apagada no quadro novo: a tarefa não muda de status e não duplica', novo.ureia === 'a_iniciar→a_iniciar' && novo.ureiaN === 1, novo.ureia + ' · ' + novo.ureiaN + ' tarefa(s)');
+    ok('Exceção declarada — REALIZAR sobre AGUARDANDO TERCEIRO fica em "Sem mudança" com a nota, e a espera não é encerrada',
+      /aguardando terceiro mantido — o quadro não diz que a espera acabou/.test(novo.exc || '') && novo.kclGrupo === 'aguardando_terceiro', novo.exc || '');
+    ok('Quadro mais novo — só a mudança entra: 1 atualizada, 0 criadas', novo.A === 1 && novo.C === 0 && novo.criadas === 0 && /1 tarefa atualizada · 0 criadas/.test(novo.flash), novo.flash);
+
+    /* separadores e data */
+    const qTab = await lerQuadro(QUADRO.split('\n').map(l => l.replace(/\s*\|\s*/g, '\t').replace(/—/g, '')).join('\n'));
+    ok('Formato — células por TABULAÇÃO (colagem de planilha, célula vazia = vazia): as mesmas 62 células', qTab.detecta && qTab.preenchidas === 62 && qTab.vazias === 18, `${qTab.preenchidas} + ${qTab.vazias}`);
+    const qEsp = await lerQuadro(QUADRO.split('\n').map(l => l.replace(/\s*\|\s*/g, ' ')).join('\n'));
+    ok('Formato — células por ESPAÇO (vazia = "—"): as mesmas 62 células e as mesmas 10 unidades', qEsp.detecta && qEsp.preenchidas === 62 && qEsp.linhas.join() === q1.linhas.join(), `${qEsp.preenchidas} · ${qEsp.linhas.length} linha(s)`);
+    const qSem = await lerQuadro(QUADRO.split('\n').filter(l => !/14\/09\/2026/.test(l)).join('\n'));
+    ok('Sem data no texto: vale o dia da colagem (14/09/2026 no relógio do teste)', qSem.semData === true && qSem.data === '2026-09-14', qSem.data);
+
+    /* nome desconhecido e produto desconhecido param na pré-visualização */
+    const desc = await lerQuadro(QUADRO.replace('ROMARIA', 'FAZENDA NOVA').replace('Sulf. Zinco', 'Boro'));
+    ok('Nome desconhecido ("FAZENDA NOVA") para na pré-visualização como unidade não reconhecida — nunca adivinhado', desc.linhas.includes('FAZENDA NOVA→?') && desc.falta === 'Escolha a unidade das 1 linha(s) em aberto', desc.falta);
+    ok('Produto desconhecido (coluna "Boro") para na pré-visualização para ligar ou deixar de fora', desc.colunas.includes('Boro?') && desc.semProduto === 9, desc.colunas.join(' | ') + ' · ' + desc.semProduto + ' célula(s)');
+    await ctx.close();
+  }
+  {
+    /* aparelho sem a rodada do mês: a pré-visualização avisa e a gravação cria "Reunião 14/09/2026" */
+    const semRod = JSON.stringify(Object.assign(JSON.parse(estado), { rodadas: [], tarefas: [], tarefaHistorico: [], semanas: [] }));
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-14T09:00:00-03:00');
+    await porD(page, semRod);
+    const r = await page.evaluate(async q => {
+      planNav = [{ v: 'menu' }, { v: 'importar' }]; planUI.quadro = quadroParsear(q); ir('planejamento');
+      const aviso = (document.querySelector('#app .aviso') || {}).textContent || '';
+      const c = quadroConciliar(planUI.quadro);
+      document.getElementById('bt-plan-quadro-ok').click(); await new Promise(r => setTimeout(r, 200));
+      const rod = planRodadas()[0];
+      return { aviso: aviso.replace(/\s+/g, ' '), perg: c.perguntas.length, C: c.criar.length, rod: rod && { nome: rod.nome, ref: rod.ref }, n: planRodadas().length, tarefas: planTarefas().length };
+    }, QUADRO);
+    ok('Sem rodada do mês no aparelho: a pré-visualização avisa que a gravação vai criá-la', /Não existe rodada de setembro/.test(r.aviso) && /Reunião 14\/09\/2026/.test(r.aviso), r.aviso.slice(0, 120));
+    ok('Gravar cria a rodada "Reunião 14/09/2026" (ref 2026-09) — uma só — com as 62 tarefas', r.n === 1 && r.rod && r.rod.nome === 'Reunião 14/09/2026' && r.rod.ref === '2026-09' && r.C === 62 && r.perg === 0 && r.tarefas === 62, JSON.stringify(r.rod) + ' · ' + r.tarefas);
+    /* porta única "Colar do WhatsApp": o quadro é classificado como ata e usa a mesma pré-visualização */
+    const porta = await page.evaluate(async q => {
+      insLimpar(); insNav = [{ v: 'colar' }]; telaDeOnde = telaDeOnde || {}; ir('colar');
+      insUI.texto = q; insUI.auto = insClassificar(q); insUI.tipo = insUI.auto.tipo; insAbrirPrev(); insRender();
+      const frase = (document.querySelector('#app .aviso') || {}).textContent || '';
+      const bt = document.getElementById('bt-ins-ata'); const rot = bt ? bt.textContent.trim() : '';
+      if (bt) bt.click(); await new Promise(r => setTimeout(r, 200));
+      return { tipo: insUI.auto.tipo, frase: frase.replace(/\s+/g, ' '), rot, tela: telaAtual, quadro: !!planUI.quadro, titulo: (document.querySelector('#app .topo h1') || {}).textContent.replace(/\s+/g, ' ').trim() };
+    }, QUADRO);
+    ok('Porta única — o quadro é classificado como ATA ("parece o quadro de planejamento do escritório")', porta.tipo === 'ata' && /parece o quadro de planejamento do escritório/.test(porta.frase), porta.frase.slice(0, 100));
+    ok('Porta única — "Conferir e importar o quadro ›" leva à MESMA pré-visualização do Planejamento', /importar o quadro/.test(porta.rot) && porta.tela === 'planejamento' && porta.quadro && /Conferir o quadro/.test(porta.titulo), porta.rot + ' → ' + porta.titulo.slice(0, 40));
+    ok('Nenhum erro de JavaScript no quadro', erros.length === 0, erros.join(' | '));
     await ctx.close();
   }
 

@@ -677,6 +677,12 @@ não têm fazenda nem prazo, por desenho.
 | Lagamar (Rodrigo) | f20 Lagamar Café (Rodrigo) | |
 | Lagamar (Grupo) | f03c Rio Preto-Lagamar — Café | |
 | Café 5º · Café 6º | f24 Vereda Café 5º e 6º | |
+| Café 5º e 6º | f24 Vereda Café 5º e 6º | v90: nome do quadro do escritório; "Café 5º" e "Café 6º" são áreas dela |
+| Rio Preto Café Rodrigo | f20 Lagamar Café (Rodrigo) | v90 |
+| Rio Preto Café Grupo | f03c Rio Preto-Lagamar — Café | v90 |
+| Vereda 365 | f22c Vereda — Café | v90: 365 é a rodovia — distingue da Vereda Romaria |
+| Monte Carmelo - Ernane | f14c Monte Carmelo — Café | v90: área "Ernane" |
+| Caxico | f14c Monte Carmelo — Café | v90: área "Caxico" |
 | Romaria | f23 Vereda Romaria | |
 | Vereda | f22c Vereda — Café | |
 | Mata Preta | f13c Mata Preta — Café | |
@@ -708,6 +714,66 @@ padrão de Caxico, Ernane e José Eustáquio.
 Ordem de decisão: FINALIZADO vence tudo; depois clima; depois terceiro;
 depois a linguagem de execução. Reimportar a mesma ata não duplica
 (chave: rodada + unidade + descrição normalizada).
+
+### Quadro do escritório — matriz fazenda × insumo (v90, `QUADRO_COLUNAS`)
+
+Segundo formato da MESMA colagem (Planejamento › Importar ata e porta
+única "Colar do WhatsApp", onde é classificado como ata: "parece o quadro
+de planejamento do escritório"). Detecção (`quadroDetectar`): cabeçalho
+com 3+ rótulos de coluna conhecidos + linha com 2+ células de status;
+células por tabulação (planilha; vazia = vazia), por "|" ou por espaço
+(vazia = "—"). Data do quadro: dd/mm/aa(aa) nas 3 primeiras linhas; sem
+data, o dia da colagem. Entra na rodada do MÊS da data do quadro.
+
+| coluna (rótulo do escritório = descrição da tarefa) | natureza | produto | vínculo com o boletim |
+|---|---|---|---|
+| Uréia | nutrição | de-para → Ureia | `PLAN_SINONIMOS` por palavra |
+| Nitrato | nutrição | de-para → Nitrato de amônio | idem |
+| KCl | nutrição | de-para → KCl | kcl → Adubação via lanço |
+| Phusion | nutrição | de-para → Phusion | idem |
+| Sulf. Manganês | nutrição | de-para → Sulf. Manganês | idem |
+| Ácido Bórico | nutrição | de-para → Ácido Bórico | idem |
+| Sulf. Zinco | nutrição | de-para → Sulf. Zinco | idem |
+| Pulverização | fitossanitária | **nenhum** (não passa pelo de-para) | pulverização → Pulverização manual |
+
+Nutrição: o produto passa a existir em `D.insumos` na gravação
+(`insGarantirProduto`) e a tarefa leva `produto`. Coluna fora do catálogo
+para na pré-visualização ("Produto não reconhecido": ligar a um produto do
+cadastro, usar sem produto ou deixar de fora) — nunca adivinhada.
+
+| célula | status da tarefa |
+|---|---|
+| OK | finalizado |
+| REALIZANDO | em execução |
+| REALIZAR | a iniciar |
+| vazia ("—", em branco) | **não cria tarefa e não altera a que existe** |
+| texto não reconhecido | vale como vazia, com aviso na pré-visualização |
+
+Tarefa criada pelo quadro nasce **sem prazo** (⏸️ cinza — nunca vermelho),
+com origem "quadro do escritório de DD/MM" e a descrição = rótulo da
+coluna, com a área da unidade no início quando a linha é uma área
+("Ernane — Uréia" ≠ "Caxico — Uréia" ≠ "Uréia").
+
+**Conciliação antes de gravar** (`quadroConciliar`, por unidade, contra as
+tarefas da rodada do mês): **Atualiza** (existe, status diferente — o
+status do quadro vence, inclusive voltando; prazo, área, responsável e
+bloqueio ficam; histórico "de → para (quadro do escritório de DD/MM)") ·
+**Sem mudança** (existe, status bate — nada grava) · **Criar** · **Só na
+ata** (o quadro não fala dela — nada muda). Exceção declarada na tela:
+REALIZAR sobre AGUARDANDO TERCEIRO / CLIMA fica em "Sem mudança" com a nota
+"aguardando terceiro mantido — o quadro não diz que a espera acabou".
+
+**Semelhança forte** (`quadroParecida`): uma palavra inteira da descrição da
+ata é o termo do insumo, ou começa por ele (termo com 4+ letras) — "Fazer
+KCL e ferti", "Kcl em andamento", "Kcl falta chegar" × coluna KCl. Linha COM
+área só casa com tarefa daquela área; linha SEM área só com tarefa sem
+prefixo de área. Vai para "❓ Confirmar se é a mesma tarefa": É a mesma
+(grava `t.quadroRotulo` = rótulo da coluna) · São diferentes (grava
+`t.quadroNao` += rótulo normalizado) · Decidir depois (a célula fica fora
+desta gravação). Nada é gravado antes da resposta; a escolha vale para as
+próximas importações. Fora do escopo (`fora:true`) descarta com aviso;
+nome desconhecido para na pré-visualização ("Unidade não reconhecida").
+Reimportar o mesmo quadro não cria nem altera nada.
 
 ### Vínculo com o boletim (`PLAN_SINONIMOS`) — o app SUGERE, nunca conclui
 
@@ -789,6 +855,9 @@ chave normalizada. `plano` é a chave do mesmo insumo no plano do agrônomo
 | Gesso · Gesso agrícola | Gesso agrícola | corretivo | — |
 | Phusion | Phusion | defensivo | `phusion` |
 | Omite | Omite | defensivo | — |
+| Sulf. Manganês | Sulf. Manganês | fertilizante | — (v90, coluna do quadro) |
+| Ácido Bórico | Ácido Bórico | fertilizante | — (v90, coluna do quadro) |
+| Sulf. Zinco | Sulf. Zinco | fertilizante | — (v90, coluna do quadro) |
 
 Apelido novo confirmado na pré-visualização entra em `D.deparaProdutos` e
 a próxima colagem não pergunta (aprendizado de formato).
