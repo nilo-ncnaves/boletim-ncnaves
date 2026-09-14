@@ -933,3 +933,54 @@ Regras que ficam:
 Conferência: `scripts/checar-poluicao.cjs`, grupo "17. Voltar devolve para a
 tela de onde se veio" — os quatro caminhos de entrada e a prova de que, dentro
 do módulo, o voltar sobe um degrau e não sai dele.
+
+## 25. Ações da tarefa no lugar: a fileira nunca some, desfazer no lugar de diálogo (desde a v91)
+
+Origem: 14/09/2026, o Nilo com o iPhone na mão em Planejamento › Todas as
+tarefas. "Comecei" só acendia o chip (o farol e a linha do cartão não
+mudavam, e o "✔ Salvo" nascia no topo da página, fora da vista); "Concluí"
+fazia a tarefa sumir (a lista inteira redesenhava e reordenava pelo farol —
+no aparelho, também pela sincronização que roda logo depois de gravar);
+"Travado", "Novo prazo" e "Definir meta" abriam o 2º nível sem rótulo e sem
+o chip-pai aceso. Regra do Nilo, com as palavras dele: "clicar em uma opção
+não deveria excluir as outras, apesar de que as antagônicas sim".
+
+Regras que ficam:
+
+1. **Numa fileira de ações, tocar numa opção nunca esconde as outras.** As
+   duas linhas de chips ficam visíveis enquanto a ação rápida está aberta; o
+   2º nível abre EMBAIXO do chip tocado, com rótulo curto ("Por quê?" · "Novo
+   prazo" · "Meta em ha"), um aberto por vez, quebrando em linhas — nunca
+   rolando de lado. Tocar o mesmo chip de novo recolhe sem gravar.
+2. **Só o grupo excludente troca a seleção.** SITUAÇÃO (Comecei · Concluí ·
+   Travado) é seleção única: um aceso, tocar noutro troca, tocar no aceso NÃO
+   desfaz. ATRIBUTOS (Novo prazo · Definir meta) são independentes e convivem
+   com qualquer situação e entre si.
+3. **Ação reversível recebe "desfazer" no lugar, nunca diálogo.** Toda
+   gravação redesenha SÓ o cartão (ou a folha) e deixa "✔ Salvo · o que
+   mudou · desfazer" abaixo da fileira, enquanto a ação rápida estiver
+   aberta. "Concluí" não some: o cartão permanece na lista com ✅ e
+   "finalizado hoje". "desfazer" devolve a foto de antes e entra no
+   histórico como reversão (quem, quando, de → para, "desfeito"). Zero
+   `confirm()`, `alert()`, `prompt()` ou `perguntar()` novo.
+4. **O chip aceso reflete o status atual ao abrir**, com `aria-pressed`; o
+   chip-pai de 2º nível leva `aria-expanded` e mostra a escolha no rótulo
+   ("Travado · falta peça", "Novo prazo · 30/09", "Meta · 96 ha").
+5. **Componente ÚNICO** `planAcoesTarefa(t, ui, ctx)` + `planAcaoClique` +
+   `planDesfazer` + `planRepintar`, nas listas de Planejamento (Todas as
+   tarefas, Semana, Rodada, Pendências com terceiros, Arrastadas, Assuntos) e
+   na folha do gerente; quem pode Novo prazo / Definir meta é o catálogo
+   `ACOES_PERFIL` (c9), nunca `if(papel)` na tela. Três atividades pela mesma
+   função.
+6. **Vocabulário:** a linha de estado relata STATUS e PRAZO ("em execução",
+   "finalizado hoje", "prazo 20/09"); proibidos "não fez", "pendente",
+   "faltou", "esqueceu".
+
+Conferência: `node scripts/teste_planejamento.cjs`, seção 13 — (a) tarefa em
+execução abre com "Comecei" aceso; (b) "Concluí" mantém o cartão, só ele
+redesenha, "Salvo · finalizada · desfazer", 1 entrada no histórico; (c)
+"desfazer" volta o status, 2 entradas; (d) "Travado" aberto mantém os 5
+chips e abre "Por quê?"; (e) "Comecei" + "Novo prazo +15" convivem; (f)
+nenhuma fileira passa de 390 px, chips sem pílula, alvo ≥ 44 px; mais
+"Gravar meta" como botão de avanço. `scripts/checar-poluicao.cjs`, grupo "14.
+Planejamento", três itens "Ações da tarefa (v91)".

@@ -267,7 +267,15 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-farol{flex:none;width:34px;min-height:44px;padding:0;font-size:1rem;line-height:1}
 .plan-mais{flex:none;width:44px;min-height:44px;padding:0;font-size:1.2rem;color:var(--tinta-2);line-height:1}
 .plan-acoes{background:var(--papel);border:1px solid var(--linha);border-top:none;padding:10px 12px}
-.plan-acoes .chip{min-height:44px;font-size:.84rem}
+/* v91: a fileira de ações tem classe própria — sem pílula (P10), mesma decisão dos filtros da v80 */
+.plan-acoes .chip{min-height:44px;font-size:.84rem;border-radius:0}
+/* v91: o 2º nível (motivo · prazo · meta) abre EMBAIXO do chip tocado, com rótulo; quebra em linhas, nunca rola de lado */
+.plan-sub{margin-top:8px;padding-top:8px;border-top:1px solid var(--linha)}
+.plan-sub input{border-radius:0}
+/* v91: retorno no lugar — "Salvo · o que mudou · desfazer" fica enquanto a ação rápida está aberta (desfazer no lugar de confirmação) */
+.plan-salvo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.82rem;color:var(--verde-esc)}
+.plan-salvo .btn{min-height:44px;border-radius:0}
+.plan-acoes-folha .plan-acoes{border:0;padding:0;background:transparent}
 .plan-pct{font-weight:700;font-size:.95rem}
 .plan-barra{height:8px;background:var(--linha);margin-top:6px}
 .plan-barra>span{display:block;height:100%;background:var(--verde)}
@@ -1376,6 +1384,10 @@ const ACOES_PERFIL={
   painel_diretoria:     {pode:()=>podePainel(), visivel:()=>false},
   relatorios_diretoria: {pode:()=>podePainel(), visivel:()=>false},
   planejamento:         {pode:()=>podePainel(), visivel:()=>false},
+  /* v91: prazo e meta da tarefa são do escritório/Diretoria; para o gerente ficam OCULTOS (ação administrativa nunca
+     aparece esmaecida para o gerente). Antes a folha decidia com if(papel); agora é o catálogo, como manda o c9. */
+  tarefa_prazo:         {pode:()=>!(sessao && sessao.papel==="gerente"), visivel:()=>false},
+  tarefa_meta:          {pode:()=>!(sessao && sessao.papel==="gerente"), visivel:()=>false},
   colar_whatsapp:       {pode:()=>podePainel(), visivel:()=>false},
   escritorio:           {pode:()=>podeCadastros(), visivel:()=>false},
   cadastros_painel:     {pode:()=>!!sessao && sessao.papel==="admin", visivel:()=>!!sessao && sessao.papel==="proprietario", papel:"Ação do escritório (administrador)"},
@@ -5101,7 +5113,7 @@ function planLinhaTexto(t){
   if(p.temMeta) partes.push(planHa(p.feito)+" de "+planHa(p.meta)+" ha");
   else if(p.ex.n) partes.push(p.ex.n+" lançamento"+(p.ex.n>1?"s":""));
   if(planPausada(t)) partes.push(((t.bloqueio&&t.bloqueio.texto)||planStatusRot(t.status).toLowerCase())+((t.bloqueio&&t.bloqueio.quem)?" ("+t.bloqueio.quem+")":""));
-  else if(t.prazo) partes.push((f==="vermelho"&&planDiasParaPrazo(t)<0?"ATRASADO desde ":"vence ")+fmtDataCurta(planPrazoEfetivo(t)));
+  else if(t.prazo) partes.push((t.status==="finalizado"?"prazo ":(f==="vermelho"&&planDiasParaPrazo(t)<0?"ATRASADO desde ":"vence "))+fmtDataCurta(planPrazoEfetivo(t)));
   else partes.push("sem prazo");
   return partes.join(" · ");
 }
@@ -5161,19 +5173,10 @@ function planFolhaCorpo(){
       ${proj?`<p class="mut tar-proj">no ritmo atual conclui em ${esc(fmtDataCurta(proj.fim))}${proj.atraso>0?` (${proj.atraso} dia${proj.atraso>1?"s":""} após o prazo)`:proj.atraso<0?` (${-proj.atraso} dia${-proj.atraso<-1?"s":""} antes do prazo)`:""}</p>
         <p class="mut" style="font-size:.72rem;margin:2px 0 0">Ritmo calculado dos talhões já registrados no boletim; dias úteis sem domingo e sem os dias de chuva declarados.</p>`:""}
     </div>
-    <div class="cartao"><b>O que aconteceu?</b>
+    <div class="cartao plan-acoes-folha"><b>O que aconteceu?</b>
       <p class="mut" style="font-size:.78rem;margin:2px 0 8px">Um toque responde. Dá para mudar de novo depois.</p>
-      <div class="chips">
-        <button class="chip ${t.status==="em_execucao"?"on":""}" data-tar-st="em_execucao">Comecei</button>
-        <button class="chip ${t.status==="finalizado"?"on":""}" data-tar-st="finalizado">Concluí</button>
-        <button class="chip ${planPausada(t)?"on":""}" data-tar-trava="1">Travado</button>
-      </div>
-      ${tarUI.trava?`<label class="mt">O que travou?</label>
-        <div class="chips">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${((t.bloqueio||{}).motivo)===m.id?"on":""}" data-tar-mot="${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+      ${planAcoesTarefa(t, tarUI, {})}
     </div>
-    ${tarUI.podePrazo?`<div class="cartao"><b>Novo prazo</b>
-      <p class="mut" style="font-size:.78rem;margin:2px 0 8px">Repactuar fica registrado no histórico, com quem e quando.</p>
-      <div class="chips">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-tar-prazo="${p.id}">${esc(p.rot)}</button>`).join("")}</div></div>`:""}
     <button class="btn sec" data-tar-zap="${t.id}">💬 Falar com o Nilo</button>
     ${hist.length?`<div class="cartao mt"><b>Histórico</b>
       <ul class="lista-limpa">${hist.map(h=>`<li><span class="mut" style="font-size:.8rem">${esc(h.em)}${h.por?" · "+esc(h.por):""}</span><br>${esc(planHistTexto(h))}</li>`).join("")}</ul></div>`:""}`;
@@ -5190,7 +5193,8 @@ function planFolhaLista(){
 }
 function planHistTexto(h){
   if(h.campo==="status") return "status: "+(h.de?planStatusRot(h.de).toLowerCase()+" → ":"")+planStatusRot(h.para).toLowerCase()+(h.motivo?" ("+h.motivo+")":"");
-  if(h.campo==="prazo") return "prazo: "+(h.de?fmtData(h.de):"sem prazo")+" → "+fmtData(h.para)+(h.motivo?" ("+h.motivo+")":"");
+  if(h.campo==="prazo") return "prazo: "+(h.de?fmtData(h.de):"sem prazo")+" → "+(h.para?fmtData(h.para):"sem prazo")+(h.motivo?" ("+h.motivo+")":"");
+  if(h.campo==="meta") return "meta: "+(h.de?h.de+" ha":"sem meta")+" → "+(h.para?h.para+" ha":"sem meta")+(h.motivo?" ("+h.motivo+")":"");
   if(h.campo==="compromisso") return h.para?"assumida na semana":"tirada da semana";
   if(h.campo==="criada") return "criada"+(h.motivo?" — "+h.motivo:"");
   if(h.campo==="quadro") return "ligada à coluna \""+h.para+"\" do quadro"+(h.motivo?" — "+h.motivo:"");
@@ -5198,7 +5202,7 @@ function planHistTexto(h){
 }
 function planFolhaPintar(){ const c=document.getElementById("tar-corpo"); if(c) c.innerHTML=planFolhaCorpo(); }
 function planFolhaAbrir(o){
-  tarUI={ id:o.id||"", fz:o.fz||"", trava:false, exec:false, podePrazo: !!(sessao && sessao.papel!=="gerente") };
+  tarUI={ id:o.id||"", fz:o.fz||"", trava:"", prazoAb:"", metaAb:"", salvo:null, exec:false };
   const f=document.createElement("div"); f.className="folha"; f.id="folha-tarefa";
   f.setAttribute("role","dialog"); f.setAttribute("aria-modal","true"); f.setAttribute("aria-label","Tarefas da reunião");
   f.innerHTML=`<div class="miolo">
@@ -5209,25 +5213,22 @@ function planFolhaAbrir(o){
       <button class="btn sec" id="bt-tar-fechar2">Fechar</button></div></div>`;
   document.body.appendChild(f);
   travarFolha();
+  const limparFolha=()=>{ tarUI.trava=""; tarUI.prazoAb=""; tarUI.metaAb=""; tarUI.salvo=null; tarUI.exec=false; };
   f.onclick=ev=>{ const bt=ev.target.closest("button"); if(!bt) return; const d=bt.dataset;
+    /* botão de avanço inativo ("Gravar meta" sem número): mostra o que falta por 2,5 s e nada executa — a folha fica
+       fora do #app, então o interceptador de .acao-off de ligarEventos não a alcança */
+    if(bt.classList.contains("acao-off")){ const on=bt.classList.toggle("mostra"); if(on) setTimeout(()=>bt.classList.remove("mostra"),2500); return; }
     if(bt.id==="bt-tar-fechar"||bt.id==="bt-tar-fechar2"){
-      if(tarUI.id && tarUI.fz){ tarUI.id=""; tarUI.trava=false; tarUI.exec=false; planFolhaPintar(); return; }
+      if(tarUI.id && tarUI.fz){ tarUI.id=""; limparFolha(); planFolhaPintar(); return; }
       fecharFolhaTarefa(); return; }
-    if(d.tarAbrir!==undefined){ tarUI.id=d.tarAbrir; tarUI.trava=false; tarUI.exec=false; planFolhaPintar(); return; }
+    if(d.tarAbrir!==undefined){ tarUI.id=d.tarAbrir; limparFolha(); planFolhaPintar(); return; }
     if(d.tarExec!==undefined){ tarUI.exec=!tarUI.exec; planFolhaPintar(); return; }
     if(!tarUI.id) return;
-    if(d.tarSt!==undefined){ const at=planTarefa(tarUI.id);
-      planMudarStatus(tarUI.id, at.status===d.tarSt?"a_iniciar":d.tarSt);
-      tarUI.trava=false; planFolhaPintar(); return; }
-    if(d.tarTrava!==undefined){ tarUI.trava=!tarUI.trava; planFolhaPintar(); return; }
-    if(d.tarMot!==undefined){ const m=planMotivoTrava(d.tarMot); if(!m) return;
-      planMudarStatus(tarUI.id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
-      tarUI.trava=false; planFolhaPintar(); return; }
-    if(d.tarPrazo!==undefined){ const novo=planPrazoChip(planTarefa(tarUI.id), d.tarPrazo);
-      if(novo) planNovoPrazo(tarUI.id, novo, "repactuado no escritório");
-      planFolhaPintar(); return; }
+    /* v91: a fileira de ações é o componente único e o tratador único grava; a folha redesenha no lugar */
+    if(planAcaoClique(d, tarUI, ()=>planFolhaPintar())) return;
     if(d.tarZap!==undefined){ planFalarComNilo(d.tarZap); return; }
   };
+  f.oninput=ev=>{ const el=ev.target; if(el && el.dataset && el.dataset.planMetacampo!==undefined) planInput(el); };
 }
 const abrirFolhaTarefa  = id => { if(planTarefa(id)) planFolhaAbrir({id}); };
 const abrirFolhaTarefas = fz => planFolhaAbrir({fz});
@@ -8309,7 +8310,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v90";
+const APP_VERSAO="v91";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -9037,7 +9038,7 @@ function planFiltroFila(rot, chips, chave, escolhido){
     + (resto>0?`<button class="chip sal-mais" data-plan-fila="${esc(chave)}" aria-label="Mostrar mais ${resto} filtro(s) de ${esc(rot)}">＋${resto}</button>`:"")
     + `</div>`;
 }
-function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; }
+function planLimpar(){ planUI.acoes=""; planUI.msg=""; planUI.novo=null; planUI.busca=""; planUI.trava=""; planUI.prazoAb=""; planUI.exec=""; planUI.metaAb=""; planUI.salvo=null; }
 function planIr(v,id){ planLimpar(); planNav.push({v, id:id||""}); ir("planejamento"); }
 function planVoltar(){ planLimpar();
   if(planNav.length>1){ planNav.pop(); ir("planejamento"); }
@@ -9061,33 +9062,159 @@ function planCabecalho(){
   if(terc) partes.push("próxima cobrança: "+terc.quem);
   return `<div class="plan-cab"><b>${esc(partes.join(" · "))}</b></div>`;
 }
-/* linha de tarefa nas listas, com a ação rápida "⋯" (item 8h) — abre no lugar, sem tela nova */
+/* linha de tarefa nas listas, com a ação rápida "⋯" (item 8h) — abre no lugar, sem tela nova.
+   v91: o cartão leva data-plan-linha para ser redesenhado SOZINHO depois de cada toque (planRepintar). */
 function planLinhaTarefa(t, o){
   o=o||{};
   const f=planFarol(t), aberta=planUI.acoes===t.id;
-  const sub=[t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||"Grupo"), planLinhaTexto(t),
+  const sub=[t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||"Grupo"), planEstadoTexto(t), planLinhaTexto(t),
     t.responsavel?"com "+t.responsavel:"", o.origem&&t.origemRot?t.origemRot:""].filter(Boolean).join(" · ");
-  return `<div class="plan-linha">
+  return `<div class="plan-linha" data-plan-linha="${t.id}"${o.origem?' data-origem="1"':""}>
     <div class="cad-item" style="margin:0">
       <button class="plan-farol" data-tar="${t.id}" aria-label="Abrir ${esc(t.desc)}">${PLAN_FAROL[f].ico}</button>
       <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(sub)}</span>
         ${t.tipoItem==="tarefa"?planTrio(t,{attr:"data-plan-exec", aberta:planUI.exec===t.id}):""}</span>
       <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${aberta}">⋯</button>
     </div>
-    ${aberta?`<div class="plan-acoes"><div class="chips">
-      <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>
-      <button class="chip ${t.status==="finalizado"?"on":""}" data-plan-st="${t.id}|finalizado">Concluí</button>
-      <button class="chip ${planPausada(t)?"on":""}" data-plan-trava="${t.id}">Travado</button>
-      <button class="chip" data-plan-prazoab="${t.id}">Novo prazo</button>
-      <button class="chip ${planMeta(t)?"on":""}" data-plan-metaab="${t.id}">${planMeta(t)?"Meta":"Definir meta"}</button></div>
-      ${planUI.trava===t.id?`<div class="chips mt">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${((t.bloqueio||{}).motivo)===m.id?"on":""}" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}
-      ${planUI.prazoAb===t.id?`<div class="chips mt">${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-plan-prazo="${t.id}|${p.id}">${esc(p.rot)}</button>`).join("")}</div>`:""}
-      ${planUI.metaAb===t.id?`<label class="mt">Área planejada (ha)</label>
-        <div class="linha-flex" style="gap:8px"><input inputmode="decimal" id="plan-meta-campo" value="${esc(planMeta(t)||"")}" placeholder="Ex.: 96" style="max-width:140px">
-        <button class="btn mini" data-plan-metaok="${t.id}">Gravar meta</button></div>
-        <p class="mut" style="font-size:.74rem;margin:6px 0 0">A meta liga a barra de progresso e o restante. Vem da ata quando ela traz a área; aqui o escritório completa o que faltou.</p>`:""}
-    </div>`:""}
+    ${aberta?planAcoesTarefa(t, planUI, {}):""}
   </div>`;
+}
+/* v91: assunto geral / necessidade de investimento — mesma casca, sem farol, sem prazo e sem meta (não têm, por desenho) */
+function planLinhaAssunto(t){
+  const aberta=planUI.acoes===t.id;
+  return `<div class="plan-linha" data-plan-linha="${t.id}" data-forma="assunto">
+    <div class="cad-item">
+      <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(planStatusRot(t.status).toLowerCase())}${t.responsavel?" · com "+esc(t.responsavel):""}${t.origemRot?" · "+esc(t.origemRot):""}</span></span>
+      <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${aberta}">⋯</button>
+    </div>
+    ${aberta?planAcoesTarefa(t, planUI, {prazo:false, meta:false}):""}
+  </div>`;
+}
+/* v91: a linha de estado do cartão DIZ o status que o toque acabou de gravar. Relata registro, nunca julga:
+   "em execução", "finalizado hoje" — nada de "não fez", "pendente", "atrasado" (o prazo continua em planLinhaTexto). */
+function planEstadoTexto(t){
+  if(t.status==="em_execucao") return "em execução";
+  if(t.status==="finalizado") return t.concluidoEm===hojeBRT()?"finalizado hoje":"finalizado"+(t.concluidoEm?" em "+fmtDataCurta(t.concluidoEm):"");
+  if(t.status==="cancelado") return "cancelado";
+  return "";
+}
+/* ============================================================
+   AÇÕES DA TAREFA NO LUGAR (v91) — componente ÚNICO da fileira, do 2º nível e do retorno
+   ------------------------------------------------------------
+   Relato do Nilo (14/09/2026): "Comecei" só acendia o chip; "Concluí" fazia a tarefa sumir
+   (a lista inteira redesenhava e reordenava pelo farol); o 2º nível abria sem rótulo e sem o
+   chip-pai aceso. Regra que fica: numa fileira de ações, tocar numa opção NUNCA esconde as
+   outras; só o grupo excludente troca a seleção; ação reversível recebe "desfazer" no lugar,
+   nunca diálogo (c10, contenção — zero confirmação nova).
+
+   Dois grupos de natureza diferente:
+   - SITUAÇÃO (excludente): Comecei → EM EXECUÇÃO · Concluí → FINALIZADO · Travado → AGUARDANDO
+     TERCEIRO / CLIMA (o motivo decide). Um aceso; tocar noutro troca; tocar no aceso NÃO desfaz
+     (status volta só por outro status ou por "desfazer").
+   - ATRIBUTOS (independentes): Novo prazo · Definir meta — convivem com qualquer situação e
+     entre si. Ligados pelo catálogo ACOES_PERFIL (tarefa_prazo / tarefa_meta), nunca por
+     if(papel) na tela (c9): o gerente continua sem os dois.
+   A fileira nunca some: o 2º nível abre EMBAIXO, com rótulo ("Por quê?" · "Novo prazo" · "Meta em
+   ha"), um aberto por vez (P5), quebrando em linhas (nunca rola de lado, v80). Escolha no 2º nível
+   grava na hora e recolhe; o chip-pai fica aceso mostrando a escolha no rótulo.
+   Toda gravação redesenha SÓ o cartão (listas) ou a folha (gerente) — a lista não pula e a
+   tarefa concluída PERMANECE onde está, com ✅ e "finalizado hoje" — e deixa a linha
+   "✔ Salvo · o que mudou · desfazer", que fica enquanto a ação rápida estiver aberta.
+   `ui` é o estado de quem chama (planUI nas listas, tarUI na folha): trava / prazoAb / metaAb
+   guardam o id da tarefa com o 2º nível aberto e `salvo` a última gravação desfazível.
+   Mesmo componente nas três atividades e nos dois perfis; o que muda é o catálogo.
+   ============================================================ */
+const PLAN_META_FALTA="Informe a área planejada em ha";
+function planAcoesTarefa(t, ui, ctx){
+  ctx=ctx||{};
+  const id=t.id, pausada=planPausada(t), mot=pausada?planMotivoTrava((t.bloqueio||{}).motivo):null;
+  const subTrava=ui.trava===id, subPrazo=ui.prazoAb===id, subMeta=ui.metaAb===id;
+  const podePrazo=ctx.prazo!==false && acaoOk("tarefa_prazo",{}), podeMeta=ctx.meta!==false && acaoOk("tarefa_meta",{});
+  const meta=planMeta(t), temMeta=n0(t.meta)>0;
+  const chipSt=(st,rot)=>`<button class="chip ${t.status===st?"on":""}" data-plan-st="${id}|${st}" aria-pressed="${t.status===st?"true":"false"}">${rot}</button>`;
+  const salvo=(ui.salvo && ui.salvo.id===id)?ui.salvo:null;
+  return `<div class="plan-acoes">
+    <div class="chips" role="group" aria-label="Situação da tarefa">
+      ${chipSt("em_execucao","Comecei")}
+      ${chipSt("finalizado","Concluí")}
+      <button class="chip ${pausada?"on":""}" data-plan-trava="${id}" aria-pressed="${pausada?"true":"false"}" aria-expanded="${subTrava?"true":"false"}">Travado${mot?" · "+esc(mot.rot):""}</button>
+      ${podePrazo?`<button class="chip ${(subPrazo||t.repactuada)?"on":""}" data-plan-prazoab="${id}" aria-expanded="${subPrazo?"true":"false"}">Novo prazo${(t.repactuada&&t.prazo)?" · "+esc(fmtDataCurta(planPrazoEfetivo(t))):""}</button>`:""}
+      ${podeMeta?`<button class="chip ${(subMeta||meta)?"on":""}" data-plan-metaab="${id}" aria-expanded="${subMeta?"true":"false"}">${meta?"Meta · "+esc(planHa(meta))+" ha":"Definir meta"}</button>`:""}
+    </div>
+    ${subTrava?`<div class="chips plan-sub" role="group" aria-label="Por quê?"><span class="cad-filtro-rot">Por quê?</span>${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip ${(mot&&mot.id===m.id)?"on":""}" data-plan-mot="${id}|${m.id}" aria-pressed="${(mot&&mot.id===m.id)?"true":"false"}">${esc(m.rot)}</button>`).join("")}</div>`:""}
+    ${subPrazo?`<div class="chips plan-sub" role="group" aria-label="Novo prazo"><span class="cad-filtro-rot">Novo prazo</span>${PLAN_NOVOS_PRAZOS.map(p=>`<button class="chip" data-plan-prazo="${id}|${p.id}">${esc(p.rot)}</button>`).join("")}</div>`:""}
+    ${subMeta?`<div class="plan-sub" role="group" aria-label="Meta em ha"><span class="cad-filtro-rot">Meta em ha</span>
+      <div class="linha-flex" style="gap:8px"><input inputmode="decimal" id="plan-meta-campo-${id}" data-plan-metacampo="${id}" value="${esc(meta||"")}" placeholder="Ex.: 96" aria-label="Área planejada em ha" style="max-width:140px">
+      ${botaoAvanco("plan-meta-ok-"+id,{rotulo:"Gravar meta", falta:(temMeta||meta)?"":PLAN_META_FALTA, classe:"btn mini", attrs:`data-plan-metaok="${id}" data-rotulo="Gravar meta"`})}</div>
+      <p class="mut" style="font-size:.74rem;margin:6px 0 0">A meta liga a barra de progresso e o restante. Vem da ata quando ela traz a área; aqui o escritório completa o que faltou.</p></div>`:""}
+    ${salvo?`<div class="plan-salvo" role="status">✔ Salvo · ${esc(salvo.texto)}<button class="btn suave mini" data-plan-desfazer="${id}" aria-label="Desfazer: ${esc(salvo.texto)}">desfazer</button></div>`:""}
+  </div>`;
+}
+/* tratador ÚNICO das ações da tarefa (listas e folha do gerente). Muta, guarda a foto de antes para o
+   "desfazer" e pede a quem chamou para redesenhar SÓ o cartão / a folha — nunca a lista inteira. */
+function planAcaoClique(d, ui, repintar){
+  const fecharSubs=()=>{ ui.trava=""; ui.prazoAb=""; ui.metaAb=""; };
+  const foto=t=>({ status:t.status, bloqueio:t.bloqueio?{...t.bloqueio}:null, statusAntes:t.statusAntes, inicioReal:t.inicioReal,
+    concluidoEm:t.concluidoEm, destravadaEm:t.destravadaEm, cancelMotivo:t.cancelMotivo, prazo:t.prazo, prazoOriginal:t.prazoOriginal,
+    repactuada:t.repactuada, meta:t.meta });
+  if(d.planSt!==undefined){ const [id,st]=d.planSt.split("|"), t=planTarefa(id); if(!t) return true;
+    if(t.status===st) return true;   /* tocar no aceso não desfaz: status volta só por outro status ou por "desfazer" */
+    const antes=foto(t);
+    planMudarStatus(id, st);
+    ui.trava=""; ui.salvo={id, campo:"status", antes, texto: st==="finalizado"?"finalizada":"em execução"};
+    repintar(id); return true; }
+  if(d.planTrava!==undefined){ const id=d.planTrava, ab=ui.trava===id; fecharSubs(); ui.trava=ab?"":id; repintar(id); return true; }
+  if(d.planMot!==undefined){ const [id,mid]=d.planMot.split("|"), m=planMotivoTrava(mid), t=planTarefa(id); if(!m||!t) return true;
+    const antes=foto(t);
+    planMudarStatus(id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
+    ui.trava=""; ui.salvo={id, campo:"status", antes, texto:"travada: "+m.rot};
+    repintar(id); return true; }
+  if(d.planPrazoab!==undefined){ const id=d.planPrazoab, ab=ui.prazoAb===id; fecharSubs(); ui.prazoAb=ab?"":id; repintar(id); return true; }
+  if(d.planPrazo!==undefined){ const [id,p]=d.planPrazo.split("|"), t=planTarefa(id); if(!t) return true;
+    const novo=planPrazoChip(t,p); if(!novo){ ui.prazoAb=""; repintar(id); return true; }
+    const antes=foto(t);
+    planNovoPrazo(id, novo, "repactuado no escritório");
+    ui.prazoAb=""; ui.salvo={id, campo:"prazo", antes, texto:"prazo "+fmtDataCurta(novo)};
+    repintar(id); return true; }
+  if(d.planMetaab!==undefined){ const id=d.planMetaab, ab=ui.metaAb===id; fecharSubs(); ui.metaAb=ab?"":id; repintar(id); return true; }
+  if(d.planMetaok!==undefined){ const id=d.planMetaok, t=planTarefa(id), el=document.getElementById("plan-meta-campo-"+id); if(!t) return true;
+    const antes=foto(t), val=n0(el?el.value:0);
+    if(val>0) t.meta=val; else delete t.meta;
+    planLog(t,"meta",antes.meta?String(antes.meta):"",val?String(val):"","meta informada no escritório");
+    planGravar(t);
+    ui.metaAb=""; ui.salvo={id, campo:"meta", antes, texto: val?"meta "+planHa(val)+" ha":"meta retirada"};
+    repintar(id); return true; }
+  if(d.planDesfazer!==undefined){ const id=d.planDesfazer; planDesfazer(id, ui); repintar(id); return true; }
+  return false;
+}
+/* "desfazer" devolve a foto de antes e fica no histórico como reversão (quem, quando, de → para, "desfeito"):
+   cancelar/reverter é STATUS registrado, nunca delete (c15). */
+function planDesfazer(id, ui){
+  const s=ui.salvo, t=planTarefa(id); if(!s||s.id!==id||!t) return null;
+  const a=s.antes, poe=(k)=>{ if(a[k]===undefined) delete t[k]; else t[k]=a[k]; };
+  if(s.campo==="status"){
+    const de=t.status;
+    ["status","statusAntes","inicioReal","concluidoEm","destravadaEm","cancelMotivo"].forEach(poe);
+    if(a.bloqueio) t.bloqueio={...a.bloqueio}; else delete t.bloqueio;
+    planLog(t,"status",de,t.status,"desfeito");
+  }else if(s.campo==="prazo"){
+    const de=t.prazo;
+    t.prazo=a.prazo||""; poe("prazoOriginal"); poe("repactuada");
+    planLog(t,"prazo",de,t.prazo,"desfeito");
+  }else if(s.campo==="meta"){
+    const de=t.meta; poe("meta");
+    planLog(t,"meta",de?String(de):"",t.meta?String(t.meta):"","desfeito");
+  }
+  planGravar(t);
+  ui.salvo=null;
+  return t;
+}
+/* redesenha SÓ o cartão da tarefa nas listas (a rolagem não pula, a tarefa concluída não some). Onde não há
+   cartão com data-plan-linha (os chips mini do ritual da sexta), cai no redesenho de sempre. */
+function planRepintar(id){
+  const el=document.querySelector('#app [data-plan-linha="'+id+'"]'), t=planTarefa(id);
+  if(!el||!t){ planRender(); return; }
+  el.outerHTML = el.dataset.forma==="assunto" ? planLinhaAssunto(t) : planLinhaTarefa(t,{origem:el.dataset.origem==="1"});
 }
 const planBusca=ph=>`<input class="cad-busca" id="plan-busca" placeholder="${esc(ph)}" value="${esc(planUI.busca||"")}" autocomplete="off" autocapitalize="off">`;
 const planBate=(t)=>cadBate(planUI.busca, t.desc, t.unidade?fazenda(t.unidade).nome:(t.unidadeTexto||""), t.responsavel, t.origemRot);
@@ -9228,14 +9355,7 @@ function planVAssuntos(){
   const grupos=[["assunto","🗒️ Assuntos gerais"],["investimento","💰 Necessidades de investimento"]];
   return planTopo("Assuntos e investimentos", ls.length+" item(ns)")
     +(ls.length?grupos.map(([k,rot])=>{ const g=ls.filter(t=>t.tipoItem===k);
-        return g.length?`<div class="cad-grupo">${rot} · ${g.length}</div>`+g.map(t=>`<div class="cad-item">
-          <span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(planStatusRot(t.status).toLowerCase())}${t.responsavel?" · com "+esc(t.responsavel):""}${t.origemRot?" · "+esc(t.origemRot):""}</span></span>
-          <button class="plan-mais" data-plan-acoes="${t.id}" aria-label="Ações rápidas de ${esc(t.desc)}" aria-expanded="${planUI.acoes===t.id}">⋯</button>
-        </div>${planUI.acoes===t.id?`<div class="plan-acoes"><div class="chips">
-          <button class="chip ${t.status==="em_execucao"?"on":""}" data-plan-st="${t.id}|em_execucao">Comecei</button>
-          <button class="chip ${t.status==="finalizado"?"on":""}" data-plan-st="${t.id}|finalizado">Concluí</button>
-          <button class="chip ${planPausada(t)?"on":""}" data-plan-trava="${t.id}">Travado</button></div>
-          ${planUI.trava===t.id?`<div class="chips mt">${PLAN_MOTIVOS_TRAVA.map(m=>`<button class="chip" data-plan-mot="${t.id}|${m.id}">${esc(m.rot)}</button>`).join("")}</div>`:""}</div>`:""}`).join(""):""; }).join("")
+        return g.length?`<div class="cad-grupo">${rot} · ${g.length}</div>`+g.map(t=>planLinhaAssunto(t)).join(""):""; }).join("")
       :planVazio("assunto ou investimento da ata"))
     +cadRodape(`<button class="btn sec" data-planv="rodadas">Importar ata da reunião</button>`);
 }
@@ -9703,6 +9823,9 @@ function planNotifDisparar(){
 /* ---- entrada de dados das telas do módulo ---- */
 function planInput(el){
   const d=el.dataset;
+  /* v91: "Gravar meta" ativa NO LUGAR quando há número (c10: validação silenciosa) */
+  if(d.planMetacampo!==undefined){ const t=planTarefa(d.planMetacampo);
+    atualizarAvanco("plan-meta-ok-"+d.planMetacampo, (n0(el.value)>0 || (t && n0(t.meta)>0)) ? "" : PLAN_META_FALTA); return true; }
   if(el.id==="plan-busca"){ planUI.busca=el.value;
     clearTimeout(planBuscaTimer);
     planBuscaTimer=setTimeout(()=>{ const pos=el.selectionStart; planRender();
@@ -9743,26 +9866,12 @@ function planClique(t,d){
   if(d.cadid!==undefined && d.cadv==="rodada"){ planIr("rodada",d.cadid); return true; }
   if(d.planExec!==undefined){ planUI.exec = planUI.exec===d.planExec?"":d.planExec; planRender(); return true; }
   if(d.planFora!==undefined){ planIr("fora", d.planFora); return true; }
-  if(d.planAcoes!==undefined){ planUI.acoes = planUI.acoes===d.planAcoes?"":d.planAcoes;
-    planUI.trava=""; planUI.prazoAb=""; planUI.metaAb=""; planRender(); return true; }
-  if(d.planSt!==undefined){ const [id,st]=d.planSt.split("|"); const at=planTarefa(id);
-    planMudarStatus(id, at&&at.status===st?"a_iniciar":st); planUI.trava=""; planRender(); return true; }
-  if(d.planTrava!==undefined){ planUI.trava = planUI.trava===d.planTrava?"":d.planTrava; planUI.prazoAb=""; planRender(); return true; }
-  if(d.planMot!==undefined){ const [id,mid]=d.planMot.split("|"), m=planMotivoTrava(mid);
-    if(m) planMudarStatus(id, m.tipo==="clima"?"aguardando_clima":"aguardando_terceiro", {motivo:m.id, texto:m.texto});
-    planUI.trava=""; planRender(); return true; }
-  if(d.planPrazoab!==undefined){ planUI.prazoAb = planUI.prazoAb===d.planPrazoab?"":d.planPrazoab; planUI.trava=""; planUI.metaAb=""; planRender(); return true; }
-  if(d.planMetaab!==undefined){ planUI.metaAb = planUI.metaAb===d.planMetaab?"":d.planMetaab; planUI.trava=""; planUI.prazoAb=""; planRender(); return true; }
-  if(d.planMetaok!==undefined){ const el=document.getElementById("plan-meta-campo"), t2=planTarefa(d.planMetaok);
-    if(t2){ const antes=planMeta(t2), val=n0(el?el.value:0);
-      if(val>0) t2.meta=val; else delete t2.meta;
-      planLog(t2,"meta",antes?String(antes):"",val?String(val):"","meta informada no escritório");
-      planGravar(t2); planSalvo("Meta gravada"); }
-    planUI.metaAb=""; planRender(); return true; }
-  if(d.planPrazo!==undefined){ const [id,p]=d.planPrazo.split("|");
-    const novo=planPrazoChip(planTarefa(id),p);
-    if(novo) planNovoPrazo(id,novo,"repactuado no escritório");
-    planUI.prazoAb=""; planSalvo("Novo prazo gravado"); planRender(); return true; }
+  /* v91: "⋯" abre/fecha a ação rápida redesenhando SÓ os cartões envolvidos (a lista não pula) */
+  if(d.planAcoes!==undefined){ const ant=planUI.acoes, id=d.planAcoes;
+    planUI.acoes = ant===id?"":id; planUI.trava=""; planUI.prazoAb=""; planUI.metaAb=""; planUI.salvo=null;
+    if(ant && ant!==id) planRepintar(ant); planRepintar(id); return true; }
+  /* v91: tratador único das ações da tarefa (o mesmo da folha do gerente): grava e redesenha só o cartão */
+  if(planAcaoClique(d, planUI, id=>planRepintar(id))) return true;
   /* v79: "＋N" abre o resto da fileira de filtros, no lugar (só na memória) */
   if(d.planFila!==undefined){ planUI.filaAberta[d.planFila]=true; planRender(); return true; }
   if(d.planFiltros!==undefined){ planUI.filtros=!planUI.filtros; planRender(); return true; }
@@ -10457,7 +10566,11 @@ async function syncTudo(){
      sozinho, no lugar — o formulário nunca é redesenhado, para não tirar o foco de quem digita. */
   if(filaAntes!==syncFila.length && sessao && (sessao.papel==="gerente"||sessao.papel==="pos") && telaAtual==="casa")
     ir("casa", null, true);
-  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol","planejamento"].includes(telaAtual))
+  /* v91: com a ação rápida "⋯" de uma tarefa aberta, a tela de Planejamento NÃO é redesenhada pela sincronização —
+     era isto que fazia a tarefa "sumir" um segundo depois de "Concluí" (a lista inteira voltava reordenada pelo
+     farol). O cartão fica onde está, com "Salvo · … · desfazer"; o redesenho natural vem ao fechar o "⋯". */
+  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol","planejamento"].includes(telaAtual)
+     && !(telaAtual==="planejamento" && planUI.acoes))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
 function syncStatus(){

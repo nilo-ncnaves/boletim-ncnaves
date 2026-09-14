@@ -894,10 +894,33 @@ atividade é o CATÁLOGO (`PLAN_VINCULO`/`PLAN_SINONIMOS`), nunca a tela.
   unidade no início ("Ernane — Uréia" ≠ "Uréia"); reimportar não cria nem
   altera nada. Fora do escopo descarta com aviso; nome desconhecido e coluna
   de produto desconhecida PARAM na pré-visualização — nunca adivinhados.
+- **Ações da tarefa no lugar (desde a v91).** Regra que fica: **numa fileira
+  de ações, tocar numa opção nunca esconde as outras; só o grupo excludente
+  troca a seleção; ação reversível recebe "desfazer" no lugar, nunca
+  diálogo.** A fileira do "⋯" das listas e da folha do gerente é o componente
+  ÚNICO `planAcoesTarefa(t, ui, ctx)` + tratador `planAcaoClique` +
+  `planDesfazer` + `planRepintar` — nunca uma variante por tela, perfil ou
+  atividade. Dois grupos de natureza diferente: SITUAÇÃO (excludente: Comecei
+  · Concluí · Travado — um aceso, tocar noutro troca, tocar no aceso NÃO
+  desfaz) e ATRIBUTOS (independentes: Novo prazo · Definir meta — convivem
+  com qualquer situação; ligados por `ACOES_PERFIL.tarefa_prazo` /
+  `tarefa_meta`, c9: o gerente continua sem os dois). O 2º nível abre EMBAIXO
+  do chip tocado, com rótulo ("Por quê?" · "Novo prazo" · "Meta em ha"), um
+  por vez (P5), quebrando em linhas (v80); a escolha grava na hora, recolhe, e
+  o chip-pai fica aceso com a escolha no rótulo ("Travado · falta peça", "Novo
+  prazo · 30/09", "Meta · 96 ha"). Toda gravação redesenha SÓ o cartão
+  (listas) ou a folha — nunca a lista inteira, e a sincronização também não
+  redesenha Planejamento com um "⋯" aberto — e deixa "✔ Salvo · o que mudou ·
+  desfazer" enquanto a ação rápida estiver aberta. A tarefa concluída
+  PERMANECE onde está, com ✅ e "finalizado hoje"; sai só no próximo
+  redesenho natural. "desfazer" devolve a foto de antes e entra no histórico
+  como reversão ("desfeito") — nunca delete. "Gravar meta" é botão de avanço
+  (c10). Nenhuma confirmação nova; o chip abre aceso com o status atual.
 - Conferência: `node scripts/teste_planejamento.cjs` (a validação da tarefa,
-  com o texto real da ata e, desde a v90, o quadro real de 14/09/2026) e
-  `scripts/checar-poluicao.cjs`, grupo "14. Planejamento"; detalhe em
-  docs/definicao-de-pronto.md, item 18.
+  com o texto real da ata e, desde a v90, o quadro real de 14/09/2026; desde
+  a v91, as provas (a)–(f) das ações no lugar) e `scripts/checar-poluicao.cjs`,
+  grupo "14. Planejamento"; detalhe em docs/definicao-de-pronto.md, itens 18
+  e 25.
 
 ### c16) Envio: a tela nunca diz "enviado" antes do banco confirmar (desde a v82)
 Lição do primeiro dia de preenchimento (11/09/2026): até a v81 a casa do
