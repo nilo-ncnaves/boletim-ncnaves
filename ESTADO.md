@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v89** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v90** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -372,7 +372,11 @@ passou a morar:
    cadastro, "sem ligação" ou "fora do escopo (ignorar sempre)". Um
    seletor por linha, que grava na hora; "＋ nome da ata" acrescenta um
    nome novo. Padrão em `DEPARA_ATA_PADRAO`; o que a pessoa muda vive em
-   `D.deparaAta` e vence o padrão.
+   `D.deparaAta` e vence o padrão. Desde a v90 o padrão tem 22 nomes
+   ligados (os 6 do quadro do escritório: Café 5º e 6º, Rio Preto Café
+   Rodrigo, Rio Preto Café Grupo, Vereda 365, Monte Carmelo - Ernane,
+   Caxico) e 3 fora do escopo; aparelho que já tinha a própria cópia
+   recebe os nomes novos ao abrir, sem mexer no que a pessoa ligou.
 8. **🔌 Integrações e robôs** — Supabase, robô iCrop (última medição ×
    última gravação, de-para, parcelas vencendo), robô Solinftec
    (SOLINFTEC_AUTO, última data, linhas sem de-para, operações sem
@@ -1481,7 +1485,8 @@ De-para da ata em `DEPARA_ATA_PADRAO`, editável em **Cadastros › De-para da
 ata**; "FMC Igrejinha" e "FMC Lazaro" viraram áreas de Monte Carmelo — Café
 (talhões `t057` e `t058`, área a confirmar); Marimbondo, Cristo Redentor e
 Córrego Grande (Dr. Adilson) ficaram marcadas fora do escopo — ignoradas
-sempre, sem perguntar.
+sempre, sem perguntar. Desde a v90 a mesma tabela liga os nomes do quadro
+do escritório (seção "Quadro 'Planejamento cafeicultura' (v90)").
 
 **Provas rodadas na v78** (sem rede, 390 px, relógio fixo):
 `node scripts/teste_planejamento.cjs` → **64 ✅ · 0 ❌** (as 48 da v77 mais 16
@@ -1506,6 +1511,114 @@ Planejamento" (10 itens ✅) e 16 telas do módulo medidas com as regras de
 Cadastros; regressão main × v77 com as telas do gerente e do pós-colheita
 IDÊNTICAS nas três atividades (só o localStorage difere, pelas coleções
 novas).
+
+## Quadro "Planejamento cafeicultura" (v90) — a matriz do escritório por cima da ata
+
+**O pedido.** 14/09/2026: o escritório emite periodicamente um quadro em
+matriz — linha = fazenda, coluna = insumo (Uréia · Nitrato · KCl · Phusion ·
+Sulf. Manganês · Ácido Bórico · Sulf. Zinco · Pulverização), célula = OK /
+REALIZANDO / REALIZAR / vazia. É o MESMO planejamento que entra por ata, em
+outro formato, e chega depois como atualização do andamento. O que está
+planejado na planilha e ainda não estava no boletim precisa entrar; o que já
+estava precisa ganhar o status do quadro — sem duplicar e sem apagar nada.
+
+**O que é agora.** O quadro é o SEGUNDO formato da mesma colagem de
+Planejamento › Importar ata (e da porta única "Colar do WhatsApp", onde é
+classificado como ata: "parece o quadro de planejamento do escritório"). O
+app detecta sozinho (`quadroDetectar`: 3+ rótulos de coluna conhecidos + linha
+com 2+ status; tab, "|" ou espaço) e o parser da ata em blocos fica intocado.
+Nenhuma tela, menu, coleção `D.` ou tabela nova: as tarefas vão para
+`planejamento_tarefa` da rodada do MÊS da data do quadro (nunca rodada
+paralela; sem rodada no aparelho, a gravação cria "Reunião DD/MM/AAAA").
+- **Status:** OK → finalizado · REALIZANDO → em execução · REALIZAR → a
+  iniciar. **Célula vazia não cria tarefa e não altera a que existe** —
+  ausência de informação nunca é informação (a coluna Nitrato do quadro de
+  14/09 está inteira vazia: zero tarefa). O quadro não traz prazo: a tarefa
+  criada nasce ⏸️ cinza, nunca vermelha para o campo.
+- **Conciliação antes de gravar** (`quadroConciliar`, por unidade), na tela
+  "Conferir o quadro", com o que pede resposta primeiro: Unidade não
+  reconhecida · Produto não reconhecido · **❓ Confirmar se é a mesma tarefa**
+  (semelhança forte sem casamento exato, ex. "Fazer KCL e ferti" × coluna
+  KCl: É a mesma · São diferentes · Decidir depois — o app sugere, nunca funde
+  por palpite; a escolha fica NA TAREFA, `quadroRotulo` / `quadroNao`, e vale
+  para as próximas importações); depois os quatro grupos contáveis e
+  editáveis (○/● e "⋯" com chips de status): **Atualiza** · **Sem mudança** ·
+  **Criar** · **Só na ata**. O Gravar nasce inativo ("Responda as N
+  pergunta(s) de 'é a mesma tarefa?'") enquanto houver ❓ sem resposta,
+  unidade ou produto não reconhecido.
+- **Quem vence.** O STATUS do quadro, inclusive voltando (finalizado → em
+  execução), registrado em `D.tarefaHistorico` com a origem "quadro do
+  escritório de DD/MM". Prazo, área, responsável e bloqueio da ata FICAM.
+  Exceção declarada na tela: REALIZAR sobre AGUARDANDO TERCEIRO / CLIMA fica
+  em "Sem mudança" com a nota "aguardando terceiro mantido — o quadro não diz
+  que a espera acabou".
+- **Duas naturezas.** As 7 colunas de nutrição casam o produto pelo de-para
+  (`DEPARA_PRODUTOS_PADRAO` ganhou "Sulf. Manganês", "Ácido Bórico" e "Sulf.
+  Zinco", com o nome exatamente como o escritório escreve), o produto passa
+  a existir em `D.insumos` (`insGarantirProduto`) e a tarefa leva `produto`.
+  "Pulverização" é fitossanitária: nasce SEM produto e casa com "Pulverização
+  manual" pelo `PLAN_SINONIMOS`. Coluna fora do catálogo para na
+  pré-visualização para ligar ou deixar de fora.
+- **Identidade** = rodada + unidade + descrição normalizada, igual à ata;
+  linha que é ÁREA de uma unidade leva a área no início ("Ernane — Uréia" ≠
+  "Caxico — Uréia" ≠ "Uréia" — três tarefas distintas de Monte Carmelo —
+  Café). Reimportar o mesmo quadro: 0 ❓, tudo "sem mudança", nada criado,
+  nada no histórico.
+- **De-para por id** (`DEPARA_ATA_PADRAO`, +6 confirmados pelo Nilo): Café 5º
+  e 6º → f24; Rio Preto Café Rodrigo → f20; Rio Preto Café Grupo → f03c;
+  Vereda 365 → f22c (365 é a rodovia — distingue da Vereda Romaria); Monte
+  Carmelo - Ernane → f14c área Ernane; Caxico → f14c área Caxico. Marimbondo
+  e Cristo Redentor (já `fora:true`) são descartados com o aviso "2 linhas
+  fora do escopo" — nunca tratados como nome desconhecido. Nome que não está
+  no de-para PARA na pré-visualização; a unidade escolhida vira de-para.
+- **Depois de gravar** o app volta para a rodada com o resumo de uma linha
+  no flash: "Quadro de 14/09 importado · 1 tarefa atualizada · 60 criadas · 1
+  sem mudança · 9 só na ata · 2 linhas fora do escopo". Sem exclamação, sem
+  emoji novo, sem cobrança. Mensagem colada pela porta única fica em
+  `mensagens_importadas` com as tarefas que criou, como a ata.
+- **O que muda para o gerente:** nada na tela; as tarefas do quadro
+  aparecem na faixa "📋 Tarefas da reunião" como qualquer tarefa da rodada
+  (sem prazo → ⏸️). **Para o escritório:** a tela "Conferir o quadro" dentro
+  do fluxo de importação que já existia, o contador "De-para da ata" (16 →
+  22) e três produtos a mais no de-para.
+
+**Onde mexe no código:** bloco novo depois de `ataImportar` (`QUADRO_COLUNAS`,
+`QUADRO_STATUS`, `quadroDetectar`, `quadroParsear`, `quadroConciliar`,
+`quadroFalta`, `quadroImportar`, `quadroResumo`, `planVQuadro`,
+`planQuadroGravar`, `planQuadroClique`, `planAreaDe`); `planVImportar` desvia
+para `planVQuadro` quando `planUI.quadro` existe; "Ler a ata" detecta o
+formato; `insClassificar` / `insAbrirPrev` / `bt-ins-ata` na porta única;
+`planHistTexto` lê o campo `quadro`; 6 linhas em `DEPARA_ATA_PADRAO`, 3 em
+`DEPARA_PRODUTOS_PADRAO` (mescladas ao abrir nos aparelhos que já têm a
+própria cópia); CSS `.plan-expl`.
+
+### Provas (v90)
+- `node scripts/teste_planejamento.cjs` → **111 ✅ · 0 ❌** (os 64 da v78 mais
+  47 da seção 12: detecção nos três separadores e a ata NÃO detectada como
+  quadro; data e rodada do mês; 62 + 18 = 80; as 8 colunas; Nitrato vazia;
+  Phusion só em Água Limpa e Caxico; 2 fora do escopo; de-para por id; as
+  três áreas de Monte Carmelo; 3 ❓ de KCl; Gravar inativo com o texto da
+  próxima ação; a tela com três chips por pergunta e nenhum campo; ordem;
+  sem cobrança; A = 1 · B = 1 · C = 60 · 9 só na ata sem nada gravado antes;
+  os grupos na tela; o resumo de uma linha; volta para a rodada única; 60
+  criadas sem prazo e ⏸️ (30 · 19 · 11 por status); histórico com a origem;
+  `quadroRotulo` / `quadroNao` na tarefa; prazo da ata mantido; produto pelo
+  de-para e "Sulf. Manganês" no cadastro; Pulverização sem produto; zero
+  nitrato; 22 nomes no de-para; reimportação sem duplicar; status voltando;
+  célula vazia sem alterar; exceção do "aguardando"; só a mudança entra;
+  tab, espaço e sem data; nome e produto desconhecidos parando; rodada
+  criada quando não existe; porta única classificando e levando à mesma
+  pré-visualização; zero erro de JavaScript).
+- `scripts/checar-poluicao.cjs` → **690 ✅ · 41 ❌**: os MESMOS 41 ❌ herdados
+  (o main da v89 mede hoje 678 ✅ · 41 ❌ com o mesmo script), nenhum novo; a
+  tela "Planejamento › Conferir o quadro" entrou na lista de Cadastros (390
+  px, 4,5 telas com busca, 31 itens com busca, "Recomeçar" fixo no rodapé,
+  nível 3) e 5 checagens ✅ no grupo "14. Planejamento".
+- `scripts/regressao_render.cjs` main × v90: boletim das três atividades,
+  pós-colheita e painel IDÊNTICOS enquanto nenhum quadro é importado (em
+  Admin muda só o contador "De-para da ata", 16 → 22).
+- `node scripts/teste_nomenclatura.cjs` → "Tudo certo"; `node
+  scripts/teste_insumos.cjs` → 54 ✅ · 0 ❌.
 
 ## "‹ Voltar" devolve para a tela de onde se veio (v89)
 
@@ -1994,6 +2107,17 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v90, 14/09/2026: **690 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o main da v89
+mede hoje 678 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v90 acrescentou
+a tela "Planejamento › Conferir o quadro" (medida com as regras de
+Cadastros: 390 px, 4,5 telas com busca, 31 itens com busca, "Recomeçar" fixo
+no rodapé, nível 3) e 5 checagens ✅ no grupo "14. Planejamento" (bloco ❓ com
+três chips por pergunta e nenhum campo; Gravar inativo dizendo a próxima ação
+e nada gravado antes da resposta; respondido, ativa no lugar sem nativo e sem
+sair da tela; grupos contáveis com a soma fechando nas células preenchidas;
+sem termo de cobrança e sem exclamação). As duas linhas ❌ de P10 em
+"Cadastros / Escritório" listam alguns exemplos a mais, todos de classes já
+existentes (`.cartao`, `.btn`). Medição anterior,
 v89, 12/09/2026: **677 ✅ · 42 ❌** — os mesmos 42 ❌ da v85, nenhum novo. A
 v89 acrescentou o grupo "17. Voltar devolve para a tela de onde se veio"
 (7 itens ✅: painel → Planejamento → painel, que é o caminho relatado pelo

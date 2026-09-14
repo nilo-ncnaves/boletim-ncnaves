@@ -263,6 +263,7 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .plan-linha>.cad-item{align-items:flex-start}
 .plan-linha>.cad-item>.plan-farol,.plan-linha>.cad-item>.plan-mais{margin-top:1px}
 .plan-linha.fora{opacity:.5}
+.plan-expl{font-size:.76rem;margin:-2px 0 6px}
 .plan-farol{flex:none;width:34px;min-height:44px;padding:0;font-size:1rem;line-height:1}
 .plan-mais{flex:none;width:44px;min-height:44px;padding:0;font-size:1.2rem;color:var(--tinta-2);line-height:1}
 .plan-acoes{background:var(--papel);border:1px solid var(--linha);border-top:none;padding:10px 12px}
@@ -1204,6 +1205,9 @@ async function carregarTudo(){
      a pessoa ligou. A tela de Cadastros não apaga linha, então nada volta contra a vontade dela. */
   if(D.deparaAta && D.deparaAta.length) DEPARA_ATA_PADRAO.forEach(x=>{
     if(!D.deparaAta.some(y=>planChaveAta(y.ata)===planChaveAta(x.ata))) D.deparaAta.push({...x}); });
+  /* v90: mesma regra para o de-para de produtos (as colunas do quadro do escritório) */
+  if(D.deparaProdutos && D.deparaProdutos.length) DEPARA_PRODUTOS_PADRAO.forEach(x=>{
+    if(!D.deparaProdutos.some(y=>insNorm(y.termo)===insNorm(x.termo))) D.deparaProdutos.push({...x}); });
   (D.talhoes||[]).forEach(t=>{ if(!t.tipo) t.tipo=tipoPeloPerfil(t.nome, perfilDe(t.fazendaId)); });
   D.ciclos = D.ciclos||[];
   /* milho semente = área arrendada a sementeira: o talhão vira ARRENDADO e o ciclo não se aplica */
@@ -4142,6 +4146,15 @@ const DEPARA_ATA_PADRAO=[
   {ata:"Lagamar (Grupo)",   unidade:"f03c"},
   {ata:"Café 5º",        unidade:"f24"},
   {ata:"Café 6º",        unidade:"f24"},
+  /* v90 (quadro "Planejamento cafeicultura", confirmado pelo Nilo em 14/09/2026): os nomes que o
+     escritório usa na matriz. "365" é a rodovia — distingue a Vereda — Café da Vereda Romaria;
+     Ernane e Caxico são áreas de Monte Carmelo — Café, como Igrejinha e Lazaro. */
+  {ata:"Café 5º e 6º",           unidade:"f24"},
+  {ata:"Rio Preto Café Rodrigo", unidade:"f20"},
+  {ata:"Rio Preto Café Grupo",   unidade:"f03c"},
+  {ata:"Vereda 365",             unidade:"f22c"},
+  {ata:"Monte Carmelo - Ernane", unidade:"f14c", area:"Ernane"},
+  {ata:"Caxico",                 unidade:"f14c", area:"Caxico"},
   {ata:"Romaria",        unidade:"f23"},
   {ata:"Vereda",         unidade:"f22c"},
   {ata:"Mata Preta",     unidade:"f13c"},
@@ -4740,6 +4753,341 @@ function ataImportar(rodada, itens){
   return {novas, repetidas};
 }
 
+/* ============================================================
+   QUADRO "PLANEJAMENTO CAFEICULTURA" (v90) — matriz fazenda × insumo
+   ------------------------------------------------------------
+   SEGUNDO formato da MESMA colagem de Planejamento › Importar ata. O escritório
+   emite o quadro (linha = fazenda, coluna = insumo, célula = OK / REALIZANDO /
+   REALIZAR / vazia) depois da ata, como atualização do andamento — é o mesmo
+   planejamento em outro formato. O parser da ata em blocos (ataParsear) NÃO
+   muda: o quadro entra ao lado, na mesma pré-visualização editável, e alimenta
+   as mesmas tarefas da rodada (nenhuma tela, coleção ou tabela nova).
+
+   Regras (decisão do Nilo, 14/09/2026):
+   1. Status: OK → finalizado · REALIZANDO → em execução · REALIZAR → a iniciar.
+      Célula vazia não cria tarefa e não altera a que existe — ausência de
+      informação nunca é informação. O quadro não traz prazo: tarefa criada por
+      ele nasce sem prazo (⏸️ cinza), nunca vermelha para o campo.
+   2. O quadro entra na rodada do MÊS DA DATA do quadro; nunca abre rodada
+      paralela. Sem rodada do mês no aparelho, a gravação a cria.
+   3. Conciliação ANTES de gravar, por unidade: Atualiza (status diferente) ·
+      Sem mudança · Criar (não existe tarefa) · Só na ata (o quadro não fala
+      dela — nada muda). Semelhança forte sem casamento exato vai para o bloco
+      "❓ Confirmar se é a mesma tarefa": o app sugere, a pessoa decide num
+      toque; nada é gravado antes disso. A resposta fica NA TAREFA
+      (t.quadroRotulo / t.quadroNao — payload que já sincroniza).
+   4. O STATUS do quadro vence a ata, inclusive voltando (finalizado → em
+      execução), registrado no histórico. Prazo, área, responsável e bloqueio
+      da ata FICAM. Exceção declarada na tela: REALIZAR sobre AGUARDANDO
+      TERCEIRO / CLIMA fica "sem mudança" — o quadro não diz que a espera acabou.
+   5. Duas naturezas, duas regras: as 7 colunas de nutrição casam o produto pelo
+      de-para (DEPARA_PRODUTOS_PADRAO), o produto passa a existir em D.insumos e
+      a tarefa leva `produto`; "Pulverização" é fitossanitária — nasce SEM
+      produto e casa com a operação do boletim pelo PLAN_SINONIMOS.
+   6. Identidade = rodada + unidade + descrição normalizada, igual à ata; a área
+      da unidade vai no início ("Ernane — Uréia" ≠ "Caxico — Uréia" ≠ "Uréia").
+      Reimportar o mesmo quadro não cria nem altera nada.
+   Vocabulário: registro e status — nunca "não fez", "pendente", "faltou".
+   ============================================================ */
+const QUADRO_COLUNAS=[
+  {id:"ureia",     natureza:"nutricao", chaves:["ureia"],                                   termos:["ureia"]},
+  {id:"nitrato",   natureza:"nutricao", chaves:["nitrato","nitratodeamonio"],               termos:["nitrato"]},
+  {id:"kcl",       natureza:"nutricao", chaves:["kcl","cloretodepotassio"],                 termos:["kcl","cloreto"]},
+  {id:"phusion",   natureza:"nutricao", chaves:["phusion"],                                 termos:["phusion"]},
+  {id:"sulf_mn",   natureza:"nutricao", chaves:["sulfmanganes","sulfatodemanganes","sulfmn"], termos:["manganes"]},
+  {id:"ac_borico", natureza:"nutricao", chaves:["acidoborico","acborico"],                  termos:["borico"]},
+  {id:"sulf_zn",   natureza:"nutricao", chaves:["sulfzinco","sulfatodezinco","sulfzn"],     termos:["zinco"]},
+  {id:"pulv",      natureza:"fito",     chaves:["pulverizacao","pulverizacoes"],            termos:["pulverizacao","pulverizar"]}
+];
+const QUADRO_STATUS={ok:"finalizado", realizando:"em_execucao", realizar:"a_iniciar"};
+const QUADRO_MIN_COLUNAS=3;   /* rótulos conhecidos no cabeçalho para o texto ser um quadro */
+const QUADRO_MIN_CELULAS=2;   /* células OK/REALIZANDO/REALIZAR numa linha para o texto ser um quadro */
+const QUADRO_SEMELHANCA=4;    /* letras mínimas do termo para "começa por ele" valer como semelhança */
+const quadroChave    = s => insNorm(s);
+const quadroColunaDe = rot => { const k=quadroChave(rot); return k?(QUADRO_COLUNAS.find(c=>c.chaves.includes(k))||null):null; };
+const quadroStatusDe = cel => { const k=normTxt(cel).replace(/[^a-z]/g,""); return QUADRO_STATUS[k]?k:""; };
+const quadroEhVazia  = cel => /^[-–—]*$/.test(String(cel==null?"":cel).trim());
+const quadroSep      = l => l.includes("\t")?"\t":(l.includes("|")?"|":" ");
+const quadroOrigem   = data => "quadro do escritório de "+fmtDataCurta(data);
+/* área da unidade que a descrição carrega no início ("Ernane — Uréia"); a ata grava assim desde a v77 */
+const planAreaDe = t => { if(t.areaNome) return t.areaNome; const m=/^(.+?)\s+—\s+/.exec(String(t.desc||"")); return m?m[1]:""; };
+function quadroCelulas(linha, sep){
+  if(sep!==" "){ const cels=linha.split(sep).map(s=>s.trim());
+    if(sep==="|"){ if(/^\s*\|/.test(linha)) cels.shift(); if(/\|\s*$/.test(linha)) cels.pop(); }
+    return cels; }
+  return linha.trim().split(/\s+/);
+}
+/* cabeçalho: célula a célula (tab, "|") ou, por espaço, juntando 1 a 3 palavras até formar um rótulo conhecido */
+function quadroCabecalho(linha){
+  const sep=quadroSep(linha), toks=quadroCelulas(linha, sep);
+  let cels=toks;
+  if(sep===" "){ cels=[];
+    for(let i=0;i<toks.length;){ let achou=null;
+      for(let n=3;n>=1&&!achou;n--){ if(i+n>toks.length) continue; const rot=toks.slice(i,i+n).join(" "); if(quadroColunaDe(rot)) achou={rot,n}; }
+      if(achou){ cels.push(achou.rot); i+=achou.n; } else { cels.push(toks[i]); i++; } } }
+  const ini=cels.findIndex(c=>quadroColunaDe(c));
+  if(ini<0) return null;
+  const cols=cels.slice(ini).filter(c=>c!=="").map(rot=>{ const col=quadroColunaDe(rot);
+    return {rot, id:col?col.id:"", chave:quadroChave(rot), natureza:col?col.natureza:"", termos:col?col.termos:[quadroChave(rot)], conhecida:!!col, incluir:true, produto:""}; });
+  if(cols.filter(c=>c.conhecida).length<QUADRO_MIN_COLUNAS) return null;
+  return {sep, cols};
+}
+/* linha de fazenda: nome + uma célula por coluna (status, vazia ou texto não reconhecido) */
+function quadroLinha(linha, sep, nCols){
+  let nome, vals;
+  if(sep===" "){ const toks=quadroCelulas(linha," "); vals=[];
+    while(toks.length){ const u=toks[toks.length-1]; if(!(quadroStatusDe(u) || (u && quadroEhVazia(u)))) break; vals.unshift(toks.pop()); }
+    nome=toks.join(" "); }
+  else { const cels=quadroCelulas(linha, sep); nome=cels[0]||""; vals=cels.slice(1); }
+  nome=String(nome||"").trim();
+  if(!nome || !vals.some(v=>quadroStatusDe(v))) return null;
+  const valores=[], estranhas=[];
+  for(let i=0;i<nCols;i++){ const v=vals[i]||""; const st=quadroStatusDe(v); valores.push(st);
+    if(v && !st && !quadroEhVazia(v)) estranhas.push(v); }
+  return {nome, valores, estranhas, n:vals.filter(v=>quadroStatusDe(v)).length};
+}
+const quadroLinhasDe = texto => String(texto||"").replace(/ /g," ").split(/\r?\n/).map(l=>l.replace(/\s+$/,"")).filter(l=>l.trim());
+/* é um quadro? cabeçalho com 3+ rótulos conhecidos e alguma linha com 2+ células de status */
+function quadroDetectar(texto){
+  const linhas=quadroLinhasDe(texto);
+  let cab=-1, h=null;
+  for(let i=0;i<linhas.length && cab<0;i++){ h=quadroCabecalho(linhas[i]); if(h) cab=i; }
+  if(cab<0) return false;
+  return linhas.slice(cab+1).some(l=>{ const ln=quadroLinha(l, h.sep, h.cols.length); return ln && ln.n>=QUADRO_MIN_CELULAS; });
+}
+function quadroParsear(texto){
+  const linhas=quadroLinhasDe(texto);
+  const q={formato:"quadro", texto:String(texto||""), data:"", semData:false, ref:"", colunas:[], linhas:[], fora:[], estranhas:[], cel:{}, resp:{}, nao:{}};
+  let cab=-1, sep=" ";
+  for(let i=0;i<linhas.length && cab<0;i++){ const h=quadroCabecalho(linhas[i]); if(h){ cab=i; sep=h.sep; q.colunas=h.cols; } }
+  if(cab<0) return null;
+  /* data do quadro: dd/mm/aa(aa) nas 3 primeiras linhas ("Mês: 09/2026" não é data); sem data, o dia da colagem */
+  const m=linhas.slice(0,3).map(l=>/(?:^|[^\d\/])(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?![\d\/])/.exec(l)).find(Boolean);
+  q.data = m ? ataData(m[1],m[2],m[3]) : hojeBRT();
+  q.semData = !m;
+  q.ref = planMesDe(q.data);
+  for(let i=cab+1;i<linhas.length;i++){
+    const ln=quadroLinha(linhas[i], sep, q.colunas.length); if(!ln) continue;
+    const dp=deparaAtaDe(ln.nome);
+    if(dp && dp.fora){ if(!q.fora.includes(ln.nome)) q.fora.push(ln.nome); continue; }   /* fora do escopo: descarta com aviso, nunca "desconhecida" */
+    q.linhas.push({nome:ln.nome, unidade:(dp&&dp.unidade)||"", area:(dp&&dp.area)||"", valores:ln.valores, incluir:true});
+    ln.estranhas.forEach(v=>{ if(!q.estranhas.includes(v)) q.estranhas.push(v); });
+  }
+  return q;
+}
+/* semelhança forte: uma palavra inteira da descrição é o termo do insumo, ou começa por ele (termo com 4+ letras) */
+function quadroParecida(desc, coluna){
+  const palavras=normTxt(desc).replace(/[^a-z0-9]+/g," ").split(" ").filter(Boolean);
+  return (coluna.termos||[]).some(term=>term && palavras.some(w=>w===term || (term.length>=QUADRO_SEMELHANCA && w.startsWith(term))));
+}
+const quadroDescricao = (linha, coluna) => (linha.area?linha.area+" — ":"")+coluna.rot;
+const quadroNormDesc  = s => normTxt(s).replace(/[^a-z0-9]/g,"");
+const quadroColunaOk  = c => c.incluir!==false && (c.conhecida || c.produto);   /* coluna desconhecida só entra depois de ligada ou marcada "sem produto" */
+/* ---- conciliação: cada célula preenchida × as tarefas da rodada do mês, por unidade ----
+   Devolve as células classificadas (grupo), as perguntas ❓ e as tarefas só na ata. Nada grava. */
+function quadroConciliar(q){
+  const r=planRodadaDoMes(q.ref);
+  const tarefas=r?planTarefas().filter(t=>t.origemId===r.id && t.tipoItem==="tarefa" && (!t.unidade||podeVer(t.unidade))):[];
+  const usadas=new Set(), cels=[];
+  const mesmaArea=(t,ln)=>planChaveAta(planAreaDe(t))===planChaveAta(ln.area||"");
+  q.linhas.forEach((ln,li)=>{ q.colunas.forEach((co,ci)=>{
+    const st=ln.valores[ci]; if(!st) return;                                   /* célula vazia: nem entra */
+    const k=li+":"+ci, ov=q.cel[k]||{};
+    const cel={k, li, ci, linha:ln, coluna:co, statusQuadro:QUADRO_STATUS[st], status:ov.status||QUADRO_STATUS[st],
+      incluir: ov.incluir!==false && ln.incluir!==false && co.incluir!==false, desc:quadroDescricao(ln,co), resp:q.resp[k]||null, tarefa:null, candidatos:[]};
+    cels.push(cel);
+    if(!ln.unidade || !cel.incluir) return;
+    const cand=tarefas.filter(t=>t.unidade===ln.unidade && !usadas.has(t.id) && mesmaArea(t,ln));
+    let t=cand.find(x=>quadroNormDesc(x.desc)===quadroNormDesc(cel.desc))
+      || cand.find(x=>x.quadroRotulo && quadroChave(x.quadroRotulo)===co.chave)
+      || (cel.resp && cel.resp.r==="mesma" ? cand.find(x=>x.id===cel.resp.t) : null);
+    if(t){ cel.tarefa=t; usadas.add(t.id); }
+  }); });
+  cels.forEach(cel=>{
+    if(cel.tarefa || !cel.linha.unidade || !cel.incluir) return;
+    if(cel.resp && cel.resp.r==="depois") return;
+    const nao=q.nao[cel.k]||[];
+    cel.candidatos=tarefas.filter(t=>t.unidade===cel.linha.unidade && !usadas.has(t.id) && mesmaArea(t,cel.linha)
+      && !(t.quadroNao||[]).includes(cel.coluna.chave) && !nao.includes(t.id) && quadroParecida(t.desc, cel.coluna));
+  });
+  const emPergunta=new Set();
+  cels.forEach(cel=>{
+    if(!cel.incluir){ cel.grupo="fora"; return; }
+    if(!cel.linha.unidade){ cel.grupo="semunidade"; return; }
+    if(!quadroColunaOk(cel.coluna)){ cel.grupo="semproduto"; return; }
+    if(cel.resp && cel.resp.r==="depois"){ cel.grupo="depois"; return; }
+    if(cel.candidatos.length){ cel.grupo="pergunta"; cel.candidatos.forEach(t=>emPergunta.add(t.id)); return; }
+    if(!cel.tarefa){ cel.grupo="criar"; return; }
+    const t=cel.tarefa;
+    if(t.status===cel.status){ cel.grupo="sem"; return; }
+    if(cel.status==="a_iniciar" && planPausada(t)){ cel.grupo="sem";
+      cel.nota=(t.status==="aguardando_terceiro"?"aguardando terceiro":"aguardando clima")+" mantido — o quadro não diz que a espera acabou"; return; }
+    cel.grupo="atualiza";
+  });
+  const soAta=tarefas.filter(t=>t.status!=="cancelado" && !usadas.has(t.id) && !emPergunta.has(t.id));
+  const g=k=>cels.filter(c=>c.grupo===k);
+  const perguntas=[]; g("pergunta").forEach(c=>c.candidatos.forEach(t=>perguntas.push({cel:c, t})));
+  const vazias=q.linhas.reduce((s,ln)=>s+ln.valores.filter(v=>!v).length,0);
+  return { rodada:r, cels, perguntas, soAta, vazias, preenchidas:cels.length, total:cels.length+vazias,
+    atualiza:g("atualiza"), sem:g("sem"), criar:g("criar"), depois:g("depois"), semUnidade:g("semunidade"), semProduto:g("semproduto") };
+}
+/* o que ainda impede o Gravar (pré-condição visível na tela → botão inativo que diz a próxima ação, c10) */
+function quadroFalta(q, c){
+  const lins=q.linhas.filter(ln=>ln.incluir!==false && !ln.unidade).length;
+  if(lins) return "Escolha a unidade das "+lins+" linha(s) em aberto";
+  const cols=q.colunas.filter(co=>co.incluir!==false && !quadroColunaOk(co)).length;
+  if(cols) return "Ligue ou deixe de fora "+cols+" coluna(s) de produto";
+  if(c.perguntas.length) return "Responda as "+c.perguntas.length+" pergunta(s) de 'é a mesma tarefa?'";
+  return "";
+}
+/* produtos que a tela oferece para ligar uma coluna desconhecida: o cadastro + o de-para, sem repetir */
+function quadroProdutosOpcoes(){
+  const vistos=new Set(), out=[];
+  [...insProdutos().map(p=>p.nome), ...deparaProdutos().map(x=>x.produto)].forEach(n=>{ const k=insChaveProd(n); if(!k||vistos.has(k)) return; vistos.add(k); out.push(insProdutoNome(n)); });
+  return out.sort((a,b)=>a.localeCompare(b,"pt-BR"));
+}
+function quadroResumo(n){
+  const p=[ "Quadro de "+fmtDataCurta(n.data)+" importado",
+    n.atualizadas===1?"1 tarefa atualizada":n.atualizadas+" tarefas atualizadas",
+    n.criadas===1?"1 criada":n.criadas+" criadas",
+    n.sem+" sem mudança", n.soAta+" só na ata" ];
+  if(n.fora) p.push(n.fora===1?"1 linha fora do escopo":n.fora+" linhas fora do escopo");
+  if(n.depois) p.push(n.depois===1?"1 deixada para depois":n.depois+" deixadas para depois");
+  return p.join(" · ");
+}
+/* ---- gravação: só depois de a pessoa conferir. Devolve o resumo de uma linha. ---- */
+function quadroImportar(q){
+  const c=quadroConciliar(q);
+  const origem=quadroOrigem(q.data);
+  let r=c.rodada;
+  if(!r){ r={id:uid(), ref:q.ref, nome:"Reunião "+fmtData(q.data), data:q.data, criadoEm:hojeBRT(), por:planQuem()}; planRodadas().push(r); }
+  r.quadroEm=q.data; r.quadroImportadoEm=hojeBRT();
+  /* aprendizado: unidade escolhida para nome novo vira de-para (a próxima colagem não pergunta) */
+  q.linhas.forEach(ln=>{ if(ln.unidade && ln.incluir!==false && !deparaAtaDe(ln.nome)) insAprenderUnidade(ln.nome, ln.unidade); });
+  q.colunas.forEach(co=>{ if(!co.conhecida && co.produto && co.produto!=="__sem__") insAprenderProduto(co.rot, co.produto); });
+  const mexidas=new Set(), criadas=[];
+  c.atualiza.forEach(cel=>{ const t=cel.tarefa;
+    if(cel.resp && cel.resp.r==="mesma" && !t.quadroRotulo){ t.quadroRotulo=cel.coluna.rot; planLog(t,"quadro","",cel.coluna.rot,"confirmada como a mesma tarefa · "+origem); }
+    planMudarStatus(t.id, cel.status, {texto:origem}); mexidas.add(t.id); });
+  c.sem.forEach(cel=>{ const t=cel.tarefa;
+    if(cel.resp && cel.resp.r==="mesma" && !t.quadroRotulo){ t.quadroRotulo=cel.coluna.rot; planLog(t,"quadro","",cel.coluna.rot,"confirmada como a mesma tarefa · "+origem); mexidas.add(t.id); } });
+  c.criar.forEach(cel=>{
+    const co=cel.coluna, nutr=co.natureza==="nutricao" || (!co.conhecida && co.produto && co.produto!=="__sem__");
+    const t=planNovaTarefa({ origemTipo:"mensal", origemId:r.id, origemRot:origem, unidade:cel.linha.unidade, unidadeTexto:cel.linha.nome,
+      desc:cel.desc, status:cel.status, tipoItem:"tarefa" });
+    if(cel.linha.area) t.areaNome=cel.linha.area;
+    t.quadroRotulo=co.rot; t.quadroEm=q.data;
+    if(nutr){ const nome=co.conhecida?co.rot:co.produto; const dp=insDeparaDe(nome);
+      insGarantirProduto(nome, {categoria:(dp&&dp.categoria)||"fertilizante", un:(dp&&dp.un)||"kg"}); t.produto=insProdutoNome(nome); }
+    if(cel.status==="em_execucao") t.inicioReal=t.inicioReal||q.data;
+    if(cel.status==="finalizado") t.concluidoEm=t.concluidoEm||q.data;
+    mexidas.add(t.id); criadas.push(t); });
+  /* "São diferentes": a recusa fica na tarefa e a próxima importação não pergunta de novo */
+  Object.entries(q.nao).forEach(([k,ids])=>{ const cel=c.cels.find(x=>x.k===k); if(!cel) return;
+    ids.forEach(id=>{ const t=planTarefa(id); if(!t) return; t.quadroNao=[...new Set([...(t.quadroNao||[]), cel.coluna.chave])]; mexidas.add(t.id); }); });
+  salvarDados();
+  mexidas.forEach(id=>syncEnfileirar("tar", id));
+  syncEnfileirar("rod", r.id);
+  return { rodada:r, data:q.data, atualizadas:c.atualiza.length, criadas:criadas.length, sem:c.sem.length, soAta:c.soAta.length,
+    fora:q.fora.length, depois:c.depois.length, tarefas:[...c.atualiza.map(x=>x.tarefa), ...criadas] };
+}
+/* ---- pré-visualização do quadro (a mesma tela de conferir a ata; ordem: o que pede resposta primeiro) ---- */
+function planVQuadro(){
+  const q=planUI.quadro, c=quadroConciliar(q);
+  const bate=cel=>cadBate(planUI.busca, cel.coluna.rot, cel.linha.nome, cel.linha.unidade?fazenda(cel.linha.unidade).nome:"", cel.tarefa?cel.tarefa.desc:"");
+  const falta=quadroFalta(q,c);
+  const uns=unidadesPermitidas(), prods=quadroProdutosOpcoes();
+  const rot=st=>planStatusRot(st);
+  const nomeUn=ln=>ln.unidade?fazenda(ln.unidade).nome+(ln.area?" · "+ln.area:""):ln.nome;
+  const linhaCel=(cel,extra)=>{ const aberta=planUI.quadroEdit===cel.k, fora=!cel.incluir;
+    return `<div class="plan-linha${fora?" fora":""}"><div class="cad-item" style="margin:0">
+      <button class="plan-farol" data-plan-qincl="${cel.k}" aria-label="${fora?"Incluir":"Deixar de fora"} ${esc(cel.desc)} de ${esc(nomeUn(cel.linha))}">${fora?"○":"●"}</button>
+      <span class="cresce"><b>${esc(cel.desc)}</b><span class="mut">${esc(nomeUn(cel.linha))} · ${esc(extra)}${cel.nota?" · "+esc(cel.nota):""}</span></span>
+      <button class="plan-mais" data-plan-qedit="${cel.k}" aria-label="Editar ${esc(cel.desc)}" aria-expanded="${aberta}">⋯</button></div>
+      ${aberta?`<div class="plan-acoes"><label>Status</label><div class="chips">${["a_iniciar","em_execucao","finalizado"].map(s=>`<button class="chip ${cel.status===s?"on":""}" data-plan-qst="${cel.k}:${s}">${esc(rot(s))}</button>`).join("")}</div>
+        ${cel.resp?`<button class="btn suave mini mt" data-plan-qdesfaz="${cel.k}">Rever a pergunta "é a mesma tarefa?"</button>`:""}
+        <p class="mut" style="font-size:.74rem;margin-top:8px">No quadro: ${esc(cel.statusQuadro?rot(cel.statusQuadro):"")}${cel.tarefa?" · na ata: "+esc(cel.tarefa.desc)+" ("+esc(rot(cel.tarefa.status).toLowerCase())+")":""}</p></div>`:""}</div>`; };
+  const grupo=(titulo, lista, expl, f)=>{ const ls=lista.filter(bate); if(!lista.length) return "";
+    return `<div class="cad-grupo">${titulo} · ${lista.length}</div><p class="mut plan-expl">${expl}</p>`+ls.map(f).join(""); };
+  const nRod=c.rodada?c.rodada.nome:("Reunião "+fmtData(q.data));
+  return planTopo("Conferir o quadro", "quadro de "+fmtDataCurta(q.data)+" · "+c.preenchidas+" célula(s) preenchida(s)")
+    +planBusca("Buscar fazenda ou insumo…")
+    +`<div class="aviso">${c.rodada
+        ?`Entra na rodada <b>${esc(c.rodada.nome)}</b> (${esc(planMesNome(q.ref))}): o status do quadro vence; prazo, área e responsável da ata ficam.`
+        :`Não existe rodada de ${esc(planMesNome(q.ref))} neste aparelho. Ao gravar, o app cria a rodada <b>${esc(nRod)}</b>, para ata e quadro conviverem nela.`}
+      ${q.semData?" Sem data no texto: vale o dia da colagem.":""}
+      ${q.fora.length?`<br>${q.fora.length} linha${q.fora.length>1?"s":""} fora do escopo: ${esc(q.fora.join(" · "))}.`:""}
+      ${q.estranhas.length?`<br>Célula com texto não reconhecido vale como vazia: ${esc(q.estranhas.join(" · "))}.`:""}</div>`
+    /* o que pede resposta primeiro */
+    +(q.linhas.some(ln=>ln.incluir!==false && !ln.unidade)?`<div class="cad-grupo">Unidade não reconhecida · ${q.linhas.filter(ln=>ln.incluir!==false && !ln.unidade).length}</div><p class="mut plan-expl">O app não adivinha fazenda: escolha a unidade ou deixe a linha de fora.</p>`
+      +q.linhas.map((ln,li)=>ln.unidade||ln.incluir===false?"":`<div class="plan-linha"><div class="cad-item" style="margin:0">
+        <button class="plan-farol" data-plan-qlincl="${li}" aria-label="Deixar de fora ${esc(ln.nome)}">●</button>
+        <span class="cresce"><b>${esc(ln.nome)}</b><span class="mut">${ln.valores.filter(Boolean).length} célula(s) preenchida(s)</span></span></div>
+        <div class="plan-acoes"><label>Qual unidade?</label><select data-planq="${li}|unidade"><option value="">— escolher —</option>${uns.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select>
+        <button class="btn suave mini mt" data-plan-qfora="${esc(ln.nome)}">Nunca mais perguntar por "${esc(ln.nome)}"</button></div></div>`).join(""):"")
+    +(q.colunas.some(co=>co.incluir!==false && !quadroColunaOk(co))?`<div class="cad-grupo">Produto não reconhecido · ${q.colunas.filter(co=>co.incluir!==false && !quadroColunaOk(co)).length}</div><p class="mut plan-expl">Coluna que não está no de-para de produtos: ligue a um produto do cadastro, use sem produto ou deixe de fora.</p>`
+      +q.colunas.map((co,ci)=>quadroColunaOk(co)||co.incluir===false?"":`<div class="plan-linha"><div class="cad-item" style="margin:0">
+        <button class="plan-farol" data-plan-qcincl="${ci}" aria-label="Deixar de fora a coluna ${esc(co.rot)}">●</button>
+        <span class="cresce"><b>${esc(co.rot)}</b><span class="mut">${q.linhas.filter(ln=>ln.valores[ci]).length} célula(s) preenchida(s)</span></span></div>
+        <div class="plan-acoes"><label>Qual produto?</label><select data-planq="${ci}|produto"><option value="">— escolher —</option>${prods.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")}<option value="__sem__">sem produto (só a tarefa)</option></select></div></div>`).join(""):"")
+    +(c.perguntas.length?`<div class="cad-grupo">❓ Confirmar se é a mesma tarefa · ${c.perguntas.length}</div><p class="mut plan-expl">O app achou parecido, mas não decide: nada é gravado antes da resposta.</p>`
+      +c.perguntas.filter(p=>bate(p.cel)).map(p=>`<div class="cartao plan-perg">
+        <p style="margin:0"><span class="mut">no quadro:</span> <b>${esc(p.cel.desc)}</b> <span class="mut">· ${esc(nomeUn(p.cel.linha))} · ${esc(rot(p.cel.status).toLowerCase())}</span></p>
+        <p style="margin:4px 0 8px"><span class="mut">na ata:</span> <b>${esc(p.t.desc)}</b> <span class="mut">· ${esc(planLinhaTexto(p.t))} · ${esc(rot(p.t.status).toLowerCase())}</span></p>
+        <div class="chips"><button class="chip" data-plan-qresp="${p.cel.k}:mesma:${p.t.id}">É a mesma</button>
+          <button class="chip" data-plan-qresp="${p.cel.k}:dif:${p.t.id}">São diferentes</button>
+          <button class="chip" data-plan-qresp="${p.cel.k}:depois:">Decidir depois</button></div></div>`).join(""):"")
+    /* os quatro grupos da conciliação */
+    +grupo("Atualiza", c.atualiza, "A tarefa existe e o quadro traz outro status: o status do quadro vence; prazo, área e responsável da ata ficam.",
+      cel=>linhaCel(cel, rot(cel.tarefa.status)+" → "+rot(cel.status)))
+    +grupo("Sem mudança", c.sem, "A tarefa existe e o status bate. Nada é gravado.",
+      cel=>linhaCel(cel, rot(cel.status)))
+    +grupo("Criar", c.criar, "Está no quadro e ainda não estava no planejamento. Nasce sem prazo (⏸️), com o rótulo da coluna.",
+      cel=>linhaCel(cel, rot(cel.status)))
+    +(c.depois.length?`<div class="cad-grupo">Deixadas para depois · ${c.depois.length}</div><p class="mut plan-expl">Ficam fora desta gravação; a próxima importação pergunta de novo.</p>`
+      +c.depois.filter(bate).map(cel=>linhaCel(cel, rot(cel.status)+" · decidir depois")).join(""):"")
+    +(c.soAta.length?`<div class="cad-grupo">Só na ata · ${c.soAta.length}</div><p class="mut plan-expl">O quadro não fala destas tarefas. Nada muda nelas.</p>`
+      +c.soAta.filter(planBate).map(t=>`<div class="cad-item" style="margin:0"><span class="cresce"><b>${esc(t.desc)}</b><span class="mut">${esc(t.unidade?fazenda(t.unidade).nome:"Grupo")} · ${esc(planLinhaTexto(t))} · ${esc(rot(t.status).toLowerCase())}</span></span></div>`).join(""):"")
+    +cadRodape(`<div class="linha-flex" style="gap:8px"><button class="btn sec" id="bt-plan-ata-limpar">Recomeçar</button>
+      ${botaoAvanco("bt-plan-quadro-ok",{rotulo:"Gravar quadro", falta})}</div>`);
+}
+function planQuadroGravar(){
+  const q=planUI.quadro; if(!q) return;
+  const falta=quadroFalta(q, quadroConciliar(q));
+  if(falta){ atualizarAvanco("bt-plan-quadro-ok", falta); return; }
+  const res=quadroImportar(q);
+  if(insMsgDaAta && insMsgDaAta.texto){
+    insRegistrarMensagem({texto:insMsgDaAta.texto, tipo:"ata",
+      criados:res.tarefas.map(t=>({tipo:"tarefa", id:t.id, desc:t.desc, unidade:t.unidade}))});
+    insMsgDaAta=null;
+  }
+  planUI.quadro=null; planUI.quadroEdit=""; planUI.ataTexto="";
+  planSalvo(quadroResumo(res));
+  planNav=[{v:"menu"},{v:"rodadas"},{v:"rodada",id:res.rodada.id}];
+  ir("planejamento");
+}
+/* cliques da pré-visualização do quadro (chamado por planClique) */
+function planQuadroClique(t,d){
+  const q=planUI.quadro; if(!q) return false;
+  if(d.planQincl!==undefined){ const o=q.cel[d.planQincl]=q.cel[d.planQincl]||{}; o.incluir = o.incluir===false; planRender(); return true; }
+  if(d.planQlincl!==undefined){ const ln=q.linhas[parseInt(d.planQlincl,10)]; if(ln) ln.incluir = ln.incluir===false; planRender(); return true; }
+  if(d.planQcincl!==undefined){ const co=q.colunas[parseInt(d.planQcincl,10)]; if(co) co.incluir = co.incluir===false; planRender(); return true; }
+  if(d.planQedit!==undefined){ planUI.quadroEdit = planUI.quadroEdit===d.planQedit?"":d.planQedit; planRender(); return true; }
+  if(d.planQst!==undefined){ const [li,ci,st]=d.planQst.split(":"); const k=li+":"+ci; const o=q.cel[k]=q.cel[k]||{}; o.status=st; planRender(); return true; }
+  if(d.planQresp!==undefined){ const [li,ci,r,id]=d.planQresp.split(":"); const k=li+":"+ci;
+    if(r==="mesma") q.resp[k]={r:"mesma", t:id};
+    else if(r==="depois") q.resp[k]={r:"depois"};
+    else { q.nao[k]=[...new Set([...(q.nao[k]||[]), id])]; if(q.resp[k] && q.resp[k].r==="depois") delete q.resp[k]; }
+    planRender(); return true; }
+  if(d.planQdesfaz!==undefined){ delete q.resp[d.planQdesfaz]; delete q.nao[d.planQdesfaz]; planRender(); return true; }
+  if(d.planQfora!==undefined){ planForaDoEscopo(d.planQfora);
+    q.linhas=q.linhas.filter(ln=>planChaveAta(ln.nome)!==planChaveAta(d.planQfora));
+    if(!q.fora.includes(d.planQfora)) q.fora.push(d.planQfora);
+    planRender(); return true; }
+  if(t.id==="bt-plan-quadro-ok"){ planQuadroGravar(); return true; }
+  return false;
+}
+
 /* ---- faixa "📋 Tarefas da reunião" (item 7) — topo da casa do gerente e do boletim ----
    Componente ÚNICO nas três atividades. Sem tarefa aberta na unidade, devolve "" (nada aparece).
    No máximo PLAN_FAIXA_MAX linhas, ordem 🔴 → 🟡 → ⏸️ → 🟢, com "＋N tarefas". Tudo em dia vira
@@ -4845,6 +5193,7 @@ function planHistTexto(h){
   if(h.campo==="prazo") return "prazo: "+(h.de?fmtData(h.de):"sem prazo")+" → "+fmtData(h.para)+(h.motivo?" ("+h.motivo+")":"");
   if(h.campo==="compromisso") return h.para?"assumida na semana":"tirada da semana";
   if(h.campo==="criada") return "criada"+(h.motivo?" — "+h.motivo:"");
+  if(h.campo==="quadro") return "ligada à coluna \""+h.para+"\" do quadro"+(h.motivo?" — "+h.motivo:"");
   return h.campo+(h.motivo?" — "+h.motivo:"");
 }
 function planFolhaPintar(){ const c=document.getElementById("tar-corpo"); if(c) c.innerHTML=planFolhaCorpo(); }
@@ -4970,7 +5319,11 @@ const DEPARA_PRODUTOS_PADRAO=[
   {termo:"Gesso",               produto:"Gesso agrícola",    categoria:"corretivo",    un:"kg"},
   {termo:"Gesso agrícola",      produto:"Gesso agrícola",    categoria:"corretivo",    un:"kg"},
   {termo:"Phusion",             produto:"Phusion",           categoria:"defensivo",    un:"L", plano:"phusion"},
-  {termo:"Omite",               produto:"Omite",             categoria:"defensivo",    un:"L"}
+  {termo:"Omite",               produto:"Omite",             categoria:"defensivo",    un:"L"},
+  /* v90: colunas do quadro "Planejamento cafeicultura", com o nome exatamente como o escritório escreve */
+  {termo:"Sulf. Manganês",      produto:"Sulf. Manganês",    categoria:"fertilizante", un:"kg"},
+  {termo:"Ácido Bórico",        produto:"Ácido Bórico",      categoria:"fertilizante", un:"kg"},
+  {termo:"Sulf. Zinco",         produto:"Sulf. Zinco",       categoria:"fertilizante", un:"kg"}
 ];
 const deparaProdutos = () => (D.deparaProdutos && D.deparaProdutos.length) ? D.deparaProdutos : DEPARA_PRODUTOS_PADRAO;
 const insNorm = s => normTxt(s).replace(/[^a-z0-9]/g,"");
@@ -5483,6 +5836,8 @@ function insClassificar(texto){
   const blocos=linhas.filter(l=>ATA_BLOCO.test(l) && !ATA_ITEM.test(l)).length;
   const itens=linhas.filter(l=>ATA_ITEM.test(l)).length;
   const chuva=linhas.filter(l=>INS_CHUVA_RE.test(l)).length;
+  /* v90: o quadro em matriz do escritório é o MESMO planejamento — entra como ata e usa a mesma pré-visualização */
+  if(quadroDetectar(texto)) return {tipo:"ata", confianca:90, motivo:"quadro em matriz (fazenda × insumo)", frase:"parece o quadro de planejamento do escritório"};
   if(blocos>=2 && itens>=3) return {tipo:"ata", confianca:90, motivo:blocos+" blocos por fazenda e "+itens+" linhas de tarefa"};
   if(aloc>=2 && aloc>=chuva) return {tipo:"remessa", confianca: (insProdutoDoTexto(linhas.join(" · "))?90:70),
     motivo:aloc+" linhas de quantidade por fazenda"};
@@ -5837,6 +6192,7 @@ function insVColar(){
 function insResumoPrev(){
   const p=insUI.prev;
   if(insUI.prevAta){ const a=insUI.prevAta;
+    if(a.formato==="quadro") return a.linhas.length+" fazendas · "+a.linhas.reduce((s,ln)=>s+ln.valores.filter(Boolean).length,0)+" células preenchidas";
     return a.blocos.length+" fazendas · "+a.itens.length+" tarefas"; }
   if(!p) return "escolha o tipo";
   if(p.tipo==="remessa"){ const ok=p.itens.filter(i=>i.incluir!==false);
@@ -5847,7 +6203,7 @@ function insResumoPrev(){
   return "";
 }
 function insBotaoImportar(){
-  if(insUI.prevAta) return `<button class="btn" id="bt-ins-ata">Conferir e importar a ata ›</button>`;
+  if(insUI.prevAta) return `<button class="btn" id="bt-ins-ata">Conferir e importar ${insUI.prevAta.formato==="quadro"?"o quadro":"a ata"} ›</button>`;
   const p=insUI.prev;
   if(!p) return botaoAvanco("bt-ins-importar",{rotulo:"Importar", falta:"Escolha o tipo da mensagem"});
   const n=p.itens.filter(i=>i.incluir!==false).length;
@@ -5860,7 +6216,7 @@ function insBotaoImportar(){
 }
 function insCorpoPrev(){
   if(insUI.prevAta){ const a=insUI.prevAta;
-    return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">A ata usa a pré-visualização do módulo de Planejamento, item a item, com as unidades já ligadas pelo de-para. Nada é gravado antes de você conferir lá.</p>
+    return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">${a.formato==="quadro"?"O quadro usa a pré-visualização do módulo de Planejamento, célula a célula, conciliado com as tarefas da rodada do mês.":"A ata usa a pré-visualização do módulo de Planejamento, item a item, com as unidades já ligadas pelo de-para."} Nada é gravado antes de você conferir lá.</p>
       ${a.fora.length?`<p class="mut" style="font-size:.78rem;margin:6px 0 0">Fora do escopo, ignoradas sem perguntar: ${esc(a.fora.join(" · "))}.</p>`:""}</div>`; }
   const p=insUI.prev;
   if(!p) return "";
@@ -6049,7 +6405,8 @@ function insClique(t,d){
   if(d.insIncl!==undefined && insUI.prev){ const it=insUI.prev.itens[parseInt(d.insIncl,10)];
     if(it) it.incluir = it.incluir===false; insRender(); return true; }
   if(t.id==="bt-ins-ata"){
-    planUI.ata=insUI.prevAta; planUI.ataTexto=insUI.texto;
+    if(insUI.prevAta.formato==="quadro"){ planUI.quadro=insUI.prevAta; planUI.ata=null; } else { planUI.ata=insUI.prevAta; planUI.quadro=null; }
+    planUI.quadroEdit=""; planUI.ataTexto=insUI.texto;
     insMsgDaAta={texto:insUI.texto};
     abrirModulo("planejamento",()=>{ planNav=[{v:"menu"},{v:"rodadas"},{v:"importar"}]; insUI.prevAta=null; });
     return true; }
@@ -6059,7 +6416,7 @@ function insClique(t,d){
 /* abre a pré-visualização do tipo escolhido (a ata usa a do módulo de Planejamento) */
 function insAbrirPrev(){
   insUI.prev=null; insUI.prevAta=null;
-  if(insUI.tipo==="ata"){ insUI.prevAta=ataParsear(insUI.texto); return; }
+  if(insUI.tipo==="ata"){ insUI.prevAta=quadroDetectar(insUI.texto)?quadroParsear(insUI.texto):ataParsear(insUI.texto); return; }
   insUI.prev=insLerPorTipo(insUI.tipo, insUI.texto);
 }
 /* UM toque do gerente: grava a chegada, destrava o que estava aguardando e pede a nota (pulável) */
@@ -7952,7 +8309,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v89";
+const APP_VERSAO="v90";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -8647,7 +9004,7 @@ function cadInput(el){
    que já cumprem os padrões P1–P10.
    ============================================================ */
 let planNav=[], planBuscaTimer=null;
-let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", novo:null, revisao:null, filaAberta:{}, filtros:false};
+let planUI={busca:"", filtroStatus:"", filtroFarol:"", filtroUnid:"", filtroOrigem:"", acoes:"", flash:"", msg:"", ata:null, ataEdit:"", quadro:null, quadroEdit:"", novo:null, revisao:null, filaAberta:{}, filtros:false};
 /* v79: fileira de filtros em linhas, com rótulo. Nada rola de lado: fila longa mostra os
    PRIMEIROS e um chip "＋N" que abre o resto no lugar (mesmo mecanismo do "+K" da v74).
    A fila com o filtro escolhido abre sozinha, para a escolha nunca ficar escondida. */
@@ -8975,14 +9332,15 @@ function planVRevisao(){
 
 /* ---- (4) importar ata por colagem, com pré-visualização editável ---- */
 function planVImportar(){
+  if(planUI.quadro) return planVQuadro();   /* v90: segundo formato, mesma colagem */
   const a=planUI.ata;
   if(!a) return planTopo("Importar ata","cole o texto da reunião")
     +`<div class="cartao">
       <label>Nome da rodada</label>
       <input data-planc="rodadaNome" value="${esc(planUI.rodadaNome||("Reunião "+fmtData(hojeBRT()).slice(0,5)+"/"+hojeBRT().slice(2,4)))}">
       <label>Texto da ata</label>
-      <textarea id="plan-ata" rows="10" placeholder="Cole aqui o texto inteiro da ata da reunião."></textarea>
-      <p class="mut" style="font-size:.78rem;margin-top:6px">O app lê os blocos por fazenda ("2.1 – Vereda"), cada linha iniciada por "-" vira uma tarefa, e mostra tudo para conferir antes de gravar. Fazenda fora do escopo é ignorada sem perguntar.</p>
+      <textarea id="plan-ata" rows="10" placeholder="Cole aqui o texto inteiro da ata da reunião ou o quadro de planejamento do escritório."></textarea>
+      <p class="mut" style="font-size:.78rem;margin-top:6px">O app lê os blocos por fazenda ("2.1 – Vereda"), cada linha iniciada por "-" vira uma tarefa, e mostra tudo para conferir antes de gravar. Fazenda fora do escopo é ignorada sem perguntar. Também reconhece o quadro do escritório (fazenda × insumo, OK / REALIZANDO / REALIZAR) e o concilia com as tarefas da rodada antes de gravar.</p>
     </div>`
     +cadRodape(`<button class="btn" id="bt-plan-ler">Ler a ata</button>`);
   const naoRec=a.itens.filter(it=>it.incluir!==false && it.tipoItem==="tarefa" && !it.unidade).length;
@@ -9362,6 +9720,10 @@ function planInput(el){
     const it=(planUI.ata||{})[lista] && planUI.ata[lista][parseInt(i,10)];
     if(it){ it[campo]=el.value; if(campo==="unidade") planRender(); }
     return true; }
+  if(d.planq!==undefined && planUI.quadro){ const [i,campo]=d.planq.split("|"); const q=planUI.quadro;
+    if(campo==="unidade"){ const ln=q.linhas[parseInt(i,10)]; if(ln){ ln.unidade=el.value; const dp=el.value?deparaAta().find(x=>x.unidade===el.value && x.area && planChaveAta(x.ata)===planChaveAta(ln.nome)):null; ln.area=dp?dp.area:""; } }
+    else { const co=q.colunas[parseInt(i,10)]; if(co) co.produto=el.value; }
+    planRender(); return true; }
   return false;
 }
 /* ---- cliques do módulo (chamado pelo tratador único de ligarEventos) ---- */
@@ -9429,8 +9791,11 @@ function planClique(t,d){
   if(t.id==="bt-plan-ler"){ const el=document.getElementById("plan-ata");
     const txt=el?el.value:(planUI.ataTexto||"");
     if(!String(txt).trim()){ avisoInline("#bt-plan-ler","Cole o texto da ata para o app ler."); return true; }
+    planUI.quadro=null; planUI.quadroEdit="";
+    if(quadroDetectar(txt)){ planUI.quadro=quadroParsear(txt); planUI.ata=null; planRender(); return true; }   /* v90 */
     planUI.ata=ataParsear(txt); planUI.ataEdit=""; planRender(); return true; }
-  if(t.id==="bt-plan-ata-limpar"){ planUI.ata=null; planUI.ataTexto=""; planRender(); return true; }
+  if(t.id==="bt-plan-ata-limpar"){ planUI.ata=null; planUI.quadro=null; planUI.quadroEdit=""; planUI.ataTexto=""; planRender(); return true; }
+  if(planQuadroClique(t,d)) return true;
   if(d.planAtaincl!==undefined){ const [lista,i]=d.planAtaincl.split("|");
     const it=planUI.ata[lista][parseInt(i,10)]; it.incluir = it.incluir===false; planRender(); return true; }
   if(d.planAtaedit!==undefined){ planUI.ataEdit = planUI.ataEdit===d.planAtaedit?"":d.planAtaedit; planRender(); return true; }

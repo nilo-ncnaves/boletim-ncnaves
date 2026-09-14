@@ -617,6 +617,36 @@ conferir — e colar a resposta no resumo:
     plano, por unidade, com % dos lançamentos — e a tela DIZ que não é
     cobrança. O fechamento mensal por unidade traz % do plano executado em
     área, % do esforço fora do plano e as tarefas sem NENHUM lançamento.
+15. **O quadro do escritório concilia antes de gravar?** (desde a v90) O
+    texto colado em Planejamento › Importar ata (ou na porta única) pode ser
+    a matriz "Planejamento cafeicultura" — o app detecta sozinho e o parser
+    da ata em blocos fica intocado. Conferir, com o quadro REAL de 14/09/2026
+    por cima da ata de 10/09 (`teste_planejamento.cjs`, seção 12): (a) 10
+    linhas × 8 colunas = 80 células, 62 preenchidas + 18 vazias, e a soma
+    Atualiza + Sem mudança + Criar = 62; (b) coluna inteira vazia (Nitrato)
+    não cria tarefa e célula vazia não altera tarefa existente; (c) as três
+    traduções de status e a tarefa nova SEM prazo (⏸️, nunca vermelha); (d)
+    Marimbondo e Cristo Redentor descartados como "fora do escopo", nunca
+    como "não reconhecida"; (e) as três células de KCl caem em "❓ Confirmar
+    se é a mesma tarefa" com três chips e NADA é gravado antes da resposta —
+    o Gravar nasce inativo dizendo "Responda as N pergunta(s) de 'é a mesma
+    tarefa?'"; (f) depois de É a mesma · É a mesma · São diferentes: A = 1 ·
+    B = 1 · C = 60 · 9 só na ata · 2 fora do escopo, e o resumo de uma linha
+    "Quadro de 14/09 importado · 1 tarefa atualizada · 60 criadas · 1 sem
+    mudança · 9 só na ata · 2 linhas fora do escopo"; (g) reimportar o mesmo
+    quadro: 0 ❓, 62 sem mudança, nada criado, nada no histórico; (h) quadro
+    mais novo com status voltando (finalizado → em execução) entra em
+    Atualiza e o histórico registra "quadro do escritório de DD/MM"; (i)
+    REALIZAR sobre AGUARDANDO TERCEIRO fica em "Sem mudança" com a nota
+    "aguardando terceiro mantido — o quadro não diz que a espera acabou";
+    (j) nome desconhecido e coluna de produto desconhecida param na
+    pré-visualização (Gravar inativo) — nunca adivinhados; (k) sem rodada do
+    mês no aparelho, a tela avisa e a gravação cria "Reunião DD/MM/AAAA"; (l)
+    a porta única classifica o quadro como ata ("parece o quadro de
+    planejamento do escritório") e leva à MESMA pré-visualização. Na
+    poluição, a tela "Planejamento › Conferir o quadro" entra na lista de
+    Cadastros e o grupo 14 prova três chips por pergunta, nenhum campo,
+    Gravar inativo → ativo no lugar, zero nativo, sem cobrança.
 
 ## 19. Envio: a tela nunca diz "enviado" antes do banco confirmar (desde a v82)
 
