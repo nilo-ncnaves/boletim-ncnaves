@@ -2026,7 +2026,11 @@ cada grupo. Agora o componente ordena em pt-BR ao desenhar; a ordem dos
 GRUPOS não muda (natureza no café; fase do ciclo nos grãos, com a fase de
 agora em primeiro) e "Outra" fica sempre por último no grupo dela. Nenhum
 catálogo foi reescrito — `OPS_CAFE_GRUPOS` e `OPS_GRAOS_FASES` continuam
-sendo a fonte, na ordem em que estão. Provas: `teste_nomenclatura.cjs`
+sendo a fonte, na ordem em que estão. No mesmo pedido entraram seis
+funções de mão de obra do café que não existiam (`LISTA_FUNCOES`, 43 → 49):
+Capinar viveiro · Gerente de campo · Limpeza com moto-serra · Rastelação
+após poda · Retirar lenha de café pós poda · Trincha após poda.
+Provas: `teste_nomenclatura.cjs`
 (passos 1–3 do café), `checar-poluicao.cjs` (nenhum ❌ novo) e a regressão
 contra o main (só a ordem das linhas dentro dos grupos muda, no café e nos
 grãos).

@@ -3325,7 +3325,7 @@ const LISTA_ATIV = OPS_CAFE_GRUPOS.flatMap(([,ops])=>ops);
 const LISTA_CLIMA = ["Ensolarado","Nublado","Garoa","Chuva fraca","Chuva forte","Geada","Granizo"];
 /* v94 (pedido do Nilo e dos gerentes do café, 15/09/2026): lista em ORDEM ALFABÉTICA — achar a
    função no meio de dezenas de linhas fora de ordem atrapalhava quem preenche — e revista com os
-   nomes que a turma do café usa (43 termos). Termo que só trocou de nome (1 para 1) está em
+   nomes que a turma do café usa (43 termos na v94, 49 na v95). Termo que só trocou de nome (1 para 1) está em
    DEPARA_NOMES: boletim antigo continua lendo e somando. `funcoesDa` ordena de novo em pt-BR ao
    montar a lista, para o termo acrescentado em Cadastros › Catálogos entrar no lugar certo. */
 const LISTA_FUNCOES = [
@@ -3333,17 +3333,17 @@ const LISTA_FUNCOES = [
   "Apoio a máquinas (abastecimento)","Arranquio de corda-de-viola","Arruação",
   "Atualização das áreas e tamanhos dos talhões","Beneficiamento de café",
   "Capina manual","Capina mecânica com roçadeira","Capina mecânica com trincha",
-  "Capina química manual","Capina química mecanizada","Carregamento de café",
+  "Capina química manual","Capina química mecanizada","Capinar viveiro","Carregamento de café",
   "Colheita manual (pano)","Colheita mecanizada (colhedora)","Desbrota manual",
-  "Esparramação de cisco","Irrigação (manutenção/filtros)","Irrigação automática","Irrigação manual",
-  "Levantar café","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
+  "Esparramação de cisco","Gerente de campo","Irrigação (manutenção/filtros)","Irrigação automática","Irrigação manual",
+  "Levantar café","Limpeza com moto-serra","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
   "Plantio / replantio de mudas","Poda manual","Poda mecanizada decote","Poda mecanizada esqueletamento",
   "Poda mecanizada recepa","Pré limpeza café de varrição","Pulverização manual","Pulverização mecanizada",
-  "Rastelação manual","Rastelação mecanizada / varrição","Recolher café varrição manual",
-  "Recolher café varrição mecanizado (Miac)","Secagem de café no secador","Secagem de café no terreiro",
+  "Rastelação após poda","Rastelação manual","Rastelação mecanizada / varrição","Recolher café varrição manual",
+  "Recolher café varrição mecanizado (Miac)","Retirar lenha de café pós poda","Secagem de café no secador","Secagem de café no terreiro",
   "Serviços gerais","Transporte de café da roça para terreiro","Transporte de café do terreiro para secador",
-  "Varrição / rapagem"
-];
+  "Trincha após poda","Varrição / rapagem"
+];   /* v95: + Capinar viveiro · Gerente de campo · Limpeza com moto-serra · Rastelação após poda · Retirar lenha de café pós poda · Trincha após poda (Nilo, 15/09/2026) */
 /* ===== De-para de nomenclatura (v76) — termo ANTIGO → termo NOVO =====
    REGRA PERMANENTE: renomear termo NUNCA reescreve boletim. O registro fica no banco
    exatamente como foi gravado; o app traduz na LEITURA (exibição, soma, comparação com o
