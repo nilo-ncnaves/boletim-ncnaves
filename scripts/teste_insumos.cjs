@@ -67,6 +67,10 @@ const MSG_ATA = [
 const MSG_TAREFAS = 'Falta trocar a bomba do pivô 3; comprar mourão';
 const MSG_SOLTA = 'Bom dia a todos! A reunião de amanhã foi remarcada para as 14h na sede.';
 const MSG_CHUVA = ['Chuva de ontem:', 'Vereda 32 mm', 'Mata Preta 18 mm'].join('\n');
+/* v93: mensagem REAL do grupo de aplicações (15/09/2026) — "Caxico arrendo" é o talhão
+   "José Eustáquio — Arrendamento" de Monte Carmelo — Café (confirmado pelo Nilo) */
+const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermon', 'Dose/ 400lts , vazão 100lts / hectares',
+  'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
 
 const provas = [];
 const ok = (nome, passou, detalhe) => provas.push({ nome, ok: !!passou, detalhe: detalhe == null ? '' : String(detalhe) });
@@ -143,7 +147,7 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
         impFalta: imp ? imp.getAttribute('data-falta') || '' : '', depoisTipo, voltou };
     }, MSG_SOLTA);
     ok('Porta única — "Ler a mensagem" com texto não reconhecido ABRE a tela que pergunta o tipo (nunca fica muda)',
-      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 4,
+      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 5,
       naoRec.h1 + ' · ' + naoRec.chips + ' chip(s) · ' + naoRec.aviso.slice(0, 60));
     ok('Porta única — sem tipo escolhido o Importar fica inativo dizendo a próxima ação', /Escolha o tipo/.test(naoRec.impFalta), naoRec.impFalta);
     ok('Porta única — escolher o tipo por chip abre a pré-visualização; Descartar devolve ao campo de colar',
@@ -414,6 +418,213 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     ok('Relato de chuva — vira SUGESTÃO, nunca grava no boletim de ninguém',
       chuva.sug && chuva.sug.mm === 32 && chuva.boletins === 0, (chuva.sug ? chuva.sug.mm + ' mm sugeridos' : 'sem sugestão') + ' · ' + chuva.boletins + ' boletim gravado');
 
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
+  /* ---------- v93: relato de aplicação — escritório cola, gerente confirma com um toque ---------- */
+  let estadoAplic = null;
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T09:00:00-03:00');
+    const lido = await page.evaluate(t => {
+      const cls = insClassificar(t);
+      const p = insLerAplicacao(t), it = p.itens[0];
+      return { cls: cls.tipo + ' · ' + cls.motivo, produto: p.produto, termo: p.produtoTermo, local: it.nomeMsg, unidade: it.unidade, talhao: it.talhaoId,
+        talhaoNome: it.talhaoId ? talhao(it.talhaoId).nome : '', ltanque: p.ltanque, vazao: p.vazao, tanques: p.tanques, receita: p.receita, obs: p.obs,
+        area: insAplicAreaCalc(p), operacao: p.operacao, data: p.data };
+    }, MSG_APLIC);
+    ok('Relato de aplicação — a mensagem real do grupo é reconhecida como RELATO DE APLICAÇÃO', /^aplicacao/.test(lido.cls), lido.cls);
+    ok('Relato de aplicação — produto lido da linha de calda ("2lts Quatermon" → Quatermon)', lido.produto === 'Quatermon', lido.produto + ' (de "' + lido.termo + '")');
+    ok('Relato de aplicação — "Caxico arrendo" vai para Monte Carmelo — Café, talhão José Eustáquio — Arrendamento (por id, pelo de-para)',
+      lido.unidade === 'f14c' && lido.talhao === 't055', lido.local + ' → ' + lido.unidade + ' / ' + lido.talhao + ' (' + lido.talhaoNome + ')');
+    ok('Relato de aplicação — 400 L por tanque, vazão 100 L/ha, 5 tanques gastos; calda e observação como vieram',
+      lido.ltanque === '400' && lido.vazao === '100' && lido.tanques === '5' && lido.receita === '2lts Quatermon' && /15 dias/.test(lido.obs),
+      [lido.ltanque, lido.vazao, lido.tanques, JSON.stringify(lido.receita), lido.obs].join(' · '));
+    ok('Relato de aplicação — área coberta calculada só para conferir (5 × 400 ÷ 100 = 20 ha)', lido.area === 20, lido.area + ' ha');
+    ok('Relato de aplicação — a atividade do boletim NÃO é adivinhada pelo nome do produto (nasce vazia)', lido.operacao === '', '"' + lido.operacao + '"');
+
+    const prev = await page.evaluate(t => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender();
+      const bt = document.getElementById('bt-ins-importar');
+      const faltaAntes = bt ? bt.getAttribute('data-falta') || '' : 'sem botão';
+      const selOp = document.querySelector('#app select[data-insprev="-|operacao"]');
+      const selTal = document.querySelector('#app select[data-insprev="0|talhaoId"]');
+      const grupos = selOp ? [...selOp.querySelectorAll('optgroup')].map(g => g.label) : [];
+      selOp.value = 'Pulverização mecanizada'; selOp.dispatchEvent(new Event('input', { bubbles: true })); selOp.dispatchEvent(new Event('change', { bubbles: true }));
+      const faltaDepois = document.getElementById('bt-ins-importar').getAttribute('data-falta') || '';
+      return { faltaAntes, faltaDepois, grupos, talSel: selTal ? selTal.value : 'sem select', rotulo: bt ? bt.textContent.trim() : '',
+        nativos: window.__nativos || 0, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    }, MSG_APLIC);
+    ok('Pré-visualização — pede a atividade do boletim antes de levar ao gerente (botão inativo diz o que falta)',
+      /Escolha a atividade/.test(prev.faltaAntes) && prev.faltaDepois === '' && prev.rotulo === 'Levar ao boletim',
+      '"' + prev.faltaAntes + '" → "' + prev.faltaDepois + '" · ' + prev.rotulo);
+    ok('Pré-visualização — a lista de atividades é o catálogo do café por natureza; o talhão já vem escolhido pelo de-para',
+      prev.grupos.length >= 4 && prev.talSel === 't055', prev.grupos.join(' · ') + ' · talhão ' + prev.talSel);
+    ok('Pré-visualização — sem termo de cobrança e sem nativo', !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto) && prev.nativos === 0, prev.nativos + ' nativo(s)');
+
+    const grav = await page.evaluate(() => {
+      insImportar();
+      const rel = insAplicacoesRelatadas();
+      const antes = rel.length;
+      insUI.texto = insUI.texto; insUI.tipo = 'aplicacao'; insAbrirPrev(); insUI.prev.operacao = 'Pulverização mecanizada'; insImportar();
+      return { antes, depois: insAplicacoesRelatadas().length, rel: rel[0], aprendida: insOperacaoAprendida('Quatermon', 'CAFE'),
+        boletins: (D.boletins || []).filter(x => x.fazendaId === 'f14c' && !x.exemplo).length, status: rel[0] ? insRelatoStatus(rel[0]) : '', flash: insUI.flash };
+    });
+    ok('Levar ao boletim — o relato fica guardado com produto, talhão, atividade, calda e dia; nenhum boletim é gravado',
+      grav.antes === 1 && grav.rel && grav.rel.unidade === 'f14c' && grav.rel.talhaoId === 't055' && grav.rel.operacao === 'Pulverização mecanizada' && grav.boletins === 0,
+      grav.rel ? [grav.rel.produto, grav.rel.talhaoId, grav.rel.operacao, grav.rel.data].join(' · ') + ' · ' + grav.boletins + ' boletim' : 'nada guardado');
+    ok('Levar ao boletim — reimportar a MESMA mensagem não duplica a sugestão', grav.depois === 1, grav.antes + ' → ' + grav.depois + ' · ' + grav.flash);
+    ok('Levar ao boletim — o app lembra a atividade escolhida para este produto (próxima colagem já vem sugerida)', grav.aprendida === 'Pulverização mecanizada', grav.aprendida);
+    ok('Mensagens importadas — a situação relata REGISTRO: "aguardando o boletim de …"', /^aguardando o boletim/.test(grav.status), grav.status);
+    estadoAplic = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'CC-6081', chave: 'f14c' },
+      '2026-09-15T10:00:00-03:00', { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+    await porD(page, estadoAplic);
+    await page.evaluate(() => { rascunho = null; ir('casa'); });
+    await page.waitForTimeout(300);
+    const cartao = await page.evaluate(() => {
+      rascunho = novoRascunho(); ir('form');
+      const c = document.querySelector('#app [data-ins-relato]');
+      const bt = c ? c.querySelector('[data-ins-aplic$="|lancar"]') : null;
+      return { existe: !!c, texto: c ? c.textContent.replace(/\s+/g, ' ').trim().slice(0, 220) : '',
+        botoes: c ? [...c.querySelectorAll('[data-ins-aplic]')].map(b => b.textContent.trim()) : [],
+        alvo: bt ? +bt.getBoundingClientRect().height.toFixed(1) : 0, ativ: rascunho.atividades.length };
+    });
+    ok('Boletim do gerente — a aplicação relatada aparece no topo como PERGUNTA ("foi assim?"), com duas respostas',
+      cartao.existe && cartao.botoes.length === 2 && /foi assim\?/.test(cartao.texto) && cartao.ativ === 0, cartao.botoes.join(' · ') + ' · ' + cartao.texto.slice(0, 120));
+    ok('Boletim do gerente — a pergunta traz talhão, calda, tanques e observação da mensagem',
+      /José Eustáquio — Arrendamento/.test(cartao.texto) && /2lts Quatermon/.test(cartao.texto) && /5 tanques × 400 L/.test(cartao.texto) && /15 dias/.test(cartao.texto), cartao.texto.slice(0, 200));
+    ok('Boletim do gerente — alvo de toque ≥ 44 px e sem termo de cobrança', cartao.alvo >= 44 && !/não fez|pendente|atrasad|faltou|esqueceu/i.test(cartao.texto), 'alvo ' + cartao.alvo + ' px');
+
+    const lanc = await page.evaluate(async () => {
+      window.__nativos = 0;
+      document.querySelector('#app [data-ins-aplic$="|lancar"]').click();
+      await new Promise(r => setTimeout(r, 250));
+      const a = rascunho.atividades[0] || {};
+      const card = document.querySelector('#app [data-ativ="' + a.id + '"]');
+      const sel = card ? card.querySelector('select[data-a="talhaoId"]') : null;
+      const rec = card ? card.querySelector('textarea[data-a="receita"]') : null;
+      return { n: rascunho.atividades.length, tipo: a.tipo, talhao: a.talhaoId, receita: a.receita, tanques: a.tanques, ltanque: a.ltanque, obs: a.obs, relato: a.relatoId,
+        cartaoSumiu: !document.querySelector('#app [data-ins-relato]'), tela: telaAtual, nativos: window.__nativos || 0,
+        cardTal: sel ? sel.value : '', cardRec: rec ? rec.value : '', resp: JSON.stringify(rascunho.relatos), trocar: !!(card && card.querySelector('[data-troca-op]')) };
+    });
+    ok('UM toque em "Lançar no boletim" cria a atividade com talhão, atividade, calda, tanques, litros e observação',
+      lanc.n === 1 && lanc.tipo === 'Pulverização mecanizada' && lanc.talhao === 't055' && lanc.receita === '2lts Quatermon' && lanc.tanques === '5' && lanc.ltanque === '400' && /15 dias/.test(lanc.obs),
+      [lanc.tipo, lanc.talhao, JSON.stringify(lanc.receita), lanc.tanques, lanc.ltanque, lanc.obs].join(' · '));
+    ok('Depois do toque a pergunta some, a atividade aparece editável no cartão de sempre (talhão, "trocar", calda), sem modal e sem nativo',
+      lanc.cartaoSumiu && lanc.tela === 'form' && lanc.nativos === 0 && lanc.cardTal === 't055' && lanc.cardRec === '2lts Quatermon' && lanc.trocar,
+      (lanc.cartaoSumiu ? 'sumiu' : 'continuou') + ' · ' + lanc.nativos + ' nativo(s) · card ' + lanc.cardTal + ' · trocar ' + lanc.trocar);
+    ok('A resposta do gerente viaja no boletim (b.relatos), com a atividade ligada ao relato', /lancada/.test(lanc.resp) && !!lanc.relato, lanc.resp);
+
+    const rem = await page.evaluate(async () => {
+      document.querySelector('#app [data-rm-ativ]').click(); await new Promise(r => setTimeout(r, 150));
+      ir('form'); await new Promise(r => setTimeout(r, 150));
+      const volta = !!document.querySelector('#app [data-ins-relato]');
+      /* lançamento manual do mesmo produto no mesmo talhão: o relato confere e NÃO pergunta de novo */
+      rascunho.atividades.push({ id: uid(), talhaoId: 't055', tipo: 'Pulverização mecanizada', pessoas: '2', obs: '', status: '', falta: '', receita: '2 L Quatermon por tanque', tanques: '5', ltanque: '400', insumos: [], maquinas: [] });
+      salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      const linha = document.querySelector('#app [data-ins-relato-linha]');
+      const pergunta = !!document.querySelector('#app [data-ins-relato]');
+      rascunho.atividades = []; salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      document.querySelector('#app [data-ins-aplic$="|nao"]').click(); await new Promise(r => setTimeout(r, 200));
+      const naoLinha = document.querySelector('#app [data-ins-relato-linha]');
+      const naoResp = JSON.stringify(rascunho.relatos);
+      const desf = naoLinha ? naoLinha.querySelector('[data-ins-aplic$="|desfazer"]') : null;
+      if (desf) desf.click(); await new Promise(r => setTimeout(r, 200));
+      return { volta, confere: linha ? linha.textContent.replace(/\s+/g, ' ').trim() : '', pergunta, naoTexto: naoLinha ? naoLinha.textContent.replace(/\s+/g, ' ').trim() : '', naoResp,
+        voltouPergunta: !!document.querySelector('#app [data-ins-relato]'), ativ: rascunho.atividades.length };
+    });
+    ok('"remover" a atividade lançada é o desfazer: a pergunta volta ao boletim', rem.volta, rem.volta ? 'voltou' : 'não voltou');
+    ok('Aplicação já lançada à mão no mesmo talhão com o mesmo produto: o relato "confere ✔" e NÃO pergunta de novo (nunca conta duas vezes)',
+      /confere com o lançamento/.test(rem.confere) && !rem.pergunta, rem.confere);
+    ok('"Não lançar" grava a resposta no boletim, some com o cartão e deixa "desfazer" no lugar; desfazer devolve a pergunta',
+      /nao/.test(rem.naoResp) && /não lançada/.test(rem.naoTexto) && rem.voltouPergunta && rem.ativ === 0, rem.naoTexto + ' · ' + rem.naoResp);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
+  /* ---------- v93 (ajuste): a mensagem chega DEPOIS de a atividade estar no boletim ---------- */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T09:00:00-03:00');
+    /* o boletim real do Rubens de 14/09: "Aplicação via drench / via solo — José Eustáquio — Arrendamento · 1p · 🧪 Quatermon" */
+    const liga = await page.evaluate(t => {
+      const s0 = sessao; sessao = { userId: 'u1', papel: 'gerente', nome: 'Rubens', atividade: 'CAFE', fazendaId: 'f14c' };
+      const b = novoRascunho('2026-09-14'); sessao = s0; b.id = 'b-rubens-1409'; b.responsavel = 'Rubens'; b.data = '2026-09-14'; b.fazendaId = 'f14c';
+      b.atividades = [{ id: 'a-drench', talhaoId: 't055', tipo: 'Aplicação via drench / via solo', pessoas: '1', obs: '', status: '', falta: '', receita: 'Quatermon', tanques: '', ltanque: '', insumos: [], maquinas: [{ nome: '11', horas: '0', comb: '' }] }];
+      D.boletins.push(b); salvarDados();
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender();
+      const p = insUI.prev, bt = document.getElementById('bt-ins-importar');
+      const av = document.querySelector('#app [data-ins-vinculo]');
+      const selects = document.querySelectorAll('#app select[data-insprev]').length;
+      return { vinculo: p.vinculo, data: p.data, rotulo: bt ? bt.textContent.trim() : '', inativo: !!bt && bt.classList.contains('acao-off'),
+        aviso: av ? av.textContent.replace(/\s+/g, ' ').trim() : '', selects, nativos: window.__nativos || 0 };
+    }, MSG_APLIC);
+    ok('Mensagem depois do boletim — o app ACHA o lançamento que confere (boletim de 14/09, mesmo talhão, Quatermon na calda)',
+      liga.vinculo && liga.vinculo.boletimId === 'b-rubens-1409' && liga.vinculo.atividadeId === 'a-drench' && liga.data === '2026-09-14',
+      liga.vinculo ? liga.vinculo.data + ' · ' + liga.vinculo.tipo + ' · ' + liga.vinculo.talhaoId : 'não achou');
+    ok('Pré-visualização — diz "Confere com o boletim de 14/09", esconde talhão/atividade e o botão vira "Ligar ao lançamento", já ativo',
+      /Confere com o boletim de 14\/09/.test(liga.aviso) && /Aplicação via drench/.test(liga.aviso) && liga.selects === 0 && liga.rotulo === 'Ligar ao lançamento' && !liga.inativo,
+      liga.rotulo + ' · ' + liga.selects + ' lista(s) · ' + liga.aviso.slice(0, 90));
+    const desl = await page.evaluate(async () => {
+      document.querySelector('#app [data-ins-desvinc]').click(); await new Promise(r => setTimeout(r, 150));
+      const semV = { vinculo: insUI.prev.vinculo, rotulo: document.getElementById('bt-ins-importar').textContent.trim(), data: insUI.prev.data,
+        selects: document.querySelectorAll('#app select[data-insprev]').length };
+      document.querySelector('#app [data-ins-revinc]').click(); await new Promise(r => setTimeout(r, 150));
+      return { semV, deNovo: !!insUI.prev.vinculo };
+    });
+    ok('"Não é este lançamento" volta ao caminho da pergunta (dia de hoje, talhão e atividade a escolher); "procurar de novo" religa',
+      desl.semV.vinculo === null && desl.semV.rotulo === 'Levar ao boletim' && desl.semV.selects === 2 && desl.deNovo, JSON.stringify(desl.semV.rotulo) + ' · religou: ' + desl.deNovo);
+    const grav = await page.evaluate(() => {
+      const antesB = D.boletins.length, antesA = D.boletins.find(b => b.id === 'b-rubens-1409').atividades.length;
+      insImportar();
+      const rel = insAplicacoesRelatadas().find(c => c.vinculo);
+      insUI.texto = insUI.texto; insUI.tipo = 'aplicacao'; insAbrirPrev(); insImportar();
+      const b = D.boletins.find(x => x.id === 'b-rubens-1409');
+      const cons = insConsumos('f14c').filter(c => /quatermon/i.test(c.produto));
+      /* boletim enviado: o detalhe aparece embaixo da atividade, sem reescrever o boletim */
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' }; ir('detalhe', b.id);
+      const html = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      return { rel, n: insAplicacoesRelatadas().filter(c => c.vinculo).length, boletins: D.boletins.length - antesB, ativ: b.atividades.length - antesA,
+        receita: b.atividades[0].receita, status: rel ? insRelatoStatus(rel) : '', flash: insUI.flash, cons: cons.map(c => c.kg + ' ' + c.base + ' · ' + c.area + ' ha · ' + c.op),
+        saldoUn: (insProduto('Quatermon') || {}).un, detalhe: (html.match(/Detalhe do grupo[^🔧]{0,160}/) || [''])[0] };
+    });
+    ok('"Ligar ao lançamento" — o relato fica ligado (boletimId, atividadeId, dia 14/09); nada é criado e o boletim do Rubens não é reescrito',
+      grav.rel && grav.rel.vinculo.atividadeId === 'a-drench' && grav.rel.data === '2026-09-14' && grav.boletins === 0 && grav.ativ === 0 && grav.receita === 'Quatermon',
+      grav.rel ? grav.rel.data + ' · ' + grav.boletins + ' boletim novo · ' + grav.ativ + ' atividade nova · calda "' + grav.receita + '"' : 'nada');
+    ok('Reimportar a mesma mensagem não duplica o detalhe ligado', grav.n === 1, grav.n + ' · ' + grav.flash);
+    ok('Mensagens importadas — a situação lê "ligada ao boletim de 14/09"', grav.status === 'ligada ao boletim de 14/09', grav.status);
+    ok('Boletim enviado — o detalhe do grupo aparece embaixo da atividade, com a data em que foi colado (c3)',
+      /Detalhe do grupo \(colado 15\/09\): 2lts Quatermon · 5 tanques × 400 L · vazão 100 L\/ha/.test(grav.detalhe), grav.detalhe.slice(0, 140));
+    ok('Insumos — o detalhe ligado vira consumo calculado: 2 L × 5 tanques = 10 L de Quatermon em ≈ 20 ha (produto em L no catálogo)',
+      grav.cons.length === 1 && /^10 L · 20 ha · Aplicação via drench/.test(grav.cons[0]) && grav.saldoUn === 'L', grav.cons.join(' | ') + ' · un ' + grav.saldoUn);
+    estadoAplic = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    /* o gerente no dia 15/09: nenhuma pergunta (o relato está ligado ao boletim de ontem) */
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'CC-6081', chave: 'f14c' },
+      '2026-09-15T10:00:00-03:00', { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+    await porD(page, estadoAplic);
+    const sem = await page.evaluate(() => {
+      rascunho = null; ir('casa'); rascunho = novoRascunho(); ir('form');
+      const pergunta = !!document.querySelector('#app [data-ins-relato]'), linha = !!document.querySelector('#app [data-ins-relato-linha]');
+      /* e se um relato SEM vínculo, datado de hoje, chegasse depois de o gerente já ter lançado ontem? confere pelo boletim de ontem, sem perguntar */
+      insMensagens().push({ id: 'm-solto', chave: 'x', tipo: 'aplicacao', texto: 'teste', por: 'Escritório', em: '2026-09-15T12:00:00Z', data: '2026-09-15',
+        criados: [{ tipo: 'aplicacao', id: 'rel-solto', unidade: 'f14c', talhaoId: 't055', data: '2026-09-15', produto: 'Quatermon', operacao: 'Pulverização mecanizada', receita: '2lts Quatermon', tanques: '5', ltanque: '400', vazao: '100', obs: '' }] });
+      ir('form');
+      const l2 = document.querySelector('#app [data-ins-relato-linha]');
+      return { pergunta, linha, pergunta2: !!document.querySelector('#app [data-ins-relato]'), linha2: l2 ? l2.textContent.replace(/\s+/g, ' ').trim() : '' };
+    });
+    ok('Boletim do gerente em 15/09 — relato ligado ao boletim de ontem NÃO vira pergunta nem linha', !sem.pergunta && !sem.linha, (sem.pergunta ? 'perguntou' : 'sem pergunta') + ' · ' + (sem.linha ? 'com linha' : 'sem linha'));
+    ok('Boletim do gerente — relato solto de hoje com lançamento igual no boletim de ONTEM: "confere com o lançamento … de 14/09 ✔", sem pergunta (nunca duas vezes)',
+      !sem.pergunta2 && /confere com o lançamento em José Eustáquio — Arrendamento de 14\/09/.test(sem.linha2), sem.linha2);
     errosTodos.push(...erros);
     await ctx.close();
   }
