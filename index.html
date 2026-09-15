@@ -1781,7 +1781,9 @@ function funcoesDa(fz){
   if(p.includes("GRAOS")) out.push(...LISTA_FUNCOES_GRAOS);
   if(p.includes("PECUARIA")) out.push(...LISTA_FUNCOES_PECUARIA);
   p.forEach(c=>out.push(...catExtra("funcoes:"+c)));   /* termos acrescentados em Cadastros › Catálogos */
-  return out.length?[...new Set(out)]:[...LISTA_FUNCOES];
+  const lista=out.length?[...new Set(out)]:[...LISTA_FUNCOES];
+  /* v94: ordem alfabética em pt-BR (pedido dos gerentes do café; a mesma lista nas três atividades) */
+  return lista.sort((a,b)=>a.localeCompare(b,"pt-BR"));
 }
 /* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária e grãos ganham as próprias) */
 const LISTA_OCORR_PECUARIA=["Morte de animal","Fuga de animais","Cerca rompida","Falta de água","Animal doente"];
@@ -3321,14 +3323,26 @@ const OPS_CAFE_GRUPOS = [
 ];
 const LISTA_ATIV = OPS_CAFE_GRUPOS.flatMap(([,ops])=>ops);
 const LISTA_CLIMA = ["Ensolarado","Nublado","Garoa","Chuva fraca","Chuva forte","Geada","Granizo"];
+/* v94 (pedido do Nilo e dos gerentes do café, 15/09/2026): lista em ORDEM ALFABÉTICA — achar a
+   função no meio de dezenas de linhas fora de ordem atrapalhava quem preenche — e revista com os
+   nomes que a turma do café usa (43 termos). Termo que só trocou de nome (1 para 1) está em
+   DEPARA_NOMES: boletim antigo continua lendo e somando. `funcoesDa` ordena de novo em pt-BR ao
+   montar a lista, para o termo acrescentado em Cadastros › Catálogos entrar no lugar certo. */
 const LISTA_FUNCOES = [
-  "Colheita manual (derriça)","Varrição / rapagem","Abanação","Carregamento de café",
-  "Terreiro (mexer/rodar café)","Secador / tulha (apoio)","Benefício (apoio)",
-  "Capina manual","Capina mecânica com roçadeira","Capina química manual","Arranquio de corda-de-viola",
-  "Desbrota manual","Poda mecanizada esqueletamento","Levantar café","Arruação","Esparramação de cisco",
-  "Adubação manual","Pulverização manual","Plantio / replantio de mudas",
-  "Irrigação manual","Irrigação (manutenção/filtros)","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
-  "Apoio a máquinas (abastecimento)","Serviços gerais"
+  "Abanação","Adubação manual","Adubação mecanizada via lanço","Adubação via fertirrigação",
+  "Apoio a máquinas (abastecimento)","Arranquio de corda-de-viola","Arruação",
+  "Atualização das áreas e tamanhos dos talhões","Beneficiamento de café",
+  "Capina manual","Capina mecânica com roçadeira","Capina mecânica com trincha",
+  "Capina química manual","Capina química mecanizada","Carregamento de café",
+  "Colheita manual (pano)","Colheita mecanizada (colhedora)","Desbrota manual",
+  "Esparramação de cisco","Irrigação (manutenção/filtros)","Irrigação automática","Irrigação manual",
+  "Levantar café","Limpeza de carreadores","Manutenção de cercas/benfeitorias",
+  "Plantio / replantio de mudas","Poda manual","Poda mecanizada decote","Poda mecanizada esqueletamento",
+  "Poda mecanizada recepa","Pré limpeza café de varrição","Pulverização manual","Pulverização mecanizada",
+  "Rastelação manual","Rastelação mecanizada / varrição","Recolher café varrição manual",
+  "Recolher café varrição mecanizado (Miac)","Secagem de café no secador","Secagem de café no terreiro",
+  "Serviços gerais","Transporte de café da roça para terreiro","Transporte de café do terreiro para secador",
+  "Varrição / rapagem"
 ];
 /* ===== De-para de nomenclatura (v76) — termo ANTIGO → termo NOVO =====
    REGRA PERMANENTE: renomear termo NUNCA reescreve boletim. O registro fica no banco
@@ -3347,7 +3361,12 @@ const DEPARA_NOMES = {
   "Roçada costal":"Capina mecânica com roçadeira",
   "Aplicação de herbicida (costal)":"Capina química manual",
   "Aplicação de defensivo (costal)":"Pulverização manual",
-  "Poda (decote/esqueletamento)":"Poda mecanizada esqueletamento"
+  "Poda (decote/esqueletamento)":"Poda mecanizada esqueletamento",
+  /* v94: nomes que a turma do café usa (15/09/2026) — mesma função, palavra nova */
+  "Colheita manual (derriça)":"Colheita manual (pano)",
+  "Terreiro (mexer/rodar café)":"Secagem de café no terreiro",
+  "Secador / tulha (apoio)":"Secagem de café no secador",
+  "Benefício (apoio)":"Beneficiamento de café"
 };
 /* Antigos que o termo novo não resolve sozinho (UM antigo → DOIS novos): a escolha é do Nilo,
    não do código. Não são oferecidos em lançamento novo e o histórico segue com o nome gravado.
@@ -3363,12 +3382,50 @@ const TERMOS_LEGADO = {
 };
 /* tradutor único de leitura: nome gravado → nome de hoje (desconhecido volta igual) */
 const nomeAtual = n => DEPARA_NOMES[String(n==null?"":n).trim()] || n;
+/* v94: texto único da calda gasta numa atividade do café — tanques (batidas), vazão em L/ha (campo de
+   hoje, a pedido dos gerentes) e, em boletim antigo, litros por tanque (campo até a v93, que a leitura
+   continua mostrando: nada gravado perde sentido). `curto` tira o "de calda" (resumo WhatsApp). */
+function caldaTexto(a, curto){
+  const t=n0(a.tanques), lt=n0(a.ltanque), vz=n0(a.vazao), p=[];
+  if(t) p.push(t+" tanque"+(t>1?"s":"")+(lt?" × "+lt+" L = "+(t*lt).toLocaleString("pt-BR")+" L"+(curto?"":" de calda"):""));
+  else if(lt) p.push(lt+" L por tanque");
+  if(vz) p.push("vazão "+vz.toLocaleString("pt-BR")+" L/ha");
+  return p.join(" · ");
+}
 const LISTA_FITO_TIPO = ["Praga","Doença","Planta daninha"];
 const SUGESTAO_FITO = {"Praga":["Broca-do-café","Bicho-mineiro","Cigarra","Ácaro-vermelho","Cochonilha","Lagarta"],
   "Doença":["Ferrugem","Cercosporiose","Phoma","Mancha-aureolada","Antracnose"],
   "Planta daninha":["Braquiária","Trapoeraba","Picão-preto","Corda-de-viola","Capim-amargoso","Tiririca"]};
 const LISTA_OCORR = ["Acidente de trabalho","Quebra de equipamento","Dano climático","Visita técnica","Recebimento de insumos","Outra"];
 const LISTA_DESTINO = ["Terreiro","Direto ao secador","Outra fazenda 🚚","Outro"];
+/* v94 (pedido dos gerentes do café, 15/09/2026): medidas padronizadas da colheita.
+   1 carreta = 4.500 L de café da roça = 10 sacas beneficiadas (logo 450 L por saca). O bag não tem
+   tamanho fixo: o gerente informa o VALOR DA MEDIDA (litros por bag) e o app lembra o último da
+   unidade. As sacas beneficiadas passam a ser CALCULADAS por essas medidas (com "≈"); boletim antigo
+   com sacas digitadas continua valendo o que foi digitado (quem traduz é a leitura). Lata não tem
+   equivalência declarada e não entra na conta — nada é estimado sem medida declarada. */
+const CARRETA_LITROS=4500, CARRETA_SACAS=10, LITROS_POR_SACA=CARRETA_LITROS/CARRETA_SACAS;
+const litrosColheita = c => n0(c.carretas)*CARRETA_LITROS + n0(c.bags)*n0(c.bagLitros);
+/* sacas de uma linha de colheita: digitadas (boletim antigo / grãos) ou calculadas pelas medidas */
+const sacasColheita = c => n0(c.sacas) || Math.round(litrosColheita(c)/LITROS_POR_SACA*10)/10;
+const sacasEstimadas = c => !n0(c.sacas) && litrosColheita(c)>0;
+/* texto único do total de sacas (resumo da seção, boletim enviado, WhatsApp): "40 sacas" quando
+   foi digitado; "≈ 95 sacas benef." quando saiu das medidas. `un` troca "sacas" por "sc" no WhatsApp. */
+function sacasTexto(lista, un){
+  const arr=Array.isArray(lista)?lista:[lista], u=un||"sacas";
+  const s=arr.reduce((t,c)=>t+sacasColheita(c),0);
+  if(!s) return "";
+  return arr.some(sacasEstimadas) ? "≈ "+(Math.round(s*10)/10).toLocaleString("pt-BR")+" "+u+" benef." : s+" "+u;
+}
+/* linha de conferência embaixo dos campos da colheita: mostra a conta, nunca pede nada */
+function colheitaCalcTexto(c){
+  if(n0(c.sacas)) return n0(c.sacas)+" sacas (como foi digitado)";
+  const L=litrosColheita(c);
+  if(!L) return "1 carreta = "+CARRETA_LITROS.toLocaleString("pt-BR")+" L = "+CARRETA_SACAS+" sacas beneficiadas · bag vale o que a medida disser";
+  const p=[]; if(n0(c.carretas)) p.push(n0(c.carretas).toLocaleString("pt-BR")+" carreta"+(n0(c.carretas)>1?"s":"")+" × "+CARRETA_LITROS.toLocaleString("pt-BR")+" L");
+  if(n0(c.bags)&&n0(c.bagLitros)) p.push(n0(c.bags).toLocaleString("pt-BR")+" bag"+(n0(c.bags)>1?"s":"")+" × "+n0(c.bagLitros).toLocaleString("pt-BR")+" L");
+  return "≈ "+sacasColheita(c).toLocaleString("pt-BR")+" sacas beneficiadas — "+p.join(" + ")+" = "+L.toLocaleString("pt-BR")+" L";
+}
 
 /* ---------- Indicadores ---------- */
 function indicadores(dias){
@@ -3378,13 +3435,13 @@ function indicadores(dias){
     && (!filtroPainel.atv || atividadeDe(b.fazendaId)===filtroPainel.atv));
   let sacas=0, chuva=0, horasMaq=0, ativ=0, fitoAltos=0, ocorrAltas=0;
   bs.forEach(b=>{
-    (b.colheita||[]).forEach(c=>sacas+=n0(c.sacas));
+    (b.colheita||[]).forEach(c=>sacas+=sacasColheita(c));
     chuva += n0(b.clima && b.clima.chuvaMm);
     (b.atividades||[]).forEach(a=>{ ativ++; (a.maquinas||[]).forEach(m=>horasMaq+=n0(m.horas)); });
     (b.fito||[]).forEach(f=>{ if(f.nivel==="Alto") fitoAltos++; });
     (b.ocorrencias||[]).forEach(o=>{ if(o.grav==="Alta") ocorrAltas++; });
   });
-  return {qtd:bs.length, sacas, chuva, horasMaq, ativ, fitoAltos, ocorrAltas};
+  return {qtd:bs.length, sacas:Math.round(sacas), chuva, horasMaq, ativ, fitoAltos, ocorrAltas};
 }
 function statusDoDia(fz){
   const b = boletimDoDia(hojeISO(), fz);
@@ -3617,8 +3674,8 @@ function resumo1linha(b){
   const parts=[];
   const ats=(b.atividades||[]).map(a=>nomeAtual(a.tipo||"").split(" —")[0]);
   if(ats.length) parts.push([...new Set(ats)].slice(0,3).join(", "));
-  const sac=(b.colheita||[]).reduce((s,c)=>s+n0(c.sacas),0);
-  if(sac) parts.push(sac+" sacas");
+  const sac=(b.colheita||[]).reduce((s,c)=>s+sacasColheita(c),0);
+  if(sac) parts.push(Math.round(sac)+" sacas");
   if(n0(b.clima&&b.clima.chuvaMm)) parts.push(b.clima.chuvaMm+" mm chuva");
   const no=(b.ocorrencias||[]).length; if(no) parts.push(no+" ocorrência"+(no>1?"s":""));
   return parts.join(" · ")||"sem atividades de campo";
@@ -5959,7 +6016,7 @@ const insAplicAreaCalc = p => (n0(p.tanques)>0 && n0(p.ltanque)>0 && n0(p.vazao)
 const INS_APLIC_ATIVIDADE={
   CAFE:{ rotulo:"Atividade", grupos:()=>gruposAtivCafe(),
     registro:c=>({id:uid(), talhaoId:c.talhaoId||"geral", tipo:c.operacao, pessoas:"", obs:c.obs||"", status:"", falta:"",
-      receita:c.receita||"", tanques:c.tanques||"", ltanque:c.ltanque||"", insumos:[], maquinas:[], relatoId:c.id}) },
+      receita:c.receita||"", tanques:c.tanques||"", ltanque:c.ltanque||"", vazao:c.vazao||"", insumos:[], maquinas:[], relatoId:c.id}) },
   GRAOS:{ rotulo:"Operação", grupos:()=>OPS_GRAOS_FASES,
     registro:c=>{ const a={id:uid(), gr:1, talhaoId:c.talhaoId||"", tipo:"", areaHa:"", obs:[c.receita,c.obs].filter(Boolean).join(" · ").replace(/\n/g,", "), relatoId:c.id};
       aplicarOperacao(a, c.operacao);
@@ -7639,7 +7696,7 @@ function vForm(){
       <button class="btn suave mt" id="bt-add-ativ">＋ Adicionar atividade</button></div></details>
 
   <details class="secao" ${r.colheita.length?"open":""}><summary><span class="ico">🍒</span>Colheita ${safra?'<span class="tag cereja" style="margin-left:6px">Safra</span>':""}
-    <span class="resumo" id="res-col">${r.colheita.length?r.colheita.reduce((s,c)=>s+n0(c.sacas),0)+" sacas":""}</span><span class="seta">›</span></summary>
+    <span class="resumo" id="res-col">${r.colheita.length?sacasTexto(r.colheita):""}</span><span class="seta">›</span></summary>
     <div class="corpo"><div id="lista-col">${r.colheita.map(cardColheita).join("")}</div>
       <button class="btn suave mt" id="bt-add-col">＋ Registrar colheita de um talhão</button></div></details>`}
 
@@ -7752,7 +7809,7 @@ function detalhesAtividade(a){
       <textarea data-a="receita" rows="3" placeholder="Escreva como manda no grupo — ex.: 500ml Mirus, 1,2L Priori Top, 600ml Auto 400, 2,4L Oberom, 1,2L Ochima" style="width:100%;margin-top:6px">${esc(a.receita||"")}</textarea>
       <div class="grade2 mt">
         <div><label>Tanques gastos (batidas)</label><input inputmode="numeric" data-a="tanques" value="${esc(a.tanques||"")}" placeholder="Ex.: 9"></div>
-        <div><label>Litros por tanque</label><input inputmode="numeric" data-a="ltanque" value="${esc(a.ltanque||"")}" placeholder="Ex.: 2000"></div>
+        <div><label>Vazão (L/ha)</label><input inputmode="numeric" data-a="vazao" value="${esc(a.vazao||"")}" placeholder="Ex.: 400"></div>
       </div></div>
     <div class="mt"><b class="mut" style="font-size:.8rem">MÁQUINAS QUE TRABALHARAM NESTA ATIVIDADE</b>
       <p class="mut" style="font-size:.76rem;margin-top:4px">Digite o <b>número do adesivo</b> da máquina que o aplicativo acha o nome. Horas e diesel só se souber.</p>
@@ -7776,9 +7833,13 @@ function cardColheita(c){
     <div class="chips">${["Mecânica","Manual","Mista"].map(m=>`<button class="chip ${c.modo===m?"on":""}" data-cmodo="${m}">${m}</button>`).join("")}</div>
     <div class="grade2">
       <div data-ql style="${c.modo==="Mecânica"?"display:none":""}"><label>Latas (manual)</label><input inputmode="decimal" data-cc="latas" value="${esc(c.latas)}"></div>
-      <div data-qc style="${c.modo==="Manual"?"display:none":""}"><label>Carretas (pode meia: 9,5)</label><input inputmode="decimal" data-cc="carretas" value="${esc(c.carretas||"")}"></div>
+      <div data-qc style="${c.modo==="Manual"?"display:none":""}"><label>Carretas de 4.500 L (pode meia: 9,5)</label><input inputmode="decimal" data-cc="carretas" value="${esc(c.carretas||"")}"></div>
     </div>
-    <label>Sacas (se pesou / souber)</label><input inputmode="decimal" data-cc="sacas" value="${esc(c.sacas)}">
+    <div class="grade2">
+      <div><label>Total em bags</label><input inputmode="decimal" data-cc="bags" value="${esc(c.bags||"")}" placeholder="0"></div>
+      <div><label>Valor da medida (L por bag)</label><input inputmode="numeric" data-cc="bagLitros" value="${esc(c.bagLitros||"")}" placeholder="litros"></div>
+    </div>
+    <p class="mut" data-colcalc style="font-size:.78rem;margin:4px 0 0">${esc(colheitaCalcTexto(c))}</p>
     <label>Passada</label>
     <div class="chips">${["1ª passada","2ª passada","Repasse"].map(p=>`<button class="chip ${c.passada===p?"on":""}" data-cpas="${p}">${p}</button>`).join("")}</div>
     <label>Destino do café</label>
@@ -8469,7 +8530,7 @@ function vDetalhe(id){
         ${a.status==="continua"&&a.falta?`<br><span class="mut">Falta: ${esc(a.falta)}</span>`:""}
         ${a.obs?`<br><span class="mut">${esc(a.obs)}</span>`:""}
         ${a.receita?`<br><span class="mut" style="white-space:pre-wrap">🧪 ${esc(a.receita)}</span>`:""}
-        ${n0(a.tanques)?`<br><span class="tag terra">${n0(a.tanques)} tanque${n0(a.tanques)>1?"s":""}${n0(a.ltanque)?` × ${n0(a.ltanque)} L = ${(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")} L de calda`:""}</span>`:""}
+        ${caldaTexto(a)?`<br><span class="tag terra">${esc(caldaTexto(a))}</span>`:""}
         ${insDetalheGrupo(b,a)}
         ${(a.insumos||[]).map(x=>`<br><span class="tag terra">${esc(x.nome||insumo(x.insumoId).nome)}${x.dose?` — ${esc(x.dose)}/ha`:""}${x.qtd?` · total ${esc(x.qtd)}`:""}</span>`).join("")}
         ${(a.maquinas||[]).map(x=>`<br><span class="tag verde">${esc(x.nome||"?")} — ${n0(x.horas)} h${n0(x.comb)?" · "+n0(x.comb)+" L comb.":""}</span>`).join("")}
@@ -8489,7 +8550,7 @@ function vDetalhe(id){
       return (cg.length && atividadeDe(b.fazendaId)==="GRAOS")?`<div class="cartao"><h3>🌾 Colheita de grãos</h3>
       ${cg.map(c=>`<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${[n0(c.areaHa)?n0(c.areaHa).toLocaleString("pt-BR")+" ha":"",n0(c.sacas)?n0(c.sacas).toLocaleString("pt-BR")+" sacas (60 kg)":"",n0(c.umidade)?n0(c.umidade).toLocaleString("pt-BR")+"% umidade":"",c.destino?esc(c.destino):""].filter(Boolean).join(" · ")||"—"}${c.obs?`<br><span class="mut">${esc(c.obs)}</span>`:""}</div>`).join("")}</div>`:"";})()}
     ${(b.colheita||[]).length && atividadeDe(b.fazendaId)!=="GRAOS"?`<div class="cartao"><h3>🍒 Colheita</h3>
-      ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.sacas)?n0(c.sacas)+" sacas · ":""}destino: ${esc(c.destino)||"—"}
+      ${b.colheita.map(c=>{const s=n0(c.cereja)+n0(c.verde)+n0(c.seco);return `<div class="mt"><b>${esc(talhao(c.talhaoId).nome)}</b> — ${n0(c.latas)?n0(c.latas)+" latas · ":""}${n0(c.carretas)?n0(c.carretas)+" carretas · ":""}${n0(c.bags)?n0(c.bags)+" bags"+(n0(c.bagLitros)?" de "+n0(c.bagLitros)+" L":"")+" · ":""}${sacasTexto(c)?sacasTexto(c)+" · ":""}destino: ${esc(c.destino)||"—"}
         ${c.modo?` <span class="tag verde">${esc(c.modo).toLowerCase()}</span>`:""}${c.passada?` <span class="tag terra">${esc(c.passada)}</span>`:""}
         <div class="matura"><div class="mat-cereja" style="width:${s?100*n0(c.cereja)/s:0}%">${n0(c.cereja)}%</div><div class="mat-verde" style="width:${s?100*n0(c.verde)/s:0}%">${n0(c.verde)}%</div><div class="mat-seco" style="width:${s?100*n0(c.seco)/s:0}%">${n0(c.seco)}%</div></div></div>`;}).join("")}</div>`:""}
     ${blocoPainelPec(b)}
@@ -8645,7 +8706,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v93";
+const APP_VERSAO="v94";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -10351,7 +10412,7 @@ function baixarCSV(){
         +(a.gr&&(a.produtos||[]).some(p=>p.nome)?" {"+a.produtos.filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+p.dose+(p.un||"")+"/ha":"")).join("; ")+"}":"")
         +(a.gr&&(a.produtoAdb||a.formulacao)?" {"+(a.produtoAdb||a.formulacao)+(n0(a.doseKgHa)?" "+a.doseKgHa+" kg/ha":"")+(n0(a.doseTHa)?" "+a.doseTHa+" t/ha":"")+"}":"")
         +(n0(a.tanques)?" ["+n0(a.tanques)+" tq]":"")+(a.status==="concluida"?" ✔":a.status==="continua"?" ⏳"+(a.falta?" falta: "+a.falta:""):"")).join(" | ")),
-      (b.colheita||[]).reduce((s,c)=>s+n0(c.sacas),0),hm,cb,
+      Math.round((b.colheita||[]).reduce((s,c)=>s+sacasColheita(c),0)*10)/10,hm,cb,
       cel((b.irg||[]).some(e2=>e2.status)
         ? b.irg.filter(e2=>e2.status).map(e2=>(e2.nome||talhao(e2.k).nome)+": "+e2.status+(n0(e2.lamina)?" "+e2.lamina+" mm":"")+((e2.quimiProdutos||[]).some(p=>p.nome)?" · quimigação "+e2.quimiProdutos.filter(p=>p.nome).map(p=>p.nome+(p.dose?" "+p.dose+(p.un||"")+"/ha":"")).join("+"):"")).join(" | ")
         : (b.irr?[b.irr.status,(b.irr.problemas||[]).join("/"),b.irr.obs||"",b.irr.fert==="Sim"?("fertirrigação"+((b.irr.fertSetores||[]).length?" ("+b.irr.fertSetores.map(id=>talhao(id).nome).join("/")+")":"")):""].filter(Boolean).join(" · "):"")),
@@ -10533,7 +10594,7 @@ function resumoWhats(b){
     const cic=cicloAtivo(a.talhaoId);
     L.push("🔧 "+(nomeAtual(a.tipo)||"Atividade")+" — "+talhao(a.talhaoId).nome+(cic?" ("+rotuloCultura(cic.cultura)+")":"")+(n0(a.pessoas)?" · "+n0(a.pessoas)+"p":"")+(maq?" · "+maq:"")+st+(a.obs?" — "+a.obs:""));
     if(a.receita) L.push("🧪 "+a.receita.split(/\n+/).map(s=>s.trim()).filter(Boolean).join(" · "));
-    if(n0(a.tanques)) L.push("🛢️ Gastou "+n0(a.tanques)+" tanque"+(n0(a.tanques)>1?"s":"")+(n0(a.ltanque)?" × "+n0(a.ltanque)+" L = "+(n0(a.tanques)*n0(a.ltanque)).toLocaleString("pt-BR")+" L":""));
+    { const ct=caldaTexto(a,true); if(ct) L.push(n0(a.tanques)?"🛢️ Gastou "+ct:"🛢️ "+ct.charAt(0).toUpperCase()+ct.slice(1)); }
   });
   L.push(...linhasWhatsIrg(b));
   (b.colheita||[]).forEach(x=>{
@@ -10542,7 +10603,7 @@ function resumoWhats(b){
       L.push("🌾 Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.areaHa)?n0(x.areaHa).toLocaleString("pt-BR")+" ha":"",n0(x.sacas)?n0(x.sacas).toLocaleString("pt-BR")+" sc (60 kg)":"",n0(x.umidade)?n0(x.umidade).toLocaleString("pt-BR")+"% umidade":"",x.destino||""].filter(Boolean).join(" · ")+(x.obs?" — "+x.obs:""));
       return;
     }
-    L.push("☕ Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.latas)?n0(x.latas)+" latas":"",n0(x.carretas)?n0(x.carretas)+" carretas":"",n0(x.sacas)?n0(x.sacas)+" sc":"",x.modo?x.modo.toLowerCase():"",x.passada||""].filter(Boolean).join(" · ")
+    L.push("☕ Colheita "+talhao(x.talhaoId).nome+": "+[n0(x.latas)?n0(x.latas)+" latas":"",n0(x.carretas)?n0(x.carretas)+" carretas":"",n0(x.bags)?n0(x.bags)+" bags":"",sacasTexto(x,"sc"),x.modo?x.modo.toLowerCase():"",x.passada||""].filter(Boolean).join(" · ")
       +((x.cereja!==""&&x.cereja!=null)?" · "+n0(x.cereja)+"% cereja":""));
     if(x.destino==="Outra fazenda 🚚"&&x.destinoFazendaId) L.push("🚚 Café enviado p/ "+fazenda(x.destinoFazendaId).nome+(x.motorista?" · "+x.motorista:"")+" — aguardando confirmação lá");
   });
@@ -11322,7 +11383,9 @@ async function concluirEnvio(){
   D.ultimasReceitas = D.ultimasReceitas||{};
   D.ultimasFert = D.ultimasFert||{};
   if(r.irr && r.irr.fert==="Sim" && r.irr.fertReceita) D.ultimasFert[r.fazendaId]=r.irr.fertReceita;
-  (r.atividades||[]).forEach(a=>{ if(a.tipo && a.receita) D.ultimasReceitas[nomeAtual(a.tipo)]={receita:a.receita, ltanque:a.ltanque||""}; });
+  (r.atividades||[]).forEach(a=>{ if(a.tipo && a.receita) D.ultimasReceitas[nomeAtual(a.tipo)]={receita:a.receita, ltanque:a.ltanque||"", vazao:a.vazao||""}; });
+  /* v94: o valor da medida (litros por bag) fica lembrado por unidade para a próxima colheita */
+  (r.colheita||[]).forEach(c=>{ if(n0(c.bagLitros)){ D.medidaBag=D.medidaBag||{}; D.medidaBag[r.fazendaId]=String(c.bagLitros); } });
   (r.atividades||[]).forEach(a=>(a.insumos||[]).forEach(x=>{
     if(x.nome){ if(x.dose||x.qtd) D.ultimasDoses[x.nome]={dose:x.dose,qtd:x.qtd};
       if(!(D.insumos||[]).some(i=>i.nome===x.nome) && !D.insumosAprendidos.includes(x.nome)) D.insumosAprendidos.push(x.nome); }
@@ -11543,7 +11606,7 @@ function ligarEventos(tela){
       let tipo=""; const pr=semAc(tel.processo);
       if(pr){ for(const ch in DEPARA_PROC){ if(pr.includes(ch)){ tipo=DEPARA_PROC[ch]; break; } } }
       const obs=tel.processo&&(tipo===""||tipo==="Outra")?("Solinftec: "+tel.processo):"";
-      const a={id:uid(), talhaoId:tel.talhaoId||"", tipo, pessoas:"", obs, status:"", falta:"", receita:"", tanques:"", ltanque:"", insumos:[],
+      const a={id:uid(), talhaoId:tel.talhaoId||"", tipo, pessoas:"", obs, status:"", falta:"", receita:"", tanques:"", ltanque:"", vazao:"", insumos:[],
         maquinas:[{nome:m?rotuloMaq(m):tel.origemNome, horas:tel.horasTrab||tel.horasMotor||"", comb:tel.comb||""}]};
       rascunho.atividades.push(a); salvarRascunho(); ir("form"); return; }
     if(d.estr){ const [fzid,k]=d.estr.split(":"); D.estruturas=D.estruturas||{}; D.estruturas[fzid]=D.estruturas[fzid]||{};
@@ -11708,7 +11771,7 @@ function ligarEventos(tela){
     if(d.opgrao){ const [tid,op]=d.opgrao.split("|");
       const i=r.atividades.findIndex(a=>a.talhaoId===tid && a.tipo===op);
       if(i>=0) r.atividades.splice(i,1);
-      else r.atividades.push({id:uid(),talhaoId:tid,tipo:op,pessoas:"",obs:"",status:"",falta:"",receita:"",tanques:"",ltanque:"",insumos:[],maquinas:[]});
+      else r.atividades.push({id:uid(),talhaoId:tid,tipo:op,pessoas:"",obs:"",status:"",falta:"",receita:"",tanques:"",ltanque:"",vazao:"",insumos:[],maquinas:[]});
       salvarRascunho(); ir("form",null,true); return; }
     if(t.id==="bt-add-lote-pec"){ r.pecuaria=r.pecuaria||pecVazia();
       r.pecuaria.lotes.push({talhaoId:"",lote:"",cabecas:""});
@@ -11876,7 +11939,7 @@ function ligarEventos(tela){
         $("#lista-pec-ev").innerHTML=r.pecuaria.eventos.map((e2,i)=>cardEventoPec(e2,i)).join("");
         salvarRascunho(); } return; }
 
-    if(t.id==="bt-add-col"){ const c={id:uid(),talhaoId:"",latas:"",sacas:"",destino:"",cereja:"",verde:"",seco:""};
+    if(t.id==="bt-add-col"){ const c={id:uid(),talhaoId:"",latas:"",carretas:"",bags:"",bagLitros:(D.medidaBag||{})[r.fazendaId]||"",sacas:"",destino:"",cereja:"",verde:"",seco:""};
       r.colheita.push(c); $("#lista-col").insertAdjacentHTML("beforeend",cardColheita(c));
       salvarRascunho(); return; }
     if(t.id==="bt-add-colg"){ const c={id:uid(),talhaoId:"",areaHa:"",sacas:"",umidade:"",destino:"",obs:""};
@@ -11884,7 +11947,7 @@ function ligarEventos(tela){
       salvarRascunho(); return; }
     if(d.rmCol){ r.colheita=r.colheita.filter(c=>c.id!==d.rmCol);
       t.closest("[data-col]").remove();
-      setResumo("res-col",r.colheita.length?r.colheita.reduce((s,c)=>s+n0(c.sacas),0)+" sacas":"");
+      setResumo("res-col",r.colheita.length?sacasTexto(r.colheita):"");
       salvarRascunho(); return; }
     if(d.cmodo){ const card=t.closest("[data-col]"); const c=rascunho.colheita.find(x=>x.id===card.dataset.col);
       c.modo=(c.modo===d.cmodo)?"":d.cmodo;
@@ -11959,10 +12022,11 @@ function ligarEventos(tela){
       return; }
     if(d.ureceita){ const a=rascunho.atividades.find(x=>x.id===d.ureceita);
       const mem=(D.ultimasReceitas||{})[nomeAtual(a&&a.tipo)]||(D.ultimasReceitas||{})[a&&a.tipo];
-      if(mem){ a.receita=mem.receita; a.ltanque=mem.ltanque||a.ltanque;
+      if(mem){ a.receita=mem.receita; a.ltanque=mem.ltanque||a.ltanque; a.vazao=mem.vazao||a.vazao;
         const card=t.closest("[data-ativ]");
         const ta=card.querySelector('textarea[data-a="receita"]'); if(ta) ta.value=a.receita;
         const lt=card.querySelector('input[data-a="ltanque"]'); if(lt) lt.value=a.ltanque;
+        const vz=card.querySelector('input[data-a="vazao"]'); if(vz) vz.value=a.vazao||"";
         salvarRascunho(); }
       return; }
     if(d.ast){ const card=t.closest("[data-ativ]"); const a=rascunho.atividades.find(x=>x.id===card.dataset.ativ);
@@ -12064,7 +12128,8 @@ function ligarEventos(tela){
       else if(d.cc!==undefined){ const card=el.closest("[data-col]"); const c=r.colheita.find(x=>x.id===card.dataset.col);
         c[d.cc]=el.value;
         if(["cereja","verde","seco"].includes(d.cc)) atualizarMatura(card,c);
-        if(d.cc==="sacas"){ const s=$("#res-col"); if(s) s.textContent=r.colheita.reduce((x,y)=>x+n0(y.sacas),0)+" sacas"; } }
+        if(["sacas","carretas","bags","bagLitros"].includes(d.cc)){ const s=$("#res-col"); if(s) s.textContent=sacasTexto(r.colheita);
+          const k=card.querySelector("[data-colcalc]"); if(k) k.textContent=colheitaCalcTexto(c); } }
       else if(d.f!==undefined){ const c=el.closest("[data-fito]"); r.fito.find(x=>x.id===c.dataset.fito)[d.f]=el.value; }
       else if(d.o!==undefined){ const c=el.closest("[data-oc]"); r.ocorrencias.find(x=>x.id===c.dataset.oc)[d.o]=el.value; }
       else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||pecVazia(); r.pecuaria[d.pec]=el.value; }
@@ -12178,17 +12243,17 @@ function vRelatorio(){
   bs.forEach(b=>{
     const k=b.fazendaId, o=porFaz[k]=porFaz[k]||{dias:0,sacas:0,latas:0,chuva:0,hm:0,comb:0,mo:0,faltas:0,fito:0,ocorr:0,pend:[]};
     o.dias++; o.chuva+=n0(b.clima.chuvaMm); o.mo+=n0(b.mo.proprios)+n0(b.mo.diaristas); o.faltas+=n0(b.mo.faltas);
-    (b.colheita||[]).forEach(c=>{o.sacas+=n0(c.sacas); o.latas+=n0(c.latas); o.carretas=(o.carretas||0)+n0(c.carretas);});
+    (b.colheita||[]).forEach(c=>{o.sacas=Math.round((o.sacas+sacasColheita(c))*10)/10; o.latas+=n0(c.latas); o.carretas=(o.carretas||0)+n0(c.carretas);});
     (b.atividades||[]).forEach(a=>(a.maquinas||[]).forEach(m=>{o.hm+=n0(m.horas); o.comb+=n0(m.comb);}));
     o.fito+=(b.fito||[]).filter(f=>f.nivel==="Alto").length;
     if(b.irr&&(b.irr.status==="Rodou com problema"||b.irr.status==="Não rodou"||["Baixo","Crítica"].includes(b.irr.agua))) o.irrProb=(o.irrProb||0)+1;
     o.ocorr+=(b.ocorrencias||[]).filter(x=>x.grav==="Alta").length;
     if(b.pendencias) o.pend.push(fmtData(b.data)+": "+b.pendencias);
   });
-  const tot=Object.values(porFaz).reduce((s,o)=>({sacas:s.sacas+o.sacas,latas:s.latas+o.latas,hm:s.hm+o.hm,comb:s.comb+o.comb,chuva:s.chuva+o.chuva}),{sacas:0,latas:0,hm:0,comb:0,chuva:0});
+  const tot=Object.values(porFaz).reduce((s,o)=>({sacas:Math.round((s.sacas+o.sacas)*10)/10,latas:s.latas+o.latas,hm:s.hm+o.hm,comb:s.comb+o.comb,chuva:s.chuva+o.chuva}),{sacas:0,latas:0,hm:0,comb:0,chuva:0});
   const talhaoSacas={};
   bs.forEach(b=>(b.colheita||[]).forEach(c=>{ const k=fazenda(b.fazendaId).nome+" · "+talhao(c.talhaoId).nome;
-    talhaoSacas[k]=(talhaoSacas[k]||0)+n0(c.sacas); }));
+    talhaoSacas[k]=Math.round(((talhaoSacas[k]||0)+sacasColheita(c))*10)/10; }));
   const rankTal=Object.entries(talhaoSacas).sort((a,b)=>b[1]-a[1]).slice(0,10);
   return topo("Relatório do período","De "+fmtData(de)+" a "+fmtData(ate),true)+`
     <div class="filtros no-print">
@@ -12227,7 +12292,7 @@ function csvRelatorio(){
   const bs=D.boletins.filter(b=>(!de||b.data>=de)&&b.data<=ate&&(!filtroRel.fazenda||b.fazendaId===filtroRel.fazenda));
   const porFaz={};
   bs.forEach(b=>{ const o=porFaz[b.fazendaId]=porFaz[b.fazendaId]||{d:0,s:0,l:0,h:0,c:0,ch:0,mo:0,al:0};
-    o.d++; (b.colheita||[]).forEach(c=>{o.s+=n0(c.sacas);o.l+=n0(c.latas);o.cr=(o.cr||0)+n0(c.carretas);});
+    o.d++; (b.colheita||[]).forEach(c=>{o.s=Math.round((o.s+sacasColheita(c))*10)/10;o.l+=n0(c.latas);o.cr=(o.cr||0)+n0(c.carretas);});
     (b.atividades||[]).forEach(a=>(a.maquinas||[]).forEach(m=>{o.h+=n0(m.horas);o.c+=n0(m.comb);}));
     o.ch+=n0(b.clima.chuvaMm); o.mo+=n0(b.mo.proprios)+n0(b.mo.diaristas);
     o.al+=(b.fito||[]).filter(f=>f.nivel==="Alto").length+(b.ocorrencias||[]).filter(x=>x.grav==="Alta").length; });

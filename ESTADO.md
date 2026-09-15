@@ -2018,6 +2018,89 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Pedidos da turma do café (v94) — funções em ordem alfabética, vazão por hectare, medidas da colheita
+Pedido do Nilo em 15/09/2026, com duas telas do boletim da Mata Preta na mão
+e a lista de sugestões dos funcionários do café.
+
+### O que mudou
+1. **"Função / serviço" da mão de obra em ORDEM ALFABÉTICA.** A lista nativa
+   do celular vinha na ordem em que o catálogo foi escrito (colheita,
+   terreiro, capinas…), e achar a função no meio de dezenas de linhas
+   atrapalhava quem preenche. `funcoesDa` passou a ordenar em pt-BR
+   (`localeCompare`) ao montar a lista — nas três atividades e incluindo os
+   termos acrescentados em Cadastros › Catálogos. "Outra (digitar)…"
+   continua por último.
+2. **Catálogo de funções do café revisto (`LISTA_FUNCOES`, 25 → 43).** Nilo
+   trouxe a lista da turma; o app conferiu termo a termo (igualdade exata):
+   - mantidos como estavam: Adubação manual · Capina manual · Capina
+     mecânica com roçadeira · Capina química manual · Desbrota manual ·
+     Irrigação manual · Poda mecanizada esqueletamento (e todos os outros
+     que já existiam e não foram citados);
+   - acrescentados (18): Adubação mecanizada via lanço · Adubação via
+     fertirrigação · Atualização das áreas e tamanhos dos talhões · Capina
+     mecânica com trincha · Capina química mecanizada · Colheita mecanizada
+     (colhedora) · Irrigação automática · Poda manual · Poda mecanizada
+     decote · Poda mecanizada recepa · Pré limpeza café de varrição ·
+     Pulverização mecanizada · Rastelação manual · Rastelação mecanizada /
+     varrição · Recolher café varrição manual · Recolher café varrição
+     mecanizado (Miac) · Transporte de café da roça para terreiro ·
+     Transporte de café do terreiro para secador;
+   - renomeados 1 para 1, pelo de-para da v76 (`DEPARA_NOMES`; o boletim
+     gravado não muda, a leitura traduz): Colheita manual (derriça) →
+     Colheita manual (pano) · Terreiro (mexer/rodar café) → Secagem de café
+     no terreiro · Secador / tulha (apoio) → Secagem de café no secador ·
+     Benefício (apoio) → Beneficiamento de café;
+   - grafia: "varricão" (na lista do Nilo) entrou como "varrição", a mesma
+     palavra de "Varrição / rapagem"; "Irrigação de manual" foi lida como
+     "Irrigação manual", que já existia; "Secagem de café no secador" e
+     "Poda mecanizada recepa" vieram duas vezes e entraram uma.
+   Funções NÃO são espelhadas em `operacao_catalogo` (só operações por
+   talhão), então não há SQL para rodar.
+3. **Atividade por talhão: "Vazão (L/ha)" no lugar de "Litros por tanque".**
+   O campo novo é `a.vazao`; `a.ltanque` deixou de ser pedido, mas todo
+   boletim antigo continua mostrando "9 tanques × 2.000 L = 18.000 L de
+   calda" pela função única `caldaTexto(a)` (boletim enviado e WhatsApp). O
+   botão "⚡ usar a última de …" passou a lembrar também a vazão; o registro
+   criado a partir do relato do grupo (v93) já traz a vazão que a mensagem
+   dizia.
+4. **Colheita: medidas padronizadas.** 1 carreta = 4.500 L de café da roça =
+   10 sacas beneficiadas (`CARRETA_LITROS`, `CARRETA_SACAS`; logo 450 L por
+   saca). O campo "Sacas (se pesou / souber)" saiu; entraram "Total em bags"
+   e "Valor da medida (L por bag)" — o bag não tem tamanho fixo, o gerente
+   informa quanto vale e o app lembra o último valor da unidade
+   (`D.medidaBag`, gravado no envio). Embaixo dos campos, uma linha de
+   conferência mostra a conta ("≈ 95 sacas beneficiadas — 9,5 carretas ×
+   4.500 L + 3 bags × 1.200 L = 46.350 L"). As sacas passam a ser
+   CALCULADAS (`sacasColheita`): resumo da seção, boletim enviado, WhatsApp,
+   KPI, tabela e CSV do painel usam a mesma função e mostram "≈ … sacas
+   benef." quando o número saiu das medidas. Sacas digitadas em boletim
+   antigo (e nos grãos, que continuam digitando) valem o que foi digitado.
+   Lata NÃO entra na conta: não existe equivalência declarada, e o app não
+   estima sem medida declarada (mesma regra do consumo de insumos, v86).
+
+### O que ficou para o Nilo decidir (perguntas do PR)
+- "Carregamento de café" é a mesma coisa que "Transporte de café da roça
+  para terreiro"? E "Varrição / rapagem" é "Rastelação manual"? Os quatro
+  ficaram na lista, sem de-para — o app não funde por palpite (regra 3 da
+  nomenclatura).
+- O de-para antigo "Poda (decote/esqueletamento) → Poda mecanizada
+  esqueletamento" (v76) agora tem dois candidatos, porque "Poda mecanizada
+  decote" passou a existir. Ficou como estava; se o Nilo preferir, vira termo
+  legado (`TERMOS_LEGADO`).
+- "Valor da medida" foi lido como litros por bag. Se a turma quis dizer
+  outra coisa (sacas por bag, ou o preço pago por medida na colheita
+  manual), o rótulo e a conta mudam numa tarefa curta.
+
+### Provas (v94)
+- `node scripts/teste_nomenclatura.cjs` (sem rede, 390 px): de-para e
+  passos 1–3 do café inalterados.
+- `node scripts/checar-poluicao.cjs`: nenhum ❌ novo; o cartão da colheita
+  segue com o ❌ herdado (talhão em seletor), agora com 9 rótulos.
+- `scripts/regressao_render.cjs` contra origin/main: o cenário preenche
+  "vazao" e "bags/bagLitros" no lugar dos campos que saíram; o resto das
+  telas do café e as de grãos/pecuária mudam só onde a ordem alfabética da
+  lista de funções manda.
+
 ## Relato de aplicação (v93) — a mensagem do grupo liga ao lançamento; sem lançamento, vira pergunta
 Pedido do Nilo em 15/09/2026: toda aplicação é anunciada num grupo de WhatsApp
 próprio, DEPOIS de concluída, e com mais detalhe do que no boletim
@@ -2553,8 +2636,10 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
     O QUÊ na lista nativa agrupada por natureza ✓ (v87, a pedido dos
     gerentes); DETALHES só depois da escolha ✓ — mesmo retrato do
     "＋ operação" dos grãos).
-  - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 8
-    rótulos de uma vez).
+  - Colheita: fechada ✅ · ao abrir ✅ · "＋" ❌ (talhão em seletor, 9
+    rótulos de uma vez — a v94 trocou "Sacas (se pesou / souber)" por
+    "Total em bags" + "Valor da medida", a pedido dos gerentes; o
+    cartão em 3 passos continua tarefa própria).
   - Pragas, doenças e daninhas: fechada ✅ · ao abrir ✅ (v69: só o par
     "Nada a registrar hoje" · "Registrar ocorrência" + lista + ＋) · "＋"
     ❌ (tipo em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ
