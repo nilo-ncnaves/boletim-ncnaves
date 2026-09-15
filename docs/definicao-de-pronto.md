@@ -1019,3 +1019,64 @@ Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
    main (o cartão só existe com relato para a unidade e o dia).
 `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (8 itens) e a
 tela "Colar do WhatsApp › Conferir a aplicação" dentro de 2 telas.
+
+## 27. Baixa do ERP: espelho e conferência, nunca segundo consumo (desde a v96)
+Tarefa que mexer na porta única, no saldo de insumos, no executado das
+tarefas ou no de-para prova, com `node scripts/teste_insumos.cjs` (cenários
+"ERP a" a "ERP o", PDF em tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf
+— sintético, mesmo layout e números do relatório real de 15/09/2026 — e a
+mensagem real do grupo "Aplicações Realizadas"):
+1. **Leitura por posição:** 24 linhas, 8 glebas, 164,90 ha, totais 1.900 /
+   775 / 950 kg, "SULFATO DE MANGANES BRANCO 31%" reunido (nome quebrado em
+   duas linhas), data final/hora final da linha quebrada na coluna certa;
+   cabeçalho (propriedade, atividade, empreendimento, safra, operação,
+   período, emissão); nenhuma leitura duvidosa (área × dose/ha fecha com a
+   quantidade a 0,5 %); layout desconhecido → "Não reconheci este relatório
+   do ERP.", nada gravado, texto extraído na trilha.
+2. **Datas:** hora do ERP gravada como LANÇAMENTO (`lancado_erp_ini/fim`),
+   competência do mês (da mensagem ou do período); nenhuma tela diz
+   "aplicado às".
+3. **Identidade por id:** propriedade → unidade pelo de-para da ata (exato);
+   gleba → talhão pergunta na primeira vez (8 seletores, botão inativo
+   dizendo o que falta) e não pergunta na segunda; insumo → produto pelo
+   de-para de produtos; área da gleba ≠ talhão em mais de 2 % vira aviso.
+4. **Casamento determinístico (`erpCasar`), o resultado por linha do caso
+   real:** SETOR 1 ✅ Bate ×3 · SETOR 2 ✅ Bate (soma de dois dias) · SETOR 3
+   ⚠️ Quantidade diferente · SETOR 4 ⚠️ Talhão diferente e SETOR 5 ➕ Só no
+   ERP (desempate) · SETOR 6 ✅ Lançado sem quantidade ×3 (setor marcado na
+   fertirrigação) · SETOR 7 ⚠️ Fora da janela · SETOR 8 ➕ ×3 · KCl do
+   SETOR 2 🔸 Só no app · adubação de solo NÃO é 🔸; rodar duas vezes dá o
+   mesmo resultado. Ordem das passadas: bate → fora da janela → sem
+   quantidade → talhão diferente → quantidade diferente → só no ERP (a
+   quantidade que bate vale mais que o talhão).
+5. **Completar:** ➕ entra no saldo e no executado da tarefa com "origem:
+   ERP"; boletins, farol de registro e dias sem registro ficam idênticos
+   antes e depois.
+6. **Regra de saldo:** recebido 2.000 + boletim 100 + baixa ERP 1.900 → saldo
+   100 (nunca as duas fontes somadas); o toque no "aplicado" diz de onde veio
+   cada número.
+7. **Checagens:** C1 mesmo PDF → 0 linhas novas e botão inativo com "Este
+   relatório já foi importado em dd/mm."; C3 mesma linha com outra
+   quantidade → três chips (substituir · somar · ignorar), nada gravado
+   antes da resposta, "substituir" deixa a anterior superada; C7 dose/ha
+   dispara só no SETOR 8 (bórico e zinco); C8 «Ferti Iniciou» sugerida e o
+   status só muda com "Concluí".
+8. **Telas:** relatório da conferência com grupos ⚠️ → 🔸 → ➕ → ✅ (⚠️ e 🔸
+   abertos), UM botão "Importar e abrir conferência"; tela "🔎 Conferência
+   ERP × App" (nível 3 do módulo, classes cad-*, busca a partir de 12 itens,
+   item de UMA linha ≥ 44 px, lado a lado no lugar, chips de resolução com
+   "desfazer", zero campo, zero nativo); pastilha "🔎 N lançamentos do ERP
+   para conferir" que some com N = 0; cartão c19 no painel; Cadastros ›
+   Insumos › Baixas do ERP; "baixado no ERP" no cartão 📦 Insumos.
+9. **Só a mensagem:** relato sem quantidade, saldo inalterado, "aguardando
+   relatório do ERP".
+10. **Vocabulário:** nenhum custo; nenhum "não fez", "não lançou", "erro do
+    gerente", "pendente"; nenhuma confirmação nova (contagem de `perguntar(`
+    igual à da v95).
+11. **Regressão:** gerente (três atividades) e pós-colheita idênticos ao
+    main; painel e Cadastros só ganham o cartão/item novos.
+`scripts/checar-poluicao.cjs`, grupo "19. Baixa do ERP" (11 itens) e as
+telas "Colar do WhatsApp › Conferir o relatório do ERP", "… › Conferência
+ERP × App", "… › Conferência ERP × App (lista)" e "Cadastros › Insumos ›
+Baixas do ERP" medidas como Cadastros; o cartão "Conferência ERP × App" no
+grupo 16 (painel em duas etapas).

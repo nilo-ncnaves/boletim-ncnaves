@@ -166,7 +166,7 @@ function acharTermos(texto, lista) {
 /* ---------- servidor estático (só os arquivos do app) ---------- */
 function servir(dir) {
   return new Promise(res => {
-    const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+    const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.pdf': 'application/pdf', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
     const srv = http.createServer((req, r) => {
       let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
       const f = path.join(dir, p);
@@ -700,6 +700,7 @@ const PAINEL_CARTOES_CHK = [
   ['plano', 'Planejado × Executado'],
   ['solinftec', 'Solinftec — medição de ontem'],
   ['remessas', 'Café em trânsito'],
+  ['erp', 'Conferência ERP × App'],   /* v96 */
   ['boletins', 'Boletins do período'],
 ];
 async function cenarioPainelCartoes(browser, base, R) {
@@ -718,6 +719,16 @@ async function cenarioPainelCartoes(browser, base, R) {
     D.remessas = [
       { id: 'rchk1', status: 'enviada', data: hoje, origem: cafes[0], destino: cafes[1], talhaoId: tal(cafes[0]), carretas: '2' },
       { id: 'rchk2', status: 'enviada', data: hoje, origem: cafes[2] || cafes[0], destino: cafes[1], talhaoId: tal(cafes[2] || cafes[0]), carretas: '1' }];
+    /* v96: duas linhas de baixa do ERP e a importação delas, para "Conferência ERP × App" ter o que listar */
+    const agora = new Date().toISOString();
+    const b1 = { id: 'erpchk1', impId: 'erpimp1', unidade: 'f23', talhaoId: 't103', glebaErp: 'SETOR 3 ROMARIA', areaGlebaErp: 22.15, produto: 'Ácido Bórico', chave: 'acidoborico', insumoErp: 'ACIDO BORICO', insumoId: '', un: 'KG', areaHa: 22.15, doseHa: 11.2867, qtde: 250,
+      competencia: hoje.slice(0, 7), operacaoErp: 'FERTIRRIGACAO', lancadoErpIni: hoje + ' 16:27:54', lancadoErpFim: hoje + ' 17:00:00', emitidoErpEm: hoje + ' 16:39:47', origemHash: 'chk', mensagemId: 'erpmsg1', status: 'vigente', superadaPor: '', criadoPor: 'Escritório', criadoEm: agora,
+      casamento: { resultado: 'qtd_dif', soma: 200, vinculos: [{ id: 'x:1', boletimId: 'x', data: diaISO(hoje, -3), talhaoId: 't103', kg: 200, por: 'Gerente', op: 'Adubação via fertirrigação', nome: 'Setor 3' }], texto: 'Setor 3 · ácido bórico · app 200 kg (' + fmtDataCurta(diaISO(hoje, -3)) + ') × ERP 250 kg' }, conf: { estado: 'aberta', historico: [] } };
+    const b2 = { ...b1, id: 'erpchk2', talhaoId: 't108', glebaErp: 'SETOR 8 ROMARIA', areaGlebaErp: 11, areaHa: 11, doseHa: 27.2727, qtde: 300, casamento: { resultado: 'so_erp', soma: 0, vinculos: [], texto: 'Setor 8 · ácido bórico · 300 kg — sem registro no boletim' }, conf: { estado: '', historico: [] } };
+    D.baixasErp = [b1, b2];
+    D.mensagensImportadas = (D.mensagensImportadas || []).concat([{ id: 'erpmsg1', chave: 'erpchk', tipo: 'erp', texto: '📎 relatorio-erp.pdf', por: 'Escritório', em: agora, data: hoje,
+      criados: [{ tipo: 'erp', id: 'erpimp1', unidade: 'f23', competencia: hoje.slice(0, 7), operacaoErp: 'FERTIRRIGACAO', arquivo: 'relatorio-erp.pdf', hash: 'chk', emitidoEm: hoje + ' 16:39:47', linhas: ['erpchk1', 'erpchk2'],
+        resumo: { total: 2, bate: 0, sem_qtd: 0, qtd_dif: 1, talhao_dif: 0, fora_janela: 0, so_erp: 1, so_app: 0, ok: 0, conf: 1 }, soApp: [], avisos: [], dose: [], plano: [], glebas: [], textoExtraido: '', comMensagem: false, superadas: 0 }] }]);
     /* uma tarefa da reunião e um plano do dia, para "Planejamento do mês" e "Planejado × Executado" */
     salvarDados();
   });
@@ -1368,6 +1379,7 @@ async function cenarioCadastros(browser, base, R) {
     ['Cadastros › Catálogos › Máquinas', [{ v: 'catalogos' }, { v: 'maquinas' }], 'lista'],
     ['Cadastros › Insumos e remessas', [{ v: 'insumos' }], 'lista'],
     ['Cadastros › Insumos › Remessas programadas', [{ v: 'insumos' }, { v: 'insremessas' }], 'lista'],
+    ['Cadastros › Insumos › Baixas do ERP', [{ v: 'insumos' }, { v: 'insbaixas' }], 'lista'],   /* v96 */
     ['Cadastros › Integrações e robôs', [{ v: 'integracoes' }], 'detalhe'],
     ['Cadastros › Importações manuais', [{ v: 'importacoes' }], 'lista'],
     ['Cadastros › Sincronização e dados', [{ v: 'sync' }], 'detalhe'],
@@ -1479,6 +1491,63 @@ async function cenarioInsumos(browser, base, R) {
   await page.evaluate(id => { insNav = [{ v: 'colar' }, { v: 'mensagens' }, { v: 'mensagem', id }]; ir('colar'); }, msgId);
   await page.waitForTimeout(200);
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Mensagem (texto original)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  /* v96: baixa do ERP — o PDF da fixture entra pela mesma porta, o app casa sozinho e abre a conferência */
+  R.erpPrev = await page.evaluate(async base => {
+    /* dois lançamentos de fertirrigação em Vereda Romaria (set/2026, a competência do relatório): um com quantidade
+       diferente da baixa (⚠️) e um com insumo que não está no PDF (🔸) — para a conferência ter o que abrir */
+    const mk = (id, data, ativs) => ({ id, fazendaId: 'f23', data, responsavel: 'Gerente Romaria', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '', diaristas: '', funcoes: [] },
+      atividades: ativs, colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {}, enviadoEm: data + 'T18:00:00' });
+    const fert = (id, t, prod, kg, area) => ({ id, talhaoId: t, tipo: 'Adubação via fertirrigação', pessoas: '2', obs: '', status: '', insProduto: prod, insDoseKgHa: String(kg / area), insAreaHa: String(area) });
+    D.boletins.push(mk('erp-b1', '2026-09-12', [fert('erp-a1', 't103', 'Ácido Bórico', 200, 22.15)]), mk('erp-b2', '2026-09-08', [fert('erp-a2', 't102', 'KCl', 200, 22.15)]));
+    salvarDados();
+    insLimpar(); insNav = [{ v: 'colar' }]; ir('colar'); await new Promise(r => setTimeout(r, 120));
+    const campos = [...document.querySelectorAll('#app textarea, #app input:not([type=hidden])')].length;
+    const bt = document.getElementById('bt-ins-pdf');
+    const alvoBt = bt ? +bt.getBoundingClientRect().height.toFixed(1) : 0;   /* medido ANTES de anexar: a tela troca */
+    const buf = await (await fetch(base + '/tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf')).arrayBuffer();
+    window.__nativos = 0;
+    const L = await erpAnexarBytes(buf, 'erp-ferti-vereda-romaria-2026-09-15.pdf');
+    const p = insUI.prev, bi = document.getElementById('bt-ins-importar');
+    const out = { campos, botao: bt ? bt.textContent.trim() : '', alvo: alvoBt, ok: L.ok, n: L.n, tipo: insUI.tipo, tela: telaAtual,
+      selects: document.querySelectorAll('#app select[data-erpsel^="gleba"]').length, inativo: !!bi && bi.classList.contains('acao-off'), falta: bi ? bi.getAttribute('data-falta') || '' : '', nativos: window.__nativos,
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    /* o escritório liga as glebas (por id) — a pré-visualização vira o relatório da conferência */
+    p.glebas.forEach((g, i) => { g.talhaoId = 't10' + (i + 1); }); erpRecalcular(p); ir('colar'); await new Promise(r => setTimeout(r, 120));
+    const bi2 = document.getElementById('bt-ins-importar');
+    out.depois = { rotulo: bi2 ? bi2.textContent.trim() : '', inativo: !!bi2 && bi2.classList.contains('acao-off'), resumo: p.resumo,
+      grupos: [...document.querySelectorAll('#app details[data-erp-grupo]')].map(d => d.dataset.erpGrupo + (d.open ? ':aberto' : ':fechado')),
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    return out;
+  }, base);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir o relatório do ERP', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  R.erpConf = await page.evaluate(async () => {
+    window.__nativos = 0;
+    const antesB = erpBaixas().length, antesBol = JSON.stringify(D.boletins);
+    document.getElementById('bt-ins-importar').click(); await new Promise(r => setTimeout(r, 250));
+    const out = { gravadas: erpBaixas().length - antesB, boletinsIguais: JSON.stringify(D.boletins) === antesBol, tela: telaAtual, nav: (insNav[insNav.length - 1] || {}).v, nivel: insNav.length,
+      h1: (document.querySelector('#app .topo h1') || {}).textContent.replace(/\s+/g, ' ').trim(),
+      grupos: [...document.querySelectorAll('#app details[data-erp-grupo]')].map(d => d.dataset.erpGrupo + (d.open ? ':aberto' : ':fechado')),
+      itens: document.querySelectorAll('#app [data-erp-abrir]').length, campos: document.querySelectorAll('#app input:not(.cad-busca), #app select, #app textarea').length,
+      alvo: Math.min(...[...document.querySelectorAll('#app [data-erp-abrir]')].map(b => b.getBoundingClientRect().height)),
+      chipsAntes: document.querySelectorAll('#app [data-erp-res]').length, pastilha: planPastilhas().map(x => x.txt).find(x => /🔎/.test(x)) || '',
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    const primeiro = document.querySelector('#app [data-erp-abrir]'); const id = primeiro.getAttribute('data-erp-abrir');
+    const telaAntes = telaAtual, altura = document.documentElement.scrollHeight;
+    primeiro.click(); await new Promise(r => setTimeout(r, 120));
+    const chips = [...document.querySelectorAll('#app [data-erp-res^="' + id + '|"]')];
+    out.aberto = { chips: chips.map(c => c.textContent.trim()), alvo: chips.length ? Math.min(...chips.map(c => c.getBoundingClientRect().height)) : 0, mesmaTela: telaAtual === telaAntes, modal: !!document.querySelector('dialog[open], .folha'),
+      ladoALado: /ERP\s*SETOR/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent.replace(/\s+/g, ' ')) && /Boletim/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent) };
+    chips[0].click(); await new Promise(r => setTimeout(r, 120));
+    out.resolvido = { abertos: erpAbertos().length, desfazer: !!document.querySelector('[data-erp-res="' + id + '|desfazer"]'), mesmaTela: telaAtual === telaAntes, nativos: window.__nativos, cresceu: document.documentElement.scrollHeight - altura };
+    document.querySelector('[data-erp-res="' + id + '|desfazer"]').click(); await new Promise(r => setTimeout(r, 120));
+    out.desfeito = { abertos: erpAbertos().length };
+    return out;
+  });
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência ERP × App', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  await page.evaluate(() => { insNav = [{ v: 'colar' }, { v: 'erp' }]; ir('colar'); }); await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência ERP × App (lista)', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  /* o gerente e o painel de baixo NÃO recebem o dado do ERP — a medição deles continua a da v86 */
+  await page.evaluate(() => { D.baixasErp = []; insMensagens().forEach(m => { m.criados = (m.criados || []).filter(c => c.tipo !== 'erp' && c.tipo !== 'erp_relato'); }); D.deparaAta = null; D.boletins = D.boletins.filter(b => !/^erp-b/.test(b.id)); salvarDados(); });
   /* painel da Diretoria: o cartão nasce recolhido */
   R.insPainel = await page.evaluate(async () => {
     sessao = { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' }; ritualPuladoSessao = true; ir('painel');
@@ -1859,7 +1928,7 @@ function avaliar(R) {
       C.inativo && /Cole a mensagem/.test(C.falta || '') && C.telaDepois === 'colar' && C.nativos === 0 && C.alvo >= TOQUE_MIN,
       `"${C.falta || ''}" · alvo ${C.alvo} px · ${C.nativos} nativo(s)`);
     add(G, 'Classificação automática — a mensagem do grupo é reconhecida e o tipo pode ser trocado',
-      P.tipo === 'remessa' && (P.chipsTipo || []).length === 5, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));
+      P.tipo === 'remessa' && (P.chipsTipo || []).length === 6, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));   /* v96: + "Aplicação realizada (baixa do ERP)" */
     add(G, 'Pré-visualização — totais de conferência antes de gravar', /fazendas/.test(P.resumo || '') && /kg|t$/.test(P.resumo || ''), P.resumo || '');
     add(G, 'Pré-visualização — nome não casado NÃO é adivinhado: a tela pede a unidade',
       P.naoCasado === 1 && /unidade/i.test(P.falta || ''), P.naoCasado + ' linha(s) para decidir · botão: "' + (P.falta || '') + '"');
@@ -1900,6 +1969,37 @@ function avaliar(R) {
       L.vinculo === true && L.rotulo === 'Ligar ao lançamento' && !L.inativo && L.selects === 0 && L.nativos === 0 && /Confere com o boletim de/.test(L.texto || ''),
       `${L.rotulo} · ${L.selects} lista(s) · ${L.nativos} nativo(s)`);
     add(G, 'Ligar ao lançamento — nada é criado e o boletim do gerente não é reescrito (nunca duas vezes)', L.criou === 0 && L.ligados === 1, `${L.criou} criado(s) · ${L.ligados} ligado(s)`);
+  }
+
+  /* 19. Baixa do ERP (v96): o app casa sozinho, completa e abre aviso de conferência */
+  if (R.erpPrev) {
+    const G = '19. Baixa do ERP: o app casa sozinho, completa e abre a conferência';
+    const P = R.erpPrev, D = P.depois || {}, C = R.erpConf || {};
+    add(G, 'Porta única — "📎 Anexar relatório do ERP (PDF)" ao lado do campo de colar; a tela continua com UM campo e o botão tem ≥ 44 px',
+      P.botao === '📎 Anexar relatório do ERP (PDF)' && P.campos === 1 && P.alvo >= TOQUE_MIN, `"${P.botao}" · ${P.campos} campo(s) · ${P.alvo} px`);
+    add(G, 'PDF anexado — leitura por posição (24 linhas), classificação certa e a pré-visualização abre na hora, sem outro toque e sem nativo',
+      P.ok && P.n === 24 && P.tipo === 'erp' && P.tela === 'colar' && P.nativos === 0, `${P.n} linhas · tipo ${P.tipo}`);
+    add(G, 'Pré-visualização — gleba do ERP → talhão NÃO é adivinhada: 8 seletores e o botão nasce inativo dizendo o que falta',
+      P.selects === 8 && P.inativo && /Ligue cada gleba/.test(P.falta), `${P.selects} seletor(es) · "${P.falta}"`);
+    add(G, 'Relatório da conferência — grupos na ordem ⚠️ → 🔸 → ➕ → ✅, com ⚠️ e 🔸 abertos e ➕ e ✅ recolhidos (P5); resumo em UMA linha no topo',
+      (D.grupos || []).join(',') === 'conf:aberto,app:aberto,erp:fechado,ok:fechado' && /24 linhas do ERP · ✅ \d+ batem · ➕ \d+ completadas pelo ERP · ⚠️ \d+ para conferir · 🔸 \d+ só no app/.test(D.texto || ''), (D.grupos || []).join(' · '));
+    add(G, 'Relatório da conferência — UM botão "Importar e abrir conferência", ativo depois de ligar as glebas', D.rotulo === 'Importar e abrir conferência' && !D.inativo, D.rotulo);
+    add(G, 'Relatório da conferência — hora do ERP é de LANÇAMENTO; sem custo, sem prescrição e sem termo de cobrança ao campo',
+      /LANÇAMENTO, não de aplicação/.test(D.texto || '') && !/aplicad[oa]s? às|R\$|custo|não fez|não lançou|erro do gerente|pendente|atrasad|dose alta|tóxic/i.test(D.texto || ''), '');
+    add(G, 'Importar — grava as 24 linhas, NÃO reescreve boletim nenhum e abre a tela "🔎 Conferência ERP × App" (até 3 níveis no módulo)',
+      C.gravadas === 24 && C.boletinsIguais && C.tela === 'colar' && C.nav === 'erpconf' && C.nivel >= 2 && C.nivel <= 3 && /Conferência ERP × App/.test(C.h1 || ''), `${C.gravadas} gravadas · ${C.nav} · nível ${C.nivel}`);
+    add(G, 'Conferência — ⚠️ e 🔸 abertos, ➕ e ✅ recolhidos; cada item é UMA linha tocável ≥ 44 px; zero campo de digitação; chips só depois do toque',
+      (C.grupos || []).join(',') === 'conf:aberto,app:aberto,erp:fechado,ok:fechado' && C.itens >= 4 && C.alvo >= TOQUE_MIN && C.campos === 0 && C.chipsAntes === 0, `${C.itens} itens · alvo ${Math.round(C.alvo || 0)} px · ${C.campos} campo(s) · ${C.chipsAntes} chip(s) antes do toque`);
+    add(G, 'Conferência — o toque abre NO LUGAR a linha do ERP lado a lado com o lançamento do app, com os quatro chips de resolução (≥ 44 px), sem modal',
+      C.aberto && C.aberto.ladoALado && C.aberto.chips.join(' · ') === 'é o mesmo lançamento · são aplicações diferentes · pedir conferência ao gerente · ERP precisa de correção' && C.aberto.alvo >= TOQUE_MIN && C.aberto.mesmaTela && !C.aberto.modal,
+      C.aberto ? C.aberto.chips.join(' · ') + ` · alvo ${Math.round(C.aberto.alvo)} px` : '');
+    add(G, 'Conferência — um toque resolve, grava na hora, no lugar, com "desfazer" (nunca diálogo, nunca nativo); "desfazer" devolve o item à contagem',
+      C.resolvido && C.resolvido.desfazer && C.resolvido.mesmaTela && C.resolvido.nativos === 0 && C.desfeito && C.desfeito.abertos === C.resolvido.abertos + 1,
+      C.resolvido ? `${C.resolvido.abertos} → ${C.desfeito.abertos} em aberto · ${C.resolvido.nativos} nativo(s)` : '');
+    add(G, 'Aviso para conferência — pastilha "🔎 N lançamentos do ERP para conferir" na porta de entrada (só com item em aberto; sem push)',
+      /^🔎 \d+ lançamentos? do ERP para conferir$/.test(C.pastilha || ''), C.pastilha || 'sem pastilha');
+    add(G, 'Conferência — relata REGISTRO ("sem registro no boletim", "sem baixa no ERP", "para conferir"); nunca "não fez", "não lançou", "pendente", "erro do gerente"; nenhum custo',
+      /sem registro no boletim/.test(C.texto || '') && /sem baixa no ERP/.test(C.texto || '') && !/não fez|não lançou|erro do gerente|pendente|atrasad|R\$|custo/i.test(C.texto || ''), '');
   }
 
   /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */
