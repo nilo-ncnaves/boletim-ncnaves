@@ -5881,7 +5881,7 @@ function insChuvaSugerida(fz, data){
 /* ============================================================
    TELAS — componentes ÚNICOS nas três atividades (CLAUDE.md, c4)
    ============================================================ */
-let insUI={ texto:"", tipo:"", auto:null, prev:null, parte:"", nota:"", cons:"", busca:"",
+let insUI={ texto:"", tipo:"", auto:null, prev:null, prevAta:null, lida:false, parte:"", nota:"", cons:"", busca:"",
   prod:"", liberadas:[], flash:"", msg:"", edit:"" };
 let insNav=[], insBuscaTimer=null, insMsgDaAta=null;
 const insIr = (v,id) => { insUI.busca=""; insUI.edit=""; insNav.push({v, id:id||""}); ir("colar"); };
@@ -5891,7 +5891,7 @@ function insVoltar(){
   else { insNav=[]; voltarDoModulo("colar"); }
 }
 const insRender = () => ir("colar",null,true);
-function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.msg=""; }
+function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; }
 
 /* ---- (3) cartão de chegada no topo do boletim: UM toque ----
    Único elemento novo SEMPRE visível do módulo — e só enquanto houver chegada
@@ -6172,7 +6172,10 @@ function vColar(){
   return insVColar();
 }
 function insVColar(){
-  if(!insUI.prev && !insUI.prevAta) return insTopo("Colar do WhatsApp","Uma mensagem, um toque")
+  /* v92: a tela de conferência abre quando a mensagem foi LIDA (toque em "Ler a mensagem"), e não só quando
+     existe pré-visualização. Até a v91, mensagem que o app não reconhecia (tipo "") voltava para a tela de
+     colar sem dizer nada — o toque parecia não ter acontecido. Agora ela pergunta o tipo, como prometido. */
+  if(!insUI.lida && !insUI.prev && !insUI.prevAta) return insTopo("Colar do WhatsApp","Uma mensagem, um toque")
     +`<div class="cartao">
       <label for="ins-texto">Cole aqui a mensagem</label>
       <textarea id="ins-texto" rows="9" placeholder="Cole a mensagem do grupo: ata da reunião, remessa de insumo, tarefas soltas ou relato de chuva.">${esc(insUI.texto||"")}</textarea>
@@ -6399,6 +6402,7 @@ function insClique(t,d){
     insUI.texto=txt;
     insUI.auto=insClassificar(txt);
     insUI.tipo=insUI.auto.tipo;
+    insUI.lida=true;
     insAbrirPrev();
     insRender(); return true; }
   if(d.insTipo!==undefined){ insUI.tipo=d.insTipo; insAbrirPrev(); insRender(); return true; }
@@ -8310,7 +8314,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v91";
+const APP_VERSAO="v92";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
