@@ -1141,6 +1141,34 @@ Planejamento.
   do módulo, um degrau por vez); detalhe em docs/definicao-de-pronto.md,
   item 24.
 
+### c21) Mensagem do grupo vira PERGUNTA no boletim, nunca registro (desde a v93)
+Decisão do Nilo em 15/09/2026 para o grupo de aplicações (vale para qualquer
+dado de campo colado pelo escritório): a mensagem colada NUNCA vira registro
+sozinha — vira pergunta no boletim da unidade, no dia, e quem grava é o
+gerente, com um toque. Componente ÚNICO `cartaoAplicacaoRelato(r)` (café e
+grãos; pecuária não tem aplicação por talhão), alimentado por
+`insAplicacoesRelatadas()` (relatos em `mensagens_importadas.criados`, como a
+sugestão de chuva) e pelo catálogo `INS_APLIC_ATIVIDADE` (como o registro entra
+em cada atividade) — nunca uma variante por atividade.
+- **Uma pergunta, duas respostas, zero campo:** "foi assim?" · "✅ Lançar no
+  boletim" · "❌ Não lançar". Lançar cria a atividade com os detalhes da
+  mensagem no cartão de sempre (editável, "trocar", "remover" = desfazer);
+  Não lançar deixa "desfazer" no lugar. A resposta viaja no boletim
+  (`b.relatos`), a atividade leva `relatoId`. Sem diálogo, sem nativo.
+- **Nunca duas vezes:** relato que já confere com um lançamento do dia (mesmo
+  talhão, mesmo produto) vira a linha "confere ✔" e não pergunta.
+- **A pré-visualização do escritório pergunta, nunca adivinha:** unidade e
+  talhão pelo de-para por id (`DEPARA_ATA_PADRAO[].talhao`), a atividade do
+  boletim pela lista nativa do catálogo da atividade — o app não deduz
+  atividade pelo nome do produto; escolhida uma vez, lembra por produto
+  (`D.deparaOperacao`). "Levar ao boletim" é botão de avanço (c10).
+- **Vocabulário:** a situação em Mensagens importadas relata REGISTRO
+  ("aguardando o boletim de …", "lançada no boletim", "o gerente respondeu
+  que não foi assim"); proibidos "não fez", "pendente", "atrasado".
+- Conferência: `node scripts/teste_insumos.cjs` (mensagem real do grupo) e
+  `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação"; detalhe em
+  docs/definicao-de-pronto.md, item 26.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho

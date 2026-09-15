@@ -138,7 +138,7 @@ const ALVO_TELAS = 2;                       /* altura-alvo: 2 telas */
 const TOQUE_MIN = 44;                       /* alvo de toque mínimo, px */
 const ALVO_PAINEL = 4;                      /* v88: teto de altura do painel da Diretoria ao abrir, em telas (era 4,15 na v87) */
 const LISTA_MAX_SEM_BUSCA = 12;
-const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
+const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', f14c: 'CC-6081', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
 
 /* ---------- termos exclusivos por atividade (fonte: docs/catalogos-por-atividade.md) ---------- */
 function lerTermos() {
@@ -1395,6 +1395,9 @@ async function cenarioCadastros(browser, base, R) {
    f23 (Vereda Romaria) é a unidade medida no boletim do gerente. */
 const MSG_INS = ['Relação de NITRATO que a Cooxupé vai entregar nas fazendas:',
   '106.000 kg - VEREDA', '50.000 kg - ROMARIA', '44.000 kg - MATA PRETA'].join('\n');
+/* v93: a mensagem REAL do grupo de aplicações (15/09/2026); "Caxico arrendo" = talhão t055 de f14c */
+const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermon', 'Dose/ 400lts , vazão 100lts / hectares',
+  'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
 async function cenarioInsumos(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
   await pularRitual(page);
@@ -1428,6 +1431,20 @@ async function cenarioInsumos(browser, base, R) {
   }, [MSG_INS]);
   await page.waitForTimeout(150);
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a remessa', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  /* v93: relato de aplicação — a pré-visualização pergunta a atividade (nunca adivinha) e leva ao boletim */
+  R.aplicPrev = await page.evaluate(async ([msg]) => {
+    insLimpar(); insUI.texto = msg; insUI.auto = insClassificar(msg); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); ir('colar');
+    await new Promise(r => setTimeout(r, 150));
+    const bt = document.getElementById('bt-ins-importar');
+    const it = insUI.prev.itens[0];
+    return { tipo: insUI.tipo, unidade: it.unidade, talhao: it.talhaoId, operacao: insUI.prev.operacao,
+      falta: bt ? bt.getAttribute('data-falta') || '' : '', inativo: !!bt && bt.classList.contains('acao-off'),
+      selects: document.querySelectorAll('#app select[data-insprev]').length, nativos: window.__nativos,
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+  }, [MSG_APLIC]);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a aplicação', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
+  await page.evaluate(() => { insUI.prev.operacao = 'Pulverização mecanizada'; insImportar(); });
+  await page.waitForTimeout(150);
   /* grava e mede a trilha de origem */
   await page.evaluate(msg => { insUI.texto = msg; insUI.tipo = 'remessa'; insAbrirPrev(); insImportar();
     /* anúncio de 10 dias atrás: é assim que a cobrança por fornecedor aparece (INS_COBRANCA_DIAS = 7) */
@@ -1480,6 +1497,34 @@ async function cenarioInsumos(browser, base, R) {
   });
   R.errosInsumos.push(...g.erros);
   await g.ctx.close();
+
+  /* v93: o gerente de Monte Carmelo — Café vê a aplicação relatada como pergunta no topo do boletim */
+  const m = await novaPagina(browser, base, { codigo: CODIGOS.f14c, chave: 'f14c' },
+    { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+  await m.page.evaluate(x => { D = JSON.parse(x); salvarDados(); }, estado);
+  await m.page.evaluate(() => { rascunho = novoRascunho(); ir('form'); }); await m.page.waitForTimeout(300);
+  R.telas.push(await medirTela(m.page, 'Boletim do gerente com aplicação relatada (f14c)', 'boletim', { tipo: 'detalhe', niveis: 1 }));
+  R.aplicBoletim = await m.page.evaluate(async () => {
+    const c = document.querySelector('#app [data-ins-relato]');
+    if (!c) return { existe: false };
+    const bts = [...c.querySelectorAll('[data-ins-aplic]')];
+    const alvo = Math.min(...bts.map(b => b.getBoundingClientRect().height));
+    const campos = c.querySelectorAll('input, textarea, select').length;
+    const alturaCartao = +(c.getBoundingClientRect().height).toFixed(0);
+    const antes = telaAtual, ativAntes = rascunho.atividades.length;
+    window.__nativos = 0;
+    bts[0].click();
+    await new Promise(r => setTimeout(r, 250));
+    const a = rascunho.atividades[0] || {};
+    return { existe: true, botoes: bts.map(b => b.textContent.trim()), alvo: +alvo.toFixed(1), campos,
+      altura: alturaCartao, texto: c.textContent.replace(/\s+/g, ' ').trim(),
+      mesmaTela: telaAtual === antes, modal: !!document.querySelector('dialog[open], .folha'), nativos: window.__nativos,
+      sumiu: !document.querySelector('#app [data-ins-relato]'), criou: rascunho.atividades.length - ativAntes,
+      atividade: [a.tipo, a.talhaoId, a.receita, a.tanques, a.ltanque].join(' · '),
+      editavel: !!document.querySelector('#app [data-ativ="' + a.id + '"] [data-troca-op]') };
+  });
+  R.errosInsumos.push(...m.erros);
+  await m.ctx.close();
 }
 
 /* ---------- avaliação: transforma medidas em ✅/❌ ---------- */
@@ -1791,7 +1836,7 @@ function avaliar(R) {
       C.inativo && /Cole a mensagem/.test(C.falta || '') && C.telaDepois === 'colar' && C.nativos === 0 && C.alvo >= TOQUE_MIN,
       `"${C.falta || ''}" · alvo ${C.alvo} px · ${C.nativos} nativo(s)`);
     add(G, 'Classificação automática — a mensagem do grupo é reconhecida e o tipo pode ser trocado',
-      P.tipo === 'remessa' && (P.chipsTipo || []).length === 4, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));
+      P.tipo === 'remessa' && (P.chipsTipo || []).length === 5, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));
     add(G, 'Pré-visualização — totais de conferência antes de gravar', /fazendas/.test(P.resumo || '') && /kg|t$/.test(P.resumo || ''), P.resumo || '');
     add(G, 'Pré-visualização — nome não casado NÃO é adivinhado: a tela pede a unidade',
       P.naoCasado === 1 && /unidade/i.test(P.falta || ''), P.naoCasado + ' linha(s) para decidir · botão: "' + (P.falta || '') + '"');
@@ -1808,6 +1853,25 @@ function avaliar(R) {
       PA.existe && PA.aberto === false && PA.cobranca, PA.existe ? (PA.aberto ? 'nasceu aberto' : 'recolhido') + (PA.cobranca ? ' · com cobrança' : ' · sem cobrança') : 'cartão não encontrado');
     add(G, 'Painel da Diretoria — divergência é assunto do escritório, sem termo de cobrança ao campo', PA.existe && !PA.proibido, PA.proibido ? 'termo proibido na tela' : '');
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosInsumos || []).length, (R.errosInsumos || []).join(' | '));
+  }
+
+  /* 18. Relato de aplicação (v93): o escritório cola, o gerente confirma com um toque, nada entra sozinho */
+  if (R.aplicPrev) {
+    const G = '18. Relato de aplicação: uma colagem, uma pergunta no boletim, um toque';
+    const P = R.aplicPrev, B = R.aplicBoletim || {};
+    add(G, 'Porta única — a mensagem do grupo de aplicações é reconhecida e o talhão vem do de-para por id',
+      P.tipo === 'aplicacao' && P.unidade === 'f14c' && P.talhao === 't055', P.tipo + ' · ' + P.unidade + ' / ' + P.talhao);
+    add(G, 'Pré-visualização — a atividade do boletim NÃO é adivinhada: o botão nasce inativo dizendo o que falta, lista nativa para escolher',
+      P.operacao === '' && P.inativo && /Escolha a atividade/.test(P.falta) && P.selects >= 2 && P.nativos === 0, `"${P.falta}" · ${P.selects} lista(s) · ${P.nativos} nativo(s)`);
+    add(G, 'Pré-visualização — sem termo de cobrança e sem prescrição', !/não fez|não realizou|faltou|esqueceu|pendente|aplicar\b/i.test(P.texto), '');
+    add(G, 'Boletim do gerente — a aplicação relatada é PERGUNTA no topo ("foi assim?"), com duas respostas e nenhum campo de digitação',
+      B.existe && (B.botoes || []).length === 2 && /foi assim\?/.test(B.texto || '') && B.campos === 0, (B.botoes || []).join(' · ') + ` · ${B.campos} campo(s)`);
+    add(G, 'Boletim do gerente — alvo de toque ≥ 44 px e cartão de menos de meia tela', B.alvo >= TOQUE_MIN && B.altura <= VP.height / 2, `alvo ${B.alvo} px · ${B.altura} px de altura`);
+    add(G, 'Boletim do gerente — UM toque cria a atividade com os detalhes da mensagem, no lugar, sem modal e sem nativo',
+      B.criou === 1 && B.mesmaTela && !B.modal && B.nativos === 0 && /Pulverização mecanizada · t055 · 2lts Quatermon · 5 · 400/.test(B.atividade || ''), B.atividade);
+    add(G, 'Boletim do gerente — respondida, a pergunta some e a atividade fica editável no cartão de sempre (nada é gravado sem o toque)',
+      B.sumiu === true && B.editavel === true, (B.sumiu ? 'sumiu' : 'continuou') + ' · ' + (B.editavel ? 'editável' : 'sem "trocar"'));
+    add(G, 'Boletim do gerente — o cartão não cobra quem usa', !/não fez|pendente|atrasad|faltou|esqueceu/i.test(B.texto || ''), (B.texto || '').slice(0, 90));
   }
 
   /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */

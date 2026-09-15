@@ -984,3 +984,27 @@ chips e abre "Por quê?"; (e) "Comecei" + "Novo prazo +15" convivem; (f)
 nenhuma fileira passa de 390 px, chips sem pílula, alvo ≥ 44 px; mais
 "Gravar meta" como botão de avanço. `scripts/checar-poluicao.cjs`, grupo "14.
 Planejamento", três itens "Ações da tarefa (v91)".
+
+## 26. Relato de aplicação: mensagem vira pergunta no boletim, nunca registro (desde a v93)
+Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
+1. **Leitura da mensagem real** (`node scripts/teste_insumos.cjs`): tipo
+   "aplicacao"; produto da linha de calda; local casado pelo de-para por id
+   (unidade E talhão); litros por tanque, vazão, tanques, calda e observação
+   como vieram; área coberta calculada (tanques × L ÷ L/ha) só para conferir;
+   a atividade do boletim nasce VAZIA (nunca deduzida do nome do produto).
+2. **Pré-visualização pergunta:** "Levar ao boletim" inativo até haver
+   unidade, talhão, produto e atividade; listas nativas; sem termo de
+   cobrança; a escolha da atividade fica aprendida por produto.
+3. **Nenhum boletim gravado** pela colagem; reimportar não duplica.
+4. **No boletim do gerente**, no dia: cartão no topo com "foi assim?", duas
+   respostas, zero campo, alvo ≥ 44 px, menos de meia tela; um toque cria a
+   atividade com os detalhes, no lugar, sem modal e sem nativo; a pergunta
+   some; a atividade fica no cartão de sempre, editável; "remover" devolve a
+   pergunta; "Não lançar" deixa "desfazer" no lugar; a resposta viaja em
+   `b.relatos`.
+5. **Nunca duas vezes:** lançamento manual do mesmo produto no mesmo talhão
+   faz o relato virar "confere ✔" sem pergunta.
+6. **Regressão:** as telas dos gerentes sem relato pendente ficam idênticas ao
+   main (o cartão só existe com relato para a unidade e o dia).
+`scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (8 itens) e a
+tela "Colar do WhatsApp › Conferir a aplicação" dentro de 2 telas.

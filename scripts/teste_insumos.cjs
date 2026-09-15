@@ -67,6 +67,10 @@ const MSG_ATA = [
 const MSG_TAREFAS = 'Falta trocar a bomba do pivô 3; comprar mourão';
 const MSG_SOLTA = 'Bom dia a todos! A reunião de amanhã foi remarcada para as 14h na sede.';
 const MSG_CHUVA = ['Chuva de ontem:', 'Vereda 32 mm', 'Mata Preta 18 mm'].join('\n');
+/* v93: mensagem REAL do grupo de aplicações (15/09/2026) — "Caxico arrendo" é o talhão
+   "José Eustáquio — Arrendamento" de Monte Carmelo — Café (confirmado pelo Nilo) */
+const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermon', 'Dose/ 400lts , vazão 100lts / hectares',
+  'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
 
 const provas = [];
 const ok = (nome, passou, detalhe) => provas.push({ nome, ok: !!passou, detalhe: detalhe == null ? '' : String(detalhe) });
@@ -143,7 +147,7 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
         impFalta: imp ? imp.getAttribute('data-falta') || '' : '', depoisTipo, voltou };
     }, MSG_SOLTA);
     ok('Porta única — "Ler a mensagem" com texto não reconhecido ABRE a tela que pergunta o tipo (nunca fica muda)',
-      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 4,
+      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 5,
       naoRec.h1 + ' · ' + naoRec.chips + ' chip(s) · ' + naoRec.aviso.slice(0, 60));
     ok('Porta única — sem tipo escolhido o Importar fica inativo dizendo a próxima ação', /Escolha o tipo/.test(naoRec.impFalta), naoRec.impFalta);
     ok('Porta única — escolher o tipo por chip abre a pré-visualização; Descartar devolve ao campo de colar',
@@ -414,6 +418,132 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     ok('Relato de chuva — vira SUGESTÃO, nunca grava no boletim de ninguém',
       chuva.sug && chuva.sug.mm === 32 && chuva.boletins === 0, (chuva.sug ? chuva.sug.mm + ' mm sugeridos' : 'sem sugestão') + ' · ' + chuva.boletins + ' boletim gravado');
 
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
+  /* ---------- v93: relato de aplicação — escritório cola, gerente confirma com um toque ---------- */
+  let estadoAplic = null;
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T09:00:00-03:00');
+    const lido = await page.evaluate(t => {
+      const cls = insClassificar(t);
+      const p = insLerAplicacao(t), it = p.itens[0];
+      return { cls: cls.tipo + ' · ' + cls.motivo, produto: p.produto, termo: p.produtoTermo, local: it.nomeMsg, unidade: it.unidade, talhao: it.talhaoId,
+        talhaoNome: it.talhaoId ? talhao(it.talhaoId).nome : '', ltanque: p.ltanque, vazao: p.vazao, tanques: p.tanques, receita: p.receita, obs: p.obs,
+        area: insAplicAreaCalc(p), operacao: p.operacao, data: p.data };
+    }, MSG_APLIC);
+    ok('Relato de aplicação — a mensagem real do grupo é reconhecida como RELATO DE APLICAÇÃO', /^aplicacao/.test(lido.cls), lido.cls);
+    ok('Relato de aplicação — produto lido da linha de calda ("2lts Quatermon" → Quatermon)', lido.produto === 'Quatermon', lido.produto + ' (de "' + lido.termo + '")');
+    ok('Relato de aplicação — "Caxico arrendo" vai para Monte Carmelo — Café, talhão José Eustáquio — Arrendamento (por id, pelo de-para)',
+      lido.unidade === 'f14c' && lido.talhao === 't055', lido.local + ' → ' + lido.unidade + ' / ' + lido.talhao + ' (' + lido.talhaoNome + ')');
+    ok('Relato de aplicação — 400 L por tanque, vazão 100 L/ha, 5 tanques gastos; calda e observação como vieram',
+      lido.ltanque === '400' && lido.vazao === '100' && lido.tanques === '5' && lido.receita === '2lts Quatermon' && /15 dias/.test(lido.obs),
+      [lido.ltanque, lido.vazao, lido.tanques, JSON.stringify(lido.receita), lido.obs].join(' · '));
+    ok('Relato de aplicação — área coberta calculada só para conferir (5 × 400 ÷ 100 = 20 ha)', lido.area === 20, lido.area + ' ha');
+    ok('Relato de aplicação — a atividade do boletim NÃO é adivinhada pelo nome do produto (nasce vazia)', lido.operacao === '', '"' + lido.operacao + '"');
+
+    const prev = await page.evaluate(t => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender();
+      const bt = document.getElementById('bt-ins-importar');
+      const faltaAntes = bt ? bt.getAttribute('data-falta') || '' : 'sem botão';
+      const selOp = document.querySelector('#app select[data-insprev="-|operacao"]');
+      const selTal = document.querySelector('#app select[data-insprev="0|talhaoId"]');
+      const grupos = selOp ? [...selOp.querySelectorAll('optgroup')].map(g => g.label) : [];
+      selOp.value = 'Pulverização mecanizada'; selOp.dispatchEvent(new Event('input', { bubbles: true })); selOp.dispatchEvent(new Event('change', { bubbles: true }));
+      const faltaDepois = document.getElementById('bt-ins-importar').getAttribute('data-falta') || '';
+      return { faltaAntes, faltaDepois, grupos, talSel: selTal ? selTal.value : 'sem select', rotulo: bt ? bt.textContent.trim() : '',
+        nativos: window.__nativos || 0, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    }, MSG_APLIC);
+    ok('Pré-visualização — pede a atividade do boletim antes de levar ao gerente (botão inativo diz o que falta)',
+      /Escolha a atividade/.test(prev.faltaAntes) && prev.faltaDepois === '' && prev.rotulo === 'Levar ao boletim',
+      '"' + prev.faltaAntes + '" → "' + prev.faltaDepois + '" · ' + prev.rotulo);
+    ok('Pré-visualização — a lista de atividades é o catálogo do café por natureza; o talhão já vem escolhido pelo de-para',
+      prev.grupos.length >= 4 && prev.talSel === 't055', prev.grupos.join(' · ') + ' · talhão ' + prev.talSel);
+    ok('Pré-visualização — sem termo de cobrança e sem nativo', !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto) && prev.nativos === 0, prev.nativos + ' nativo(s)');
+
+    const grav = await page.evaluate(() => {
+      insImportar();
+      const rel = insAplicacoesRelatadas();
+      const antes = rel.length;
+      insUI.texto = insUI.texto; insUI.tipo = 'aplicacao'; insAbrirPrev(); insUI.prev.operacao = 'Pulverização mecanizada'; insImportar();
+      return { antes, depois: insAplicacoesRelatadas().length, rel: rel[0], aprendida: insOperacaoAprendida('Quatermon', 'CAFE'),
+        boletins: (D.boletins || []).filter(x => x.fazendaId === 'f14c' && !x.exemplo).length, status: rel[0] ? insRelatoStatus(rel[0]) : '', flash: insUI.flash };
+    });
+    ok('Levar ao boletim — o relato fica guardado com produto, talhão, atividade, calda e dia; nenhum boletim é gravado',
+      grav.antes === 1 && grav.rel && grav.rel.unidade === 'f14c' && grav.rel.talhaoId === 't055' && grav.rel.operacao === 'Pulverização mecanizada' && grav.boletins === 0,
+      grav.rel ? [grav.rel.produto, grav.rel.talhaoId, grav.rel.operacao, grav.rel.data].join(' · ') + ' · ' + grav.boletins + ' boletim' : 'nada guardado');
+    ok('Levar ao boletim — reimportar a MESMA mensagem não duplica a sugestão', grav.depois === 1, grav.antes + ' → ' + grav.depois + ' · ' + grav.flash);
+    ok('Levar ao boletim — o app lembra a atividade escolhida para este produto (próxima colagem já vem sugerida)', grav.aprendida === 'Pulverização mecanizada', grav.aprendida);
+    ok('Mensagens importadas — a situação relata REGISTRO: "aguardando o boletim de …"', /^aguardando o boletim/.test(grav.status), grav.status);
+    estadoAplic = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'CC-6081', chave: 'f14c' },
+      '2026-09-15T10:00:00-03:00', { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+    await porD(page, estadoAplic);
+    await page.evaluate(() => { rascunho = null; ir('casa'); });
+    await page.waitForTimeout(300);
+    const cartao = await page.evaluate(() => {
+      rascunho = novoRascunho(); ir('form');
+      const c = document.querySelector('#app [data-ins-relato]');
+      const bt = c ? c.querySelector('[data-ins-aplic$="|lancar"]') : null;
+      return { existe: !!c, texto: c ? c.textContent.replace(/\s+/g, ' ').trim().slice(0, 220) : '',
+        botoes: c ? [...c.querySelectorAll('[data-ins-aplic]')].map(b => b.textContent.trim()) : [],
+        alvo: bt ? +bt.getBoundingClientRect().height.toFixed(1) : 0, ativ: rascunho.atividades.length };
+    });
+    ok('Boletim do gerente — a aplicação relatada aparece no topo como PERGUNTA ("foi assim?"), com duas respostas',
+      cartao.existe && cartao.botoes.length === 2 && /foi assim\?/.test(cartao.texto) && cartao.ativ === 0, cartao.botoes.join(' · ') + ' · ' + cartao.texto.slice(0, 120));
+    ok('Boletim do gerente — a pergunta traz talhão, calda, tanques e observação da mensagem',
+      /José Eustáquio — Arrendamento/.test(cartao.texto) && /2lts Quatermon/.test(cartao.texto) && /5 tanques × 400 L/.test(cartao.texto) && /15 dias/.test(cartao.texto), cartao.texto.slice(0, 200));
+    ok('Boletim do gerente — alvo de toque ≥ 44 px e sem termo de cobrança', cartao.alvo >= 44 && !/não fez|pendente|atrasad|faltou|esqueceu/i.test(cartao.texto), 'alvo ' + cartao.alvo + ' px');
+
+    const lanc = await page.evaluate(async () => {
+      window.__nativos = 0;
+      document.querySelector('#app [data-ins-aplic$="|lancar"]').click();
+      await new Promise(r => setTimeout(r, 250));
+      const a = rascunho.atividades[0] || {};
+      const card = document.querySelector('#app [data-ativ="' + a.id + '"]');
+      const sel = card ? card.querySelector('select[data-a="talhaoId"]') : null;
+      const rec = card ? card.querySelector('textarea[data-a="receita"]') : null;
+      return { n: rascunho.atividades.length, tipo: a.tipo, talhao: a.talhaoId, receita: a.receita, tanques: a.tanques, ltanque: a.ltanque, obs: a.obs, relato: a.relatoId,
+        cartaoSumiu: !document.querySelector('#app [data-ins-relato]'), tela: telaAtual, nativos: window.__nativos || 0,
+        cardTal: sel ? sel.value : '', cardRec: rec ? rec.value : '', resp: JSON.stringify(rascunho.relatos), trocar: !!(card && card.querySelector('[data-troca-op]')) };
+    });
+    ok('UM toque em "Lançar no boletim" cria a atividade com talhão, atividade, calda, tanques, litros e observação',
+      lanc.n === 1 && lanc.tipo === 'Pulverização mecanizada' && lanc.talhao === 't055' && lanc.receita === '2lts Quatermon' && lanc.tanques === '5' && lanc.ltanque === '400' && /15 dias/.test(lanc.obs),
+      [lanc.tipo, lanc.talhao, JSON.stringify(lanc.receita), lanc.tanques, lanc.ltanque, lanc.obs].join(' · '));
+    ok('Depois do toque a pergunta some, a atividade aparece editável no cartão de sempre (talhão, "trocar", calda), sem modal e sem nativo',
+      lanc.cartaoSumiu && lanc.tela === 'form' && lanc.nativos === 0 && lanc.cardTal === 't055' && lanc.cardRec === '2lts Quatermon' && lanc.trocar,
+      (lanc.cartaoSumiu ? 'sumiu' : 'continuou') + ' · ' + lanc.nativos + ' nativo(s) · card ' + lanc.cardTal + ' · trocar ' + lanc.trocar);
+    ok('A resposta do gerente viaja no boletim (b.relatos), com a atividade ligada ao relato', /lancada/.test(lanc.resp) && !!lanc.relato, lanc.resp);
+
+    const rem = await page.evaluate(async () => {
+      document.querySelector('#app [data-rm-ativ]').click(); await new Promise(r => setTimeout(r, 150));
+      ir('form'); await new Promise(r => setTimeout(r, 150));
+      const volta = !!document.querySelector('#app [data-ins-relato]');
+      /* lançamento manual do mesmo produto no mesmo talhão: o relato confere e NÃO pergunta de novo */
+      rascunho.atividades.push({ id: uid(), talhaoId: 't055', tipo: 'Pulverização mecanizada', pessoas: '2', obs: '', status: '', falta: '', receita: '2 L Quatermon por tanque', tanques: '5', ltanque: '400', insumos: [], maquinas: [] });
+      salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      const linha = document.querySelector('#app [data-ins-relato-linha]');
+      const pergunta = !!document.querySelector('#app [data-ins-relato]');
+      rascunho.atividades = []; salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      document.querySelector('#app [data-ins-aplic$="|nao"]').click(); await new Promise(r => setTimeout(r, 200));
+      const naoLinha = document.querySelector('#app [data-ins-relato-linha]');
+      const naoResp = JSON.stringify(rascunho.relatos);
+      const desf = naoLinha ? naoLinha.querySelector('[data-ins-aplic$="|desfazer"]') : null;
+      if (desf) desf.click(); await new Promise(r => setTimeout(r, 200));
+      return { volta, confere: linha ? linha.textContent.replace(/\s+/g, ' ').trim() : '', pergunta, naoTexto: naoLinha ? naoLinha.textContent.replace(/\s+/g, ' ').trim() : '', naoResp,
+        voltouPergunta: !!document.querySelector('#app [data-ins-relato]'), ativ: rascunho.atividades.length };
+    });
+    ok('"remover" a atividade lançada é o desfazer: a pergunta volta ao boletim', rem.volta, rem.volta ? 'voltou' : 'não voltou');
+    ok('Aplicação já lançada à mão no mesmo talhão com o mesmo produto: o relato "confere ✔" e NÃO pergunta de novo (nunca conta duas vezes)',
+      /confere com o lançamento/.test(rem.confere) && !rem.pergunta, rem.confere);
+    ok('"Não lançar" grava a resposta no boletim, some com o cartão e deixa "desfazer" no lugar; desfazer devolve a pergunta',
+      /nao/.test(rem.naoResp) && /não lançada/.test(rem.naoTexto) && rem.voltouPergunta && rem.ativ === 0, rem.naoTexto + ' · ' + rem.naoResp);
     errosTodos.push(...erros);
     await ctx.close();
   }
