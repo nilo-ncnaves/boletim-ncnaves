@@ -169,6 +169,19 @@ antigo para nome de hoje é a leitura (item 17 da definição de pronto).
   `seletorOperacao`, o mesmo dos grãos — lá o grupo é a FASE do ciclo,
   aqui é a NATUREZA do serviço (CLAUDE.md, c4). Até a v86 eram grupos
   recolhidos com chips dentro; a turma reclamou da rolagem.
+- Calda da atividade (v94, pedido dos gerentes): "Tanques gastos
+  (batidas)" + "Vazão (L/ha)". Até a v93 o segundo campo era "Litros por
+  tanque" (`ltanque`); o boletim antigo continua mostrando o que gravou
+  ("9 tanques × 2.000 L = 18.000 L de calda") pela função única
+  `caldaTexto` — nada é reescrito.
+- Colheita (v94, pedido dos gerentes): medidas padronizadas. 1 carreta =
+  4.500 L de café da roça = 10 sacas beneficiadas (`CARRETA_LITROS`,
+  `CARRETA_SACAS`); "Total em bags" + "Valor da medida (L por bag)" no
+  lugar do campo "Sacas (se pesou / souber)" — o bag não tem tamanho
+  fixo, o gerente diz quanto vale e o app lembra o último da unidade
+  (`D.medidaBag`). Sacas beneficiadas passam a ser CALCULADAS
+  (`sacasColheita`, com "≈"); sacas digitadas em boletim antigo valem o
+  que foi digitado; lata não entra na conta (sem equivalência declarada).
 - Irrigação de café é seção própria (💧 gotejo). As operações
   "Irrigação manual", "Irrigação automática" e "Adubação via
   fertirrigação" existem na lista por talhão porque são serviço de gente
@@ -199,25 +212,50 @@ nem recebe badge. Termos que o escritório acrescentar em Cadastros ›
 Catálogos entram num 5º grupo, "Outras (cadastro do escritório)", que só
 aparece quando existe pelo menos um.
 
-### Funções de mão de obra — 25 (`LISTA_FUNCOES`)
-Colheita manual (derriça) · Varrição / rapagem · Abanação ·
-Carregamento de café · Terreiro (mexer/rodar café) · Secador / tulha
-(apoio) · Benefício (apoio) · Capina manual · Capina mecânica com
-roçadeira · Capina química manual · Arranquio de corda-de-viola ·
-Desbrota manual · Poda mecanizada esqueletamento · Levantar café ·
-Arruação · Esparramação de cisco · Adubação manual · Pulverização manual
-· Plantio / replantio de mudas · Irrigação manual · Irrigação
-(manutenção/filtros) · Limpeza de carreadores · Manutenção de
-cercas/benfeitorias · Apoio a máquinas (abastecimento) · Serviços gerais
+### Funções de mão de obra — 43, em ordem alfabética (`LISTA_FUNCOES`, v94)
+Revista em 15/09/2026 com a lista que o Nilo trouxe da turma do café.
+A lista aparece em ORDEM ALFABÉTICA (pt-BR) na "Função / serviço" da mão
+de obra: `funcoesDa` ordena ao montar, então termo acrescentado em
+Cadastros › Catálogos entra no lugar certo, nas três atividades.
 
-A lista de funções é de MÃO DE OBRA: entram os serviços que uma pessoa
-faz. Os termos mecanizados que só existem como operação de máquina
+Abanação · Adubação manual · Adubação mecanizada via lanço · Adubação via
+fertirrigação · Apoio a máquinas (abastecimento) · Arranquio de
+corda-de-viola · Arruação · Atualização das áreas e tamanhos dos talhões
+· Beneficiamento de café · Capina manual · Capina mecânica com roçadeira
+· Capina mecânica com trincha · Capina química manual · Capina química
+mecanizada · Carregamento de café · Colheita manual (pano) · Colheita
+mecanizada (colhedora) · Desbrota manual · Esparramação de cisco ·
+Irrigação (manutenção/filtros) · Irrigação automática · Irrigação manual
+· Levantar café · Limpeza de carreadores · Manutenção de
+cercas/benfeitorias · Plantio / replantio de mudas · Poda manual · Poda
+mecanizada decote · Poda mecanizada esqueletamento · Poda mecanizada
+recepa · Pré limpeza café de varrição · Pulverização manual ·
+Pulverização mecanizada · Rastelação manual · Rastelação mecanizada /
+varrição · Recolher café varrição manual · Recolher café varrição
+mecanizado (Miac) · Secagem de café no secador · Secagem de café no
+terreiro · Serviços gerais · Transporte de café da roça para terreiro ·
+Transporte de café do terreiro para secador · Varrição / rapagem
+
+Da v76 à v93 os termos mecanizados ficavam fora desta lista (só como
+operação de máquina). Na v94 o Nilo pediu que entrassem também como
+função — quem opera a máquina é mão de obra que se aponta por serviço
 (Pulverização mecanizada, Capina mecânica com trincha, Capina química
-mecanizada, Irrigação automática, Adubação via fertirrigação) ficam de
-fora daqui — quem trabalha na máquina aparece em "Apoio a máquinas
-(abastecimento)" e a máquina é apontada na própria atividade.
-"Irrigação (manutenção/filtros)" continua separada de "Irrigação
-manual": uma é conserto, a outra é molhar a lavoura.
+mecanizada, Irrigação automática, Adubação via fertirrigação, Adubação
+mecanizada via lanço, Colheita mecanizada (colhedora), Recolher café
+varrição mecanizado (Miac), as podas mecanizadas). "Apoio a máquinas
+(abastecimento)" continua para quem só abastece. "Irrigação
+(manutenção/filtros)" continua separada de "Irrigação manual": uma é
+conserto, a outra é molhar a lavoura.
+
+Quatro termos só trocaram de palavra (1 para 1) e foram para o de-para:
+Colheita manual (derriça) → Colheita manual (pano) · Terreiro
+(mexer/rodar café) → Secagem de café no terreiro · Secador / tulha
+(apoio) → Secagem de café no secador · Benefício (apoio) →
+Beneficiamento de café. Ficaram na lista, à espera da palavra do Nilo,
+os pares que o app não sabe se são a mesma coisa: "Carregamento de
+café" × os dois "Transporte de café…"; "Varrição / rapagem" × as duas
+"Rastelação…". "Irrigação de manual" (com o "de") foi lida como
+"Irrigação manual", que já existia.
 
 ### De-para de nomenclatura (v76) — `DEPARA_NOMES`
 Termo antigo → termo de hoje. Vale na LEITURA (exibição, soma, plano,
@@ -231,6 +269,10 @@ filtro, badge); o registro no banco nunca muda.
 | Roçada costal | Capina mecânica com roçadeira | função |
 | Aplicação de herbicida (costal) | Capina química manual | função |
 | Aplicação de defensivo (costal) | Pulverização manual | função |
+| Colheita manual (derriça) | Colheita manual (pano) | função (v94) |
+| Terreiro (mexer/rodar café) | Secagem de café no terreiro | função (v94) |
+| Secador / tulha (apoio) | Secagem de café no secador | função (v94) |
+| Benefício (apoio) | Beneficiamento de café | função (v94) |
 
 ### Termos legados — `TERMOS_LEGADO.CAFE` (aguardam decisão do Nilo)
 Um antigo que se abriu em DOIS novos: o app não adivinha. Some da
@@ -928,7 +970,7 @@ atividade? Acrescente aqui na mesma tarefa.
 café, cafezal, cereja, florada, requeima, lata, latas, terreiro,
 secador, tulha, gotejo, gotejadores, derriça, desbrota, arruação,
 esparramação, peneira, catação, bicho-mineiro, broca-do-café,
-passada, repasse, maturação, benefício
+passada, repasse, maturação, benefício, recepa, decote
 
 > A revisão de nomenclatura da v76 não acrescentou termo exclusivo
 > novo: "desbrota" já estava na lista (e "Desbrota manual" a contém),
