@@ -168,7 +168,12 @@ antigo para nome de hoje é a leitura (item 17 da definição de pronto).
   e nada vem escolhido de antemão. O seletor é o componente ÚNICO
   `seletorOperacao`, o mesmo dos grãos — lá o grupo é a FASE do ciclo,
   aqui é a NATUREZA do serviço (CLAUDE.md, c4). Até a v86 eram grupos
-  recolhidos com chips dentro; a turma reclamou da rolagem.
+  recolhidos com chips dentro; a turma reclamou da rolagem. Desde a v95
+  (pedido do Nilo, 15/09/2026) as operações saem em ORDEM ALFABÉTICA
+  dentro de cada grupo, no próprio componente — vale para o café e para
+  a "Operação" dos grãos; a ordem dos grupos não muda e "Outra" fica por
+  último. As listas abaixo seguem na ordem do catálogo, que é a fonte;
+  a tela ordena ao desenhar.
 - Calda da atividade (v94, pedido dos gerentes): "Tanques gastos
   (batidas)" + "Vazão (L/ha)". Até a v93 o segundo campo era "Litros por
   tanque" (`ltanque`); o boletim antigo continua mostrando o que gravou
@@ -212,7 +217,7 @@ nem recebe badge. Termos que o escritório acrescentar em Cadastros ›
 Catálogos entram num 5º grupo, "Outras (cadastro do escritório)", que só
 aparece quando existe pelo menos um.
 
-### Funções de mão de obra — 43, em ordem alfabética (`LISTA_FUNCOES`, v94)
+### Funções de mão de obra — 49, em ordem alfabética (`LISTA_FUNCOES`, v94/v95)
 Revista em 15/09/2026 com a lista que o Nilo trouxe da turma do café.
 A lista aparece em ORDEM ALFABÉTICA (pt-BR) na "Função / serviço" da mão
 de obra: `funcoesDa` ordena ao montar, então termo acrescentado em
@@ -223,18 +228,26 @@ fertirrigação · Apoio a máquinas (abastecimento) · Arranquio de
 corda-de-viola · Arruação · Atualização das áreas e tamanhos dos talhões
 · Beneficiamento de café · Capina manual · Capina mecânica com roçadeira
 · Capina mecânica com trincha · Capina química manual · Capina química
-mecanizada · Carregamento de café · Colheita manual (pano) · Colheita
-mecanizada (colhedora) · Desbrota manual · Esparramação de cisco ·
-Irrigação (manutenção/filtros) · Irrigação automática · Irrigação manual
-· Levantar café · Limpeza de carreadores · Manutenção de
-cercas/benfeitorias · Plantio / replantio de mudas · Poda manual · Poda
-mecanizada decote · Poda mecanizada esqueletamento · Poda mecanizada
-recepa · Pré limpeza café de varrição · Pulverização manual ·
-Pulverização mecanizada · Rastelação manual · Rastelação mecanizada /
-varrição · Recolher café varrição manual · Recolher café varrição
-mecanizado (Miac) · Secagem de café no secador · Secagem de café no
-terreiro · Serviços gerais · Transporte de café da roça para terreiro ·
-Transporte de café do terreiro para secador · Varrição / rapagem
+mecanizada · Capinar viveiro · Carregamento de café · Colheita manual
+(pano) · Colheita mecanizada (colhedora) · Desbrota manual ·
+Esparramação de cisco · Gerente de campo · Irrigação
+(manutenção/filtros) · Irrigação automática · Irrigação manual ·
+Levantar café · Limpeza com moto-serra · Limpeza de carreadores ·
+Manutenção de cercas/benfeitorias · Plantio / replantio de mudas · Poda
+manual · Poda mecanizada decote · Poda mecanizada esqueletamento · Poda
+mecanizada recepa · Pré limpeza café de varrição · Pulverização manual ·
+Pulverização mecanizada · Rastelação após poda · Rastelação manual ·
+Rastelação mecanizada / varrição · Recolher café varrição manual ·
+Recolher café varrição mecanizado (Miac) · Retirar lenha de café pós
+poda · Secagem de café no secador · Secagem de café no terreiro ·
+Serviços gerais · Transporte de café da roça para terreiro · Transporte
+de café do terreiro para secador · Trincha após poda · Varrição /
+rapagem
+
+Na v95 entraram mais seis, pedidos pelo Nilo em 15/09/2026 (nenhum
+existia): Capinar viveiro · Gerente de campo · Limpeza com moto-serra ·
+Rastelação após poda · Retirar lenha de café pós poda · Trincha após
+poda.
 
 Da v76 à v93 os termos mecanizados ficavam fora desta lista (só como
 operação de máquina). Na v94 o Nilo pediu que entrassem também como

@@ -2018,6 +2018,23 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Operações em ordem alfabética dentro de cada grupo (v95)
+Pedido do Nilo em 15/09/2026, logo depois da v94: a lista "Atividade" do café
+(e a "Operação" dos grãos, que é o mesmo componente `seletorOperacao`)
+continuava com as operações na ordem em que o catálogo foi escrito dentro de
+cada grupo. Agora o componente ordena em pt-BR ao desenhar; a ordem dos
+GRUPOS não muda (natureza no café; fase do ciclo nos grãos, com a fase de
+agora em primeiro) e "Outra" fica sempre por último no grupo dela. Nenhum
+catálogo foi reescrito — `OPS_CAFE_GRUPOS` e `OPS_GRAOS_FASES` continuam
+sendo a fonte, na ordem em que estão. No mesmo pedido entraram seis
+funções de mão de obra do café que não existiam (`LISTA_FUNCOES`, 43 → 49):
+Capinar viveiro · Gerente de campo · Limpeza com moto-serra · Rastelação
+após poda · Retirar lenha de café pós poda · Trincha após poda.
+Provas: `teste_nomenclatura.cjs`
+(passos 1–3 do café), `checar-poluicao.cjs` (nenhum ❌ novo) e a regressão
+contra o main (só a ordem das linhas dentro dos grupos muda, no café e nos
+grãos).
+
 ## Pedidos da turma do café (v94) — funções em ordem alfabética, vazão por hectare, medidas da colheita
 Pedido do Nilo em 15/09/2026, com duas telas do boletim da Mata Preta na mão
 e a lista de sugestões dos funcionários do café.
