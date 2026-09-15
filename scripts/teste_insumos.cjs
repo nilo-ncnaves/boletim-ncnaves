@@ -120,6 +120,34 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     ok('Porta única — a lista solta é reconhecida como TAREFAS AVULSAS', cls.tarefas.tipo === 'tarefas', cls.tarefas.tipo + ' · ' + cls.tarefas.motivo);
     ok('Porta única — o relato de chuva é reconhecido como RELATO DE CHUVA', cls.chuva.tipo === 'chuva', cls.chuva.tipo + ' · ' + cls.chuva.motivo);
     ok('Porta única — texto sem relação NÃO é adivinhado (o app pede o tipo)', cls.solta.tipo === '', '"' + cls.solta.tipo + '"');
+    /* v92: o toque em "Ler a mensagem" com texto que o app NÃO reconhece abre a tela que pergunta o tipo —
+       até a v91 a tela voltava para o campo de colar sem dizer nada, como se o toque não tivesse acontecido. */
+    const naoRec = await page.evaluate(async msg => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      await new Promise(r => setTimeout(r, 150));
+      const ta = document.getElementById('ins-texto'); ta.value = msg; ta.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 50));
+      document.getElementById('bt-ins-ler').click();
+      await new Promise(r => setTimeout(r, 150));
+      const h1 = (document.querySelector('#app .topo h1') || {}).textContent || '';
+      const aviso = (document.querySelector('#app .aviso') || {}).textContent || '';
+      const chips = [...document.querySelectorAll('#app [data-ins-tipo]')].length;
+      const imp = document.getElementById('bt-ins-importar');
+      const chip = document.querySelector('#app [data-ins-tipo="tarefas"]'); if (chip) chip.click();
+      await new Promise(r => setTimeout(r, 150));
+      const depoisTipo = insUI.tipo + '|' + (insUI.prev ? insUI.prev.itens.length : -1);
+      const limpar = document.getElementById('bt-ins-limpar'); if (limpar) limpar.click();
+      await new Promise(r => setTimeout(r, 150));
+      const voltou = !!document.getElementById('ins-texto') && !insUI.lida;
+      return { h1: h1.replace(/\s+/g, ' ').trim(), aviso: aviso.replace(/\s+/g, ' ').trim(), chips,
+        impFalta: imp ? imp.getAttribute('data-falta') || '' : '', depoisTipo, voltou };
+    }, MSG_SOLTA);
+    ok('Porta única — "Ler a mensagem" com texto não reconhecido ABRE a tela que pergunta o tipo (nunca fica muda)',
+      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 4,
+      naoRec.h1 + ' · ' + naoRec.chips + ' chip(s) · ' + naoRec.aviso.slice(0, 60));
+    ok('Porta única — sem tipo escolhido o Importar fica inativo dizendo a próxima ação', /Escolha o tipo/.test(naoRec.impFalta), naoRec.impFalta);
+    ok('Porta única — escolher o tipo por chip abre a pré-visualização; Descartar devolve ao campo de colar',
+      /^tarefas\|\d+$/.test(naoRec.depoisTipo) && naoRec.voltou, naoRec.depoisTipo + ' · voltou: ' + naoRec.voltou);
 
     /* 1. leitura da remessa real */
     const prev = await page.evaluate(t => {

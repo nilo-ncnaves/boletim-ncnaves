@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v90** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v92** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -1942,6 +1942,17 @@ aplicado e quanto sobrou. Várias tarefas do planejamento (v77) ficam paradas
    Cadastros › Insumos) a pessoa cola o texto; o app diz o que entendeu,
    mostra a pré-visualização com os totais de conferência ("8 fazendas ·
    486.000 kg · 486 t") e só grava depois do toque em "Importar".
+   **Mensagem que o app NÃO reconhece (v92):** o toque em "Ler a mensagem"
+   abre a tela "Conferir a mensagem · escolha o tipo", com o aviso "O app
+   não reconheceu o formato desta mensagem" e os quatro chips de tipo; o
+   "Importar" fica inativo dizendo "Escolha o tipo da mensagem" e
+   "Descartar" devolve ao campo de colar. Até a v91 esse caso voltava para
+   o campo de colar sem dizer nada — o toque parecia não ter acontecido
+   (relatado pelo Nilo em 15/09/2026 com um relato de aplicação de
+   herbicida: não é remessa, ata, tarefa nem chuva). A tela de conferência
+   passou a abrir por `insUI.lida` (a mensagem foi lida), e não só quando
+   existe pré-visualização. Prova: `node scripts/teste_insumos.cjs`, as três
+   linhas "Ler a mensagem com texto não reconhecido …".
 2. **O gerente confirma a chegada com UM toque.** Enquanto houver remessa
    programada e não recebida, o topo do boletim traz "📦 Nitrato de amônio —
    106 t programado (Cooxupé) · chegou?" com "✅ Chegou tudo" · "➗ Chegou
@@ -2233,6 +2244,10 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v92, 15/09/2026: **693 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v91, nenhum
+novo (a v92 só corrige o toque em "Ler a mensagem" com texto não
+reconhecido; a tela de tipo não reconhecido é a mesma "Conferir a mensagem"
+já medida). Medição anterior,
 v91, 14/09/2026: **693 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o main da v90
 mede hoje 690 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v91 acrescentou 3
 checagens ✅ ao grupo "14. Planejamento" ("Ações da tarefa (v91)": depois do
