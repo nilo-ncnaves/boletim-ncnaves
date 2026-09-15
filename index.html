@@ -6924,10 +6924,14 @@ function seletorOperacao(a,{rotulo,grupos,destaque,nota}){
   if(a.tipo) return `<label>${rotulo}</label>
     <div class="linha-flex"><span class="cresce"><b>${esc(nomeAtual(a.tipo))}</b></span>
       <button class="btn suave mini" data-troca-op="${a.id}">trocar</button></div>`;
+  /* v95 (pedido do Nilo, 15/09/2026): dentro de cada grupo as operações saem em ORDEM ALFABÉTICA
+     (pt-BR), como a "Função / serviço"; "Outra" fica sempre por último no grupo dela. A ordem dos
+     GRUPOS não muda (natureza no café; fase do ciclo nos grãos, com a fase de agora em primeiro). */
+  const ordena=ops=>[...ops].sort((x,y)=>(x==="Outra")-(y==="Outra")||x.localeCompare(y,"pt-BR"));
   return `<label>${rotulo}</label>
     <select data-opsel="${a.id}">
       <option value="">— toque para escolher —</option>
-      ${grupos.map(([f,ops])=>`<optgroup label="${esc(f)}${destaque&&destaque===f?" "+esc(nota||""):""}">${ops.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("")}</optgroup>`).join("")}
+      ${grupos.map(([f,ops])=>`<optgroup label="${esc(f)}${destaque&&destaque===f?" "+esc(nota||""):""}">${ordena(ops).map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("")}</optgroup>`).join("")}
     </select>`;
 }
 /* O que a escolha da operação pré-preenche (era do toque no chip, agora é da lista nativa):
@@ -8706,7 +8710,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v94";
+const APP_VERSAO="v95";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

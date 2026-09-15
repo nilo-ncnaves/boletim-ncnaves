@@ -168,7 +168,12 @@ antigo para nome de hoje é a leitura (item 17 da definição de pronto).
   e nada vem escolhido de antemão. O seletor é o componente ÚNICO
   `seletorOperacao`, o mesmo dos grãos — lá o grupo é a FASE do ciclo,
   aqui é a NATUREZA do serviço (CLAUDE.md, c4). Até a v86 eram grupos
-  recolhidos com chips dentro; a turma reclamou da rolagem.
+  recolhidos com chips dentro; a turma reclamou da rolagem. Desde a v95
+  (pedido do Nilo, 15/09/2026) as operações saem em ORDEM ALFABÉTICA
+  dentro de cada grupo, no próprio componente — vale para o café e para
+  a "Operação" dos grãos; a ordem dos grupos não muda e "Outra" fica por
+  último. As listas abaixo seguem na ordem do catálogo, que é a fonte;
+  a tela ordena ao desenhar.
 - Calda da atividade (v94, pedido dos gerentes): "Tanques gastos
   (batidas)" + "Vazão (L/ha)". Até a v93 o segundo campo era "Litros por
   tanque" (`ltanque`); o boletim antigo continua mostrando o que gravou
