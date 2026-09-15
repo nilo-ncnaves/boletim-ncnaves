@@ -358,7 +358,7 @@ const tarefasDe = (page, fz) => page.evaluate(f => planTarefas().filter(t => t.u
     ok('Fitossanitário — "Pulverização" nasce SEM produto e casa com "Pulverização manual" pelo PLAN_SINONIMOS',
       grav.pulv && grav.pulv.produto === '' && grav.pulv.ops.includes('Pulverização manual'), JSON.stringify(grav.pulv));
     ok('Coluna vazia — zero tarefa de nitrato', grav.nitrato === 0, grav.nitrato + '');
-    ok('De-para da ata — 22 nomes ligados (16 + 6 do quadro)', grav.depara === 22, grav.depara + '');
+    ok('De-para da ata — 23 nomes ligados (16 + 6 do quadro + 1 do grupo de aplicações, v93)', grav.depara === 23, grav.depara + '');
 
     /* reimportação: nada cria, nada altera */
     const re = await page.evaluate(async q => {

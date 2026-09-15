@@ -985,8 +985,19 @@ nenhuma fileira passa de 390 px, chips sem pílula, alvo ≥ 44 px; mais
 "Gravar meta" como botão de avanço. `scripts/checar-poluicao.cjs`, grupo "14.
 Planejamento", três itens "Ações da tarefa (v91)".
 
-## 26. Relato de aplicação: mensagem vira pergunta no boletim, nunca registro (desde a v93)
+## 26. Relato de aplicação: mensagem liga ao lançamento ou vira pergunta, nunca registro (desde a v93)
 Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
+0. **Mensagem depois do boletim** (o caso real: boletim de 14/09 com
+   "Aplicação via drench / via solo — José Eustáquio — Arrendamento · 🧪
+   Quatermon", mensagem em 15/09): o app acha o lançamento, a pré-visualização
+   diz "Confere com o boletim de 14/09", esconde talhão e atividade, o botão é
+   "Ligar ao lançamento" já ativo; ligar não cria boletim nem atividade e não
+   muda a calda do gerente; reimportar não duplica; "Não é este lançamento"
+   volta à pergunta e "procurar de novo" religa; Mensagens importadas lê
+   "ligada ao boletim de 14/09"; o boletim enviado mostra "📥 Detalhe do grupo
+   (colado 15/09): …"; o consumo soma 2 L × 5 tanques = 10 L em ≈ 20 ha; o
+   gerente NÃO vê pergunta no dia seguinte; relato solto de hoje com
+   lançamento igual ontem vira "confere … de 14/09 ✔".
 1. **Leitura da mensagem real** (`node scripts/teste_insumos.cjs`): tipo
    "aplicacao"; produto da linha de calda; local casado pelo de-para por id
    (unidade E talhão); litros por tanque, vazão, tanques, calda e observação

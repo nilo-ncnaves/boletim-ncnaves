@@ -1445,6 +1445,29 @@ async function cenarioInsumos(browser, base, R) {
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a aplicação', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
   await page.evaluate(() => { insUI.prev.operacao = 'Pulverização mecanizada'; insImportar(); });
   await page.waitForTimeout(150);
+  /* v93 (ajuste): com o boletim de ontem já enviado, a mesma mensagem LIGA ao lançamento em vez de perguntar */
+  R.aplicLiga = await page.evaluate(async ([msg]) => {
+    const s0 = sessao; sessao = { userId: 'u1', papel: 'gerente', nome: 'Rubens', atividade: 'CAFE', fazendaId: 'f14c' };
+    const b = novoRascunho(diaISO(hojeBRT(), -1)); sessao = s0; b.id = 'b-ontem-f14c'; b.fazendaId = 'f14c'; b.data = diaISO(hojeBRT(), -1); b.responsavel = 'Rubens';
+    b.atividades = [{ id: 'a-ontem', talhaoId: 't055', tipo: 'Aplicação via drench / via solo', pessoas: '1', obs: '', status: '', falta: '', receita: 'Quatermon', tanques: '', ltanque: '', insumos: [], maquinas: [] }];
+    D.boletins.push(b); salvarDados();
+    insLimpar(); insUI.texto = msg + ' (ontem)'; insUI.auto = insClassificar(insUI.texto); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); ir('colar');
+    await new Promise(r => setTimeout(r, 150));
+    const bt = document.getElementById('bt-ins-importar');
+    const out = { vinculo: !!insUI.prev.vinculo, rotulo: bt ? bt.textContent.trim() : '', inativo: !!bt && bt.classList.contains('acao-off'),
+      selects: document.querySelectorAll('#app select[data-insprev]').length, nativos: window.__nativos,
+      texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    const antes = D.boletins.length, ativ = b.atividades.length;
+    insImportar(); await new Promise(r => setTimeout(r, 100));
+    out.criou = (D.boletins.length - antes) + (D.boletins.find(x => x.id === 'b-ontem-f14c').atividades.length - ativ);
+    out.ligados = insAplicacoesRelatadas().filter(c => c.vinculo).length;
+    /* limpa para o cenário do gerente continuar medindo a pergunta do relato solto */
+    D.boletins = D.boletins.filter(x => x.id !== 'b-ontem-f14c');
+    insMensagens().forEach(m => { m.criados = (m.criados || []).filter(c => !c.vinculo); });
+    salvarDados();
+    return out;
+  }, [MSG_APLIC]);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a aplicação (ligada ao lançamento)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
   /* grava e mede a trilha de origem */
   await page.evaluate(msg => { insUI.texto = msg; insUI.tipo = 'remessa'; insAbrirPrev(); insImportar();
     /* anúncio de 10 dias atrás: é assim que a cobrança por fornecedor aparece (INS_COBRANCA_DIAS = 7) */
@@ -1872,6 +1895,11 @@ function avaliar(R) {
     add(G, 'Boletim do gerente — respondida, a pergunta some e a atividade fica editável no cartão de sempre (nada é gravado sem o toque)',
       B.sumiu === true && B.editavel === true, (B.sumiu ? 'sumiu' : 'continuou') + ' · ' + (B.editavel ? 'editável' : 'sem "trocar"'));
     add(G, 'Boletim do gerente — o cartão não cobra quem usa', !/não fez|pendente|atrasad|faltou|esqueceu/i.test(B.texto || ''), (B.texto || '').slice(0, 90));
+    const L = R.aplicLiga || {};
+    add(G, 'Mensagem depois do boletim — o app acha o lançamento de ontem e LIGA o detalhe a ele: sem pergunta, sem lista, botão "Ligar ao lançamento" ativo',
+      L.vinculo === true && L.rotulo === 'Ligar ao lançamento' && !L.inativo && L.selects === 0 && L.nativos === 0 && /Confere com o boletim de/.test(L.texto || ''),
+      `${L.rotulo} · ${L.selects} lista(s) · ${L.nativos} nativo(s)`);
+    add(G, 'Ligar ao lançamento — nada é criado e o boletim do gerente não é reescrito (nunca duas vezes)', L.criou === 0 && L.ligados === 1, `${L.criou} criado(s) · ${L.ligados} ligado(s)`);
   }
 
   /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */

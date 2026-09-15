@@ -548,6 +548,87 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     await ctx.close();
   }
 
+  /* ---------- v93 (ajuste): a mensagem chega DEPOIS de a atividade estar no boletim ---------- */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T09:00:00-03:00');
+    /* o boletim real do Rubens de 14/09: "Aplicação via drench / via solo — José Eustáquio — Arrendamento · 1p · 🧪 Quatermon" */
+    const liga = await page.evaluate(t => {
+      const s0 = sessao; sessao = { userId: 'u1', papel: 'gerente', nome: 'Rubens', atividade: 'CAFE', fazendaId: 'f14c' };
+      const b = novoRascunho('2026-09-14'); sessao = s0; b.id = 'b-rubens-1409'; b.responsavel = 'Rubens'; b.data = '2026-09-14'; b.fazendaId = 'f14c';
+      b.atividades = [{ id: 'a-drench', talhaoId: 't055', tipo: 'Aplicação via drench / via solo', pessoas: '1', obs: '', status: '', falta: '', receita: 'Quatermon', tanques: '', ltanque: '', insumos: [], maquinas: [{ nome: '11', horas: '0', comb: '' }] }];
+      D.boletins.push(b); salvarDados();
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender();
+      const p = insUI.prev, bt = document.getElementById('bt-ins-importar');
+      const av = document.querySelector('#app [data-ins-vinculo]');
+      const selects = document.querySelectorAll('#app select[data-insprev]').length;
+      return { vinculo: p.vinculo, data: p.data, rotulo: bt ? bt.textContent.trim() : '', inativo: !!bt && bt.classList.contains('acao-off'),
+        aviso: av ? av.textContent.replace(/\s+/g, ' ').trim() : '', selects, nativos: window.__nativos || 0 };
+    }, MSG_APLIC);
+    ok('Mensagem depois do boletim — o app ACHA o lançamento que confere (boletim de 14/09, mesmo talhão, Quatermon na calda)',
+      liga.vinculo && liga.vinculo.boletimId === 'b-rubens-1409' && liga.vinculo.atividadeId === 'a-drench' && liga.data === '2026-09-14',
+      liga.vinculo ? liga.vinculo.data + ' · ' + liga.vinculo.tipo + ' · ' + liga.vinculo.talhaoId : 'não achou');
+    ok('Pré-visualização — diz "Confere com o boletim de 14/09", esconde talhão/atividade e o botão vira "Ligar ao lançamento", já ativo',
+      /Confere com o boletim de 14\/09/.test(liga.aviso) && /Aplicação via drench/.test(liga.aviso) && liga.selects === 0 && liga.rotulo === 'Ligar ao lançamento' && !liga.inativo,
+      liga.rotulo + ' · ' + liga.selects + ' lista(s) · ' + liga.aviso.slice(0, 90));
+    const desl = await page.evaluate(async () => {
+      document.querySelector('#app [data-ins-desvinc]').click(); await new Promise(r => setTimeout(r, 150));
+      const semV = { vinculo: insUI.prev.vinculo, rotulo: document.getElementById('bt-ins-importar').textContent.trim(), data: insUI.prev.data,
+        selects: document.querySelectorAll('#app select[data-insprev]').length };
+      document.querySelector('#app [data-ins-revinc]').click(); await new Promise(r => setTimeout(r, 150));
+      return { semV, deNovo: !!insUI.prev.vinculo };
+    });
+    ok('"Não é este lançamento" volta ao caminho da pergunta (dia de hoje, talhão e atividade a escolher); "procurar de novo" religa',
+      desl.semV.vinculo === null && desl.semV.rotulo === 'Levar ao boletim' && desl.semV.selects === 2 && desl.deNovo, JSON.stringify(desl.semV.rotulo) + ' · religou: ' + desl.deNovo);
+    const grav = await page.evaluate(() => {
+      const antesB = D.boletins.length, antesA = D.boletins.find(b => b.id === 'b-rubens-1409').atividades.length;
+      insImportar();
+      const rel = insAplicacoesRelatadas().find(c => c.vinculo);
+      insUI.texto = insUI.texto; insUI.tipo = 'aplicacao'; insAbrirPrev(); insImportar();
+      const b = D.boletins.find(x => x.id === 'b-rubens-1409');
+      const cons = insConsumos('f14c').filter(c => /quatermon/i.test(c.produto));
+      /* boletim enviado: o detalhe aparece embaixo da atividade, sem reescrever o boletim */
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' }; ir('detalhe', b.id);
+      const html = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      return { rel, n: insAplicacoesRelatadas().filter(c => c.vinculo).length, boletins: D.boletins.length - antesB, ativ: b.atividades.length - antesA,
+        receita: b.atividades[0].receita, status: rel ? insRelatoStatus(rel) : '', flash: insUI.flash, cons: cons.map(c => c.kg + ' ' + c.base + ' · ' + c.area + ' ha · ' + c.op),
+        saldoUn: (insProduto('Quatermon') || {}).un, detalhe: (html.match(/Detalhe do grupo[^🔧]{0,160}/) || [''])[0] };
+    });
+    ok('"Ligar ao lançamento" — o relato fica ligado (boletimId, atividadeId, dia 14/09); nada é criado e o boletim do Rubens não é reescrito',
+      grav.rel && grav.rel.vinculo.atividadeId === 'a-drench' && grav.rel.data === '2026-09-14' && grav.boletins === 0 && grav.ativ === 0 && grav.receita === 'Quatermon',
+      grav.rel ? grav.rel.data + ' · ' + grav.boletins + ' boletim novo · ' + grav.ativ + ' atividade nova · calda "' + grav.receita + '"' : 'nada');
+    ok('Reimportar a mesma mensagem não duplica o detalhe ligado', grav.n === 1, grav.n + ' · ' + grav.flash);
+    ok('Mensagens importadas — a situação lê "ligada ao boletim de 14/09"', grav.status === 'ligada ao boletim de 14/09', grav.status);
+    ok('Boletim enviado — o detalhe do grupo aparece embaixo da atividade, com a data em que foi colado (c3)',
+      /Detalhe do grupo \(colado 15\/09\): 2lts Quatermon · 5 tanques × 400 L · vazão 100 L\/ha/.test(grav.detalhe), grav.detalhe.slice(0, 140));
+    ok('Insumos — o detalhe ligado vira consumo calculado: 2 L × 5 tanques = 10 L de Quatermon em ≈ 20 ha (produto em L no catálogo)',
+      grav.cons.length === 1 && /^10 L · 20 ha · Aplicação via drench/.test(grav.cons[0]) && grav.saldoUn === 'L', grav.cons.join(' | ') + ' · un ' + grav.saldoUn);
+    estadoAplic = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    /* o gerente no dia 15/09: nenhuma pergunta (o relato está ligado ao boletim de ontem) */
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'CC-6081', chave: 'f14c' },
+      '2026-09-15T10:00:00-03:00', { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+    await porD(page, estadoAplic);
+    const sem = await page.evaluate(() => {
+      rascunho = null; ir('casa'); rascunho = novoRascunho(); ir('form');
+      const pergunta = !!document.querySelector('#app [data-ins-relato]'), linha = !!document.querySelector('#app [data-ins-relato-linha]');
+      /* e se um relato SEM vínculo, datado de hoje, chegasse depois de o gerente já ter lançado ontem? confere pelo boletim de ontem, sem perguntar */
+      insMensagens().push({ id: 'm-solto', chave: 'x', tipo: 'aplicacao', texto: 'teste', por: 'Escritório', em: '2026-09-15T12:00:00Z', data: '2026-09-15',
+        criados: [{ tipo: 'aplicacao', id: 'rel-solto', unidade: 'f14c', talhaoId: 't055', data: '2026-09-15', produto: 'Quatermon', operacao: 'Pulverização mecanizada', receita: '2lts Quatermon', tanques: '5', ltanque: '400', vazao: '100', obs: '' }] });
+      ir('form');
+      const l2 = document.querySelector('#app [data-ins-relato-linha]');
+      return { pergunta, linha, pergunta2: !!document.querySelector('#app [data-ins-relato]'), linha2: l2 ? l2.textContent.replace(/\s+/g, ' ').trim() : '' };
+    });
+    ok('Boletim do gerente em 15/09 — relato ligado ao boletim de ontem NÃO vira pergunta nem linha', !sem.pergunta && !sem.linha, (sem.pergunta ? 'perguntou' : 'sem pergunta') + ' · ' + (sem.linha ? 'com linha' : 'sem linha'));
+    ok('Boletim do gerente — relato solto de hoje com lançamento igual no boletim de ONTEM: "confere com o lançamento … de 14/09 ✔", sem pergunta (nunca duas vezes)',
+      !sem.pergunta2 && /confere com o lançamento em José Eustáquio — Arrendamento de 14\/09/.test(sem.linha2), sem.linha2);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
   await browser.close(); srv.close();
 
   ok('Nenhum erro de JavaScript em nenhum cenário', errosTodos.length === 0, errosTodos.slice(0, 3).join(' | '));

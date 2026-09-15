@@ -2018,17 +2018,37 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
-## Relato de aplicação (v93) — o grupo de aplicações vira pergunta no boletim
+## Relato de aplicação (v93) — a mensagem do grupo liga ao lançamento; sem lançamento, vira pergunta
 Pedido do Nilo em 15/09/2026: toda aplicação é anunciada num grupo de WhatsApp
-próprio, onde o funcionário escreve com mais detalhe do que no boletim
+próprio, DEPOIS de concluída, e com mais detalhe do que no boletim
 ("Aplicação de Quatermon Caxico arrendo / 2lts Quatermon / Dose/ 400lts,
 vazão 100lts / hectares / Gastou 5 arbus / Obs: daqui a 15 dias vamos repetir").
-O escritório cola a mensagem; quando o gerente abre o boletim do dia, aparece
-a pergunta "foi assim?"; um toque lança a aplicação no boletim com os detalhes
-da mensagem. A aplicação NUNCA conta duas vezes: a mensagem não vira registro
-sozinha, e relato que já confere com um lançamento do dia não pergunta.
+O exemplo real: o boletim do Rubens de 14/09 já tinha "Aplicação via drench /
+via solo — José Eustáquio — Arrendamento · 🧪 Quatermon"; a mensagem chegou em
+15/09. Regra que fica: **a mensagem colada NUNCA vira registro sozinha.**
+Primeiro o app procura o lançamento que confere e LIGA o detalhe a ele; só sem
+lançamento a mensagem vira pergunta no boletim do dia, e quem grava é o
+gerente, com um toque. A aplicação nunca conta duas vezes.
 
 ### O que o app faz
+0. **Primeiro procura o lançamento (`insBuscarLancamento`).** Nos boletins
+   ENVIADOS da unidade dos últimos 7 dias, do mais recente ao mais antigo, a
+   atividade com o mesmo produto (na calda, no insumo aplicado ou na receita
+   dos grãos) e o mesmo talhão quando os dois são conhecidos (`insAtivConfere`).
+   Achou: a pré-visualização diz "✔ Confere com o boletim de 14/09: Aplicação
+   via drench / via solo — José Eustáquio — Arrendamento · Quatermon", esconde
+   talhão e atividade, a data passa a ser a do boletim e o botão vira **"Ligar
+   ao lançamento"**. O detalhe (calda, tanques, litros, vazão, observação) fica
+   em `mensagens_importadas.criados` com `vinculo:{boletimId, atividadeId,
+   data, tipo, talhaoId}` — nada é criado e o boletim do gerente não é
+   reescrito. "Não é este lançamento" volta ao caminho da pergunta (e
+   "procurar de novo" religa). Onde o detalhe ligado aparece: no boletim
+   enviado, embaixo da atividade ("📥 Detalhe do grupo (colado 15/09): 2lts
+   Quatermon · 5 tanques × 400 L · vazão 100 L/ha · … · ≈ 20,00 ha", c3), em
+   Mensagens importadas ("ligada ao boletim de 14/09") e no módulo de insumos:
+   a calda diz quanto por tanque e a mensagem quantos tanques, então o
+   consumo é calculado (2 L × 5 = 10 L de Quatermon em ≈ 20 ha) e o produto
+   entra no catálogo com a unidade da calda (L). Sem tanques, não conta.
 1. **Quinto tipo na porta única "📥 Colar do WhatsApp": 🚜 Relato de aplicação.**
    Reconhecido pelo cabeçalho ("Aplicação de …", "Pulverização …") e ao menos
    uma linha de calda/dose (`insClassificar`). O leitor (`insLerAplicacao`)
@@ -2074,7 +2094,12 @@ sozinha, e relato que já confere com um lançamento do dia não pergunta.
    resposta ao relato" · "lançada no boletim" · "o gerente respondeu que não
    foi assim". Não existe cartão de cobrança na Diretoria (decisão do Nilo:
    começar só com a sugestão e ver um mês de uso).
-7. **Pecuária não recebe relato de aplicação** (não tem aplicação por talhão);
+7. **Sem lançamento que confira (nos itens 1 a 6 acima):** vale o caminho da
+   pergunta, para quando o escritório cola antes de o gerente fechar o boletim.
+   E no aparelho do gerente o cartão também olha os boletins enviados dos
+   últimos 7 dias: relato solto que confere com um lançamento de outro dia vira
+   "confere com o lançamento em … de 14/09 ✔" e não pergunta.
+8. **Pecuária não recebe relato de aplicação** (não tem aplicação por talhão);
    a pré-visualização diz isso e pede outra unidade. Catálogo por atividade em
    `INS_APLIC_ATIVIDADE` (c4): mesmo componente, o que muda é como o registro
    entra no boletim.
@@ -2090,20 +2115,29 @@ com o talhão; linha que já tinha talhão não é sobrescrita.
 ### Limites conhecidos
 - Uma aplicação por mensagem colada (uma unidade, um talhão). Mensagem com
   várias aplicações: colar uma de cada vez.
-- O relato aparece só no boletim DAQUELE dia. Se o boletim do dia já foi
-  enviado, o gerente vê a pergunta ao corrigir (48 h); depois disso a situação
-  fica em Mensagens importadas como "enviado sem resposta ao relato".
+- A pergunta (sem lançamento que confira) aparece só no boletim DAQUELE dia.
+  Se o boletim do dia já foi enviado sem a aplicação, o gerente vê a pergunta
+  ao corrigir (48 h); depois disso a situação fica em Mensagens importadas como
+  "enviado sem resposta ao relato".
+- A ligação procura só nos boletins que o aparelho do escritório já baixou.
+  Colar antes de o boletim de ontem chegar ao aparelho leva ao caminho da
+  pergunta — e aí o cartão do gerente é que reconhece o lançamento de ontem.
 - A observação da atividade recebe "vazão 100 L/ha" porque o boletim do café
   não tem campo de vazão — nenhum campo novo foi criado.
 
 ### Provas
-- `node scripts/teste_insumos.cjs`: 79 ✅ (v93 acrescentou 19 provas: leitura da
+- `node scripts/teste_insumos.cjs`: 89 ✅ (v93 acrescentou 29 provas: leitura da
   mensagem real, de-para por id, área calculada, atividade não adivinhada,
   gravação sem boletim, idempotência, aprendizado, pergunta no boletim de
   Monte Carmelo — Café, um toque cria a atividade, remover devolve a pergunta,
-  lançamento manual "confere ✔", não lançar + desfazer).
-- `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (8 ✅) e a
-  tela "Colar do WhatsApp › Conferir a aplicação" (≤ 2 telas).
+  lançamento manual "confere ✔", não lançar + desfazer; e, com o boletim real
+  do Rubens de 14/09: o app acha o lançamento, "Ligar ao lançamento" sem
+  criar nem reescrever nada, "Não é este lançamento" e "procurar de novo",
+  situação "ligada ao boletim de 14/09", detalhe no boletim enviado, consumo
+  de 10 L em 20 ha, nenhuma pergunta ao gerente em 15/09 e relato solto que
+  confere com o lançamento de ontem).
+- `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (10 ✅) e as
+  telas "Colar do WhatsApp › Conferir a aplicação" (as duas formas, ≤ 2 telas).
 
 ## Aparelho sem unidade aberta no monitor de chegada (v84)
 Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
@@ -2331,11 +2365,12 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
-v93, 15/09/2026: **710 ✅ · 41 ❌** — os mesmos 41 ❌ herdados, nenhum novo. A
-v93 acrescentou o grupo "18. Relato de aplicação" (8 ✅), a tela "Colar do
-WhatsApp › Conferir a aplicação" (2 telas, com as checagens de sempre) e a tela
-"Boletim do gerente com aplicação relatada (f14c)"; a checagem "Classificação
-automática" passou a esperar 5 tipos. Medição anterior,
+v93, 15/09/2026: **718 ✅ · 41 ❌** — os mesmos 41 ❌ herdados, nenhum novo. A
+v93 acrescentou o grupo "18. Relato de aplicação" (10 ✅), as telas "Colar do
+WhatsApp › Conferir a aplicação" (pergunta e ligada ao lançamento, ≤ 2 telas,
+com as checagens de sempre) e a tela "Boletim do gerente com aplicação
+relatada (f14c)"; a checagem "Classificação automática" passou a esperar 5
+tipos. Medição anterior,
 v92, 15/09/2026: **693 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v91, nenhum
 novo (a v92 só corrige o toque em "Ler a mensagem" com texto não
 reconhecido; a tela de tipo não reconhecido é a mesma "Conferir a mensagem"

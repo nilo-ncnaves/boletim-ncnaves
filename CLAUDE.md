@@ -1141,22 +1141,30 @@ Planejamento.
   do módulo, um degrau por vez); detalhe em docs/definicao-de-pronto.md,
   item 24.
 
-### c21) Mensagem do grupo vira PERGUNTA no boletim, nunca registro (desde a v93)
+### c21) Mensagem do grupo liga ao lançamento ou vira PERGUNTA — nunca registro (desde a v93)
 Decisão do Nilo em 15/09/2026 para o grupo de aplicações (vale para qualquer
-dado de campo colado pelo escritório): a mensagem colada NUNCA vira registro
-sozinha — vira pergunta no boletim da unidade, no dia, e quem grava é o
-gerente, com um toque. Componente ÚNICO `cartaoAplicacaoRelato(r)` (café e
-grãos; pecuária não tem aplicação por talhão), alimentado por
-`insAplicacoesRelatadas()` (relatos em `mensagens_importadas.criados`, como a
-sugestão de chuva) e pelo catálogo `INS_APLIC_ATIVIDADE` (como o registro entra
-em cada atividade) — nunca uma variante por atividade.
+dado de campo colado pelo escritório): a mensagem chega DEPOIS de a atividade
+estar no boletim, então a mensagem colada NUNCA vira registro sozinha.
+Primeiro o app procura o lançamento que confere (`insBuscarLancamento`:
+boletins enviados da unidade, 7 dias, mesmo produto e mesmo talhão) e LIGA o
+detalhe a ele (`criados[].vinculo`, lido por `insDetalheGrupo` no boletim
+enviado e pelo consumo de insumos) — nada é criado, nada é reescrito, nenhuma
+pergunta. Só sem lançamento que confira a mensagem vira pergunta no boletim da
+unidade, no dia, e quem grava é o gerente, com um toque. Componente ÚNICO
+`cartaoAplicacaoRelato(r)` (café e grãos; pecuária não tem aplicação por
+talhão), alimentado por `insAplicacoesRelatadas()` (relatos em
+`mensagens_importadas.criados`, como a sugestão de chuva) e pelo catálogo
+`INS_APLIC_ATIVIDADE` (como o registro entra em cada atividade) — nunca uma
+variante por atividade.
 - **Uma pergunta, duas respostas, zero campo:** "foi assim?" · "✅ Lançar no
   boletim" · "❌ Não lançar". Lançar cria a atividade com os detalhes da
   mensagem no cartão de sempre (editável, "trocar", "remover" = desfazer);
   Não lançar deixa "desfazer" no lugar. A resposta viaja no boletim
   (`b.relatos`), a atividade leva `relatoId`. Sem diálogo, sem nativo.
-- **Nunca duas vezes:** relato que já confere com um lançamento do dia (mesmo
-  talhão, mesmo produto) vira a linha "confere ✔" e não pergunta.
+- **Nunca duas vezes:** relato que já confere com um lançamento do dia ou dos
+  boletins enviados dos últimos 7 dias (mesmo talhão, mesmo produto) vira a
+  linha "confere ✔" e não pergunta — a mesma regra `insAtivConfere` nas duas
+  pontas (escritório e gerente).
 - **A pré-visualização do escritório pergunta, nunca adivinha:** unidade e
   talhão pelo de-para por id (`DEPARA_ATA_PADRAO[].talhao`), a atividade do
   boletim pela lista nativa do catálogo da atividade — o app não deduz
