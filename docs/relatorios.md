@@ -194,8 +194,10 @@ Desde a v55 os relatórios marcados "motor" saem sozinhos: o Supabase
 calcula em horário agendado (pg_cron) e grava o resultado pronto na
 tabela `relatorios_gerados`; o app só lê e mostra (Diretoria/ADMIN ›
 botão 📊 Relatórios no topo do painel ou atalho na tela de entrada →
-tela com "Textos para revisar" em cima e "Números" embaixo, v58;
-gerente › cartão 📊 Meus relatórios, só da unidade dele).
+menu em três níveis desde a v99: "📝 Textos para revisar" › abas por
+atividade com uma linha por unidade › folha do texto, e "📊 Números" em
+tela própria — era uma tela só, textos em cima e números embaixo, da
+v58 à v98; gerente › cartão 📊 Meus relatórios, só da unidade dele).
 Nada é calculado no celular além de formatação (nome do talhão pelo
 cadastro do `index.html`, datas, números). Arquivos:
 `sql/020-relatorios-motor.sql` (tabelas, funções, agenda) e
@@ -254,36 +256,65 @@ de enviar", com o botão "copiar para WhatsApp". A chave da API vive só em
 | `painel_executivo` | mês anterior fechado | linha do grupo | `farol_30`, `custo_fisico_talhao_mes`, `rebanho_mes`, `plano_executado_mes`, semanas de `irrigacao_rec_exec_semana` e dito × medido, resumos do mês anterior | dia 8 08:20 / 08:35 |
 | `alerta_divergencia` | manual (sql/032) | por unidade e dia | `dito_medido_icrop_dia`, `dito_medido_solinftec_dia` | — |
 
-### Tela "Textos para revisar" (v68): cartão colapsado + folha de leitura
+### Tela "Textos para revisar" em três níveis (v99): menu › abas por atividade › folha
 
-Desde a v68 cada texto do redator entra na tela (Diretoria › 📊
-Relatórios, seção "Textos para revisar", e a tela do relatório narrativo
-aberta por "ver com os números ›") pelo componente único
-`cartaoTextoLongo` do `index.html` (CLAUDE.md, item c7). O cartão nasce
-**colapsado**: tag "gerado automaticamente — revisar antes de enviar",
-título (unidade destinatária), prévia de 3 linhas cortada por linha
-inteira com reticências, linha compacta de origem e dois botões lado a
-lado — "ler texto completo ›" e "📲 copiar para WhatsApp". Copiar
-funciona sem expandir e copia o texto integral de
-`relatorios_gerados.texto` (nunca a prévia). Texto curto (cabe nas 3
-linhas) não mostra reticências nem "ler texto completo".
+Desde a v99 (CLAUDE.md, item c22; docs/definicao-de-pronto.md, item 28)
+os textos do redator entram na Diretoria por três níveis, nunca numa lista
+só:
 
-"ler texto completo ›" abre uma folha de tela cheia (não expande na
-lista): cabeçalho fixo com "‹ Fechar", a tag, o texto completo rolável,
-a origem completa e um rodapé fixo com Fechar e copiar. Ao fechar, a
-lista volta à posição de rolagem de antes.
+1. **Nível 1 — o menu** (`vRelatorios`, tela `relatorios`). Cabeçalho
+   "Relatórios · DIRETORIA" com "‹" e "⇥", "🔄 Atualizar" e **duas linhas**:
+   **📝 Textos para revisar** — estado na linha: `Devolutiva semanal · 04 a
+   10/09 · 24 textos` (com mais de um relatório narrativo no período: `2
+   relatórios · 26 textos`; sem texto: `nenhum texto neste período`, linha
+   visível e inativa) — e **📊 Números** — `último: semana 04 a 10/09 · 3
+   para conferir` (âmbar só no número). Nada mais: nenhuma prévia, nenhum
+   cartão, nenhum parágrafo; a tela cabe em 1 tela de iPhone com 24 textos
+   baixados (era 8 telas na v98).
+2. **Nível 2 — Textos para revisar** (`vRelTextos`, tela `reltextos`).
+   Sublinha por relatório narrativo do período ("Devolutiva semanal ao
+   gerente · 04/09 a 10/09/2026") com o atalho "ver com os números ›" uma
+   vez só. **Abas por atividade** pelo componente único `chipsAtividade`
+   (a fileira do painel da Diretoria), ordem fixa 🏢 Grupo · ☕ Café · 🌾
+   Grãos · 🐂 Pecuária, contador na aba ("☕ Café (10)"); só aparecem as
+   atividades com unidade no escopo do código (escopo de uma atividade só
+   → sem abas, só a lista); 🏢 Grupo só quando há texto sem `unidade_id`
+   (painel executivo, alerta do grupo) ou com id fora do catálogo (o id
+   fica visível na linha). Dentro da aba, **uma linha por unidade** do
+   escopo, na ordem da tela inicial: nome como o app já exibe ("Rio
+   Preto-Lagamar — Café") + `robô-redator · 11/09 05:35` + seta; unidade
+   sem texto no período lê `sem texto neste período`, em cinza, sem ação.
+   **Nenhuma prévia na lista.** A atividade da unidade vem do catálogo por
+   id (`atividadeDe`), nunca de trecho do nome. A aba tocada fica na
+   memória da sessão (nunca em `localStorage`).
+3. **Nível 3 — a folha de leitura da v68** (`abrirFolhaTexto`), sem
+   mudança: cabeçalho fixo "‹ Fechar", tag "gerado automaticamente —
+   revisar antes de enviar", texto completo rolável, origem completa
+   ("Redigido no Supabase por <texto_modelo> em dd/mm, hh:mm a partir dos
+   números do relatório") e rodapé fixo com Fechar + "📲 copiar para
+   WhatsApp" (`relCopiar`: copia o texto integral de
+   `relatorios_gerados.texto` e abre o compartilhar). Ao fechar, a lista
+   volta à mesma aba e à mesma posição de rolagem. O texto continua SÓ
+   leitura no app: o ajuste é feito no WhatsApp, depois de colar; nada é
+   editado nem gravado.
 
-Regra da origem: no cartão só a versão compacta, `robô-redator ·
-dd/mm hh:mm` (de `texto_em`); a completa — "Redigido no Supabase por
-<texto_modelo> em dd/mm, hh:mm a partir dos números do relatório" — só
-na folha. O aviso "Confira e ajuste antes de mandar" saiu do rodapé: a
-tag já diz isso. O texto continua SÓ leitura no app: o ajuste é feito
-no WhatsApp, depois de colar; nada é editado nem gravado.
+**📊 Números** (`vRelNumeros`, tela `relnumeros`) é o conteúdo que ficava
+no rodapé da tela até a v98, em tela própria: filtro Todos/Dia/Semana/Mês,
+último período gerado por relatório, "N para conferir" em âmbar ("N
+unidades · todas para conferir" quando os dois números coincidem; "1
+unidade · para conferir" no singular), toque abre a tela do relatório com
+anterior/próximo, "📲 Compartilhar" e "🖨 PDF" — idêntica à de antes. A
+lista de Números é por relatório (não por unidade), por isso não recebe
+abas. Cada "‹" sobe um degrau: relatório → Números ou Textos → menu →
+painel/tela inicial.
 
-Na lista "Números": quando o total de unidades e o número "para
-conferir" coincidem, a linha diz "N unidades · todas para conferir"
-("1 unidade · para conferir" no singular); diferentes, os dois números
-continuam.
+O **cartão colapsado da v68** (`cartaoTextoLongo`: tag, título, prévia de
+3 linhas cortada por linha inteira, origem compacta, "ler texto completo
+›" + copiar sem expandir) continua existindo, mas só na tela do relatório
+narrativo aberta por "ver com os números ›" — nunca mais na lista. Nada é
+baixado nem calculado a mais: `baixarRelatorios`, `bdf:relatorios` e o
+offline com o último baixado não mudaram; o gerente continua sem receber
+rascunho nenhum.
 
 Pedido: modelo `claude-sonnet-4-6`, `max_tokens` 1500 (300 no alerta),
 system = instruções do modelo, uma mensagem de usuário com data, unidade,

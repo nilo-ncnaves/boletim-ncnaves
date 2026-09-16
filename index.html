@@ -218,6 +218,10 @@ body.folha-aberta{position:fixed;left:0;right:0;overflow:hidden}
 .cad-item .cresce .mut{font-size:.78rem;white-space:normal}
 .cad-item .seta{color:var(--tinta-2);flex:none}
 .cad-item .cad-extra{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;flex:none}
+/* v99: abas por atividade em Relatórios — a fileira de filtros da v80 (quebra em linhas, nunca rola de lado),
+   com o alvo de toque de 44 px; a linha "sem texto neste período" é só leitura, em cinza, sem seta */
+.rel-abas .chip{min-height:44px}
+.cad-item.rel-sem{cursor:default}.cad-item.rel-sem b{color:var(--tinta-2);font-weight:600}
 /* Badge de categoria da operação (v67): UMA letra, fundo neutro único para todas as categorias (cor é canal do
    farol), sem raio e sem sombra, à esquerda do nome e centrado na primeira linha. Toque mostra o nome da
    categoria (legenda sob demanda, .mostra); a área de toque cresce por ::before sem crescer o quadrado. */
@@ -2176,9 +2180,10 @@ const REL_CATALOGO={
   insumos_programado_recebido_aplicado:{nome:"Insumos: programado × recebido × aplicado — mês", per:"mes"},
   /* fase 2 (v57): relatórios narrativos redigidos pelo robô-redator (sql/030) — texto acima dos números,
      marcado "gerado automaticamente — revisar antes de enviar"; só Diretoria/ADMIN, nunca o gerente */
-  devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", per:"semana", texto:true},
-  painel_executivo:{nome:"Painel executivo aos sócios (texto)", per:"mes", texto:true},
-  alerta_divergencia:{nome:"Alerta de divergência (texto)", per:"dia", texto:true}
+  /* v99: `curto` é o nome que cabe na linha do menu de Relatórios ("Devolutiva semanal · 04 a 10/09 · 24 textos") */
+  devolutiva_semanal:{nome:"Devolutiva semanal ao gerente (texto)", curto:"Devolutiva semanal", per:"semana", texto:true},
+  painel_executivo:{nome:"Painel executivo aos sócios (texto)", curto:"Painel executivo", per:"mes", texto:true},
+  alerta_divergencia:{nome:"Alerta de divergência (texto)", curto:"Alerta de divergência", per:"dia", texto:true}
 };
 let relCache=[];                 /* linhas de relatorios_gerados guardadas no aparelho (bdf:relatorios) */
 let relEstado={carregando:false, erro:false};   /* v61: separa "carregando" e "erro" de "vazio" na tela Relatórios */
@@ -2458,32 +2463,131 @@ function relItensNumeros(per){
       <span class="mut">›</span></button></li>`;
   }).join("");
 }
+/* ---------- Abas por atividade (v99) — componente ÚNICO ----------
+   É a fileira ☕ Café · 🌾 Grãos · 🐂 Pecuária que o painel da Diretoria já tinha (data-atv-filtro),
+   extraída em função para ser a MESMA em Relatórios — nunca uma variante por tela. A ordem, o emoji
+   e o rótulo vêm do catálogo ATIVIDADES; o conteúdo por aba é de quem chama. Opções: `todas` (chip
+   "Todas", como no painel), `extra` (abas fora do catálogo antes das atividades — 🏢 Grupo), `so`
+   (só as atividades presentes), `contagem` (contador no rótulo: "☕ Café (10)") e `classe` da
+   fileira: "chips no-print mb" no painel; "cad-saltos rel-abas" em Relatórios — a fileira de filtros
+   da v80, que quebra em linhas e nunca rola de lado (c15). O painel continua byte a byte igual. */
+function chipsAtividade(attr, atual, o){
+  o=o||{};
+  const chip=(k,rot)=>`<button class="chip ${atual===k?"on":""}" data-${attr}="${k}">${rot}</button>`;
+  const cont=k=>(o.contagem&&o.contagem[k]!=null)?" ("+o.contagem[k]+")":"";
+  return `<div class="${o.classe||"chips no-print mb"}">
+      ${o.todas?chip("",o.todas)+"\n      ":""}${(o.extra||[]).map(([k,rot])=>chip(k,rot+cont(k))).join("")}${ATIVIDADES.filter(([k])=>!o.so||o.so.includes(k)).map(([k,emo,rot])=>chip(k,emo+" "+rot+cont(k))).join("")}
+    </div>`;
+}
+
+/* ---------- Relatórios da Diretoria em três níveis (v99) ----------
+   Relato do Nilo em 16/09/2026, iPhone a 390 px: a tela 📊 Relatórios abria com 24 cartões de texto
+   (um por unidade), café e pecuária misturados em ordem alfabética, e "Números" só depois de 10 telas
+   de rolagem. Mesmo diagnóstico da v88: a lista despejava a descrição de todas as unidades quando devia
+   mostrar só o nome e o estado. Padrão que fica (CLAUDE.md, c22): lista de leitura com uma entrada por
+   unidade nasce em TRÊS níveis — menu › abas por atividade com uma linha por unidade (nome + estado,
+   sem prévia) › tela/folha da unidade; unidades de atividades diferentes nunca aparecem na mesma lista.
+   Nível 1 (vRelatorios): duas linhas de menu, "📝 Textos para revisar" e "📊 Números", com o estado na
+   própria linha (P7), nada mais. Nível 2 (vRelTextos, tela reltextos): abas por atividade pelo
+   componente único chipsAtividade (🏢 Grupo à esquerda só quando há texto sem unidade), uma linha por
+   unidade do escopo na ordem da tela inicial; unidade sem texto diz "sem texto neste período".
+   Nível 3: a folha de leitura da v68 (abrirFolhaTexto), sem mudança. "📊 Números" (vRelNumeros, tela
+   relnumeros) é o conteúdo de antes em tela própria. A atribuição unidade → atividade é pelo catálogo
+   (atividadeDe, por id), nunca por trecho do nome; unidade_id fora do catálogo cai em 🏢 Grupo com o id
+   visível. Nada é baixado nem calculado a mais: é rearranjo do que já está em relCache. */
+let relTextosVista={aba:""};   /* aba escolhida em "Textos para revisar" — só na memória da sessão, nunca localStorage */
+const relNomeLongo=k=>String((REL_CATALOGO[k]||{nome:k}).nome).replace(/\s*\(texto\)$/,"");   /* "Devolutiva semanal ao gerente" (sublinha) */
+const relNomeTexto=k=>(REL_CATALOGO[k]||{}).curto||relNomeLongo(k);                                 /* "Devolutiva semanal" (linha do menu e da lista) */
+/* o último período de cada relatório narrativo, com as linhas que têm texto */
+function relTextosPeriodo(){
+  return Object.keys(REL_CATALOGO).filter(k=>REL_CATALOGO[k].texto).map(k=>{
+    const ps=relPeriodos(k); if(!ps.length) return null;
+    const [ini,fim]=ps[0].split("|"), ls=relLinhas(k,ini,fim).filter(l=>l.texto);
+    return ls.length?{k,ini,fim,ls}:null;
+  }).filter(Boolean);
+}
+/* período curto para a linha do menu: "04 a 10/09" (mesmo mês), "28/08 a 03/09", "10/09" (um dia) */
+function relPerCurto(ini,fim){
+  if(ini===fim) return fmtDataCurta(ini);
+  return (ini.slice(0,7)===fim.slice(0,7)?ini.slice(8):fmtDataCurta(ini))+" a "+fmtDataCurta(fim);
+}
+/* textos por aba: GRUPO (sem unidade ou id fora do catálogo) e uma por atividade do catálogo; `abas` são as que
+   aparecem — 🏢 Grupo só com texto de grupo, atividade só com unidade no ESCOPO do código (chave de escopo) */
+function relTextosPorAba(tx){
+  const porAba={GRUPO:[]}; ATIVIDADES.forEach(([k])=>{ porAba[k]=[]; });
+  tx.forEach(x=>x.ls.forEach(l=>{
+    const f=l.unidade_id?D.fazendas.find(z=>z.id===l.unidade_id):null;
+    porAba[f?atividadeDe(f.id):"GRUPO"].push({l,k:x.k});
+  }));
+  const uns=unidadesPermitidas();
+  const abas=(porAba.GRUPO.length?["GRUPO"]:[]).concat(ATIVIDADES.map(([k])=>k).filter(k=>uns.some(f=>atividadeDe(f.id)===k)));
+  return {porAba, abas, uns};
+}
+const relTopo=(titulo)=>topo(titulo, sessao.papel==="admin"?"Administrador":"Diretoria", true);
+/* Nível 1: o menu */
 function vRelatorios(){
-  const per=relFiltro.per;
-  /* textos: o último período de cada relatório narrativo, um cartão por unidade */
-  const textos=Object.keys(REL_CATALOGO).filter(k=>REL_CATALOGO[k].texto).flatMap(k=>{
-    const ps=relPeriodos(k); if(!ps.length) return [];
-    const [ini,fim]=ps[0].split("|");
-    const ls=relLinhas(k,ini,fim).filter(l=>l.texto).sort((a,b)=>relUni(a.unidade_id).localeCompare(relUni(b.unidade_id),"pt-BR"));
-    if(!ls.length) return [];
-    return [`<p class="mut" style="font-size:.78rem;margin:12px 0 4px"><b>${esc(REL_CATALOGO[k].nome)}</b> · ${relRotuloPer(k,ini,fim)} · ${ls.length} texto${ls.length>1?"s":""}
-        <button class="btn suave mini" data-relab="${k}|${ini}|${fim}" style="display:inline-flex;padding:2px 8px;margin-left:6px">ver com os números ›</button></p>`
-      +relTextos(ls)];
-  }).join("");
-  const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
-  const itens=relItensNumeros(per);
-  const PER_ROT={dia:"Dia",semana:"Semana",mes:"Mês"};
-  const cab=topo("Relatórios", sessao.papel==="admin"?"Administrador":"Diretoria", true)+`
+  const cab=relTopo("Relatórios")+`
     ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}`;
   const voltar=`<button class="btn sec mt no-print" data-voltar="1">‹ Voltar ao painel</button>`;
   /* v61: sem nada no aparelho, distingue "baixando" e "não conseguiu baixar" de "o motor não gerou nada" */
   if(!relCache.length && (relEstado.carregando||syncOcupado)) return cab+`<div class="cartao">${htmlEstado("carregando",{que:"relatórios"})}</div>`+voltar;
   if(!relCache.length && relEstado.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"os relatórios"},{acao:true})}</div>`+voltar;
+  /* linha 1 — textos: o último período de cada relatório narrativo */
+  const tx=relTextosPeriodo(), nTx=tx.reduce((n,x)=>n+x.ls.length,0);
+  const estTx=!tx.length?"nenhum texto neste período"
+    :tx.length===1?`${esc(relNomeTexto(tx[0].k))} · ${relPerCurto(tx[0].ini,tx[0].fim)} · ${nTx} texto${nTx>1?"s":""}`
+    :`${tx.length} relatórios · ${nTx} texto${nTx>1?"s":""}`;
+  /* linha 2 — números: o período mais recente calculado e a soma do "para conferir" dos últimos períodos (os mesmos da lista) */
+  const nums=Object.keys(REL_CATALOGO).filter(k=>!REL_CATALOGO[k].texto).map(k=>{
+    const ps=relPeriodos(k); if(!ps.length) return null;
+    const [ini,fim]=ps[0].split("|"); return {k,ini,fim,conf:relLinhas(k,ini,fim).filter(l=>l.unidade_id).filter(relAlerta).length}; }).filter(Boolean);
+  const ult=nums.slice().sort((a,b)=>b.fim.localeCompare(a.fim)||b.ini.localeCompare(a.ini))[0];
+  const conf=nums.reduce((n,x)=>n+x.conf,0);
+  /* "último: semana 04 a 10/09" · "último: mês ago/2026" · "último: dia 15/09" (o farol de 7/30 dias é diário mas cobre um
+     intervalo — aí só o intervalo, sem a palavra do período) */
+  const perUlt=u=>{ const per=REL_CATALOGO[u.k].per; return per==="mes"?"mês "+relRotuloPer(u.k,u.ini,u.fim):per==="semana"?"semana "+relPerCurto(u.ini,u.fim):(u.ini===u.fim?"dia ":"")+relPerCurto(u.ini,u.fim); };
+  const estNum=!ult?"nenhum relatório calculado neste período"
+    :`último: ${perUlt(ult)}${conf?` · <span class="rel-conf">${conf} para conferir</span>`:""}`;
+  /* as duas linhas têm a mesma classe e altura das linhas de unidade da v88; sem texto/número a linha fica
+     visível e inativa pelo botão de avanço (c10): o toque diz a próxima ação */
+  const linha=(id,titulo,estado,falta)=>botaoAvanco(id,{classe:"cad-item", falta, aria:titulo,
+    rotulo:`<span class="cresce"><b>${titulo}</b><span class="mut">${estado}</span></span>${falta?"":`<span class="seta">›</span>`}`});
   return cab+`
-    <h2 style="margin-bottom:6px">📝 Textos para revisar</h2>
-    <p class="mut" style="font-size:.8rem">Escritos pelo robô-redator a partir dos números. Toque em copiar para mandar no WhatsApp.</p>
-    ${textos||`<div class="cartao">${htmlEstado("vazio",{que:"texto do redator para revisar",dica:"Os textos aparecem aqui depois de sincronizar."})}</div>`}
-    <h2 style="margin:18px 0 6px">📊 Números</h2>
+    ${linha("bt-rel-textos","📝 Textos para revisar",estTx,tx.length?"":"Os textos chegam ao sincronizar: toque em Atualizar com internet.")}
+    ${linha("bt-rel-numeros","📊 Números",estNum,ult?"":"Os números chegam ao sincronizar: toque em Atualizar com internet.")}
+    `+voltar;
+}
+/* Nível 2: Textos para revisar — abas por atividade, uma linha por unidade, sem prévia */
+function vRelTextos(){
+  const tx=relTextosPeriodo();
+  const cab=relTopo("📝 Textos para revisar");
+  const voltar=`<button class="btn sec mt no-print" data-voltar="1">‹ Voltar aos relatórios</button>`;
+  if(!tx.length) return cab+`<div class="cartao">${htmlEstado("vazio",{que:"texto do redator para revisar",dica:"Os textos aparecem aqui depois de sincronizar."})}</div>`+voltar;
+  const {porAba,abas,uns}=relTextosPorAba(tx);
+  if(!abas.includes(relTextosVista.aba)) relTextosVista.aba=abas[0]||"";
+  const aba=relTextosVista.aba;
+  /* o nome do relatório só entra na linha quando a MESMA aba mistura mais de um relatório (uma unidade com devolutiva e alerta) */
+  const varios=new Set((porAba[aba]||[]).map(x=>x.k)).size>1;
+  const sub=tx.map(x=>`<p class="mut" style="font-size:.78rem;margin:0 0 6px"><b>${esc(relNomeLongo(x.k))}</b> · ${relRotuloPer(x.k,x.ini,x.fim)}
+      <button class="btn suave mini" data-relab="${x.k}|${x.ini}|${x.fim}" style="display:inline-flex;padding:2px 8px;margin-left:6px">ver com os números ›</button></p>`).join("");
+  const contagem={}; abas.forEach(k=>{ contagem[k]=porAba[k].length; });
+  const chips=abas.length>1?chipsAtividade("relaba", aba, {classe:"cad-saltos rel-abas", so:abas, contagem, extra:porAba.GRUPO.length?[["GRUPO","🏢 Grupo"]]:[]}):"";
+  const linhaTexto=x=>{ const o=relTextoLongo(x.l); textosLongos.set(o.chave,o);
+    return `<button class="cad-item" data-txtler="${esc(o.chave)}" data-rel-un="${esc(x.l.unidade_id||"")}"><span class="cresce"><b>${esc(relUni(x.l.unidade_id))}</b><span class="mut">${varios?esc(relNomeTexto(x.k))+" · ":""}${esc(o.origemCurta)}</span></span><span class="seta">›</span></button>`; };
+  const linhaSem=f=>`<div class="cad-item rel-sem" aria-disabled="true" data-rel-un="${esc(f.id)}"><span class="cresce"><b>${esc(f.nome)}</b><span class="mut">sem texto neste período</span></span></div>`;
+  const lista=aba==="GRUPO"?porAba.GRUPO.map(linhaTexto).join("")
+    :uns.filter(f=>atividadeDe(f.id)===aba).map(f=>{ const ts=porAba[aba].filter(x=>x.l.unidade_id===f.id); return ts.length?ts.map(linhaTexto).join(""):linhaSem(f); }).join("");
+  return cab+sub+chips+(lista||`<div class="cartao">${htmlEstado("vazio",{que:"texto do redator para revisar",atividade:aba==="GRUPO"?"":aba})}</div>`)+voltar;
+}
+/* Nível 2: Números — o conteúdo que era o rodapé da tela Relatórios até a v98, em tela própria */
+function vRelNumeros(){
+  const per=relFiltro.per;
+  const ultimo=relCache.length?relCache.map(l=>l.gerado_em||"").sort().slice(-1)[0]:"";
+  const itens=relItensNumeros(per);
+  const PER_ROT={dia:"Dia",semana:"Semana",mes:"Mês"};
+  const cab=relTopo("📊 Números");
+  const voltar=`<button class="btn sec mt no-print" data-voltar="1">‹ Voltar aos relatórios</button>`;
+  return cab+`
     ${relCache.length?`<div class="chips mb no-print">${[["","Todos"],["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,r])=>`<button class="chip ${per===k?"on":""}" data-relper="${k}">${r}</button>`).join("")}</div>
       <div class="cartao"><ul class="lista-limpa">${itens||htmlEstado("vazio",{que:"relatório calculado",filtro:PER_ROT[per]||"Todos"},{tag:"li"})}</ul></div>
       <p class="mut" style="font-size:.72rem">Calculado no Supabase toda madrugada (motor sql/020); o app só mostra. Último cálculo: ${ultimo?new Date(ultimo).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}. Diferença entre dito e medido é "para conferir", nunca erro.</p>`
@@ -3481,7 +3585,7 @@ function ir(tela, arg, manterScroll){
   /* portaria: sem código válido nada abre; cada tela respeita o escopo do código */
   if(!acesso) tela="codigo";
   else if((tela==="cadastros"||tela==="importar"||tela==="unidplano") && !podeCadastros()) tela = podePainel()?"painel":"entrada";
-  else if(["painel","painelun","relatorio","historico","relatorios","farois","farol","planejamento","colar"].includes(tela) && !podePainel()) tela="entrada";
+  else if(["painel","painelun","relatorio","historico","relatorios","reltextos","relnumeros","farois","farol","planejamento","colar"].includes(tela) && !podePainel()) tela="entrada";
   /* v77: ritual que se abre sozinho — na sexta (fechar a semana) e do dia 10 em diante (ata da
      reunião), a porta da Diretoria/Escritório é a tela curta do ritual. Pulável; o "pulado" vale
      só para esta sessão, então volta no próximo acesso do MESMO dia (item 9 da tarefa). */
@@ -3510,6 +3614,8 @@ function ir(tela, arg, manterScroll){
   else if(tela==="relatorio") app.innerHTML = vRelatorio();
   else if(tela==="relat") app.innerHTML = vRelat();
   else if(tela==="relatorios") app.innerHTML = vRelatorios();
+  else if(tela==="reltextos") app.innerHTML = vRelTextos();     /* v99: Relatórios › Textos para revisar */
+  else if(tela==="relnumeros") app.innerHTML = vRelNumeros();   /* v99: Relatórios › Números */
   else if(tela==="farois") app.innerHTML = vFarois();
   else if(tela==="farol") app.innerHTML = vFarol(arg);
   else if(tela==="ajuda") app.innerHTML = vAjuda();
@@ -9208,10 +9314,7 @@ function vPainel(){
   const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
   const i7 = indicadores(7), i30 = indicadores(30);
   return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
-    <div class="chips no-print mb">
-      <button class="chip ${!filtroPainel.atv?"on":""}" data-atv-filtro="">Todas</button>
-      ${ATIVIDADES.map(([k,emo,rot])=>`<button class="chip ${filtroPainel.atv===k?"on":""}" data-atv-filtro="${k}">${emo} ${rot}</button>`).join("")}
-    </div>
+    ${chipsAtividade("atv-filtro", filtroPainel.atv||"", {todas:"Todas"})}
     <div class="cartao"><div class="linha-flex"><span class="farol ${enviadasHoje?"ok":"espera"}"></span>
       <div class="cresce"><h2>${enviadasHoje} de ${unidadesAtv.length} unidades enviaram hoje</h2>
       <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
@@ -9631,7 +9734,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v98";
+const APP_VERSAO="v99";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -11900,7 +12003,7 @@ async function syncTudo(){
   /* v91: com a ação rápida "⋯" de uma tarefa aberta, a tela de Planejamento NÃO é redesenhada pela sincronização —
      era isto que fazia a tarefa "sumir" um segundo depois de "Concluí" (a lista inteira voltava reordenada pelo
      farol). O cartão fica onde está, com "Salvo · … · desfazer"; o redesenho natural vem ao fechar o "⋯". */
-  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","farois","farol","planejamento"].includes(telaAtual)
+  if(sessao && (sessao.papel==="proprietario"||sessao.papel==="admin") && ["painel","casa","relatorios","reltextos","relnumeros","farois","farol","planejamento"].includes(telaAtual)
      && !(telaAtual==="planejamento" && planUI.acoes))
     ir(telaAtual, telaAtual==="farol"?farolVista.unidade:null, true);
 }
@@ -12601,7 +12704,12 @@ function ligarEventos(tela){
       sessao={userId:u.id,papel:u.papel,nome:u.nome};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); ir("casa"); return; }
     if(t.id==="bt-sair"||t.id==="bt-topo-sair"){ sessao=null; Persist.del("bdf:sessao"); ir("entrada"); return; }
-    if(d.voltar && telaAtual==="relat" && sessao && sessao.papel!=="gerente"){ ir("relatorios"); return; }
+    /* v99: o relatório aberto por "ver com os números" ou pela lista de Números devolve à tela de onde veio (c20) */
+    if(d.voltar && telaAtual==="relat" && sessao && sessao.papel!=="gerente"){ ir(["reltextos","relnumeros"].includes(relVista.de)?relVista.de:"relatorios"); return; }
+    if(d.voltar && (telaAtual==="reltextos"||telaAtual==="relnumeros")){ ir("relatorios"); return; }
+    if(t.id==="bt-rel-textos"){ ir("reltextos"); return; }
+    if(t.id==="bt-rel-numeros"){ ir("relnumeros"); return; }
+    if(d.relaba!==undefined){ relTextosVista.aba=d.relaba; ir("reltextos",null,true); return; }
     if(d.voltar && telaAtual==="farol"){ ir("farois"); return; }
     if(d.farolun){ ir("farol", d.farolun); return; }
     /* v88: cartão do painel em duas etapas — a lista de unidades abre a tela da unidade */
@@ -12617,7 +12725,7 @@ function ligarEventos(tela){
     if(t.id==="bt-cad"){ abrirModulo("cadastros",()=>{ cadNav=[]; }); return; }
     if(d.ver){ painelVoltaDetalhe = telaAtual==="painelun"; ir("detalhe", d.ver); return; }
     /* relatórios automáticos (v55) */
-    if(d.relab){ const [rel,ini,fim]=d.relab.split("|"); relVista={rel,ini,fim}; ir("relat"); return; }
+    if(d.relab){ const [rel,ini,fim]=d.relab.split("|"); relVista={rel,ini,fim,de:telaAtual}; ir("relat"); return; }
     if(d.relper!==undefined){ relFiltro.per=d.relper; ir(telaAtual,null,true); return; }
     if(d.relnav){ relNavegar(d.relnav); return; }
     if(t.id==="bt-rel-zap"){ abrirTextoZap(relTexto()); return; }

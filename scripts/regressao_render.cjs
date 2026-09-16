@@ -182,6 +182,10 @@ async function cenario(browser, nome, acesso, sessao, passos) {
       await p.evaluate(() => { const f = document.querySelector('#folha-texto'); const d = document.createElement('div'); d.id = 'dump-folha'; d.hidden = true; d.setAttribute('data-scroll-travado', document.body.classList.contains('folha-aberta') ? '1' : '0'); d.textContent = f ? f.outerHTML : 'SEM FOLHA'; document.querySelector('#app').appendChild(d); }); }],
     ['27-relatorios-fechada', async p => { await p.evaluate(() => { const d = document.querySelector('#dump-folha'); if (d) d.remove(); const b = document.querySelector('#bt-folha-fechar'); if (b) b.click(); }); await pausa(p, 300); }],
     ['28-relat-texto', async p => { await p.evaluate(() => { relVista = { rel: 'devolutiva_semanal', ini: '2026-09-01', fim: '2026-09-07' }; ir('relat'); }); await pausa(p, 300); }],
+    /* v99: Relatórios em três níveis — menu, Textos para revisar (abas por atividade) e Números; na versão antiga os passos caem em FALHOU (telas novas) */
+    ['29-reltextos', async p => { await p.evaluate(() => ir('relatorios')); await pausa(p, 200); const b = await p.$('#bt-rel-textos'); if (!b) throw new Error('sem menu de Relatórios (versão antiga)'); await b.click(); await pausa(p, 300); }],
+    ['29b-reltextos-aba', async p => { const b = await p.$('[data-relaba="PECUARIA"]'); if (!b) throw new Error('sem abas (versão antiga)'); await b.click(); await pausa(p, 300); }],
+    ['29c-relnumeros', async p => { await p.evaluate(() => ir('relatorios')); await pausa(p, 200); const b = await p.$('#bt-rel-numeros'); if (!b) throw new Error('sem menu de Relatórios (versão antiga)'); await b.click(); await pausa(p, 300); }],
     ['30-farois', async p => { await p.evaluate(() => ir('farois')); await pausa(p, 300); }],
     ['40-farol-f26', async p => { await p.evaluate(() => ir('farol', 'f26')); await pausa(p, 300); }],
     ['41-farol-f01', async p => { await p.evaluate(() => ir('farol', 'f01')); await pausa(p, 300); }],
