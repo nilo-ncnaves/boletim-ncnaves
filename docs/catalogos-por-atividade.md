@@ -1005,3 +1005,27 @@ touros, vaca, vacas, boi, rebanho, pasto, pastos, retiro, retiros,
 IATF, bicheira, berro, desmama, brinco, sal mineral, proteinado,
 vermifugação, everminou, apartação, castração, pesagem, embarque,
 gado, aguadas, porteira, capataz, prenhes, gestação, carrapato
+
+## Operação do ERP → operações do app (v96) — `ERP_OPERACOES`
+Catálogo por chave, usado SÓ para dois fins: o escopo do 🔸 "só no app"
+(que lançamentos do boletim, na mesma operação e competência do relatório,
+ficaram sem linha do ERP) e a sugestão de tarefa (C8). O casamento linha a
+linha NÃO usa operação — a chave é talhão + insumo + janela + quantidade.
+Operação do ERP sem de-para: o casamento continua e o 🔸 fica vazio.
+
+| operação no ERP | ☕ Café | 🌾 Grãos | 🐂 Pecuária |
+| --- | --- | --- | --- |
+| FERTIRRIGAÇÃO | Adubação via fertirrigação | Adubação de cobertura · Aplicação foliar / micronutrientes | — |
+| ADUBAÇÃO | Adubação manual · Adubação via lanço · Adubação orgânica | Adubação de cobertura · Adubação de plantio (sulco) | — |
+| CALAGEM | Calagem / gessagem | Calagem | — |
+| GESSAGEM | Calagem / gessagem | Gessagem | — |
+| PULVERIZAÇÃO | Pulverização manual · Pulverização mecanizada | Fungicida · Inseticida · Herbicida pós-emergente | — |
+
+Lançamento SEM quantidade que o casamento reconhece (`ERP_ATIVIDADE`, por
+chave): café = setor marcado em "Fertirrigação hoje? › Em quais setores?" e
+operação de `INS_OPS_CONSUMO` sem produto/dose; grãos = operação de adubação,
+calagem, gessagem ou aplicação sem produto; pecuária = evento com produto sem
+quantidade. Vocabulário dos resultados (igual nas três atividades): ✅ Bate ·
+✅ Lançado sem quantidade · ⚠️ Quantidade diferente · ⚠️ Talhão diferente ·
+⚠️ Fora da janela · ➕ Só no ERP · 🔸 Só no app — relatam REGISTRO, nunca
+trabalho.

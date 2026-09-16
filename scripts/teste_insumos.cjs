@@ -71,13 +71,16 @@ const MSG_CHUVA = ['Chuva de ontem:', 'Vereda 32 mm', 'Mata Preta 18 mm'].join('
    "José Eustáquio — Arrendamento" de Monte Carmelo — Café (confirmado pelo Nilo) */
 const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermon', 'Dose/ 400lts , vazão 100lts / hectares',
   'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
+/* v96: mensagem REAL do grupo "Aplicações Realizadas" (15/09/2026) — a baixa já feita no ERP; o PDF é a fixture sintética
+   tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf (mesmo layout e números do relatório real) */
+const MSG_ERP = ['Ferti-irrigação mês de Setembro/26 Fazenda Vereda-Romaria , finalizada ✅', '', 'Obs : Adubos já baixados no sistema !', '', 'Acido borico', 'Sulf. Manganês', 'Sulf. Zinco'].join('\n');
 
 const provas = [];
 const ok = (nome, passou, detalhe) => provas.push({ nome, ok: !!passou, detalhe: detalhe == null ? '' : String(detalhe) });
 
 function servir(dir) {
   return new Promise(res => {
-    const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+    const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.pdf': 'application/pdf', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
     const srv = http.createServer((req, r) => {
       let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
       const f = path.join(dir, p);
@@ -147,7 +150,7 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
         impFalta: imp ? imp.getAttribute('data-falta') || '' : '', depoisTipo, voltou };
     }, MSG_SOLTA);
     ok('Porta única — "Ler a mensagem" com texto não reconhecido ABRE a tela que pergunta o tipo (nunca fica muda)',
-      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 5,
+      /Conferir a mensagem/.test(naoRec.h1) && /não reconheceu/.test(naoRec.aviso) && naoRec.chips === 6,   /* v96: + "Aplicação realizada (baixa do ERP)" */
       naoRec.h1 + ' · ' + naoRec.chips + ' chip(s) · ' + naoRec.aviso.slice(0, 60));
     ok('Porta única — sem tipo escolhido o Importar fica inativo dizendo a próxima ação', /Escolha o tipo/.test(naoRec.impFalta), naoRec.impFalta);
     ok('Porta única — escolher o tipo por chip abre a pré-visualização; Descartar devolve ao campo de colar',
@@ -625,6 +628,310 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     ok('Boletim do gerente em 15/09 — relato ligado ao boletim de ontem NÃO vira pergunta nem linha', !sem.pergunta && !sem.linha, (sem.pergunta ? 'perguntou' : 'sem pergunta') + ' · ' + (sem.linha ? 'com linha' : 'sem linha'));
     ok('Boletim do gerente — relato solto de hoje com lançamento igual no boletim de ONTEM: "confere com o lançamento … de 14/09 ✔", sem pergunta (nunca duas vezes)',
       !sem.pergunta2 && /confere com o lançamento em José Eustáquio — Arrendamento de 14\/09/.test(sem.linha2), sem.linha2);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
+  /* ======================================================================
+     v96 — BAIXA DO ERP × APP: o app casa sozinho, completa e abre a conferência
+     (cenários a–o da tarefa, com o PDF da fixture — sintético, mesmo layout e
+     mesmos números do relatório real de 15/09/2026 — e a mensagem real do grupo)
+     ====================================================================== */
+  let estadoErp = null;
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T17:00:00-03:00');
+    /* boletins semeados em Vereda Romaria (cenário e) + tarefa da ata + recebimentos para o saldo */
+    await page.evaluate(() => {
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' };
+      const mk = (id, data, ativs, irr) => ({ id, fazendaId: 'f23', data, responsavel: 'Gerente Romaria', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '', diaristas: '', funcoes: [] },
+        atividades: ativs || [], colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {}, irr: irr || null, enviadoEm: data + 'T18:00:00' });
+      const fert = (id, t, prod, kg, area) => ({ id, talhaoId: t, tipo: 'Adubação via fertirrigação', pessoas: '2', obs: '', status: '', insProduto: prod, insDoseKgHa: String(kg / area), insAreaHa: String(area) });
+      D.boletins = D.boletins.filter(b => b.fazendaId !== 'f23');
+      D.boletins.push(mk('b0905', '2026-09-05', [fert('a1', 't101', 'Ácido Bórico', 300, 21), fert('a2', 't101', 'Sulf. Manganês', 125, 21), fert('a3', 't101', 'Sulf. Zinco', 150, 21)]));
+      D.boletins.push(mk('b0903', '2026-09-03', [fert('a4', 't102', 'Ácido Bórico', 100, 22.15), { id: 'a9', talhaoId: 't102', tipo: 'Adubação manual', pessoas: '3', obs: '', status: '', insProduto: 'Ureia', insDoseKgHa: '10', insAreaHa: '22.15' }]));
+      D.boletins.push(mk('b0904', '2026-09-04', [fert('a5', 't102', 'Ácido Bórico', 100, 22.15)]));
+      D.boletins.push(mk('b0912', '2026-09-12', [fert('a6', 't103', 'Ácido Bórico', 200, 22.15)]));
+      D.boletins.push(mk('b0911', '2026-09-11', [fert('a7', 't105', 'Ácido Bórico', 250, 22.15)]));
+      D.boletins.push(mk('b0910', '2026-09-10', [], { status: 'Rodou normal', agua: 'Médio', problemas: [], fert: 'Sim', fertSetores: ['t106'], fertReceita: '', obs: '' }));
+      D.boletins.push(mk('b0820', '2026-08-20', [fert('a8', 't107', 'Ácido Bórico', 200, 22.15)]));
+      D.boletins.push(mk('b0908', '2026-09-08', [fert('a10', 't102', 'KCl', 200, 22.15)]));
+      /* a tarefa da ata de 10/09: "Ferti Iniciou – PRAZO: 15/09/26" de Vereda Romaria */
+      const t = planNovaTarefa({ origemTipo: 'rodada', origemRot: 'ata de 10/09', unidade: 'f23', desc: 'Ferti Iniciou', prazo: '2026-09-15', status: 'a_iniciar', tipoItem: 'tarefa' });
+      t.id = 'tar-ferti'; planGravar(t);
+      insRecebimentos().push({ id: 'rec-zn', unidade: 'f23', produto: 'Sulf. Zinco', kg: 2000, data: '2026-09-01', por: 'Gerente Romaria' });
+      salvarDados();
+    });
+    /* a) leitura do PDF por posição */
+    const L = await page.evaluate(async base => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      await new Promise(r => setTimeout(r, 150));
+      const campos = [...document.querySelectorAll('#app textarea, #app input:not([type=hidden])')].length;
+      const btPdf = document.getElementById('bt-ins-pdf');
+      const buf = await (await fetch(base + '/tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf')).arrayBuffer();
+      const L = await erpAnexarBytes(buf, 'erp-ferti-vereda-romaria-2026-09-15.pdf');
+      const insumos = [...new Set(L.linhas.map(r => r.campos.insumo))];
+      const tot = nome => L.linhas.filter(r => r.campos.insumo === nome).reduce((s, r) => s + r.campos.qtde, 0);
+      return { campos, btPdf: btPdf ? btPdf.textContent.trim() : '', ok: L.ok, n: L.n, glebas: L.glebas.length, area: L.somaArea, insumos, totais: insumos.map(tot), duvidosas: L.linhas.filter(r => !r.ok).length,
+        l0: L.linhas[0].campos, cab: L.cab, tipo: insUI.tipo, tela: telaAtual, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    }, base);
+    ok('ERP a) Porta única — o botão "📎 Anexar relatório do ERP (PDF)" existe e a tela de colar continua com UM campo', L.btPdf === '📎 Anexar relatório do ERP (PDF)' && L.campos === 1, L.btPdf + ' · ' + L.campos + ' campo(s)');
+    ok('ERP a) Leitura por posição — 24 linhas, 8 glebas, 164,90 ha, nenhuma leitura duvidosa', L.ok && L.n === 24 && L.glebas === 8 && Math.abs(L.area - 164.9) < 0.01 && L.duvidosas === 0, L.n + ' linhas · ' + L.glebas + ' glebas · ' + L.area + ' ha · ' + L.duvidosas + ' duvidosa(s)');
+    ok('ERP a) Leitura — totais 1.900 / 775 / 950 kg e "SULFATO DE MANGANES BRANCO 31%" reunido (nome quebrado em duas linhas)',
+      L.insumos.join('|') === 'ACIDO BORICO|SULFATO DE MANGANES BRANCO 31%|SULFATO DE ZINCO 20%' && L.totais.join('/') === '1900/775/950', L.insumos.join(' | ') + ' · ' + L.totais.join(' / '));
+    ok('ERP a) Cabeçalho — propriedade, atividade, empreendimento, safra, operação, período e emissão lidos',
+      L.cab.propriedade === 'FAZENDA VEREDA ROMARIA' && L.cab.atividade === 'CAFE' && /FAZ\. ROMARIA/.test(L.cab.empreendimento) && L.cab.safra === '2026/2027' && L.cab.operacoes[0] === 'FERTIRRIGAÇAO' && L.cab.periodo.de === '2026-09-15' && L.cab.emitidoEm === '2026-09-15 16:39:47',
+      JSON.stringify(L.cab).slice(0, 200));
+    ok('ERP a) Com o PDF anexado a classificação é certa: tipo "erp", pré-visualização aberta na hora, sem outro toque', L.tipo === 'erp' && L.tela === 'colar' && /Conferir a mensagem/.test(L.texto) && /lido por posição: 24 linhas/.test(L.texto), L.tipo + ' · ' + L.tela);
+    /* b) datas: hora de lançamento, competência do mês */
+    ok('ERP b) Hora do ERP é de LANÇAMENTO (16:22:44 · 17:00:00), competência 2026-09; nenhuma tela diz "aplicado às"',
+      L.l0.dataIni === '2026-09-15' && L.l0.horaIni === '16:22:44' && L.l0.horaFim === '17:00:00' && !/aplicad[oa]s? às/i.test(L.texto) && /LANÇAMENTO, não de aplicação/.test(L.texto), L.l0.horaIni + ' → ' + L.l0.horaFim);
+    /* identidade por id + e) o casamento */
+    const C = await page.evaluate(() => {
+      const p = insUI.prev;
+      const antes = { unidade: p.unidade, comp: p.competencia, op: p.operacaoErp, falta: erpFalta(p), glebasSemTalhao: p.glebas.filter(g => !g.talhaoId).length, produtos: p.produtos.map(x => x.erp + '→' + x.produto),
+        selects: document.querySelectorAll('#app select[data-erpsel^="gleba"]').length, inativo: !!document.getElementById('bt-ins-importar') && document.getElementById('bt-ins-importar').classList.contains('acao-off') };
+      /* o escritório liga cada gleba ao talhão (por id) na pré-visualização — a primeira vez pergunta, a próxima não */
+      p.glebas.forEach((g, i) => { g.talhaoId = 't10' + (i + 1); }); erpRecalcular(p); ir('colar');
+      const r1 = JSON.stringify(p.itens.map(it => it.res)); erpRecalcular(p); const r2 = JSON.stringify(p.itens.map(it => it.res));
+      const por = (setor, prod) => { const it = p.itens.find(x => x.gleba === 'SETOR ' + setor + ' ROMARIA' && x.produto === prod); return it ? it.res.resultado : '?'; };
+      const bt = document.getElementById('bt-ins-importar');
+      return { antes, falta: erpFalta(p), resumo: p.resumo, reproduz: r1 === r2, soApp: p.soApp.map(erpTextoSoApp), dose: p.dose.map(d => d.gleba + ' · ' + d.produto),
+        tarefas: p.tarefas.map(t => t.desc), avisos: p.avisos, rotulo: bt ? bt.textContent.trim() : '', inativo: !!bt && bt.classList.contains('acao-off'),
+        s1: [por(1, 'Ácido Bórico'), por(1, 'Sulf. Manganês'), por(1, 'Sulf. Zinco')], s2: por(2, 'Ácido Bórico'), s3: por(3, 'Ácido Bórico'), s4: por(4, 'Ácido Bórico'), s5: por(5, 'Ácido Bórico'),
+        s6: [por(6, 'Ácido Bórico'), por(6, 'Sulf. Manganês'), por(6, 'Sulf. Zinco')], s7: por(7, 'Ácido Bórico'), s8: [por(8, 'Ácido Bórico'), por(8, 'Sulf. Manganês'), por(8, 'Sulf. Zinco')],
+        outras: p.itens.filter(it => !['SETOR 1 ROMARIA', 'SETOR 6 ROMARIA', 'SETOR 8 ROMARIA'].includes(it.gleba) && it.produto !== 'Ácido Bórico').map(it => it.res.resultado),
+        texto3: erpTextoLinha(p.itens.find(x => x.gleba === 'SETOR 3 ROMARIA' && x.produto === 'Ácido Bórico'), 'f23'), texto4: erpTextoLinha(p.itens.find(x => x.gleba === 'SETOR 4 ROMARIA' && x.produto === 'Ácido Bórico'), 'f23'),
+        abertos: [...document.querySelectorAll('#app details[data-erp-grupo]')].map(d => d.querySelector('summary').textContent.replace(/\s+/g, ' ').replace(/›\s*$/, '').trim() + (d.open ? ' [aberto]' : ' [fechado]')),
+        texto: document.querySelector('#app').textContent.replace(/\s+/g, ' '), nativos: window.__nativos || 0 };
+    });
+    ok('ERP 2.3) Propriedade do ERP → unidade pelo de-para da ata por id (FAZENDA VEREDA ROMARIA → f23); competência set/2026 do período; operação FERTIRRIGACAO',
+      C.antes.unidade === 'f23' && C.antes.comp === '2026-09' && C.antes.op === 'FERTIRRIGACAO', C.antes.unidade + ' · ' + C.antes.comp + ' · ' + C.antes.op);
+    ok('ERP 2.3) Gleba do ERP → talhão NÃO é adivinhada ("SETOR 1" nunca casa por conter "1"): 8 seletores, botão inativo dizendo o que falta',
+      C.antes.glebasSemTalhao === 8 && C.antes.selects === 8 && C.antes.inativo && /Ligue cada gleba/.test(C.antes.falta), C.antes.glebasSemTalhao + ' sem talhão · ' + C.antes.selects + ' seletor(es) · "' + C.antes.falta + '"');
+    ok('ERP 2.3) Insumo do ERP → D.insumos pelo de-para de produtos (ACIDO BORICO → Ácido Bórico, SULFATO DE MANGANES BRANCO 31% → Sulf. Manganês, SULFATO DE ZINCO 20% → Sulf. Zinco)',
+      C.antes.produtos.join('|') === 'ACIDO BORICO→Ácido Bórico|SULFATO DE MANGANES BRANCO 31%→Sulf. Manganês|SULFATO DE ZINCO 20%→Sulf. Zinco', C.antes.produtos.join(' | '));
+    ok('ERP e) SETOR 1: 300 kg bórico, 125 kg Mn e 150 kg Zn em 05/09 → as 3 linhas ✅ Bate', C.s1.join() === 'bate,bate,bate', C.s1.join(' · '));
+    ok('ERP e) SETOR 2: bórico 100 kg em 03/09 + 100 kg em 04/09 → ✅ Bate (soma)', C.s2 === 'bate', C.s2);
+    ok('ERP e) SETOR 3: bórico 200 kg em 12/09 → ⚠️ Quantidade diferente, explicada em palavras', C.s3 === 'qtd_dif' && /app 200 kg \(12\/09\) × ERP 250 kg/.test(C.texto3), C.texto3);
+    ok('ERP e) SETOR 4 sem bórico e SETOR 5 com 250 kg em 11/09 → SETOR 4 ⚠️ Talhão diferente ("possível setor trocado") e SETOR 5 ➕ Só no ERP (o lançamento já foi usado no desempate)',
+      C.s4 === 'talhao_dif' && C.s5 === 'so_erp' && /possível setor trocado: app no Setor 5 .*ERP no Setor 4/.test(C.texto4), C.s4 + ' · ' + C.s5 + ' · ' + C.texto4);
+    ok('ERP e) SETOR 6 marcado em "Em quais setores?" em 10/09, sem produto → as 3 linhas ✅ Lançado sem quantidade', C.s6.join() === 'sem_qtd,sem_qtd,sem_qtd', C.s6.join(' · '));
+    ok('ERP e) SETOR 7: bórico 200 kg em 20/08 → ⚠️ Fora da janela', C.s7 === 'fora_janela', C.s7);
+    ok('ERP e) SETOR 8 sem nada → as 3 linhas ➕ Só no ERP; todas as outras linhas sem lançamento → ➕', C.s8.join() === 'so_erp,so_erp,so_erp' && C.outras.every(r => r === 'so_erp'), C.s8.join(' · ') + ' · outras: ' + [...new Set(C.outras)].join(','));
+    ok('ERP e) Fertirrigação de KCl no SETOR 2 em 08/09 (insumo fora do PDF) → 🔸 Só no app; a adubação de solo de 03/09 NÃO aparece como 🔸',
+      C.soApp.length === 1 && /Setor 2 · kcl · 200 kg no boletim de 08\/09 — sem baixa no ERP — conferir o estoque/.test(C.soApp[0]), C.soApp.join(' | '));
+    ok('ERP Resumo no topo — "Vereda Romaria · Fertirrigação · set/2026 · 24 linhas do ERP · ✅ 7 batem · ➕ 14 completadas pelo ERP · ⚠️ 3 para conferir · 🔸 1 só no app"',
+      /Vereda Romaria · Fertirrigação · set\/2026 · 24 linhas do ERP · ✅ 7 batem · ➕ 14 completadas pelo ERP · ⚠️ 3 para conferir · 🔸 1 só no app/.test(C.texto), JSON.stringify(C.resumo));
+    ok('ERP f) Reprodutível — rodar o casamento duas vezes com a mesma entrada dá resultado idêntico', C.reproduz, '');
+    ok('ERP j) C7 dose/ha fora do padrão do relatório dispara SÓ no SETOR 8 (bórico e zinco), sem juízo agronômico',
+      C.dose.length === 2 && C.dose.every(d => /^SETOR 8 ROMARIA/.test(d)) && /Ácido Bórico/.test(C.dose[0]) && /Sulf\. Zinco/.test(C.dose[1]) && /fora do padrão deste relatório/.test(C.texto) && !/dose alta|errada|tóxic/i.test(C.texto), C.dose.join(' | '));
+    ok('ERP k) C8 — a tarefa «Ferti Iniciou» é sugerida na pré-visualização; nada muda antes de importar', C.tarefas.join() === 'Ferti Iniciou' && /A tarefa «Ferti Iniciou» casa com esta aplicação — concluir\?/.test(C.texto) && /nunca conclui sozinho/.test(C.texto), C.tarefas.join(' | '));
+    ok('ERP 2.6) Pré-visualização — grupos na ordem ⚠️ → 🔸 → ➕ → ✅, com ⚠️ e 🔸 abertos e ➕ e ✅ recolhidos (P5)',
+      C.abertos.length === 4 && /^⚠️\s*Para conferir\s*3 \[aberto\]$/.test(C.abertos[0]) && /^🔸\s*Só no app\s*1 \[aberto\]$/.test(C.abertos[1]) && /^➕\s*Completado pelo ERP\s*14 \[fechado\]$/.test(C.abertos[2]) && /^✅\s*Batem\s*7 \[fechado\]$/.test(C.abertos[3]), C.abertos.join(' | '));
+    ok('ERP 2.6) UM botão "Importar e abrir conferência", ativo depois de ligar as glebas; zero diálogo nativo', C.rotulo === 'Importar e abrir conferência' && !C.inativo && C.falta === '' && !C.nativos, C.rotulo + ' · falta "' + C.falta + '"');
+    ok('ERP n) Pré-visualização — nenhum custo e nenhum termo proibido', !/R\$|custo|não fez|não lançou|erro do gerente|pendente|atrasad/i.test(C.texto), '');
+    /* g) completar: importa e prova que farol, dias sem registro e boletins ficam idênticos */
+    const G = await page.evaluate(async () => {
+      const antes = { bol: JSON.stringify(D.boletins), farol: JSON.stringify(farolPorUnidade()), dsr: JSON.stringify(dsrCache), baixas: erpBaixas().length, msgs: insMensagens().length };
+      window.__nativos = 0;
+      document.getElementById('bt-ins-importar').click();
+      await new Promise(r => setTimeout(r, 200));
+      const depois = { bol: JSON.stringify(D.boletins), farol: JSON.stringify(farolPorUnidade()), dsr: JSON.stringify(dsrCache), baixas: erpBaixas().length, msgs: insMensagens().length };
+      const b1 = erpBaixas().find(b => b.glebaErp === 'SETOR 1 ROMARIA' && b.produto === 'Ácido Bórico');
+      const imp = erpImportacoes()[0];
+      const abertos = erpAbertos();
+      const past = planPastilhas().map(p => p.txt);
+      const ex = planExecucao(planTarefa('tar-ferti'));
+      const zn = insSaldos('f23').find(l => l.nome === 'Sulf. Zinco');
+      insUI.cons = 'f23|' + insChaveProd('Sulf. Zinco'); ir('colar', null, true);
+      const listaApl = insListaAplicadoErp('f23', zn).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const det = [...document.querySelectorAll('#app details[data-erp-grupo]')].map(d => d.querySelector('summary').textContent.replace(/\s+/g, ' ').replace(/›\s*$/, '').trim() + (d.open ? ' [aberto]' : ' [fechado]'));
+      const alvo = Math.min(...[...document.querySelectorAll('#app [data-erp-abrir]')].map(b => b.getBoundingClientRect().height));
+      return { antes, depois, b1, impResumo: imp && imp.resumo, impLinhas: imp ? imp.linhas.length : 0, soApp: imp ? imp.soApp.length : 0, abertos: abertos.length, past, nativos: window.__nativos,
+        tela: telaAtual, nav: (insNav[insNav.length - 1] || {}).v, h1: (document.querySelector('#app .topo h1') || {}).textContent.replace(/\s+/g, ' ').trim(),
+        ex: { ha: ex.ha, n: ex.n, erp: ex.itens.filter(l => l.origem === 'erp').length, por: [...new Set(ex.itens.map(l => l.por))] }, zn: zn && { recebido: zn.recebido, aplicado: zn.aplicado, saldo: zn.saldo, erp: zn.baixadoErp },
+        listaApl, det, alvo, fila: syncFila.filter(x => x.t === 'erp').length, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    });
+    ok('ERP g) "Importar e abrir conferência" grava 24 linhas em D.baixasErp (fila offline "erp") e a trilha em Mensagens importadas; abre a tela da conferência',
+      G.depois.baixas - G.antes.baixas === 24 && G.fila === 24 && G.depois.msgs - G.antes.msgs === 1 && G.tela === 'colar' && G.nav === 'erpconf' && /Conferência ERP × App/.test(G.h1) && !G.nativos,
+      (G.depois.baixas - G.antes.baixas) + ' linhas · fila ' + G.fila + ' · ' + G.nav + ' · ' + G.h1);
+    ok('ERP b) A linha gravada leva lancado_erp_ini "2026-09-15 16:22:44", lancado_erp_fim "2026-09-15 17:00:00", competência 2026-09, status vigente, emitido 15/09 16:39:47',
+      G.b1 && G.b1.lancadoErpIni === '2026-09-15 16:22:44' && G.b1.lancadoErpFim === '2026-09-15 17:00:00' && G.b1.competencia === '2026-09' && G.b1.status === 'vigente' && G.b1.emitidoErpEm === '2026-09-15 16:39:47' && G.b1.talhaoId === 't101',
+      G.b1 ? G.b1.lancadoErpIni + ' → ' + G.b1.lancadoErpFim + ' · ' + G.b1.competencia : 'linha não achada');
+    ok('ERP g) Nenhum boletim é reescrito; farol de registro e dias sem registro de Vereda Romaria ficam idênticos antes e depois da importação',
+      G.antes.bol === G.depois.bol && G.antes.farol === G.depois.farol && G.antes.dsr === G.depois.dsr, '');
+    ok('ERP g) As linhas ➕ COMPLETAM o executado da tarefa «Ferti Iniciou» com "origem: ERP" (soma em ha dos talhões distintos)',
+      G.ex.erp > 0 && G.ex.por.includes('origem: ERP') && G.ex.ha > 0, G.ex.n + ' lançamento(s), ' + G.ex.erp + ' do ERP, ' + G.ex.ha + ' ha · por: ' + G.ex.por.join(' / '));
+    ok('ERP 2.5) Regra de saldo — sulf. zinco: recebido 2.000 + boletim 150 kg (set) + baixa ERP 950 kg → aplicado 950 e saldo 1.050 (a baixa manda; o boletim do mês vira conferência, nunca soma)',
+      G.zn && G.zn.recebido === 2000 && Math.abs(G.zn.aplicado - 950) < 0.01 && Math.abs(G.zn.saldo - 1050) < 0.01 && Math.abs(G.zn.erp - 950) < 0.01, JSON.stringify(G.zn));
+    ok('ERP 2.5) O toque no "aplicado" diz de onde veio o número: "baixa do ERP de 15/09 · origem: ERP" e o lançamento do boletim como "conferência · mês coberto pela baixa do ERP, não soma"',
+      /baixa do ERP de 15\/09/.test(G.listaApl) && /origem: ERP/.test(G.listaApl) && /conferência · mês coberto pela baixa do ERP, não soma/.test(G.listaApl), G.listaApl.slice(0, 160));
+    ok('ERP 2.6) Tela da conferência — ⚠️ 3 e 🔸 1 abertos, ➕ 14 e ✅ 7 recolhidos; cada item é UMA linha tocável ≥ 44 px',
+      G.det.length === 4 && /⚠️\s*Para conferir\s*3 \[aberto\]/.test(G.det[0]) && /🔸\s*Só no app\s*1 \[aberto\]/.test(G.det[1]) && /\[fechado\]/.test(G.det[2]) && /\[fechado\]/.test(G.det[3]) && G.alvo >= 44, G.det.join(' | ') + ' · alvo ' + G.alvo + ' px');
+    ok('ERP i) Pastilha "🔎 4 lançamentos do ERP para conferir" (3 ⚠️ + 1 🔸) na porta de entrada; zero notificação push',
+      G.past.includes('🔎 4 lançamentos do ERP para conferir') && G.abertos === 4, G.past.join(' | '));
+    ok('ERP n) Tela da conferência — sem custo e sem termo proibido', !/R\$|custo|não fez|não lançou|erro do gerente|pendente|atrasad/i.test(G.texto), '');
+    /* h) resolver com chips e desfazer no lugar */
+    const H = await page.evaluate(async () => {
+      const b3 = erpBaixas().find(b => b.glebaErp === 'SETOR 3 ROMARIA' && b.produto === 'Ácido Bórico');
+      document.querySelector('[data-erp-abrir="' + b3.id + '"]').click(); await new Promise(r => setTimeout(r, 100));
+      const chips = [...document.querySelectorAll('[data-erp-res^="' + b3.id + '|"]')].map(c => c.textContent.trim());
+      const lado = document.querySelector('[data-erp-item="' + b3.id + '"] .plan-acoes').textContent.replace(/\s+/g, ' ');
+      const alturaAntes = document.documentElement.scrollHeight, telaAntes = telaAtual, campos = document.querySelectorAll('[data-erp-item="' + b3.id + '"] input, [data-erp-item="' + b3.id + '"] select, [data-erp-item="' + b3.id + '"] textarea').length;
+      window.__nativos = 0;
+      document.querySelector('[data-erp-res="' + b3.id + '|mesmo"]').click(); await new Promise(r => setTimeout(r, 100));
+      const dep1 = { estado: b3.conf.estado, hist: b3.conf.historico.length, abertos: erpAbertos().length, salvo: (document.querySelector('[data-erp-item="' + b3.id + '"]') || {}).textContent.replace(/\s+/g, ' '), desfazer: !!document.querySelector('[data-erp-res="' + b3.id + '|desfazer"]') };
+      document.querySelector('[data-erp-res="' + b3.id + '|desfazer"]').click(); await new Promise(r => setTimeout(r, 100));
+      const dep2 = { estado: b3.conf.estado, hist: b3.conf.historico.length, abertos: erpAbertos().length, motivo: b3.conf.historico[1] && b3.conf.historico[1].motivo, quem: b3.conf.historico[0].por };
+      return { chips, lado, campos, dep1, dep2, nativos: window.__nativos, mesmaTela: telaAtual === telaAntes, modal: !!document.querySelector('dialog[open], .folha') };
+    });
+    ok('ERP 2.6) O toque abre, NO LUGAR, a linha do ERP lado a lado com o lançamento do app (data, talhão, quantidade e quem lançou), sem campo e sem modal',
+      /ERP\s*SETOR 3 ROMARIA · ACIDO BORICO · lançado no ERP em 15\/09/.test(H.lado) && /Boletim\s*12\/09 · Setor 3 · Adubação via fertirrigação · Gerente Romaria/.test(H.lado) && H.campos === 0 && !H.modal && H.mesmaTela, H.lado.slice(0, 200));
+    ok('ERP 2.6) Chips de resolução: é o mesmo lançamento · são aplicações diferentes · pedir conferência ao gerente · ERP precisa de correção',
+      H.chips.join(' · ') === 'é o mesmo lançamento · são aplicações diferentes · pedir conferência ao gerente · ERP precisa de correção', H.chips.join(' · '));
+    ok('ERP h) "é o mesmo lançamento" grava na hora: o item sai da contagem aberta (4 → 3), "✔ Salvo · é o mesmo lançamento · desfazer" no lugar, 1 entrada no histórico; zero nativo',
+      H.dep1.estado === 'mesmo' && H.dep1.hist === 1 && H.dep1.abertos === 3 && /✔ Salvo · é o mesmo lançamento/.test(H.dep1.salvo) && H.dep1.desfazer && !H.nativos, H.dep1.estado + ' · ' + H.dep1.abertos + ' abertos');
+    ok('ERP h) "desfazer" volta ao estado anterior (aberta, 4 para conferir) com 2 entradas no histórico (quem, quando, de → para, "desfeito")',
+      H.dep2.estado === 'aberta' && H.dep2.hist === 2 && H.dep2.abertos === 4 && H.dep2.motivo === 'desfeito' && H.dep2.quem === 'Escritório', H.dep2.estado + ' · ' + H.dep2.hist + ' · ' + H.dep2.abertos);
+    /* k) a tarefa só muda com o toque em "Concluí" */
+    const K = await page.evaluate(async () => {
+      const antes = planTarefa('tar-ferti').status;
+      const chip = document.querySelector('[data-erp-tar="tar-ferti|concluir"]'); const rot = [...document.querySelectorAll('[data-erp-tar^="tar-ferti|"]')].map(c => c.textContent.trim());
+      if (chip) chip.click(); await new Promise(r => setTimeout(r, 150));
+      return { antes, rot, depois: planTarefa('tar-ferti').status, hist: planHistDe('tar-ferti').filter(h => h.campo === 'status').length };
+    });
+    ok('ERP k) C8 — «Ferti Iniciou» estava A INICIAR; os chips "Concluí · ainda não" existem e o status só muda com o toque em Concluí',
+      K.antes === 'a_iniciar' && K.rot.join(' · ') === 'Concluí · ainda não' && K.depois === 'finalizado' && K.hist === 1, K.antes + ' → ' + K.depois + ' · ' + K.rot.join(' · '));
+    /* c) reimportação: 0 linhas novas e botão inativo com a falta certa */
+    const R = await page.evaluate(async base => {
+      insLimpar(); insNav = [{ v: 'colar' }]; ir('colar');
+      const buf = await (await fetch(base + '/tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf')).arrayBuffer();
+      await erpAnexarBytes(buf, 'erp-ferti-vereda-romaria-2026-09-15.pdf');
+      const p = insUI.prev, bt = document.getElementById('bt-ins-importar');
+      const antes = erpBaixas().length; bt.click(); await new Promise(r => setTimeout(r, 100));
+      return { glebasLigadas: p.glebas.filter(g => g.talhaoId).length, ja: p.jaImportadas, hashIgual: p.hashIgual, falta: bt.getAttribute('data-falta') || '', inativo: bt.classList.contains('acao-off'), novas: erpBaixas().length - antes,
+        texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    }, base);
+    ok('ERP 2.3) Na segunda importação as 8 glebas já vêm ligadas aos talhões (de-para aprendido — não pergunta de novo)', R.glebasLigadas === 8, R.glebasLigadas + ' ligadas');
+    ok('ERP c) C1 — o mesmo PDF dá 0 linhas novas (24 "já importada em 15/09 por Escritório") e o botão fica inativo com "Este relatório já foi importado em 15/09."',
+      R.ja === 24 && R.hashIgual && R.inativo && R.falta === 'Este relatório já foi importado em 15/09.' && R.novas === 0 && /já importada/i.test(R.texto) && /por Escritório/.test(R.texto), R.ja + ' já importadas · "' + R.falta + '" · ' + R.novas + ' nova(s)');
+    /* d) C3 — mesmo PDF com SETOR 3 ácido bórico = 300: três chips, nada gravado antes da resposta; "substituir" deixa 2 linhas (1 superada) */
+    const D3 = await page.evaluate(async () => {
+      const L = insUI.erp; const r = L.linhas.find(x => x.gleba === 'SETOR 3 ROMARIA' && /BORICO/.test(x.campos.insumo));
+      r.campos.qtde = 300; r.campos.doseHa = 300 / 22.15; L.hash = 'x' + L.hash; insAbrirPrev(); ir('colar');
+      const p = insUI.prev, bt = document.getElementById('bt-ins-importar');
+      const it = p.conflitos[0];
+      const chips = [...document.querySelectorAll('[data-erp-c3]')].map(c => c.textContent.trim());
+      const textoPrev = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      const marcadoAntes = p.conflitos.filter(x => x.conflito.resposta).length;
+      const antes = erpBaixas().length;
+      bt.click(); await new Promise(r => setTimeout(r, 100));
+      const gravouAntes = erpBaixas().length - antes;
+      const falta = bt.getAttribute('data-falta') || '';
+      document.querySelector('[data-erp-c3="' + it.i + '|substituir"]').click(); await new Promise(r => setTimeout(r, 100));
+      const bt2 = document.getElementById('bt-ins-importar'); const ativo = !bt2.classList.contains('acao-off');
+      bt2.click(); await new Promise(r => setTimeout(r, 200));
+      const s3 = erpBaixas().filter(b => b.glebaErp === 'SETOR 3 ROMARIA' && b.produto === 'Ácido Bórico');
+      return { conflitos: p.conflitos.length, chips, marcado: marcadoAntes, gravouAntes, falta, ativo, novas: erpBaixas().length - antes,
+        s3: s3.map(b => b.qtde + ' ' + b.status + (b.superadaPor ? ' → superada por outra' : '') + (b.substitui ? ' (substitui a anterior)' : '')), res300: (s3.find(b => b.qtde === 300) || { casamento: {} }).casamento.resultado, texto: textoPrev };
+    });
+    ok('ERP d) C3 — a linha já importada com OUTRA quantidade mostra "já existe 250 kg (lançado 15/09); este relatório traz 300 kg" com três chips, nenhum marcado',
+      D3.conflitos === 1 && D3.chips.join(' · ') === 'substituir · somar como outra aplicação · ignorar esta linha' && D3.marcado === 0 && /já existe 250 kg \(lançado 15\/09\); este relatório traz 300 kg/.test(D3.texto), D3.chips.join(' · ') + ' · ' + (D3.texto.match(/já existe[^·]{0,80}/) || [''])[0]);
+    ok('ERP d) C3 — o "Importar" fica inativo até o conflito ser respondido e NADA é gravado antes', D3.gravouAntes === 0 && /Responda o que fazer/.test(D3.falta), '"' + D3.falta + '" · ' + D3.gravouAntes + ' gravada(s)');
+    ok('ERP d) C3 — "substituir" libera o botão e deixa 2 linhas no banco: a de 250 kg superada (com a ligação) e a de 300 kg vigente; as outras 23 não entram de novo',
+      D3.ativo && D3.novas === 1 && D3.s3.length === 2 && D3.s3.includes('250 superada → superada por outra') && D3.s3.includes('300 vigente (substitui a anterior)') && D3.res300 === 'qtd_dif', D3.s3.join(' | ') + ' · ' + D3.novas + ' nova(s) · a nova é ' + D3.res300 + ' (o lançamento de 200 kg foi liberado pela linha substituída)');
+    /* m) só a mensagem: relato sem quantidade, sem casamento, saldo inalterado */
+    const M = await page.evaluate(async msg => {
+      const saldoAntes = JSON.stringify(insSaldos('f23'));
+      insLimpar(); insNav = [{ v: 'colar' }]; ir('colar'); await new Promise(r => setTimeout(r, 100));
+      const ta = document.getElementById('ins-texto'); ta.value = msg; ta.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 50));
+      document.getElementById('bt-ins-ler').click(); await new Promise(r => setTimeout(r, 150));
+      const cls = insClassificar(msg), p = insUI.prev, bt = document.getElementById('bt-ins-importar');
+      const out = { tipo: cls.tipo, soMensagem: !!(p && p.soMensagem), unidade: p && p.unidade, comp: p && p.competencia, op: p && p.operacaoErp, produtos: p ? p.produtos.map(x => x.erp + '→' + x.produto) : [], finalizada: p && p.finalizada,
+        rotulo: bt ? bt.textContent.trim() : '', inativo: !!bt && bt.classList.contains('acao-off'), texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+      const antesB = erpBaixas().length; bt.click(); await new Promise(r => setTimeout(r, 150));
+      out.baixasNovas = erpBaixas().length - antesB; out.relatos = erpRelatos().length; out.flash = insUI.flash; out.saldoIgual = JSON.stringify(insSaldos('f23')) === saldoAntes;
+      insNav = [{ v: 'colar' }, { v: 'erp' }]; ir('colar'); out.lista = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      return out;
+    }, MSG_ERP);
+    ok('ERP m) Só a mensagem — classificada como "Aplicação realizada (baixa do ERP)"; unidade Vereda-Romaria → f23 por id, competência 2026-09 ("mês de Setembro/26"), fertirrigação, 3 produtos pelo de-para, "finalizada"',
+      M.tipo === 'erp' && M.soMensagem && M.unidade === 'f23' && M.comp === '2026-09' && M.op === 'FERTIRRIGACAO' && M.produtos.join('|') === 'Acido borico→Ácido Bórico|Sulf. Manganês→Sulf. Manganês|Sulf. Zinco→Sulf. Zinco' && M.finalizada,
+      M.tipo + ' · ' + M.unidade + ' · ' + M.comp + ' · ' + M.produtos.join(' | '));
+    ok('ERP m) Só a mensagem — "Importar relato" grava um relato SEM quantidade (0 baixas, 0 casamento), o saldo não muda e a lista diz "aguardando relatório do ERP"; nunca estima kg',
+      M.rotulo === 'Importar relato' && !M.inativo && M.baixasNovas === 0 && M.relatos === 1 && M.saldoIgual && /aguardando relatório do ERP/.test(M.lista) && /Nunca estimamos kg/.test(M.texto), M.rotulo + ' · ' + M.baixasNovas + ' baixa(s) · ' + M.relatos + ' relato(s)');
+    /* o) layout desconhecido: nada gravado, texto na trilha */
+    const O = await page.evaluate(async () => {
+      const lido = erpLerItens([[{ s: 'Relatório de estoque', x: 40, y: 500, w: 80 }, { s: 'Produto', x: 40, y: 480, w: 30 }, { s: 'Saldo', x: 200, y: 480, w: 20 }, { s: 'Ureia', x: 40, y: 468, w: 20 }, { s: '1.000', x: 200, y: 468, w: 20 }]], 'estoque.pdf');
+      const original = erpLerBytes; erpLerBytes = async () => lido;
+      insLimpar(); insNav = [{ v: 'colar' }]; ir('colar'); await new Promise(r => setTimeout(r, 100));
+      const antes = { baixas: erpBaixas().length, msgs: insMensagens().length };
+      await erpAnexarBytes(new ArrayBuffer(8), 'estoque.pdf'); await new Promise(r => setTimeout(r, 100));
+      erpLerBytes = original;
+      const m = insMensagens()[insMensagens().length - 1];
+      return { ok: lido.ok, motivo: lido.motivo, baixas: erpBaixas().length - antes.baixas, msgs: insMensagens().length - antes.msgs, prev: !!insUI.prev, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' '), guardou: /Relatório de estoque/.test(m.texto) };
+    });
+    ok('ERP o) Layout desconhecido — "Não reconheci este relatório do ERP.", nada gravado, texto extraído guardado na trilha de mensagens',
+      !O.ok && O.motivo === 'Não reconheci este relatório do ERP.' && O.baixas === 0 && O.msgs === 1 && O.guardou && !O.prev && /Não reconheci este relatório do ERP/.test(O.texto), O.motivo + ' · ' + O.baixas + ' baixa(s) · ' + O.msgs + ' mensagem(ns)');
+    /* painel (c19) e Cadastros › Insumos › Baixas do ERP */
+    const PC = await page.evaluate(async () => {
+      sessao = { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' }; ritualPuladoSessao = true; ir('painel'); await new Promise(r => setTimeout(r, 200));
+      const det = [...document.querySelectorAll('#app details.secao')].find(d => /Conferência ERP × App/.test(d.querySelector('summary').textContent));
+      if (!det) return { existe: false };
+      const out = { existe: true, fechado: !det.open, resumo: det.querySelector('summary .resumo').textContent.trim() };
+      det.open = true; const uns = [...det.querySelectorAll('[data-painelun]')];
+      out.unidades = uns.map(b => b.querySelector('b').textContent.trim()); out.campos = det.querySelectorAll('.corpo input, .corpo select, .corpo textarea').length; out.alvo = Math.min(...uns.map(b => b.getBoundingClientRect().height));
+      uns[0].click(); await new Promise(r => setTimeout(r, 200));
+      out.un = { tela: telaAtual, ctx: (document.querySelector('.topo.ctx h1') || {}).textContent.replace(/\s+/g, ' ').trim(), chips: document.querySelectorAll('#app [data-erp-abrir]').length, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+      const insCard = [...document.querySelectorAll('#app details.secao')].find(d => /Insumos/.test(d.querySelector('summary').textContent));
+      ir('painel'); await new Promise(r => setTimeout(r, 150));
+      const ins = [...document.querySelectorAll('#app details.secao')].find(d => /^\s*📦\s*Insumos/.test(d.querySelector('summary').textContent.replace(/\s+/g, ' ')));
+      out.insTexto = ins ? ins.textContent.replace(/\s+/g, ' ') : '';
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' }; cadNav = [{ v: 'menu' }, { v: 'insumos' }]; cadLimpar(); ir('cadastros'); await new Promise(r => setTimeout(r, 150));
+      out.cadInsumos = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+      cadNav = [{ v: 'menu' }, { v: 'insumos' }, { v: 'insbaixas' }]; ir('cadastros'); await new Promise(r => setTimeout(r, 150));
+      out.cadBaixas = document.querySelector('#app').textContent.replace(/\s+/g, ' '); out.cadNivel = cadNav.length;
+      const item = document.querySelector('#app [data-erp-abrirconf]'); if (item) item.click(); await new Promise(r => setTimeout(r, 200));
+      out.abriu = { tela: telaAtual, nav: (insNav[insNav.length - 1] || {}).v }; for (let k = 0; k < 3; k++) { document.querySelector('[data-insvoltar]').click(); await new Promise(r => setTimeout(r, 100)); } out.voltou = telaAtual;
+      return out;
+    });
+    ok('ERP 2.6) Painel — cartão "🔎 Conferência ERP × App" no padrão c19: nasce fechado, resumo neutro na linha, lista só UNIDADES (alvo ≥ 44 px, zero campo)',
+      PC.existe && PC.fechado && /1 unidade · 4 para conferir/.test(PC.resumo) && PC.unidades.join() === 'Vereda Romaria' && PC.campos === 0 && PC.alvo >= 44, PC.existe ? PC.resumo + ' · ' + PC.unidades.join(',') : 'cartão não encontrado');
+    ok('ERP 2.6) Painel — o toque abre a TELA da unidade com cabeçalho contextual e a conferência inteira (itens tocáveis), sem nome de pessoa e sem termo proibido',
+      PC.existe && PC.un.tela === 'painelun' && /Vereda Romaria/.test(PC.un.ctx) && PC.un.chips >= 4 && !/não fez|não lançou|erro do gerente|pendente|R\$|custo/i.test(PC.un.texto), PC.existe ? PC.un.tela + ' · ' + PC.un.ctx + ' · ' + PC.un.chips + ' chip(s)' : '');
+    ok('ERP 2.6) Painel › cartão "📦 Insumos" — a unidade mostra "baixado no ERP" ao lado de recebido, aplicado e saldo', /baixado no ERP/.test(PC.insTexto || ''), (PC.insTexto || '').slice(0, 200));
+    ok('ERP 2.6) Cadastros › Insumos › "🔎 Baixas do ERP" (nível 3): lista por unidade e competência com link para a conferência; "‹ Voltar" devolve a Cadastros',
+      /Baixas do ERP/.test(PC.cadInsumos) && PC.cadNivel === 3 && /Vereda Romaria · set\/2026/.test(PC.cadBaixas) && /linhas · /.test(PC.cadBaixas) && PC.abriu.tela === 'colar' && PC.abriu.nav === 'erpconf' && PC.voltou === 'cadastros', PC.abriu.tela + '/' + PC.abriu.nav + ' → ' + PC.voltou);
+    /* i) resolvidos todos, a pastilha some */
+    const I = await page.evaluate(() => {
+      erpAbertos().forEach(x => erpResolver(x.id, 'diferentes'));
+      return { abertos: erpAbertos().length, past: planPastilhas().map(p => p.txt), notif: typeof Notification === 'undefined' ? 'sem' : 'ok' };
+    });
+    ok('ERP i) Resolvidos os 4 itens em aberto (a linha de 250 kg superada no C3 saiu da conta; a de 300 kg entrou), a pastilha "🔎 … para conferir" some (N = 0); nenhuma notificação push existe no módulo', I.abertos === 0 && !I.past.some(t => /🔎/.test(t)), I.past.join(' | ') || 'sem pastilha');
+    estadoErp = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  /* l) o exemplo literal da tarefa: recebido 2.000 kg de ácido bórico + boletim com 100 kg + baixa ERP de 1.900 kg dá saldo 100 (não 0) */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-15T17:00:00-03:00');
+    const Lq = await page.evaluate(async base => {
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' };
+      D.boletins = D.boletins.filter(b => b.fazendaId !== 'f23');
+      D.boletins.push({ id: 'bl1', fazendaId: 'f23', data: '2026-09-06', responsavel: 'Gerente Romaria', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '', diaristas: '', funcoes: [] },
+        atividades: [{ id: 'al1', talhaoId: 't102', tipo: 'Adubação via fertirrigação', pessoas: '2', obs: '', status: '', insProduto: 'Ácido Bórico', insDoseKgHa: String(100 / 22.15), insAreaHa: '22.15' }],
+        colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {}, enviadoEm: '2026-09-06T18:00:00' });
+      insRecebimentos().push({ id: 'rec-b', unidade: 'f23', produto: 'Ácido Bórico', kg: 2000, data: '2026-09-01', por: 'Gerente Romaria' });
+      salvarDados();
+      const antes = insSaldos('f23').find(l => l.nome === 'Ácido Bórico');
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; }); await new Promise(r => setTimeout(r, 100));
+      const buf = await (await fetch(base + '/tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf')).arrayBuffer();
+      await erpAnexarBytes(buf, 'erp-ferti-vereda-romaria-2026-09-15.pdf');
+      const p = insUI.prev; p.glebas.forEach((g, i) => { g.talhaoId = 't10' + (i + 1); }); erpRecalcular(p); erpImportar(); await new Promise(r => setTimeout(r, 100));
+      const depois = insSaldos('f23').find(l => l.nome === 'Ácido Bórico');
+      return { antes: antes && { aplicado: antes.aplicado, saldo: antes.saldo }, depois: depois && { aplicado: depois.aplicado, saldo: depois.saldo, erp: depois.baixadoErp } };
+    }, base);
+    ok('ERP l) Saldo — recebido 2.000 kg de ácido bórico + boletim com 100 kg + baixa ERP de 1.900 kg dá saldo 100 kg (não 0): antes 1.900, depois 100',
+      Lq.antes && Math.abs(Lq.antes.saldo - 1900) < 0.01 && Lq.depois && Math.abs(Lq.depois.aplicado - 1900) < 0.01 && Math.abs(Lq.depois.saldo - 100) < 0.01, JSON.stringify(Lq));
     errosTodos.push(...erros);
     await ctx.close();
   }

@@ -1,0 +1,14 @@
+pdf.js (Mozilla) — leitor de PDF usado SÓ pela importação do relatório do ERP
+(v96, "📎 Anexar relatório do ERP (PDF)" na porta única "Colar do WhatsApp").
+
+Versão fixa: pdfjs-dist 4.10.38, build "legacy" (roda no Safari do iPhone).
+Arquivos copiados de https://www.npmjs.com/package/pdfjs-dist/v/4.10.38
+(legacy/build/pdf.min.mjs e legacy/build/pdf.worker.min.mjs), sem alteração.
+Licença: Apache 2.0 (arquivo LICENSE ao lado).
+
+Dependência autorizada explicitamente pelo Nilo na tarefa da v96 (CLAUDE.md,
+"Segurança": nenhuma outra biblioteca externa). Guardada DENTRO do repositório —
+nunca por CDN — e carregada sob demanda, só quando alguém toca em "Anexar":
+a tela inicial não fica mais pesada. O service worker guarda os dois arquivos
+no cache do aparelho no primeiro uso; sem internet e sem uso anterior, o app
+diz "A primeira leitura de PDF precisa de internet."
