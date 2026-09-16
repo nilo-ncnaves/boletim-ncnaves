@@ -674,7 +674,7 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
       return { campos, btPdf: btPdf ? btPdf.textContent.trim() : '', ok: L.ok, n: L.n, glebas: L.glebas.length, area: L.somaArea, insumos, totais: insumos.map(tot), duvidosas: L.linhas.filter(r => !r.ok).length,
         l0: L.linhas[0].campos, cab: L.cab, tipo: insUI.tipo, tela: telaAtual, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
     }, base);
-    ok('ERP a) Porta única — o botão "📎 Anexar relatório do ERP (PDF)" existe e a tela de colar continua com UM campo', L.btPdf === '📎 Anexar relatório do ERP (PDF)' && L.campos === 1, L.btPdf + ' · ' + L.campos + ' campo(s)');
+    ok('ERP a) Porta única — o botão "📎 Anexar relatório do Agro1 (PDF)" existe e a tela de colar continua com UM campo', L.btPdf === '📎 Anexar relatório do Agro1 (PDF)' && L.campos === 1, L.btPdf + ' · ' + L.campos + ' campo(s)');
     ok('ERP a) Leitura por posição — 24 linhas, 8 glebas, 164,90 ha, nenhuma leitura duvidosa', L.ok && L.n === 24 && L.glebas === 8 && Math.abs(L.area - 164.9) < 0.01 && L.duvidosas === 0, L.n + ' linhas · ' + L.glebas + ' glebas · ' + L.area + ' ha · ' + L.duvidosas + ' duvidosa(s)');
     ok('ERP a) Leitura — totais 1.900 / 775 / 950 kg e "SULFATO DE MANGANES BRANCO 31%" reunido (nome quebrado em duas linhas)',
       L.insumos.join('|') === 'ACIDO BORICO|SULFATO DE MANGANES BRANCO 31%|SULFATO DE ZINCO 20%' && L.totais.join('/') === '1900/775/950', L.insumos.join(' | ') + ' · ' + L.totais.join(' / '));

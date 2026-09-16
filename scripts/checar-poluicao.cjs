@@ -1975,8 +1975,8 @@ function avaliar(R) {
   if (R.erpPrev) {
     const G = '19. Baixa do ERP: o app casa sozinho, completa e abre a conferência';
     const P = R.erpPrev, D = P.depois || {}, C = R.erpConf || {};
-    add(G, 'Porta única — "📎 Anexar relatório do ERP (PDF)" ao lado do campo de colar; a tela continua com UM campo e o botão tem ≥ 44 px',
-      P.botao === '📎 Anexar relatório do ERP (PDF)' && P.campos === 1 && P.alvo >= TOQUE_MIN, `"${P.botao}" · ${P.campos} campo(s) · ${P.alvo} px`);
+    add(G, 'Porta única — "📎 Anexar relatório do Agro1 (PDF)" ao lado do campo de colar; a tela continua com UM campo e o botão tem ≥ 44 px',
+      P.botao === '📎 Anexar relatório do Agro1 (PDF)' && P.campos === 1 && P.alvo >= TOQUE_MIN, `"${P.botao}" · ${P.campos} campo(s) · ${P.alvo} px`);
     add(G, 'PDF anexado — leitura por posição (24 linhas), classificação certa e a pré-visualização abre na hora, sem outro toque e sem nativo',
       P.ok && P.n === 24 && P.tipo === 'erp' && P.tela === 'colar' && P.nativos === 0, `${P.n} linhas · tipo ${P.tipo}`);
     add(G, 'Pré-visualização — gleba do ERP → talhão NÃO é adivinhada: 8 seletores e o botão nasce inativo dizendo o que falta',
