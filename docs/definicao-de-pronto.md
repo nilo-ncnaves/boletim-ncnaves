@@ -1031,7 +1031,7 @@ mensagem real do grupo "Aplicações Realizadas"):
    duas linhas), data final/hora final da linha quebrada na coluna certa;
    cabeçalho (propriedade, atividade, empreendimento, safra, operação,
    período, emissão); nenhuma leitura duvidosa (área × dose/ha fecha com a
-   quantidade a 0,5 %); layout desconhecido → "Não reconheci este relatório
+   quantidade a 1 %); layout desconhecido → "Não reconheci este relatório
    do ERP.", nada gravado, texto extraído na trilha.
 2. **Datas:** hora do ERP gravada como LANÇAMENTO (`lancado_erp_ini/fim`),
    competência do mês (da mensagem ou do período); nenhuma tela diz
@@ -1039,7 +1039,7 @@ mensagem real do grupo "Aplicações Realizadas"):
 3. **Identidade por id:** propriedade → unidade pelo de-para da ata (exato);
    gleba → talhão pergunta na primeira vez (8 seletores, botão inativo
    dizendo o que falta) e não pergunta na segunda; insumo → produto pelo
-   de-para de produtos; área da gleba ≠ talhão em mais de 2 % vira aviso.
+   de-para de produtos; área da gleba ≠ talhão em mais de 5 % vira aviso.
 4. **Casamento determinístico (`erpCasar`), o resultado por linha do caso
    real:** SETOR 1 ✅ Bate ×3 · SETOR 2 ✅ Bate (soma de dois dias) · SETOR 3
    ⚠️ Quantidade diferente · SETOR 4 ⚠️ Talhão diferente e SETOR 5 ➕ Só no

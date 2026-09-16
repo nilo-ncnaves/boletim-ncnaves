@@ -6915,12 +6915,19 @@ function insRegistrarChegada(remessaId, fz, kg){
    6. Nunca custo (nem se um relatório futuro trouxer R$), nunca kg estimado
       a partir da mensagem, nunca PDF binário guardado no aparelho.
    ============================================================ */
-const ERP_TOL_PCT=2;               /* quantidade: diferença ≤ 2 % ou ≤ ERP_TOL_KG bate */
-const ERP_TOL_KG=1;
-const ERP_JANELA_DEPOIS_DIAS=3;    /* lançamento do app até N dias depois da data do ERP também entra na janela */
-const ERP_DOSE_FATOR=2;            /* C7: dose/ha acima de N × a mediana das glebas do MESMO relatório → aviso (trocável numa linha) */
-const ERP_AREA_DIF_PCT=2;          /* área da gleba no ERP × área do talhão no app: acima disso, aviso "área diferente do cadastro" */
-const ERP_LINHA_TOL_PCT=0.5;       /* autoconferência da leitura: área × dose/ha deve bater com a quantidade */
+/* ---- TOLERÂNCIAS (decididas para o cenário de implantação, 16/09/2026) ----
+   O boletim começou a ser preenchido em 11/09/2026 e os três campos de insumo do café
+   (produto, dose kg/ha, área) são OPCIONAIS e novos: no primeiro mês a maioria das linhas
+   do ERP vai cair em "➕ Só no ERP" ou "✅ Lançado sem quantidade", e o pouco que casar
+   virá de dose e área DIGITADAS À MÃO, com arredondamento. Por isso as tolerâncias nascem
+   FROUXAS: o que precisa aparecer é o que está realmente trocado (setor errado, aplicação
+   que ninguém lançou), não a diferença de arredondamento. Apertar depois é uma linha. */
+const ERP_TOL_PCT=5;               /* quantidade: diferença ≤ 5 % (ou ≤ ERP_TOL_KG) bate — cobre dose com uma casa e área arredondada */
+const ERP_TOL_KG=2;                /* piso para as linhas pequenas: 5 % de 50 kg seriam 2,5 kg */
+const ERP_JANELA_DEPOIS_DIAS=7;    /* lançamento do app até N dias depois da data do ERP também entra na janela (a mesma semana de INS_COBRANCA_DIAS) */
+const ERP_DOSE_FATOR=2.5;          /* C7: dose/ha acima de N × a mediana das glebas do MESMO relatório → aviso (trocável numa linha) */
+const ERP_AREA_DIF_PCT=5;          /* área da gleba no ERP × área do talhão no app: acima disso, aviso "área diferente do cadastro" */
+const ERP_LINHA_TOL_PCT=1;         /* autoconferência da leitura: área × dose/ha deve bater com a quantidade (relatório com menos casas decimais não vira "leitura duvidosa") */
 const ERP_PDFJS="vendor/pdfjs/pdf.min.mjs";               /* pdf.js (Mozilla) guardado no repositório — nunca CDN */
 const ERP_PDFJS_WORKER="vendor/pdfjs/pdf.worker.min.mjs";
 const ERP_TEXTO_MAX=30000;         /* texto extraído guardado na trilha (mensagens_importadas) */

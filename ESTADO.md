@@ -2054,7 +2054,7 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    DE MANG" + "ANES BRANCO 31%"), inclusive quando a data final da linha
    quebrada cai na segunda linha visual. Números em formato brasileiro.
    Autoconferência antes de mostrar: área × dose/ha tem de bater com a
-   quantidade (0,5 %) e a soma das glebas com o total; linha que falha fica
+   quantidade (1 %) e a soma das glebas com o total; linha que falha fica
    "leitura duvidosa" e não entra no Importar. Layout não reconhecido: "Não
    reconheci este relatório do ERP.", o texto extraído vai para a trilha e
    nada é gravado. **Hora do ERP é hora de LANÇAMENTO** (16:22 a 16:34, fim
@@ -2071,7 +2071,7 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    da unidade na primeira vez ("SETOR 1" nunca casa com um talhão por conter
    "1"), a escolha confirmada vira de-para (`{ata:"SETOR 1 ROMARIA",
    unidade:"f23", talhao:"t101"}`) e a próxima importação não pergunta; área
-   da gleba diferente do talhão em mais de `ERP_AREA_DIF_PCT` = 2 % vira aviso
+   da gleba diferente do talhão em mais de `ERP_AREA_DIF_PCT` = 5 % vira aviso
    "área diferente do cadastro". Insumo do ERP → `D.insumos` pelo
    `D.deparaProdutos` (ampliado com os nomes do relatório: "Sulfato de
    manganês branco 31%" → Sulf. Manganês, "Sulfato de zinco 20%" → Sulf.
@@ -2084,9 +2084,9 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    sem produto; grãos e pecuária, os equivalentes; mesmo motor nas três
    atividades) com a chave **mesma unidade + mesmo talhão + mesmo insumo +
    data na janela** (a competência inteira; sem competência, do 1º dia do mês
-   até a data do ERP; mais `ERP_JANELA_DEPOIS_DIAS` = 3 dias depois). Vários
+   até a data do ERP; mais `ERP_JANELA_DEPOIS_DIAS` = 7 dias depois). Vários
    lançamentos do mesmo talhão e insumo na janela são SOMADOS; tolerância
-   `ERP_TOL_PCT` = 2 % ou 1 kg. Ordem das passadas (a quantidade que bate vale
+   `ERP_TOL_PCT` = 5 % ou 2 kg. Ordem das passadas (a quantidade que bate vale
    mais que o talhão): ✅ Bate → ⚠️ Fora da janela → ✅ Lançado sem quantidade
    → ⚠️ Talhão diferente (menor diferença vence, depois a ordem do PDF) → ⚠️
    Quantidade diferente → ➕ Só no ERP. Um lançamento casa com no máximo UMA
@@ -2117,7 +2117,7 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    recebimento/saldo (v86) continua no cartão "📦 Insumos" do painel. C6 plano
    do agrônomo: kg baixado × previsto por produto acima de `INS_DIVERG_PCT`
    vira aviso âmbar com "previsto pelo agrônomo" e "plano vN" (só telas do
-   escritório/Diretoria). C7 dose/ha acima de `ERP_DOSE_FATOR` = 2 × a mediana
+   escritório/Diretoria). C7 dose/ha acima de `ERP_DOSE_FATOR` = 2,5 × a mediana
    das glebas do mesmo relatório: "dose/ha fora do padrão deste relatório —
    conferir o lançamento no ERP" (no caso real dispara só no SETOR 8, bórico
    e zinco; nunca "dose alta/errada/tóxica"). C8 tarefa aberta da unidade que
@@ -3040,10 +3040,23 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   arquivo e rodar `node scripts/teste_insumos.cjs`: se o leitor por posição
   não reconhecer alguma coluna do layout real, o teste "ERP a)" acusa.
 - **Baixa do ERP (v96) — para o Nilo conferir/decidir:**
-  1. **Tolerâncias:** `ERP_TOL_PCT` = 2 % (ou 1 kg) para "bate";
-     `ERP_JANELA_DEPOIS_DIAS` = 3 dias depois da data do ERP;
-     `ERP_AREA_DIF_PCT` = 2 % para "área diferente do cadastro";
-     `ERP_DOSE_FATOR` = 2 × a mediana (C7). Cada um é uma linha.
+  1. **Tolerâncias — decididas em 16/09/2026 para o cenário de implantação**
+     (o Nilo pediu a decisão; ficam assim até o primeiro mês de uso mostrar
+     outra coisa). O boletim começou em 11/09/2026 e os campos de insumo do
+     café são novos e opcionais: no começo quase tudo cai em "só no ERP" ou
+     "lançado sem quantidade", e o pouco que casa vem de dose e área digitadas
+     à mão. Tolerância apertada só encheria o escritório de aviso de
+     arredondamento. Valores: `ERP_TOL_PCT` = **5 %** (ou `ERP_TOL_KG` = 2 kg,
+     o piso das linhas pequenas) para "bate" — uma diferença real como 200 ×
+     250 kg (20 %) continua aparecendo; `ERP_JANELA_DEPOIS_DIAS` = **7 dias**
+     depois da data do ERP, a mesma semana de `INS_COBRANCA_DIAS`, para o
+     boletim lançado com atraso ainda casar; `ERP_AREA_DIF_PCT` = **5 %** para
+     "área diferente do cadastro" (2 % acusava 0,44 ha num talhão de 22 ha —
+     ruído de cadastro); `ERP_DOSE_FATOR` = **2,5 ×** a mediana (C7), que no
+     relatório real continua disparando exatamente no SETOR 8 (bórico 2,68 × e
+     zinco 2,68 × a mediana) e em nenhum outro; `ERP_LINHA_TOL_PCT` = **1 %**
+     na autoconferência da leitura, para relatório com menos casas decimais não
+     virar "leitura duvidosa". Cada um é uma linha do index.html.
   2. **Ordem do desempate.** A quantidade que bate vale mais que o talhão:
      um lançamento com a quantidade exata de outra linha vira "talhão
      diferente" (setor trocado) antes de a linha do próprio talhão virar
