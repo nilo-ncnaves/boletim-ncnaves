@@ -108,6 +108,9 @@ mensagens_importadas; o PDF em si nunca é guardado. A biblioteca pdf.js
 (Mozilla, Apache 2.0) vive em vendor/pdfjs/ — dependência autorizada pelo
 Nilo na v96, guardada no repositório, nunca por CDN, carregada só ao tocar
 em "Anexar".
+Desde a v99: NENHUMA tabela nova, nenhum campo novo e nenhuma chamada nova
+ao Supabase. A tela 📊 Relatórios da Diretoria só rearranja o que
+baixarRelatorios já guarda em relCache (menu › abas por atividade › folha).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -1214,6 +1217,60 @@ variante por atividade.
 - Conferência: `node scripts/teste_insumos.cjs` (mensagem real do grupo) e
   `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação"; detalhe em
   docs/definicao-de-pronto.md, item 26.
+
+### c22) Lista de leitura com uma entrada por unidade nasce em três níveis (desde a v99)
+Relato do Nilo em 16/09/2026, iPhone a 390 px: Diretoria › 📊 Relatórios
+abria com 24 cartões de texto (um por unidade), café e pecuária misturados
+em ordem alfabética, cada cartão ocupando um quarto da tela, e "📊 Números"
+só depois de oito telas de rolagem. Mesmo diagnóstico da v88. Regra que
+fica: **lista de leitura com uma entrada por unidade nasce em três níveis:
+menu › abas por atividade com uma linha por unidade (nome + estado, sem
+prévia) › tela/folha da unidade; unidades de atividades diferentes nunca
+aparecem na mesma lista.**
+- **Nível 1 é um menu** (`vRelatorios`): uma linha por assunto ("📝 Textos
+  para revisar", "📊 Números"), mesma classe e altura das linhas de unidade
+  da v88 (`cad-item`, ≥ 44 px, seta "›"), com o estado na própria linha
+  (P7: "Devolutiva semanal · 04 a 10/09 · 24 textos"; "último: semana 04 a
+  10/09 · 3 para conferir", âmbar só no número). Nada mais nessa tela:
+  nenhuma prévia, nenhum cartão, nenhum parágrafo; altura ≤ 1 tela. Linha
+  sem conteúdo ("nenhum texto neste período") fica visível e inativa pelo
+  botão de avanço (c10), nunca some.
+- **Nível 2 são abas por atividade** pelo componente ÚNICO
+  `chipsAtividade(attr, atual, o)` do index.html — a fileira ☕ Café · 🌾
+  Grãos · 🐂 Pecuária que o painel da Diretoria já tinha (`data-atv-filtro`),
+  extraída em função; o painel continua byte a byte igual. Ordem fixa do
+  catálogo `ATIVIDADES`, contador no rótulo ("☕ Café (10)"), só as atividades
+  com unidade no ESCOPO do código; escopo de uma atividade só não mostra aba
+  nenhuma, só a lista. Texto sem unidade (`unidade_id` nulo) ou com id fora
+  do catálogo entra em **🏢 Grupo**, primeira à esquerda, só quando existe.
+  A fileira usa a classe de filtros da v80 (`cad-saltos`): quebra em linhas,
+  nunca rola de lado, nunca passa de 390 px; chips ≥ 44 px, sem pílula. A
+  aba escolhida vive só na memória da sessão (`relTextosVista`), nunca em
+  `localStorage`.
+- **Dentro da aba, uma linha por unidade** do escopo, na MESMA ordem da tela
+  inicial (`unidadesPermitidas()` filtrada por `atividadeDe`), nome pelo
+  cadastro (`relUni`) + estado ("robô-redator · 11/09 05:35"), seta à
+  direita. Unidade sem texto: "sem texto neste período", em cinza, sem ação
+  — nunca "não gerou", "faltou". **Nenhuma prévia na lista**: o
+  `cartaoTextoLongo` da v68 continua existindo, mas só na tela do relatório
+  narrativo ("ver com os números ›"), nunca na lista.
+- **A atribuição unidade → atividade é pelo catálogo, por id**
+  (`atividadeDe(f.id)`), nunca por trecho do nome (regra 3 do plano de
+  safra): uma pecuária chamada "Café do Sul" fica em 🐂. Isolamento por
+  atividade é comportamental (c4): o componente é um só; o que muda é o
+  conteúdo por aba.
+- **Nível 3 é a folha/tela que já existia** (`abrirFolhaTexto`, v68): nada
+  muda nela; fechar devolve a mesma aba e a mesma rolagem (P8). "📊 Números"
+  é o conteúdo de antes em tela própria (`vRelNumeros`); a tela do relatório
+  (anterior/próximo, Compartilhar, PDF) é idêntica. Cada "‹" sobe UM degrau
+  (c20): relatório → Números ou Textos → menu → painel/tela inicial.
+- **O que não entra:** ranking, custo, cor de farol em contador de lista
+  (contador não é farol), campo de texto, `prompt()`/`alert()`, calendário,
+  tabela nova, chamada nova ao Supabase. O gerente não vê nada disto.
+- Conferência: `node scripts/teste_relatorios.cjs` (cenários a–g da tarefa)
+  e `scripts/checar-poluicao.cjs`, grupo "20. Relatórios em três níveis"
+  (o grupo 8 da v68 passou a medir o cartão colapsado na tela do relatório
+  narrativo); detalhe em docs/definicao-de-pronto.md, item 28.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

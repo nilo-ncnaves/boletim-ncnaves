@@ -424,12 +424,14 @@ automáticos".
   `bdf:relatorios`, funciona offline com o último baixado; tabela
   inexistente = silêncio. Diretoria/ADMIN (v58): botão grande
   "📊 Relatórios" no topo do painel e atalho "Relatórios" na tela de
-  entrada abrem a tela própria `vRelatorios` — em cima "📝 Textos para
-  revisar" (devolutivas e painel executivo do último período, texto
-  visível, botão copiar para WhatsApp), embaixo "📊 Números" com filtro
-  dia/semana/mês, último período gerado e "N para conferir" em âmbar
-  (a seção fechada dentro do painel, da v55, deixou de existir; o botão
-  antigo "📊 Relatório" do painel virou "📈 Resumo do período"); toque
+  entrada abrem a tela própria `vRelatorios` — desde a v99 um MENU de
+  duas linhas: "📝 Textos para revisar" (abre `vRelTextos`: abas por
+  atividade, uma linha por unidade, folha do texto com copiar para
+  WhatsApp) e "📊 Números" (abre `vRelNumeros`: filtro dia/semana/mês,
+  último período gerado e "N para conferir" em âmbar). Da v58 à v98 era
+  uma tela só, textos em cima e números embaixo (a seção fechada dentro
+  do painel, da v55, deixou de existir; o botão antigo "📊 Relatório" do
+  painel virou "📈 Resumo do período"); toque
   abre a tela do relatório (tabelas compactas `.rel-tab`,
   fonte tabular, âmbar = para conferir, vermelho só janela fechada) com
   navegação anterior/próximo, "📲 Compartilhar" (texto limpo para
@@ -722,8 +724,10 @@ docs/relatorios.md, "Tela Textos para revisar (v68)".
   cartão (a tag já avisa). Lista "Números": "N unidades · todas para
   conferir" quando total e "para conferir" coincidem ("1 unidade · para
   conferir" no singular); diferentes, os dois números ficam.
-- **Onde entra:** seção "Textos para revisar" e a tela do relatório
-  narrativo ("ver com os números ›"), mesmo componente. Só
+- **Onde entra:** a tela do relatório narrativo ("ver com os números ›").
+  Até a v98 entrava também na seção "Textos para revisar"; desde a v99
+  essa lista tem uma linha por unidade, sem prévia (seção "Relatórios da
+  Diretoria em três níveis"). Só
   Diretoria/ADMIN veem textos (o gerente nunca baixa rascunho — igual à
   v57). Sem variação por atividade. **Não editável, como antes:** o app
   nunca gravou ajuste de texto; nada foi acrescentado.
@@ -2018,6 +2022,114 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Relatórios da Diretoria em três níveis (v99) — menu › abas por atividade › folha
+Regra permanente em CLAUDE.md, item c22; checagem em
+docs/definicao-de-pronto.md, item 28; comportamento da tela em
+docs/relatorios.md, "Tela Textos para revisar em três níveis (v99)".
+
+**O problema real.** 16/09/2026, o Nilo com a tela na mão, iPhone a 390 px:
+Diretoria › 📊 Relatórios abria com a seção "📝 Textos para revisar" já
+aberta e **24 cartões** (um por unidade, devolutiva semanal), cada um com
+tag, título, prévia de 3 linhas, origem e dois botões. Quatro defeitos, nas
+palavras dele: **D1** "uma simples recomendação de mensagem ocupa a maior
+parte da tela" (cada cartão media 229 px = 27 % da tela; na lista ninguém lê
+prévia, a pessoa procura a fazenda); **D2** "não há divisão organizada entre
+fazenda de pecuária, café ou grãos" (Água Limpa ☕ seguida de Água Santa 🐂,
+em ordem alfabética: 17 trocas de atividade em 25 cartões); **D3** "a aba
+Textos para revisar deveria estar sozinha, bastando clicar e aparecer as
+opções"; **D4** "tenho que rolar a tela muito até chegar lá embaixo pra poder
+acessar 📊 Números" (a seção começava a 7,54 telas de rolagem; a tela inteira
+media **8,05 telas**). Mesmo diagnóstico da v88: a lista despejava a
+descrição de todas as unidades quando devia mostrar só o nome e o estado.
+
+**O que é agora** — o padrão em três níveis da v88, com o componente de abas
+que o painel já tinha:
+1. **Nível 1 — o menu** (`vRelatorios`): cabeçalho "Relatórios · DIRETORIA",
+   "🔄 Atualizar" e **duas linhas** na classe das linhas de unidade da v88
+   (`cad-item`, 53 px, seta "›"), com o estado na própria linha (P7):
+   "📝 Textos para revisar — Devolutiva semanal · 04 a 10/09 · 24 textos" (com
+   mais de um relatório narrativo: "2 relatórios · 25 textos"; sem texto:
+   "nenhum texto neste período", linha visível e inativa pelo botão de avanço
+   da v72) e "📊 Números — último: semana 04 a 10/09 · 3 para conferir" (âmbar
+   só no número). Nada mais: nenhuma prévia, nenhum cartão, nenhum parágrafo.
+2. **Nível 2 — Textos para revisar** (`vRelTextos`, tela `reltextos`):
+   sublinha por relatório do período ("Devolutiva semanal ao gerente · 04/09 a
+   10/09/2026") com o "ver com os números ›" uma vez só; **abas por atividade**
+   pelo componente ÚNICO `chipsAtividade(attr, atual, o)` — é a fileira ☕ Café
+   · 🌾 Grãos · 🐂 Pecuária do painel da Diretoria (`data-atv-filtro`), extraída
+   em função; o painel continua byte a byte igual (regressão) — na ordem fixa
+   do catálogo `ATIVIDADES`, com contador ("☕ Café (10)"), só as atividades
+   com unidade no escopo do código (escopo de uma atividade só → sem abas),
+   mais **🏢 Grupo** à esquerda só quando há texto sem `unidade_id` ou com id
+   fora do catálogo (o id fica visível). A fileira usa `cad-saltos` (v80):
+   quebra em linhas, nunca rola de lado (362 px em 390). Dentro da aba, **uma
+   linha por unidade** do escopo, na ordem da tela inicial, nome pelo cadastro
+   + "robô-redator · 11/09 05:35" + seta; unidade sem texto lê "sem texto neste
+   período", em cinza, sem ação. **Nenhuma prévia na lista.** Atividade pelo
+   catálogo por id (`atividadeDe`), nunca por trecho do nome. A aba escolhida
+   vive só na memória da sessão (`relTextosVista`).
+3. **Nível 3 — a folha da v68** (`abrirFolhaTexto`), sem mudança: texto
+   integral daquela unidade, "📲 copiar para WhatsApp" (`relCopiar`); fechar
+   devolve a mesma aba e a mesma rolagem (P8).
+"📊 Números" (`vRelNumeros`, tela `relnumeros`) é o conteúdo que ficava no
+rodapé da tela até a v98, em tela própria — filtro, lista, "para conferir",
+relatório com anterior/próximo, Compartilhar e PDF (tela do relatório
+idêntica). A lista de Números é por relatório, não por unidade, então não
+recebe abas. Cada "‹" sobe um degrau (c20): relatório → Números ou Textos →
+menu → painel/tela inicial (`relVista.de` guarda de onde o relatório foi
+aberto).
+
+**Medidas a 390 × 844, antes → depois** (24 textos por unidade + 1 de grupo
+semeados, `scripts/checar-poluicao.cjs`):
+
+| defeito | v98 | v99 |
+|---|---|---|
+| D1 — tela de entrada de Relatórios | 8,05 telas, 25 cartões de 229 px (27 % da tela cada) | **1 tela**, 2 linhas de 53 px, zero prévia |
+| D2 — mistura de atividades na lista | 17 trocas de atividade em 25 cartões alfabéticos | **zero**: abas ☕ 10 · 🌾 5 · 🐂 9 · 🏢 1, cada uma só da própria atividade |
+| D3 — "Textos para revisar" sozinha | seção aberta na tela de entrada, 24 cartões dentro | linha de menu; um toque abre as abas; aba ☕ Café **1,18 telas** com 10 linhas |
+| D4 — distância até "📊 Números" | 7,54 telas de rolagem | **0 rolagem**: 2ª linha do menu, a 1 toque |
+
+**Onde mexe no código:** bloco novo no lugar de `vRelatorios` (`chipsAtividade`,
+`relTextosVista`, `relNomeTexto`/`relNomeLongo`, `relTextosPeriodo`,
+`relPerCurto`, `relTextosPorAba`, `relTopo`, `vRelatorios`, `vRelTextos`,
+`vRelNumeros`); `REL_CATALOGO` ganhou `curto` nos três relatórios narrativos;
+`vPainel` passou a chamar `chipsAtividade` (HTML idêntico); `ir()` ganhou as
+telas `reltextos` e `relnumeros` (também na lista do redesenho pós-sincronização
+e na portaria do painel); o clique ganhou `#bt-rel-textos`, `#bt-rel-numeros`,
+`data-relaba` e o voltar de um degrau; `data-relab` grava `relVista.de`. CSS:
+`.rel-abas .chip{min-height:44px}` e `.cad-item.rel-sem`. `cartaoTextoLongo`,
+`abrirFolhaTexto`, `relCopiar`, `baixarRelatorios` continuam com os nomes e
+assinaturas de antes; `cartaoTextoLongo` só não é mais chamado na lista. Sem
+SQL, sem tabela, sem campo, sem chamada nova, sem `localStorage`. Gerente,
+pós-colheita, apontamento e painel intocados.
+
+### Provas (v99)
+- `node scripts/teste_relatorios.cjs` → **17 ✅ · 0 ❌** (a–g da tarefa: 4 abas
+  com contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9; escopo de pecuária → sem abas e 9
+  linhas; unidade sem texto; folha com o texto integral daquela unidade e
+  copiar integral; fechar mantém aba e rolagem; `unidade_id` fora do catálogo
+  em 🏢 Grupo; pecuária rebatizada "Café do Sul" fica em 🐂; voltar um degrau;
+  gerente sem texto nenhum).
+- `scripts/checar-poluicao.cjs` → **803 ✅ · 41 ❌**: os MESMOS 41 ❌ herdados
+  (o `origin/main` da v98 mede 763 ✅ · 41 ❌ com o mesmo script), nenhum novo;
+  20 checagens novas no grupo "20. Relatórios em três níveis", todas ✅, e as
+  telas "Relatórios (menu, 24 textos + 1 de grupo)" (1 tela), "Textos para
+  revisar" (1 tela), "Textos para revisar (☕ Café)" (1,18 telas, 10 itens) e
+  "Números" (1 tela) medidas com as regras de Cadastros (nível 2, cabeçalho fixo
+  com voltar, 390 px). O grupo "8. Texto longo em lista" (13 itens, ✅) passou a
+  medir o cartão colapsado na tela do relatório narrativo, onde ele vive agora.
+- `scripts/regressao_render.cjs` `origin/main` × v99: café, grãos, pecuária e
+  pós-colheita **idênticos em todas as telas** (só o minuto do relógio no
+  localStorage difere); painel da Diretoria e do ADMIN, boletim enviado, Faróis,
+  Resumo do período, tela do relatório (`relat`) e Cadastros idênticos. Mudaram
+  SÓ `vRelatorios` (passos 25–27) e as duas telas novas (passos 29–29c, que na
+  versão antiga caem em FALHOU).
+- `node scripts/teste_nomenclatura.cjs` e `node scripts/teste_insumos.cjs` (141 ✅)
+  sem ❌; `node scripts/teste_planejamento.cjs` 123 ✅ · 1 ❌ — o MESMO ❌ que o
+  `origin/main` da v98 já tem ("De-para da ata — 23 nomes ligados … — 25": o
+  de-para cresceu na v96 e a prova não foi atualizada; fica para a tarefa que
+  mexer no planejamento). `node --check` no JS extraído ok.
+
 ## A conferência também fala Agro1 (v98)
 Pedido do Nilo em 16/09/2026, logo depois da v97: **"Quero q falem Agro1. E
 troca de texto, não mexe em nada gravado."** Na v97 só a PORTA de entrada
@@ -2757,6 +2869,12 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v99, 16/09/2026: **803 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o `origin/main`
+da v98 mede 763 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v99 acrescentou
+o grupo "20. Relatórios em três níveis" (20 ✅) e as telas "Relatórios (menu,
+24 textos + 1 de grupo)", "Textos para revisar", "Textos para revisar (☕
+Café)" e "Números"; o grupo 8 (texto longo, v68) passou a medir na tela do
+relatório narrativo. Medição anterior,
 v93, 15/09/2026: **718 ✅ · 41 ❌** — os mesmos 41 ❌ herdados, nenhum novo. A
 v93 acrescentou o grupo "18. Relato de aplicação" (10 ✅), as telas "Colar do
 WhatsApp › Conferir a aplicação" (pergunta e ligada ao lançamento, ≤ 2 telas,
@@ -2997,8 +3115,8 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 ### Diretoria e Escritório (padrões b e c)
 - Painel da Diretoria: renderiza ✅ · 3,2 telas de altura com a busca
   de boletins ✅ (referência; v71: 4 botões em duas linhas, 390 px sem
-  rolar de lado ✅) · Relatórios 1 tela ✅ · Resumo do período
-  1,2 telas ✅.
+  rolar de lado ✅) · Relatórios (menu, v99, com 24 textos + 1 de grupo)
+  1 tela ✅ · Resumo do período 1,2 telas ✅.
 - Decisão e confirmação (v72, grupo 10): boletim de café, grãos e
   pecuária e registro do pós-colheita — Enviar inativo ao abrir (cinza,
   tracejado, aria-disabled) ✅ · toque mostra "Registre o clima ou uma
@@ -3014,13 +3132,24 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   sem vermelho/ícone ✅ · toque mostra o papel sem modal/alert/troca de
   tela ✅ · texto "Ação do/da …" sem termo proibido ✅ · 1 de 4 botões
   ✅ · zero na tela de apontamento (três atividades) ✅.
-- Diretoria › Relatórios com textos do redator (v68, medida com dois
-  textos de exemplo, um longo e um curto): 13 itens do grupo "8. Texto
-  longo em lista" ✅ — cartão colapsado de 3 linhas, cabe em menos de
-  uma tela, "Números" visível sem rolar, copiar sem expandir e integral,
-  corte por linha inteira, texto curto sem reticências, origem compacta,
-  "todas para conferir", folha em tela cheia com cabeçalho e ação
-  fixos, origem completa, padrão visual da folha, rolagem devolvida.
+- Diretoria › Relatórios em três níveis (v99, medida com 24 textos por
+  unidade + 1 de grupo): grupo "20. Relatórios em três níveis" ✅ — menu
+  em 1 tela com duas linhas de 53 px e zero prévia; abas 🏢 1 · ☕ 10 ·
+  🌾 5 · 🐂 9 numa fileira de 362 px que quebra em linhas; aba ☕ Café
+  1,18 telas com 10 linhas na ordem da tela inicial; toque abre a folha
+  com o texto daquela unidade; fechar devolve aba e rolagem; "sem texto
+  neste período" sem ação; Números com filtro, lista e relatório
+  (anterior/próximo, Compartilhar, PDF); voltar um degrau; sem termo
+  proibido. Telas "Textos para revisar", "(☕ Café)" e "Números" medidas
+  como Cadastros: 1 / 1,18 / 1 telas, nível 2, cabeçalho fixo com voltar ✅.
+- Diretoria › Relatório narrativo ("ver com os números ›", v68, medido
+  desde a v99 nesta tela, com um texto longo e um curto): 13 itens do
+  grupo "8. Texto longo em lista" ✅ — cartão colapsado de 3 linhas, cabe
+  em menos de uma tela, bloco "Números" visível sem rolar, copiar sem
+  expandir e integral, corte por linha inteira, texto curto sem
+  reticências, origem compacta, "todas para conferir" (na tela Números),
+  folha em tela cheia com cabeçalho e ação fixos, origem completa,
+  padrão visual da folha, rolagem devolvida.
 - Diretoria › Faróis de registro (v60, medida como Cadastros): lista 1,5
   telas com busca ✅ (14 unidades > 12 → busca) · nível 2 ✅ · cabeçalho
   fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
@@ -3113,6 +3242,17 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Relatórios em três níveis (v99) — para o Nilo testar no iPhone:**
+  Diretoria › 📊 Relatórios abre com duas linhas ("📝 Textos para revisar"
+  com "Devolutiva semanal · dd a dd/mm · N textos" e "📊 Números" com
+  "último: …"); um toque em Textos mostra as abas ☕ Café · 🌾 Grãos · 🐂
+  Pecuária (e 🏢 Grupo quando houver painel executivo) com uma linha por
+  fazenda, sem prévia; o toque na fazenda abre a folha de sempre com
+  "📲 copiar para WhatsApp"; Fechar volta à mesma aba, no mesmo ponto;
+  "‹" volta um passo de cada vez. Os números não mudaram de lugar dentro
+  de "📊 Números". Se algum `unidade_id` vindo do banco não bater com o
+  cadastro, ele aparece em 🏢 Grupo com o id à mostra — avisar para acertar
+  `rel_unidades`.
 - **Baixa do Agro1 (v96) — SQL RODADO em 16/09/2026.** O Nilo rodou o
   `sql/057-insumo-baixa-erp.sql` no SQL Editor e a tabela `insumo_baixa_erp`
   responde vazia pela API. Retrato do banco conferido no mesmo dia (leitura

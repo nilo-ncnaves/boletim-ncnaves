@@ -1089,3 +1089,60 @@ telas "Colar do WhatsApp › Conferir o relatório do Agro1", "… › Conferên
 Agro1 × Boletim", "… › Conferência Agro1 × Boletim (lista)" e "Cadastros › Insumos ›
 Baixas do Agro1" medidas como Cadastros; o cartão "Conferência Agro1 × Boletim" no
 grupo 16 (painel em duas etapas).
+
+## 28. Lista de leitura com uma entrada por unidade nasce em três níveis (desde a v99)
+
+Origem: 16/09/2026, o Nilo com a tela 📊 Relatórios na mão, no iPhone. A
+tela abria com 24 cartões de texto (um por unidade, devolutiva semanal),
+café seguido de pecuária em ordem alfabética, cada cartão ocupando um quarto
+da tela, e "📊 Números" só depois de 7,5 telas de rolagem. Mesmo diagnóstico
+da v88 (item 23): a lista despejava a descrição de todas as unidades quando
+devia mostrar só o nome e o estado.
+
+Regras que ficam:
+
+1. **Três níveis, sempre:** menu › abas por atividade com uma linha por
+   unidade (nome + estado, sem prévia) › tela/folha da unidade. Unidades de
+   atividades diferentes nunca aparecem na mesma lista.
+2. **O menu é só o menu (P1, P7):** uma linha por assunto, mesma classe e
+   altura das linhas de unidade da v88 (`cad-item`, ≥ 44 px, seta "›"), com o
+   estado na própria linha ("Devolutiva semanal · 04 a 10/09 · 24 textos";
+   "último: semana 04 a 10/09 · 3 para conferir", âmbar só no número).
+   Nenhuma prévia, nenhum cartão, nenhum parágrafo; altura ≤ 1 tela. Linha
+   sem conteúdo fica visível e inativa pelo botão de avanço (item 13), com o
+   texto "nenhum texto neste período".
+3. **Abas pelo componente ÚNICO `chipsAtividade`** (a fileira do painel da
+   Diretoria, extraída em função — nunca um terceiro componente de abas):
+   ordem fixa do catálogo `ATIVIDADES`, contador no rótulo, só as atividades
+   com unidade no escopo do código; escopo de uma atividade só → sem abas.
+   🏢 Grupo à esquerda só quando há texto sem unidade ou com id fora do
+   catálogo (o id fica visível). Fileira `cad-saltos` (v80): quebra em
+   linhas, nunca rola de lado, nunca passa de 390 px; chips ≥ 44 px, sem
+   pílula. Aba escolhida só na memória da sessão.
+4. **Uma linha por unidade do escopo, na ordem da tela inicial**, nome pelo
+   cadastro; unidade sem texto lê "sem texto neste período", em cinza, sem
+   ação — proibidos "não gerou", "não fez", "faltou", "erro".
+5. **Atividade pelo catálogo, por id** (`atividadeDe`), nunca por trecho do
+   nome. Prova: uma unidade de pecuária rebatizada "Café do Sul" continua em
+   🐂 Pecuária.
+6. **O nível 3 não muda:** a folha da v68 (`abrirFolhaTexto`) com o texto
+   integral daquela unidade e de nenhuma outra; `relCopiar` copia o texto
+   inteiro; fechar devolve a mesma aba e a mesma rolagem (P8). "📊 Números" é
+   o conteúdo de antes em tela própria; a tela do relatório é idêntica.
+7. **Cada "‹" sobe um degrau (item 24):** relatório → Números ou Textos →
+   menu → painel/tela inicial.
+8. **Nada novo por baixo:** sem tabela, sem campo, sem chamada ao Supabase,
+   sem `localStorage`; rearranjo do que `relCache` já tem. O gerente continua
+   sem ver texto nenhum.
+
+Conferência: `node scripts/teste_relatorios.cjs` (a–g da tarefa: 4 abas com
+contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9; escopo de pecuária sem abas e 9
+linhas; unidade sem texto; folha com o texto integral daquela unidade; fechar
+mantém aba e rolagem; `unidade_id` fora do catálogo em 🏢 Grupo; nome
+enganoso não decide atividade) e `scripts/checar-poluicao.cjs`, grupo "20.
+Relatórios em três níveis" (nível 1 ≤ 1 tela; aba ☕ Café ≤ 2 telas com 10
+unidades; zero prévia; nenhuma fileira acima de 390 px) — o grupo 8 (v68)
+passou a medir o cartão colapsado na tela do relatório narrativo.
+`scripts/regressao_render.cjs` contra `origin/main`: gerente das três
+atividades, pós-colheita, apontamento e painel da Diretoria idênticos; só
+`vRelatorios` e as duas telas novas mudam.

@@ -32,9 +32,10 @@
       detalhe tem a ação principal visível sem rolar.
    7. Padrão visual da casa: sem gradiente, sem sombra, sem canto
       arredondado, toque ≥ 44 px — medido no CSS calculado de cada tela.
-   8. Texto longo em lista (v68): na tela Relatórios com textos do
-      robô-redator semeados, o cartão nasce colapsado (3 linhas, corte
-      por linha inteira), cabe em menos de uma tela, deixa o cabeçalho
+   8. Texto longo em lista (v68; desde a v99 medido na tela do relatório
+      narrativo — "ver com os números ›" —, porque a lista de Textos para
+      revisar deixou de ter prévia): o cartão nasce colapsado (3 linhas,
+      corte por linha inteira), cabe em menos de uma tela, deixa o bloco
       "Números" visível sem rolar, copia o texto integral sem expandir,
       e "ler texto completo" abre a folha de tela cheia (cabeçalho fixo,
       ação principal visível, origem completa) e devolve a rolagem.
@@ -103,6 +104,19 @@
       única multi-seleção (problemas do pivô) mora no cartão de apontamento e por
       isso NÃO recebe o componente — o script prova a ausência com a seleção feita.
 
+  20. Relatórios em três níveis (v99): com 24 textos por unidade + 1 de grupo
+      semeados (o relato do Nilo de 16/09/2026), a tela Relatórios cabe em UMA
+      tela e tem só duas linhas de menu (Textos para revisar · Números) com o
+      estado na própria linha, sem prévia e sem cartão; "Textos para revisar"
+      abre com as abas 🏢 Grupo · ☕ Café · 🌾 Grãos · 🐂 Pecuária (contadores
+      1 · 10 · 5 · 9) numa fileira que quebra em linhas e nunca passa de 390 px;
+      a aba ☕ Café cabe em 2 telas com 10 unidades, uma linha por unidade na
+      ordem da tela inicial (nome + estado, sem prévia), atividade decidida
+      pelo catálogo por id; o toque abre a folha com o texto integral daquela
+      unidade e fechar devolve a mesma aba e a mesma rolagem; unidade sem
+      texto lê "sem texto neste período" sem ação; "Números" é o conteúdo de
+      antes em tela própria (filtro, lista, relatório com anterior/próximo,
+      Compartilhar e PDF) e o voltar devolve um degrau por vez.
   15. Insumos (v86): a porta única "Colar do WhatsApp" tem uma tela e um campo,
       com o botão de avanço inativo dizendo a próxima ação (sem nativo e sem sair
       da tela); a mensagem do grupo é classificada sozinha e o tipo pode ser
@@ -305,7 +319,7 @@ const NA_PAGINA = {
     const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const app = document.querySelector('#app');
     const cartoes = [...app.querySelectorAll('.txt-cartao')];
-    const h2 = [...app.querySelectorAll('h2')].find(h => /Números/.test(h.textContent));
+    const h2 = [...app.querySelectorAll('h2, details.secao > summary')].find(h => /Números/.test(h.textContent));
     const olhar = c => {
       if (!c) return null;
       const r = c.getBoundingClientRect(), previa = c.querySelector('.txt-previa'), ler = c.querySelector('.txt-ler'), cop = c.querySelector('[data-txtcopiar]');
@@ -693,6 +707,101 @@ async function cenarioPlanoPainel(browser, base, R) {
   await ctx.close();
 }
 
+/* v99: Relatórios da Diretoria em três níveis — 24 textos por unidade (uma devolutiva semanal por unidade do
+   cadastro) + 1 texto de grupo (painel executivo), como na tela que o Nilo relatou em 16/09/2026; mais um
+   farol para a linha "Números" ter o que dizer. Roda dentro da página. */
+const RELATORIOS_SEMENTE = () => {
+  const d = n => { const x = new Date(); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+  const em = new Date(d(0) + 'T05:35:00-03:00').toISOString(), base = { gerado_em: em, texto_em: em, texto_modelo: 'claude-sonnet-4-6', dados: { composto: true, fontes: [] } };
+  const ls = D.fazendas.map((f, i) => ({ id: 'tx-' + f.id, relatorio: 'devolutiva_semanal', periodo_ini: d(12), periodo_fim: d(6), unidade_id: f.id,
+    texto: f.nome + ' — devolutiva da semana.\n\n' + 'Boletins: a unidade registrou boletim em 5 dos 6 dias úteis da semana; o dia sem registro foi a quarta-feira. '.repeat(4 + i % 3), ...base }));
+  ls.push({ id: 'tx-grupo', relatorio: 'painel_executivo', periodo_ini: d(40).slice(0, 8) + '01', periodo_fim: d(10), unidade_id: null, texto: 'Painel executivo do grupo.\n\nTexto do mês para os sócios.', ...base });
+  ls.push({ id: 'n1', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { em_dia: false, enviados: 5, uteis: 6, marcas: '●●○●●●' }, gerado_em: em, texto: null });
+  ls.push({ id: 'n2', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f26', dados: { em_dia: true, enviados: 6, uteis: 6, marcas: '●●●●●●' }, gerado_em: em, texto: null });
+  relCache = ls; relEstado.erro = false; relTextosVista.aba = '';
+};
+const RELATORIOS_PROIBIDO = /n[ãa]o gerou|n[ãa]o fez|n[ãa]o realizou|pendente|atrasad|faltou|esqueceu|\berro\b/i;
+/* a frase da v55 "Diferença entre dito e medido é 'para conferir', nunca erro" ENUNCIA a regra — não a fere */
+const SEM_A_REGRA = t => String(t || '').replace(/nunca erro/g, '');
+async function cenarioRelatorios(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' },
+    { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' });
+  await pularRitual(page);
+  await page.evaluate(RELATORIOS_SEMENTE);
+  await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
+  const V = {};
+  /* nível 1: o menu */
+  const menu = await medirTela(page, 'Diretoria — Relatórios (menu, 24 textos + 1 de grupo)', 'diretoria');
+  menu.menu = await page.evaluate(() => {
+    const app = document.querySelector('#app'), it = [...app.querySelectorAll('.cad-item')];
+    return { linhas: it.map(b => ({ titulo: (b.querySelector('b') || {}).textContent || '', estado: (b.querySelector('.mut') || {}).textContent || '', botao: b.tagName === 'BUTTON', seta: !!b.querySelector('.seta'), off: b.classList.contains('acao-off'), alt: b.getBoundingClientRect().height })),
+      previas: app.querySelectorAll('.txt-previa, .txt-cartao').length, cartoes: app.querySelectorAll('.cartao').length, paragrafos: [...app.querySelectorAll('p')].filter(p => !p.closest('.topo') && !/Atualizar|Sincroniz/.test(p.textContent)).length,
+      ambar: !!app.querySelector('.cad-item .rel-conf'), texto: app.innerText.replace(/\s+/g, ' ').trim() };
+  });
+  R.telas.push(menu); V.menu = menu.menu; V.menuTelas = menu.telas;
+  /* nível 2: Textos para revisar */
+  await page.click('#bt-rel-textos'); await page.waitForTimeout(300);
+  const tx = await medirTela(page, 'Diretoria › Relatórios › Textos para revisar', 'cadastros', { tipo: 'lista', niveis: 2 });
+  tx.abas = await page.evaluate(() => {
+    const fila = document.querySelector('#app .rel-abas'); if (!fila) return null;
+    const chips = [...fila.querySelectorAll('[data-relaba]')];
+    return { rotulos: chips.map(b => b.textContent.trim()), on: chips.filter(b => b.classList.contains('on')).map(b => b.dataset.relaba), largura: fila.scrollWidth, cliente: fila.clientWidth, wrap: getComputedStyle(fila).flexWrap,
+      minH: Math.min(...chips.map(b => b.getBoundingClientRect().height)), raio: Math.max(...chips.map(b => parseFloat(getComputedStyle(b).borderTopLeftRadius) || 0)), scrollW: document.documentElement.scrollWidth,
+      verNumeros: document.querySelectorAll('#app [data-relab]').length, sub: [...document.querySelectorAll('#app p.mut')].map(p => p.textContent.replace(/\s+/g, ' ').trim()).filter(t => /ver com os números/.test(t)), tela: telaAtual };
+  });
+  R.telas.push(tx); V.tx = tx.abas; V.txTelas = tx.telas;
+  /* aba ☕ Café: 10 unidades, uma linha cada */
+  await page.click('[data-relaba="CAFE"]'); await page.waitForTimeout(300);
+  const cafe = await medirTela(page, 'Diretoria › Relatórios › Textos para revisar (☕ Café)', 'cadastros', { tipo: 'lista', niveis: 2 });
+  const LISTA = () => {
+    const app = document.querySelector('#app'), it = [...app.querySelectorAll('.cad-item')];
+    return { aba: relTextosVista.aba, on: [...app.querySelectorAll('[data-relaba].on')].map(b => b.dataset.relaba),
+      linhas: it.map(b => ({ nome: (b.querySelector('b') || {}).textContent || '', estado: (b.querySelector('.mut') || {}).textContent || '', botao: b.tagName === 'BUTTON', seta: !!b.querySelector('.seta'), un: b.dataset.relUn || '', alt: b.getBoundingClientRect().height, atv: b.dataset.relUn && D.fazendas.some(f => f.id === b.dataset.relUn) ? atividadeDe(b.dataset.relUn) : 'GRUPO' })),
+      ordem: unidadesPermitidas().filter(f => atividadeDe(f.id) === relTextosVista.aba).map(f => f.nome), previas: app.querySelectorAll('.txt-previa, .txt-cartao').length, cartoes: app.querySelectorAll('.cartao').length,
+      campos: app.querySelectorAll('input, select, textarea').length, texto: app.innerText.replace(/\s+/g, ' ').trim(), scrollW: document.documentElement.scrollWidth };
+  };
+  cafe.lista = await page.evaluate(LISTA);
+  /* toque na 3ª unidade abre a folha com o texto integral DAQUELA unidade; fechar devolve aba e rolagem */
+  cafe.antesY = await page.evaluate(() => { window.scrollTo(0, 150); return window.scrollY; });
+  cafe.alvo = await page.evaluate(() => { const b = document.querySelectorAll('#app [data-txtler]')[2]; if (!b) return null; const l = relCache.find(x => 'rel:' + x.id === b.dataset.txtler); b.click(); return l ? { un: l.unidade_id, nome: relUni(l.unidade_id), texto: l.texto } : null; });
+  await page.waitForTimeout(300);
+  cafe.folha = await page.evaluate(NA_PAGINA.folha);
+  await page.click('#bt-folha-fechar').catch(() => {}); await page.waitForTimeout(250);
+  cafe.depois = await page.evaluate(() => ({ y: window.scrollY, aba: relTextosVista.aba, tela: telaAtual, folha: !!document.querySelector('#folha-texto'), travado: document.body.classList.contains('folha-aberta'), on: [...document.querySelectorAll('#app [data-relaba].on')].map(b => b.dataset.relaba) }));
+  R.telas.push(cafe); V.cafe = cafe;
+  /* unidade sem texto: tira o texto da 2ª unidade de café e redesenha a aba */
+  V.semTexto = await page.evaluate(() => {
+    const un = unidadesPermitidas().filter(f => atividadeDe(f.id) === 'CAFE')[1]; if (!un) return null;
+    relCache = relCache.filter(l => l.unidade_id !== un.id); ir('reltextos', null, true);
+    const b = document.querySelector('#app .cad-item[data-rel-un="' + un.id + '"]');
+    return { nome: un.nome, existe: !!b, botao: !!b && b.tagName === 'BUTTON', estado: b ? (b.querySelector('.mut') || {}).textContent : '', seta: !!(b && b.querySelector('.seta')), cor: b ? getComputedStyle(b.querySelector('b')).color : '', linhas: document.querySelectorAll('#app .cad-item').length, contador: (document.querySelector('[data-relaba="CAFE"]') || {}).textContent || '' };
+  });
+  /* as outras abas: contadores e isolamento (nenhuma unidade de outra atividade na aba) */
+  V.abas = {};
+  for (const k of ['PECUARIA', 'GRAOS', 'GRUPO']) {
+    await page.click(`[data-relaba="${k}"]`).catch(() => {}); await page.waitForTimeout(200);
+    const l = await page.evaluate(LISTA); V.abas[k] = { n: l.linhas.length, atvs: [...new Set(l.linhas.map(x => x.atv))], nomes: l.linhas.map(x => x.nome), telas: +((await page.evaluate(() => document.documentElement.scrollHeight)) / VP.height).toFixed(2), scrollW: l.scrollW };
+  }
+  await page.evaluate(() => { const v = [...document.querySelectorAll('#app [data-voltar]')].pop(); if (v) v.click(); }); await page.waitForTimeout(250);
+  V.voltouTextos = await page.evaluate(() => telaAtual);
+  /* nível 2: Números — o conteúdo de antes em tela própria */
+  await page.click('#bt-rel-numeros').catch(() => {}); await page.waitForTimeout(300);
+  const num = await medirTela(page, 'Diretoria › Relatórios › Números', 'cadastros', { tipo: 'lista', niveis: 2 });
+  num.numeros = await page.evaluate(() => ({ tela: telaAtual, filtros: [...document.querySelectorAll('#app [data-relper]')].map(b => b.textContent.trim()), itens: document.querySelectorAll('#app [data-relab]').length,
+    conferir: /para conferir/.test(document.querySelector('#app').innerText), texto: document.querySelector('#app').innerText.replace(/\s+/g, ' ').trim() }));
+  await page.click('#app [data-relab] >> nth=0').catch(() => {}); await page.waitForTimeout(300);
+  num.relat = await page.evaluate(() => ({ tela: telaAtual, nav: document.querySelectorAll('#app [data-relnav]').length, zap: !!document.querySelector('#bt-rel-zap'), pdf: !!document.querySelector('#bt-rel-pdf') }));
+  await page.evaluate(() => { const v = document.querySelector('#app .topo [data-voltar]'); if (v) v.click(); }); await page.waitForTimeout(250);
+  num.voltou = await page.evaluate(() => telaAtual);
+  await page.evaluate(() => { const v = [...document.querySelectorAll('#app [data-voltar]')].pop(); if (v) v.click(); }); await page.waitForTimeout(250);
+  num.voltou2 = await page.evaluate(() => telaAtual);
+  R.telas.push(num); V.num = num;
+  V.nativos = await page.evaluate(() => window.__nativos);
+  V.erros = erros.slice();
+  R.relatorios = V;
+  await ctx.close();
+}
+
 /* v88: cartão do painel em DUAS ETAPAS — nasce fechado, abre em lista de unidades e a descrição
    inteira mora na tela da unidade. Cinco cartões pelo MESMO componente (cartaoUnidades). */
 const PAINEL_CARTOES_CHK = [
@@ -893,7 +1002,8 @@ const relatoriosExemplo = () => {
   const curto = 'Água Santa — ' + d(1).slice(8) + '/' + d(1).slice(5, 7) + ': boletim e medição batem; sem ponto para conferir hoje.';
   const base = { gerado_em: em.toISOString(), texto_em: em.toISOString(), texto_modelo: 'claude-sonnet-4-6' };
   return [
-    { id: 'ex-txt-1', relatorio: 'devolutiva_semanal', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { composto: true, fontes: [] }, texto: longo, ...base },
+    /* v99: a devolutiva leva uma fonte anexada, para o bloco "📊 Números — Floramill" existir na tela do relatório narrativo */
+    { id: 'ex-txt-1', relatorio: 'devolutiva_semanal', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { composto: true, fontes: [{ relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), dados: { em_dia: false, enviados: 5, uteis: 6, marcas: '●●○●●●' } }] }, texto: longo, ...base },
     { id: 'ex-txt-2', relatorio: 'alerta_divergencia', periodo_ini: d(1), periodo_fim: d(1), unidade_id: 'f26', dados: { composto: true, fontes: [] }, texto: curto, ...base },
     { id: 'ex-num-1', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f33', dados: { em_dia: false, enviados: 5, uteis: 6, marcas: '●●○●●●' }, gerado_em: em.toISOString(), texto: null },
     { id: 'ex-num-2', relatorio: 'farol_7', periodo_ini: d(7), periodo_fim: d(1), unidade_id: 'f26', dados: { em_dia: false, enviados: 4, uteis: 6, marcas: '●○○●●●' }, gerado_em: em.toISOString(), texto: null },
@@ -1016,9 +1126,11 @@ async function cenarioDiretoria(browser, base, R) {
   R.telas.push(det);
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
-  /* v68: textos do robô-redator semeados — cartão colapsado, "Números" sem rolar, folha de leitura, rolagem devolvida */
-  await page.evaluate(ex => { relCache = ex; ir('relatorios'); }, relatoriosExemplo()); await page.waitForTimeout(300);
-  const relTx = await medirTela(page, 'Diretoria — Relatórios (com textos do redator)', 'diretoria');
+  /* v68: textos do robô-redator semeados — cartão colapsado, "Números" sem rolar, folha de leitura, rolagem devolvida.
+     v99: o cartão colapsado saiu da lista (que passou a ter uma linha por unidade, sem prévia) e vive na tela do relatório
+     narrativo, aberta por "ver com os números ›" — é lá que o componente da v68 é medido agora */
+  await page.evaluate(ex => { relCache = ex; relEstado.erro = false; relVista = { rel: 'devolutiva_semanal', ini: ex[0].periodo_ini, fim: ex[0].periodo_fim, de: 'reltextos' }; ir('relat'); }, relatoriosExemplo()); await page.waitForTimeout(300);
+  const relTx = await medirTela(page, 'Diretoria — Relatório narrativo (texto do redator, "ver com os números")', 'diretoria');
   relTx.textoLongo = await page.evaluate(NA_PAGINA.textoLongo);
   relTx.antesY = await page.evaluate(() => { window.scrollTo(0, 120); return window.scrollY; });
   await page.click('#app .txt-ler >> nth=0').catch(() => {}); await page.waitForTimeout(250);
@@ -1026,6 +1138,12 @@ async function cenarioDiretoria(browser, base, R) {
   relTx.folhaVisual = relTx.folha ? relTx.folha.visual : null;
   await page.click('#bt-folha-fechar').catch(() => {}); await page.waitForTimeout(250);
   relTx.depois = await page.evaluate(() => ({ y: window.scrollY, folha: !!document.querySelector('#folha-texto'), travado: document.body.classList.contains('folha-aberta') }));
+  /* o texto CURTO (alerta, f26) é outro relatório narrativo: mede o cartão dele na tela própria */
+  await page.evaluate(ex => { relVista = { rel: 'alerta_divergencia', ini: ex[1].periodo_ini, fim: ex[1].periodo_fim, de: 'reltextos' }; ir('relat'); }, relatoriosExemplo()); await page.waitForTimeout(300);
+  relTx.textoLongo.curto = (await page.evaluate(NA_PAGINA.textoLongo)).longo;
+  /* "N unidades · todas para conferir" mora na lista de Números (v99: tela própria) */
+  await page.evaluate(() => ir('relnumeros')); await page.waitForTimeout(300);
+  relTx.textoLongo.todas = await page.evaluate(() => /todas para conferir/.test(document.querySelector('#app').innerText));
   R.telas.push(relTx);
   await page.evaluate(() => { relCache = []; window.scrollTo(0, 0); });
   await page.evaluate(() => ir('relatorio')); await page.waitForTimeout(300);
@@ -1692,10 +1810,10 @@ function avaliar(R) {
   });
   /* 8. texto longo em lista (v68) */
   R.telas.filter(t => t.textoLongo).forEach(t => {
-    const g = '8. Texto longo em lista: colapsado, copiar sem expandir, folha de leitura', x = t.textoLongo, L = x.longo || {}, C = x.curto || {}, F = t.folha, nome = t.nome.split(' — ')[0] + ' › Relatórios';
-    add(g, `${nome} — cartão nasce colapsado (prévia de 3 linhas)`, x.cartoes >= 2 && L.linhas === 3 && L.cortado, `${x.cartoes} cartões; prévia com ${L.linhas} linhas${L.cortado ? ', com reticências' : ', sem reticências'}`);
+    const g = '8. Texto longo em lista: colapsado, copiar sem expandir, folha de leitura', x = t.textoLongo, L = x.longo || {}, C = x.curto || {}, F = t.folha, nome = t.nome.split(' — ')[0] + ' › Relatório narrativo';
+    add(g, `${nome} — cartão nasce colapsado (prévia de 3 linhas)`, x.cartoes >= 1 && L.linhas === 3 && L.cortado, `${x.cartoes} cartão(ões); prévia com ${L.linhas} linhas${L.cortado ? ', com reticências' : ', sem reticências'}`);
     add(g, `${nome} — cartão colapsado cabe em menos de uma tela`, L.cabe, `${L.altura} px de ${VP.height}`);
-    add(g, `${nome} — cabeçalho "Números" visível sem rolar (2 textos na lista)`, x.numerosVisivel, x.numerosTopo === null ? 'sem cabeçalho Números' : `topo a ${x.numerosTopo} px`);
+    add(g, `${nome} — bloco "Números" visível sem rolar, abaixo do texto`, x.numerosVisivel, x.numerosTopo === null ? 'sem bloco Números' : `topo a ${x.numerosTopo} px`);
     add(g, `${nome} — copiar visível no cartão colapsado e copia o texto integral`, L.copiarVisivel && L.copiaIntegral, `${L.copiarVisivel ? 'botão visível' : 'botão ausente'}; ${L.copiaIntegral ? 'texto integral' : 'texto diferente da linha'}`);
     add(g, `${nome} — prévia corta por linha inteira, nunca no meio da palavra`, L.corteInteiro === true && !L.gradiente, `…${(L.ultimo || '').trim()}${L.gradiente ? ' (fade em gradiente)' : ''}`);
     add(g, `${nome} — texto curto sem "ler texto completo" e sem reticências`, C.altura > 0 && !C.lerVisivel && !C.cortado, `${C.linhas} linha(s); ler ${C.lerVisivel ? 'visível' : 'oculto'}; ${C.cortado ? 'com' : 'sem'} reticências`);
@@ -2035,6 +2153,58 @@ function avaliar(R) {
     add(G, 'Nenhum erro de JavaScript no painel em duas etapas', !P.erros.length, P.erros[0] || 'sem erro');
   }
 
+  /* 20. Relatórios em três níveis (v99): menu › abas por atividade com uma linha por unidade › folha da unidade */
+  if (R.relatorios) {
+    const G = '20. Relatórios em três níveis: menu, abas por atividade, uma linha por unidade, folha';
+    const V = R.relatorios, M = V.menu, T = V.tx, C = V.cafe, L = C.lista, N = V.num;
+    add(G, 'Nível 1 — a tela Relatórios cabe em 1 tela de iPhone com 24 textos + 1 de grupo baixados (era 8,05 telas na v98)', V.menuTelas <= 1, `${V.menuTelas} telas`);
+    add(G, 'Nível 1 — só duas linhas de menu (Textos para revisar · Números): nenhuma prévia, nenhum cartão, nenhum parágrafo',
+      M.linhas.length === 2 && M.previas === 0 && M.cartoes === 0 && M.paragrafos === 0 && /Textos para revisar/.test(M.linhas[0].titulo) && /Números/.test(M.linhas[1].titulo),
+      `${M.linhas.length} linhas; ${M.previas} prévia(s); ${M.cartoes} cartão(ões); ${M.paragrafos} parágrafo(s)`);
+    add(G, 'Nível 1 — estado na própria linha (P7): "Devolutiva semanal · dd a dd/mm · N textos" e "último: … · N para conferir" (âmbar só no número)',
+      /^\d+ relatórios · 25 textos$|^Devolutiva semanal · \d\d a \d\d\/\d\d · \d+ textos$/.test(M.linhas[0].estado) && /^último: .+ · 1 para conferir$/.test(M.linhas[1].estado) && M.ambar,
+      `"${M.linhas[0].estado}" · "${M.linhas[1].estado}"`);
+    add(G, `Nível 1 — as duas linhas são botões com seta "›", alvo ≥ ${TOQUE_MIN} px, mesma classe das linhas de unidade da v88`,
+      M.linhas.every(l => l.botao && l.seta && !l.off && l.alt >= TOQUE_MIN), M.linhas.map(l => Math.round(l.alt) + ' px').join(' · '));
+    add(G, 'Textos para revisar — abas na ordem fixa 🏢 Grupo · ☕ Café · 🌾 Grãos · 🐂 Pecuária, com contadores 1 · 10 · 5 · 9',
+      !!T && T.rotulos.join(' | ') === '🏢 Grupo (1) | ☕ Café (10) | 🌾 Grãos (5) | 🐂 Pecuária (9)', T ? T.rotulos.join(' | ') : 'sem abas');
+    add(G, `Textos para revisar — a fileira de abas quebra em linhas, nunca passa de ${VP.width} px nem rola de lado; chips ≥ ${TOQUE_MIN} px, sem pílula`,
+      !!T && T.wrap === 'wrap' && T.largura <= T.cliente + 1 && T.scrollW <= VP.width && T.minH >= TOQUE_MIN && T.raio === 0,
+      T ? `${T.largura} px em ${T.cliente} px; página ${T.scrollW} px; chip ${T.minH} px; raio ${T.raio}` : '');
+    add(G, 'Textos para revisar — sublinha com o relatório e o período, e "ver com os números ›" uma vez por relatório (2 relatórios no período)',
+      !!T && T.sub.length === 2 && T.verNumeros === 2 && /Devolutiva semanal ao gerente · \d\d\/\d\d a \d\d\/\d\d\/\d{4}/.test(T.sub[0]), T ? T.sub.join(' | ') : '');
+    add(G, `Aba ☕ Café — cabe em ${ALVO_TELAS} telas com 10 unidades (P3)`, C.telas <= ALVO_TELAS && L.linhas.length === 10, `${C.telas} telas · ${L.linhas.length} linhas`);
+    add(G, 'Aba ☕ Café — uma linha por unidade, na ordem da tela inicial, nome + estado ("robô-redator · dd/mm hh:mm"), sem prévia, sem cartão, sem campo',
+      L.linhas.map(x => x.nome).join('|') === L.ordem.join('|') && L.linhas.every(x => /^robô-redator · \d\d\/\d\d \d\d:\d\d$/.test(x.estado) && x.botao && x.seta) && L.previas === 0 && L.cartoes === 0 && L.campos === 0,
+      `${L.linhas.slice(0, 3).map(x => x.nome).join(', ')}…; estado "${(L.linhas[0] || {}).estado}"; ${L.previas} prévia(s)`);
+    add(G, `Aba ☕ Café — cada linha é um alvo de toque ≥ ${TOQUE_MIN} px`, L.linhas.every(x => x.alt >= TOQUE_MIN), `menor ${Math.round(Math.min(...L.linhas.map(x => x.alt)))} px`);
+    add(G, 'Isolamento por atividade — cada aba lista só unidades da própria atividade, decididas pelo catálogo por id (nunca por trecho do nome)',
+      L.linhas.every(x => x.atv === 'CAFE') && V.abas.PECUARIA.atvs.join() === 'PECUARIA' && V.abas.PECUARIA.n === 9 && V.abas.GRAOS.atvs.join() === 'GRAOS' && V.abas.GRAOS.n === 5 && V.abas.GRUPO.atvs.join() === 'GRUPO' && V.abas.GRUPO.n === 1,
+      `café ${[...new Set(L.linhas.map(x => x.atv))].join('/')} ×${L.linhas.length} · pecuária ${V.abas.PECUARIA.atvs.join('/')} ×${V.abas.PECUARIA.n} · grãos ${V.abas.GRAOS.atvs.join('/')} ×${V.abas.GRAOS.n} · grupo ×${V.abas.GRUPO.n}`);
+    add(G, `Todas as abas — ≤ ${ALVO_TELAS} telas e ≤ ${VP.width} px de largura`, Object.values(V.abas).every(a => a.telas <= ALVO_TELAS && a.scrollW <= VP.width) && C.telas <= ALVO_TELAS,
+      Object.entries(V.abas).map(([k, a]) => `${k} ${a.telas}`).join(' · '));
+    add(G, 'Toque na linha abre a folha de leitura da v68 com o texto integral DAQUELA unidade (e de nenhuma outra)',
+      !!C.alvo && !!C.folha && C.folha.bodyTravado && C.folha.texto === C.alvo.texto && C.folha.texto.length > 200,
+      C.alvo ? `${C.alvo.nome}: ${C.folha ? C.folha.texto.length : 0} caracteres ${C.folha && C.folha.texto === C.alvo.texto ? 'iguais ao relCache' : 'DIFERENTES do relCache'}` : 'sem linha');
+    add(G, 'Fechar a folha volta à mesma aba (☕ Café) e à mesma posição de rolagem (P8)',
+      !!C.depois && !C.depois.folha && !C.depois.travado && C.depois.aba === 'CAFE' && C.depois.on.join() === 'CAFE' && C.depois.y === C.antesY && C.depois.tela === 'reltextos',
+      C.depois ? `aba ${C.depois.aba}; antes ${C.antesY} px, depois ${C.depois.y} px` : '');
+    add(G, 'Unidade do escopo sem texto no período aparece com "sem texto neste período", em cinza, sem ação — nunca "não gerou"',
+      !!V.semTexto && V.semTexto.existe && !V.semTexto.botao && V.semTexto.estado === 'sem texto neste período' && !V.semTexto.seta && V.semTexto.linhas === 10 && /\(9\)/.test(V.semTexto.contador),
+      V.semTexto ? `${V.semTexto.nome}: "${V.semTexto.estado}"; ${V.semTexto.linhas} linhas; aba "${V.semTexto.contador}"` : '');
+    add(G, '"‹ Voltar" de Textos para revisar devolve ao menu de Relatórios', V.voltouTextos === 'relatorios', V.voltouTextos);
+    add(G, `Números — o conteúdo de antes em tela própria: filtro Todos/Dia/Semana/Mês, lista com "para conferir", ≤ ${ALVO_TELAS} telas`,
+      N.numeros.tela === 'relnumeros' && N.numeros.filtros.join() === 'Todos,Dia,Semana,Mês' && N.numeros.itens >= 1 && N.numeros.conferir && N.telas <= ALVO_TELAS,
+      `${N.numeros.filtros.join('/')} · ${N.numeros.itens} relatório(s) · ${N.telas} telas`);
+    add(G, 'Números — o toque abre o relatório com anterior/próximo, Compartilhar e PDF; "‹" devolve a Números, e depois ao menu',
+      N.relat.tela === 'relat' && N.relat.nav === 2 && N.relat.zap && N.relat.pdf && N.voltou === 'relnumeros' && N.voltou2 === 'relatorios',
+      `${N.relat.tela} (${N.relat.nav} setas${N.relat.zap ? ', compartilhar' : ''}${N.relat.pdf ? ', PDF' : ''}) → ${N.voltou} → ${N.voltou2}`);
+    add(G, 'Vocabulário — nenhum "não gerou", "não fez", "pendente", "atrasado", "faltou", "erro" nas três telas; nenhum diálogo nativo',
+      [M.texto, L.texto, N.numeros.texto].every(t => !RELATORIOS_PROIBIDO.test(SEM_A_REGRA(t))) && V.nativos === 0,
+      [M.texto, L.texto, N.numeros.texto].map(t => (RELATORIOS_PROIBIDO.exec(SEM_A_REGRA(t)) || [])[0]).filter(Boolean).join(', ') || `sem termo proibido; ${V.nativos} nativo(s)`);
+    add(G, 'Nenhum erro de JavaScript nas três telas', !V.erros.length, V.erros[0] || 'sem erro');
+  }
+
   /* 17. Voltar (v89): o "‹ Voltar" do primeiro nível devolve para a tela de onde o módulo foi aberto */
   if (R.voltar) {
     const G = '17. Voltar devolve para a tela de onde se veio';
@@ -2096,6 +2266,7 @@ function relatorio(itens, R) {
     await medirPlano(browser, base, R, 'Café (f23 Vereda Romaria)', 'f23', 'CAFE', true, termos);
     await cenarioPlanoPainel(browser, base, R);
     await cenarioPainelCartoes(browser, base, R);
+    await cenarioRelatorios(browser, base, R);   /* v99 */
     await cenarioVoltar(browser, base, R);
     await cenarioPlanejamento(browser, base, R);
     await cenarioInsumos(browser, base, R);
