@@ -2155,7 +2155,7 @@ data; zero nativo. Nenhum CSS novo: `.cartao`, `.cad-item`, `.grade2`,
 - Contagem de confirmações: 11 `perguntar(` — a mesma da v95/v96.
 
 ### Provas (v99)
-- `node scripts/teste_insumos.cjs`: __INSUMOS__ (a v99 acrescentou 22 provas,
+- `node scripts/teste_insumos.cjs`: **164 ✅ · 0 ❌** (a v99 acrescentou 22 provas,
   cenários a–i com a mensagem do Fabinho exatamente como colada, com
   "Lavamar": classificação e chip aceso; um seletor no cabeçalho, herança,
   de-para aprendido e trilha; segunda colagem sem pergunta; tarefas avulsas
@@ -2164,11 +2164,15 @@ data; zero nativo. Nenhum CSS novo: `.cartao`, `.cad-item`, `.grade2`,
   as datas e "sem registro", período do boletim, payload; sem boletim algum;
   duas fazendas → seletor por linha; reimportar = 0; vocabulário e largura;
   Agro1 e a mensagem da v93 inalterados; painel lendo o payload).
-- `scripts/checar-poluicao.cjs`: __POLUICAO__; grupo novo "20. Leitor do
+- `scripts/checar-poluicao.cjs`: **786 ✅ · 41 ❌** — os mesmos 41 ❌ herdados do `main` (763 ✅ · 41 ❌), nenhum novo, nenhum a menos; grupo novo "20. Leitor do
   WhatsApp" (10 ✅) e as telas "Colar do WhatsApp › Conferir a mensagem (relato
   de aplicação por setores)" e "… (tarefas avulsas com aviso de doses)" medidas
   como Cadastros.
-- `scripts/regressao_render.cjs` contra `origin/main`: __REGRESSAO__
+- `scripts/regressao_render.cjs` contra `origin/main`: casa, boletim e apontamento do gerente (café f23,
+  grãos f33, pecuária f26), pós-colheita, painel da Diretoria e Admin
+  **idênticos** — só o número da versão e o minuto do relógio do `enviadoEm`
+  diferem. A tela "Colar do WhatsApp › Conferir a aplicação" (forma da v93)
+  perdeu o cartão repetido do local e mede 2,0 telas (era 1,98).
 - `node --check` no JS extraído: ok. `teste_nomenclatura.cjs`: tudo certo.
   `teste_planejamento.cjs`: 123 ✅ · 1 ❌ — o mesmo ❌ do `main` ("De-para da
   ata — 23 nomes", que a v96 levou a 25; a expectativa da prova ficou
