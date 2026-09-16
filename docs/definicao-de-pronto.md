@@ -1020,10 +1020,19 @@ Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
 `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (8 itens) e a
 tela "Colar do WhatsApp › Conferir a aplicação" dentro de 2 telas.
 
-## 27. Baixa do ERP: espelho e conferência, nunca segundo consumo (desde a v96)
+## 27. Baixa do Agro1: espelho e conferência, nunca segundo consumo (desde a v96)
+**O nome nas telas é Agro1** — o sistema é chamado pelo nome que o escritório
+usa, na porta de entrada (v97) e em toda a conferência (v98): "🔎 Conferência
+Agro1 × Boletim", "➕ Só no Agro1", "🔸 Só no boletim", "origem: Agro1",
+"Baixas do Agro1". As chaves continuam "erp" (`tipo:"erp"`,
+`insumo_baixa_erp`, `lancado_erp_ini`, `ERP_TOL_PCT`) e a frase de cada linha
+é REMONTADA na leitura (`erpTextoLinha`), então trocar vocabulário nunca toca
+no que já foi gravado (regra da v76, item 2). Tarefa que renomear de novo faz
+pelas duas pontas: o texto na leitura e o teste que o exige.
+
 Tarefa que mexer na porta única, no saldo de insumos, no executado das
 tarefas ou no de-para prova, com `node scripts/teste_insumos.cjs` (cenários
-"ERP a" a "ERP o", PDF em tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf
+"Agro1 a" a "Agro1 o", PDF em tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf
 — sintético, mesmo layout e números do relatório real de 15/09/2026 — e a
 mensagem real do grupo "Aplicações Realizadas"):
 1. **Leitura por posição:** 24 linhas, 8 glebas, 164,90 ha, totais 1.900 /
@@ -1032,8 +1041,8 @@ mensagem real do grupo "Aplicações Realizadas"):
    cabeçalho (propriedade, atividade, empreendimento, safra, operação,
    período, emissão); nenhuma leitura duvidosa (área × dose/ha fecha com a
    quantidade a 1 %); layout desconhecido → "Não reconheci este relatório
-   do ERP.", nada gravado, texto extraído na trilha.
-2. **Datas:** hora do ERP gravada como LANÇAMENTO (`lancado_erp_ini/fim`),
+   do Agro1.", nada gravado, texto extraído na trilha.
+2. **Datas:** hora do Agro1 gravada como LANÇAMENTO (`lancado_erp_ini/fim`),
    competência do mês (da mensagem ou do período); nenhuma tela diz
    "aplicado às".
 3. **Identidade por id:** propriedade → unidade pelo de-para da ata (exato);
@@ -1043,16 +1052,16 @@ mensagem real do grupo "Aplicações Realizadas"):
 4. **Casamento determinístico (`erpCasar`), o resultado por linha do caso
    real:** SETOR 1 ✅ Bate ×3 · SETOR 2 ✅ Bate (soma de dois dias) · SETOR 3
    ⚠️ Quantidade diferente · SETOR 4 ⚠️ Talhão diferente e SETOR 5 ➕ Só no
-   ERP (desempate) · SETOR 6 ✅ Lançado sem quantidade ×3 (setor marcado na
+   Agro1 (desempate) · SETOR 6 ✅ Lançado sem quantidade ×3 (setor marcado na
    fertirrigação) · SETOR 7 ⚠️ Fora da janela · SETOR 8 ➕ ×3 · KCl do
-   SETOR 2 🔸 Só no app · adubação de solo NÃO é 🔸; rodar duas vezes dá o
+   SETOR 2 🔸 Só no boletim · adubação de solo NÃO é 🔸; rodar duas vezes dá o
    mesmo resultado. Ordem das passadas: bate → fora da janela → sem
-   quantidade → talhão diferente → quantidade diferente → só no ERP (a
+   quantidade → talhão diferente → quantidade diferente → só no Agro1 (a
    quantidade que bate vale mais que o talhão).
 5. **Completar:** ➕ entra no saldo e no executado da tarefa com "origem:
-   ERP"; boletins, farol de registro e dias sem registro ficam idênticos
+   Agro1"; boletins, farol de registro e dias sem registro ficam idênticos
    antes e depois.
-6. **Regra de saldo:** recebido 2.000 + boletim 100 + baixa ERP 1.900 → saldo
+6. **Regra de saldo:** recebido 2.000 + boletim 100 + baixa do Agro1 1.900 → saldo
    100 (nunca as duas fontes somadas); o toque no "aplicado" diz de onde veio
    cada número.
 7. **Checagens:** C1 mesmo PDF → 0 linhas novas e botão inativo com "Este
@@ -1063,20 +1072,20 @@ mensagem real do grupo "Aplicações Realizadas"):
    status só muda com "Concluí".
 8. **Telas:** relatório da conferência com grupos ⚠️ → 🔸 → ➕ → ✅ (⚠️ e 🔸
    abertos), UM botão "Importar e abrir conferência"; tela "🔎 Conferência
-   ERP × App" (nível 3 do módulo, classes cad-*, busca a partir de 12 itens,
+   Agro1 × Boletim" (nível 3 do módulo, classes cad-*, busca a partir de 12 itens,
    item de UMA linha ≥ 44 px, lado a lado no lugar, chips de resolução com
-   "desfazer", zero campo, zero nativo); pastilha "🔎 N lançamentos do ERP
+   "desfazer", zero campo, zero nativo); pastilha "🔎 N lançamentos do Agro1
    para conferir" que some com N = 0; cartão c19 no painel; Cadastros ›
-   Insumos › Baixas do ERP; "baixado no ERP" no cartão 📦 Insumos.
+   Insumos › Baixas do Agro1; "baixado no Agro1" no cartão 📦 Insumos.
 9. **Só a mensagem:** relato sem quantidade, saldo inalterado, "aguardando
-   relatório do ERP".
+   relatório do Agro1".
 10. **Vocabulário:** nenhum custo; nenhum "não fez", "não lançou", "erro do
     gerente", "pendente"; nenhuma confirmação nova (contagem de `perguntar(`
     igual à da v95).
 11. **Regressão:** gerente (três atividades) e pós-colheita idênticos ao
     main; painel e Cadastros só ganham o cartão/item novos.
-`scripts/checar-poluicao.cjs`, grupo "19. Baixa do ERP" (11 itens) e as
-telas "Colar do WhatsApp › Conferir o relatório do ERP", "… › Conferência
-ERP × App", "… › Conferência ERP × App (lista)" e "Cadastros › Insumos ›
-Baixas do ERP" medidas como Cadastros; o cartão "Conferência ERP × App" no
+`scripts/checar-poluicao.cjs`, grupo "19. Baixa do Agro1" (11 itens) e as
+telas "Colar do WhatsApp › Conferir o relatório do Agro1", "… › Conferência
+Agro1 × Boletim", "… › Conferência Agro1 × Boletim (lista)" e "Cadastros › Insumos ›
+Baixas do Agro1" medidas como Cadastros; o cartão "Conferência Agro1 × Boletim" no
 grupo 16 (painel em duas etapas).

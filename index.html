@@ -2899,7 +2899,7 @@ function relTexto(){
     if(rel==="irrigacao_rec_exec_semana"){ L.push("• "+relUni(l.unidade_id)+": R$ nec. "+relNum(r.reais_nec,0)+" × real. "+relNum(r.reais_real,0)+" · mm mín. rec. "+relNum(r.mm_min_rec)+" × exec. "+relNum(r.mm_real));
       (d.pivos||[]).filter(p=>p.alerta).forEach(p=>L.push("   – "+(p.equipamento||("Pivô "+p.pivo))+": "+[n0(p.dias_rec_sem_irr)?p.dias_rec_sem_irr+" dia(s) recomendado(s) sem irrigação":"",n0(p.atraso)>=3?p.atraso+" dias de atraso":""].filter(Boolean).join(" · "))); return; }
     if(rel==="balanco_hidrico_dia"){ (d.pivos||[]).forEach(p=>L.push("• "+relUni(l.unidade_id)+" "+(p.equipamento||("Pivô "+p.pivo))+": déficit "+relNum(p.deficit)+" mm · umidade "+relNum(p.umidade)+"%"+(p.umid_baixa?" (abaixo da segurança)":"")+(n0(p.atraso)?" · atraso "+p.atraso+" d":""))); return; }
-    if(rel==="custo_fisico_talhao_mes"){ const t=d.totais||{}; L.push("• "+relUni(l.unidade_id)+": "+relNum(t.mm)+" mm · "+relNum(t.horas)+" h máquina · "+relNum(t.diesel_l,0)+" L · "+relNum(t.pessoas_dia,0)+" pessoas-dia · "+n0(t.produtos)+" aplicações (R$ de insumo: ERP)");
+    if(rel==="custo_fisico_talhao_mes"){ const t=d.totais||{}; L.push("• "+relUni(l.unidade_id)+": "+relNum(t.mm)+" mm · "+relNum(t.horas)+" h máquina · "+relNum(t.diesel_l,0)+" L · "+relNum(t.pessoas_dia,0)+" pessoas-dia · "+n0(t.produtos)+" aplicações (R$ de insumo: Agro1)");
       (d.talhoes||[]).forEach(x=>{ const ir=x.irrigacao||{}; L.push("   – "+(x.nome||relTal(x.talhao_id))+": "+[ir.mm!=null?relNum(ir.mm)+" mm":"",n0(x.horas)?relNum(x.horas)+" h":"",n0(x.pessoas_dia)?relNum(x.pessoas_dia,0)+" pessoas-dia":"",(x.produtos||[]).length?(x.produtos||[]).length+" aplicações":""].filter(Boolean).join(" · ")); }); return; }
     if(rel==="rebanho_mes"){ const m=d.movimentacao||{}, rp=d.reproducao||{}; L.push("• "+relUni(l.unidade_id)+": "+n0(m.nascimentos)+" nasc. ("+n0(m.nascimentos_m)+"M/"+n0(m.nascimentos_f)+"F) · "+n0(m.mortes)+" mortes · "+n0(m.desmamas)+" desmamas · "+n0(m.entradas)+" entradas · "+n0(m.saidas)+" saídas · saldo "+n0(m.saldo)+(rp.taxa_prenhez!=null?" · prenhez "+relNum(rp.taxa_prenhez,0)+"%":"")+" · "+relNum(d.cabecas_contadas,0)+" cabeças contadas");
       (d.embarques||[]).forEach(e=>L.push("   – "+fmtDataCurta(e.data)+" "+e.tipo+": "+relNum(e.cabecas,0)+" cab."+(e.valor?" · R$ "+relNum(e.valor,0):"")+(e.contraparte?" · "+e.contraparte:""))); return; }
@@ -5395,7 +5395,7 @@ const DEPARA_PRODUTOS_PADRAO=[
   {termo:"Sulf. Manganês",      produto:"Sulf. Manganês",    categoria:"fertilizante", un:"kg"},
   {termo:"Ácido Bórico",        produto:"Ácido Bórico",      categoria:"fertilizante", un:"kg"},
   {termo:"Sulf. Zinco",         produto:"Sulf. Zinco",       categoria:"fertilizante", un:"kg"},
-  /* v96: os nomes como saem no relatório do ERP (AgroGestão) — igualdade exata pela chave normalizada */
+  /* v96: os nomes como saem no relatório do Agro1 (AgroGestão) — igualdade exata pela chave normalizada */
   {termo:"Sulfato de manganês branco 31%", produto:"Sulf. Manganês", categoria:"fertilizante", un:"kg"},
   {termo:"Sulfato de zinco 20%",           produto:"Sulf. Zinco",    categoria:"fertilizante", un:"kg"}
 ];
@@ -6282,16 +6282,16 @@ function insListaConsumo(fz,l){
 function insListaAplicadoErp(fz,l){
   const f=insAplicadoFontes(fz,l.chave);
   return `<div class="plan-exec-lista">
-    <p class="mut plan-exec-cab">${f.erp.length} baixa${f.erp.length>1?"s":""} do ERP · ${f.boletim.length} lançamento${f.boletim.length===1?"":"s"} do boletim</p>
+    <p class="mut plan-exec-cab">${f.erp.length} baixa${f.erp.length>1?"s":""} do Agro1 · ${f.boletim.length} lançamento${f.boletim.length===1?"":"s"} do boletim</p>
     ${f.erp.slice(0,20).map(b=>`<div class="plan-exec-l">
       <span class="num">${esc(fmtDataCurta(String(b.lancadoErpIni||b.criadoEm||"").slice(0,10)))}</span>
-      <span class="cresce">${esc(b.talhaoId?planoOndeNome(fz,b.talhaoId):b.glebaErp||"—")}<br><span class="mut">baixa do ERP de ${esc(fmtDataCurta(String(b.lancadoErpIni||b.criadoEm||"").slice(0,10)))} · ${esc(erpOpRot(b.operacaoErp))} · ${esc(erpCompRot(b.competencia))} · origem: ERP</span></span>
+      <span class="cresce">${esc(b.talhaoId?planoOndeNome(fz,b.talhaoId):b.glebaErp||"—")}<br><span class="mut">baixa do Agro1 de ${esc(fmtDataCurta(String(b.lancadoErpIni||b.criadoEm||"").slice(0,10)))} · ${esc(erpOpRot(b.operacaoErp))} · ${esc(erpCompRot(b.competencia))} · origem: Agro1</span></span>
       <span class="num">${esc(insQtd(erpKg(b),l.base))}</span></div>`).join("")}
     ${f.boletim.slice(0,20).map(c=>`<div class="plan-exec-l">
       <span class="num">${esc(fmtDataCurta(c.data))}</span>
-      <span class="cresce">${esc(c.nome||c.op||"—")}<br><span class="mut">${esc([c.op&&c.nome?c.op:"", c.dose>0?insNumTxt(c.dose)+" kg/ha × "+fmtHa(c.area)+" ha":c.detalhe, c.por, c.conta?"":"conferência · mês coberto pela baixa do ERP, não soma"].filter(Boolean).join(" · "))}</span></span>
+      <span class="cresce">${esc(c.nome||c.op||"—")}<br><span class="mut">${esc([c.op&&c.nome?c.op:"", c.dose>0?insNumTxt(c.dose)+" kg/ha × "+fmtHa(c.area)+" ha":c.detalhe, c.por, c.conta?"":"conferência · mês coberto pela baixa do Agro1, não soma"].filter(Boolean).join(" · "))}</span></span>
       <span class="num${c.conta?"":" mut"}">${esc(insQtd(c.kg,l.base))}</span></div>`).join("")}
-    <p class="mut plan-exec-cab">Havendo baixa do ERP no mês, ela manda no aplicado; o boletim do mesmo mês fica só como conferência. Nunca as duas fontes somadas.</p></div>`;
+    <p class="mut plan-exec-cab">Havendo baixa do Agro1 no mês, ela manda no aplicado; o boletim do mesmo mês fica só como conferência. Nunca as duas fontes somadas.</p></div>`;
 }
 /* ---- (1/5) campos do lançamento que alimentam o consumo ----
    Só nas operações que o catálogo da atividade declara (INS_OPS_CONSUMO) e só
@@ -6391,7 +6391,7 @@ function cartaoInsumosPainel(){
       <p class="mut ins-nums" style="margin:2px 0 0">programado <b class="num">${esc(insQtd(s.programado,base))}</b> ·
         recebido <b class="num">${esc(insQtd(s.recebido,base))}</b> ·
         aplicado <b class="num">${esc(insQtd(s.aplicado,base))}</b> ·
-        saldo <b class="num">${esc(insQtd(s.saldo,base))}</b>${s.erp>0?` · baixado no ERP <b class="num">${esc(insQtd(s.erp,base))}</b>`:""}</p>
+        saldo <b class="num">${esc(insQtd(s.saldo,base))}</b>${s.erp>0?` · baixado no Agro1 <b class="num">${esc(insQtd(s.erp,base))}</b>`:""}</p>
       <div class="plan-barra" role="img" aria-label="${pctR}% do programado foi recebido"><span style="width:${pctR}%"></span></div>
       <div class="plan-barra" role="img" aria-label="${pctA}% do recebido tem lançamento"><span class="fora" style="width:${pctA}%"></span></div>
       ${per?`<p class="mut" style="margin:3px 0 0;font-size:.72rem">no período: recebido ${esc(insQtd(per.recebido,base))} · aplicado ${esc(insQtd(per.aplicado,base))}</p>`:""}</div>`;
@@ -6451,7 +6451,7 @@ function cadVInsumos(){
   return cadTopo("Insumos",insProdutos().length+" produtos · "+insRemessas().length+" remessas")+
     (insProdutos().length>12?cadBusca("cad-i-busca","Buscar produto, fornecedor ou categoria…"):"")+
     cadItem("insremessas","","📦 Remessas programadas",insRemessas().length?insRemessas().length+" remessas · "+insQtd(insRemessas().reduce((s,r)=>s+insProgramadoTotal(r),0),"kg")+" programados":"nenhuma remessa importada",insRemessas().length)+
-    cadItem("insbaixas","","🔎 Baixas do ERP",erpBaixas().length?erpBaixas().filter(b=>b.status==="vigente").length+" linhas vigentes · "+erpImportacoes().length+" relatório"+(erpImportacoes().length===1?"":"s")+(erpAbertos().length?" · "+erpAbertos().length+" para conferir":""):"nenhum relatório do ERP importado",erpBaixas().filter(b=>b.status==="vigente").length)+
+    cadItem("insbaixas","","🔎 Baixas do Agro1",erpBaixas().length?erpBaixas().filter(b=>b.status==="vigente").length+" linhas vigentes · "+erpImportacoes().length+" relatório"+(erpImportacoes().length===1?"":"s")+(erpAbertos().length?" · "+erpAbertos().length+" para conferir":""):"nenhum relatório do Agro1 importado",erpBaixas().filter(b=>b.status==="vigente").length)+
     (cadUI.novo==="insumo"?`<div class="cartao"><h3>Novo produto</h3>${cadCampo("Nome","inome","",'placeholder="Ex.: Nitrato de amônio"')}
       ${cadCampo("Unidade (kg, L…)","iun","kg")}
       ${cadSelect("Categoria","icat",INS_CATEGORIAS,fm.icat||"fertilizante")}
@@ -6687,8 +6687,8 @@ function insVMensagem(id){
         :c.tipo==="chuva"?"🌧️ sugestão de "+insNumTxt(c.mm)+" mm em "+esc(fazenda(c.unidade).nome)+" ("+esc(fmtDataCurta(c.data))+")"
         :c.tipo==="tarefa"?"🗒️ tarefa "+esc(c.desc||"")+(c.unidade?" · "+esc(fazenda(c.unidade).nome):"")
         :c.tipo==="aplicacao"?"🚜 aplicação de "+esc(c.produto||"")+" em "+esc(fazenda(c.unidade).nome)+(c.talhaoId?" · "+esc(insRelatoOnde(c)):"")+" ("+esc(fmtDataCurta(c.data))+") · "+esc(insRelatoStatus(c))
-        :c.tipo==="erp"?"🔎 baixa do ERP em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+((c.linhas||[]).length)+" linhas · ⚠️ "+((c.resumo||{}).conf||0)+" · 🔸 "+((c.resumo||{}).so_app||0)+` <button class="btn suave mini" data-erp-abrirconf="${esc(c.id)}" style="display:inline-flex;padding:2px 8px">abrir conferência</button>`
-        :c.tipo==="erp_relato"?"🧾 relato de "+esc(erpOpRot(c.operacaoErp).toLowerCase())+" em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+esc((c.produtos||[]).join(", "))+(c.pdfId?" · ligado ao relatório do ERP":" — aguardando relatório do ERP")
+        :c.tipo==="erp"?"🔎 baixa do Agro1 em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+((c.linhas||[]).length)+" linhas · ⚠️ "+((c.resumo||{}).conf||0)+" · 🔸 "+((c.resumo||{}).so_app||0)+` <button class="btn suave mini" data-erp-abrirconf="${esc(c.id)}" style="display:inline-flex;padding:2px 8px">abrir conferência</button>`
+        :c.tipo==="erp_relato"?"🧾 relato de "+esc(erpOpRot(c.operacaoErp).toLowerCase())+" em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+esc((c.produtos||[]).join(", "))+(c.pdfId?" · ligado ao relatório do Agro1":" — aguardando relatório do Agro1")
         :"📋 "+esc(c.desc||c.tipo||"")}</p>`).join("")
         :`<p class="mut" style="font-size:.8rem">Nada foi criado a partir desta mensagem.</p>`}
       ${m.descartados?`<p class="mut" style="font-size:.78rem">${m.descartados} linha(s) deixada(s) de fora na conferência.</p>`:""}</div>`;
@@ -6954,16 +6954,16 @@ const erpOpsApp  = (k, atv) => ((ERP_OPERACOES.find(o=>o.erp===k)||{})[atv]||[])
 /* rótulos dos seis resultados do casamento — relatam REGISTRO, nunca trabalho */
 const ERP_RESULTADOS={
   bate:       {ico:"✅", rot:"Bate",                 grupo:"ok",   texto:"talhão, insumo e quantidade batem com o boletim"},
-  sem_qtd:    {ico:"✅", rot:"Lançado sem quantidade", grupo:"ok", texto:"o boletim marcou o talhão sem quantidade; o ERP completa"},
+  sem_qtd:    {ico:"✅", rot:"Lançado sem quantidade", grupo:"ok", texto:"o boletim marcou o talhão sem quantidade; o Agro1 completa"},
   qtd_dif:    {ico:"⚠️", rot:"Quantidade diferente", grupo:"conf", texto:"talhão e insumo batem, a quantidade não"},
   talhao_dif: {ico:"⚠️", rot:"Talhão diferente",     grupo:"conf", texto:"possível setor trocado"},
   fora_janela:{ico:"⚠️", rot:"Fora da janela",       grupo:"conf", texto:"o lançamento do boletim ficou fora do mês da baixa"},
-  so_erp:     {ico:"➕", rot:"Só no ERP",            grupo:"erp",  texto:"completado pelo ERP · sem registro no boletim"},
-  so_app:     {ico:"🔸", rot:"Só no app",            grupo:"app",  texto:"sem baixa no ERP — conferir o estoque"}
+  so_erp:     {ico:"➕", rot:"Só no Agro1",          grupo:"erp",  texto:"completado pelo Agro1 · sem registro no boletim"},
+  so_app:     {ico:"🔸", rot:"Só no boletim",        grupo:"app",  texto:"sem baixa no Agro1 — conferir o estoque"}
 };
-const ERP_GRUPOS=[["conf","⚠️ Para conferir",true],["app","🔸 Só no app",true],["erp","➕ Completado pelo ERP",false],["ok","✅ Batem",false]];
+const ERP_GRUPOS=[["conf","⚠️ Para conferir",true],["app","🔸 Só no boletim",true],["erp","➕ Completado pelo Agro1",false],["ok","✅ Batem",false]];
 const ERP_CONF_ESTADOS={ aberta:"para conferir", gerente:"conferência pedida ao gerente", mesmo:"é o mesmo lançamento",
-  diferentes:"são aplicações diferentes", erp:"ERP precisa de correção" };
+  diferentes:"são aplicações diferentes", erp:"Agro1 precisa de correção" };
 const erpBaixas = () => (D.baixasErp = D.baixasErp || []);
 let erpVersao=0;   /* muda a cada gravação: invalida os caches de saldo e de executado */
 const erpMarca = () => "|erp"+erpBaixas().length+"."+erpVersao;
@@ -7032,7 +7032,7 @@ function erpLerItens(paginas, nome){
   if(per){ cab.periodo={de:erpDataISO(per[1]), ate:erpDataISO(per[2])}; }
   const em=/emitid[oa]\s*(?:em)?\s*:?\s*(\d{2}\/\d{2}\/\d{4})\s*,?\s*(?:[àa]s)?\s*(\d{2}:\d{2}(?::\d{2})?)/i.exec(textoTodo);
   if(em) cab.emitidoEm=erpDataISO(em[1])+" "+em[2];
-  if(!tituloOk || iTit<0) return {...base, cab, motivo:"Não reconheci este relatório do ERP."};
+  if(!tituloOk || iTit<0) return {...base, cab, motivo:"Não reconheci este relatório do Agro1."};
   /* 3) colunas: âncora = centro do título, achado no texto normalizado da linha de títulos */
   const tit=linhas[iTit];
   let concat=""; const mapa=[];
@@ -7045,7 +7045,7 @@ function erpLerItens(paginas, nome){
     if(pos<0) return;
     const {x,fim}=xDe(pos,nome.length); cols.push({k, x, fim, c:(x+fim)/2}); cursor=pos+nome.length; });
   const col=k=>cols.find(c=>c.k===k)||null;
-  if(!col("insumo")||!col("qtde")||!col("dataIni")) return {...base, cab, motivo:"Não reconheci as colunas deste relatório do ERP."};
+  if(!col("insumo")||!col("qtde")||!col("dataIni")) return {...base, cab, motivo:"Não reconheci as colunas deste relatório do Agro1."};
   const colDe=it=>{ const cx=it.x+it.w/2; let best=null, d=1e9; cols.forEach(c=>{ const dd=Math.abs(cx-c.c); if(dd<d){ d=dd; best=c; } }); return best?best.k:""; };
   const colDireita=k=>{ const i=cols.findIndex(c=>c.k===k); return i>=0 && cols[i+1] ? cols[i+1].x-2 : Infinity; };
   /* 4) grupos (glebas) e linhas de detalhe, com as continuações reunidas coluna a coluna */
@@ -7106,7 +7106,7 @@ function erpLerItens(paginas, nome){
       if(Math.abs(calc-c.qtde)>Math.max(0.01, c.qtde*ERP_LINHA_TOL_PCT/100)){ r.ok=false; r.motivo="área × dose/ha ("+insNumTxt(Math.round(calc*100)/100)+") não fecha com a quantidade ("+insNumTxt(c.qtde)+")"; } }
     if(!c.operacao && cab.operacoes.length===1) c.operacao=cab.operacoes[0];
   });
-  if(!linhasOut.length) return {...base, cab, motivo:"Não achei nenhuma linha de aplicação neste relatório do ERP."};
+  if(!linhasOut.length) return {...base, cab, motivo:"Não achei nenhuma linha de aplicação neste relatório do Agro1."};
   const avisos=[];
   const somaArea=glebas.reduce((s,g)=>s+n0(g.area),0);
   if(totais.area!==null && Math.abs(somaArea-totais.area)>0.05) avisos.push("A soma das áreas das glebas ("+fmtHa(somaArea)+" ha) não fecha com o total do relatório ("+fmtHa(totais.area)+" ha).");
@@ -7169,10 +7169,10 @@ function erpMontarPrev(leitura, texto){
     p.produtos.push({erp:nome, produto:d?d.produto:(pr?pr.nome:""), un:(leitura.linhas.find(r=>r.campos.insumo===nome)||{campos:{}}).campos.un||"KG"}); });
   /* mensagem × PDF: conferem entre si? (aviso âmbar, nunca bloqueio) */
   if(msg){
-    if(msg.unidade && p.unidade && msg.unidade!==p.unidade) p.avisos.push("A mensagem fala de "+fazenda(msg.unidade).nome+" e o relatório do ERP é de "+fazenda(p.unidade).nome+".");
+    if(msg.unidade && p.unidade && msg.unidade!==p.unidade) p.avisos.push("A mensagem fala de "+fazenda(msg.unidade).nome+" e o relatório do Agro1 é de "+fazenda(p.unidade).nome+".");
     const noPdf=nome=>p.produtos.some(x=>insNorm(x.produto||x.erp)===insNorm(nome) || insNorm(x.erp)===insNorm(nome) || (x.produto && insChaveProd(x.produto)===insChaveProd(nome)));
     const fora=msg.produtos.filter(x=>!noPdf(x.produto||x.erp)).map(x=>x.erp);
-    if(fora.length) p.avisos.push("Produto citado na mensagem sem linha no relatório do ERP: "+fora.join(", ")+".");
+    if(fora.length) p.avisos.push("Produto citado na mensagem sem linha no relatório do Agro1: "+fora.join(", ")+".");
     if(msg.competencia && cab.periodo && cab.periodo.de && (cab.periodo.de.slice(0,7)!==msg.competencia || cab.periodo.ate.slice(0,7)!==msg.competencia))
       p.avisos.push("A mensagem fala de "+erpCompRot(msg.competencia)+" e o período do relatório é "+fmtDataCurta(cab.periodo.de)+" a "+fmtDataCurta(cab.periodo.ate)+".");
   }
@@ -7183,7 +7183,7 @@ function erpMontarPrev(leitura, texto){
 function erpRecalcular(p){
   const fz=p.unidade;
   p.glebas.forEach(g=>{ if(!g.talhaoId && fz) g.talhaoId=erpTalhaoDaGleba(g.nome,fz); g.aviso="";
-    if(g.talhaoId && g.area!==null){ const a=n0(talhao(g.talhaoId).area); if(a>0 && Math.abs(a-g.area)*100/a>ERP_AREA_DIF_PCT) g.aviso="área diferente do cadastro: ERP "+fmtHa(g.area)+" ha × app "+fmtHa(a)+" ha"; } });
+    if(g.talhaoId && g.area!==null){ const a=n0(talhao(g.talhaoId).area); if(a>0 && Math.abs(a-g.area)*100/a>ERP_AREA_DIF_PCT) g.aviso="área diferente do cadastro: Agro1 "+fmtHa(g.area)+" ha × app "+fmtHa(a)+" ha"; } });
   const talhaoDe=nome=>{ const g=p.glebas.find(x=>x.nome===nome); return g?g.talhaoId:""; };
   const prodDe=nome=>{ const x=p.produtos.find(y=>y.erp===nome); return x&&x.produto?x.produto:""; };
   p.itens=p.leitura.linhas.map(r=>{ const c=r.campos, produto=prodDe(c.insumo);
@@ -7234,7 +7234,7 @@ function erpResumo(itens, soApp){
   return n;
 }
 const erpResumoTexto = (p) => { const n=p.resumo||{}; return [fazenda(p.unidade).nome||"unidade a escolher", erpOpRot(p.operacaoErp), p.competencia?erpCompRot(p.competencia):"competência a informar",
-  n.total+" linhas do ERP", "✅ "+n.ok+" batem", "➕ "+n.so_erp+" completadas pelo ERP", "⚠️ "+n.conf+" para conferir", "🔸 "+n.so_app+" só no app"].join(" · "); };
+  n.total+" linhas do Agro1", "✅ "+n.ok+" batem", "➕ "+n.so_erp+" completadas pelo Agro1", "⚠️ "+n.conf+" para conferir", "🔸 "+n.so_app+" só no boletim"].join(" · "); };
 
 /* ---------- (2.4) O MOTOR DE CASAMENTO — determinístico e reproduzível ----------
    Onde procurar: em TODAS as fontes que registram insumo aplicado na unidade (INS_ATIVIDADE por
@@ -7337,14 +7337,14 @@ function erpTextoLinha(it, unidade){
   const q=insNumTxt(n0(it.qtde))+" "+String(it.un||"kg").toLowerCase();
   const v=(r.vinculos||[]);
   const datas=v.map(x=>fmtDataCurta(x.data)).filter((x,i,a)=>a.indexOf(x)===i).join(", ");
-  if(r.resultado==="bate") return tal+" · "+prod+" · app "+insNumTxt(n0(r.soma))+" kg ("+datas+") = ERP "+q;
-  if(r.resultado==="sem_qtd") return tal+" · "+prod+" · marcado no boletim de "+datas+" sem quantidade — o ERP completa: "+q;
-  if(r.resultado==="qtd_dif") return tal+" · "+prod+" · app "+insNumTxt(n0(r.soma))+" kg ("+datas+") × ERP "+q;
-  if(r.resultado==="talhao_dif") return "possível setor trocado: app no "+(v[0]?v[0].nome:"?")+" ("+insNumTxt(n0(r.soma))+" kg, "+datas+"), ERP no "+tal+" · "+prod;
-  if(r.resultado==="fora_janela") return tal+" · "+prod+" · app "+insNumTxt(n0(r.soma))+" kg em "+datas+", fora de "+(r.janela?fmtDataCurta(r.janela.de)+" a "+fmtDataCurta(r.janela.ate):"da janela")+" × ERP "+q;
+  if(r.resultado==="bate") return tal+" · "+prod+" · boletim "+insNumTxt(n0(r.soma))+" kg ("+datas+") = Agro1 "+q;
+  if(r.resultado==="sem_qtd") return tal+" · "+prod+" · marcado no boletim de "+datas+" sem quantidade — o Agro1 completa: "+q;
+  if(r.resultado==="qtd_dif") return tal+" · "+prod+" · boletim "+insNumTxt(n0(r.soma))+" kg ("+datas+") × Agro1 "+q;
+  if(r.resultado==="talhao_dif") return "possível setor trocado: boletim no "+(v[0]?v[0].nome:"?")+" ("+insNumTxt(n0(r.soma))+" kg, "+datas+"), Agro1 no "+tal+" · "+prod;
+  if(r.resultado==="fora_janela") return tal+" · "+prod+" · boletim "+insNumTxt(n0(r.soma))+" kg em "+datas+", fora de "+(r.janela?fmtDataCurta(r.janela.de)+" a "+fmtDataCurta(r.janela.ate):"da janela")+" × Agro1 "+q;
   return tal+" · "+prod+" · "+q+" — sem registro no boletim";
 }
-const erpTextoSoApp = s => (s.nome||"—")+" · "+String(s.produto||"").toLowerCase()+" · "+insNumTxt(n0(s.kg))+" kg no boletim de "+fmtDataCurta(s.data)+" — sem baixa no ERP — conferir o estoque";
+const erpTextoSoApp = s => (s.nome||"—")+" · "+String(s.produto||"").toLowerCase()+" · "+insNumTxt(n0(s.kg))+" kg no boletim de "+fmtDataCurta(s.data)+" — sem baixa no Agro1 — conferir o estoque";
 
 /* ---------- (2.5) O QUE FICA GRAVADO ---------- */
 const erpImportacoes = () => { const out=[]; insMensagens().forEach(m=>(m.criados||[]).forEach(c=>{ if(c.tipo==="erp" && c.id) out.push({...c, msgId:m.id, por:m.por||"", em:m.em||""}); })); return out; };
@@ -7364,7 +7364,7 @@ function erpFalta(p){
   if(p.soMensagem){ if(!p.unidade) return "Escolha a unidade da mensagem"; if(!p.competencia) return "Informe o mês da aplicação"; return ""; }
   if(!p.unidade) return "Escolha a unidade do relatório";
   if(!p.competencia) return "Informe o mês da aplicação";
-  if(p.glebas.some(g=>!g.talhaoId)) return "Ligue cada gleba do ERP a um talhão";
+  if(p.glebas.some(g=>!g.talhaoId)) return "Ligue cada gleba do Agro1 a um talhão";
   if(p.produtos.some(x=>!x.produto)) return "Escolha o produto do cadastro para cada insumo";
   if(p.conflitos.some(it=>!it.conflito.resposta)) return "Responda o que fazer com cada linha já importada com outra quantidade";
   const novas=p.itens.filter(it=>!it.jaImportada && it.ok && !(it.conflito && it.conflito.resposta==="ignorar"));
@@ -7383,7 +7383,7 @@ function erpImportar(){
     if(rep){ insUI.flash="Este relato já estava registrado para "+fazenda(fz).nome+" em "+erpCompRot(p.competencia)+" — nada foi duplicado."; }
     else { const c={tipo:"erp_relato", id:uid(), unidade:fz, competencia:p.competencia, operacaoErp:p.operacaoErp, produtos:p.produtos.map(x=>x.produto||x.erp), finalizada:!!p.finalizada, pdfId:""};
       insRegistrarMensagem({texto:insUI.texto, tipo:"erp", criados:[c]});
-      insUI.flash="Relato de "+erpOpRot(p.operacaoErp).toLowerCase()+" em "+fazenda(fz).nome+" ("+erpCompRot(p.competencia)+") registrado sem quantidade — aguardando relatório do ERP."; }
+      insUI.flash="Relato de "+erpOpRot(p.operacaoErp).toLowerCase()+" em "+fazenda(fz).nome+" ("+erpCompRot(p.competencia)+") registrado sem quantidade — aguardando relatório do Agro1."; }
     salvarDados(); insLimpar(); insRender(); return;
   }
   /* aprendizado de formato: o que foi confirmado uma vez não pergunta de novo */
@@ -7392,7 +7392,7 @@ function erpImportar(){
   p.glebas.forEach(g=>insAprenderUnidade(g.nome, fz, g.talhaoId));
   p.produtos.forEach(x=>{ insAprenderProduto(x.erp, x.produto); insGarantirProduto(x.produto,{un:/^l/i.test(x.un||"")?"L":"kg"}); });
   const impId=uid();
-  const textoMsg=String(insUI.texto||"").trim() ? insUI.texto : "📎 "+(p.arquivo||"relatório do ERP")+"\n"+p.leitura.texto.slice(0,800);
+  const textoMsg=String(insUI.texto||"").trim() ? insUI.texto : "📎 "+(p.arquivo||"relatório do Agro1")+"\n"+p.leitura.texto.slice(0,800);
   const linhasIds=[]; let gravadas=0, superadas=0;
   p.itens.forEach(it=>{
     if(it.jaImportada || !it.ok || !it.res) return;
@@ -7418,7 +7418,7 @@ function erpImportar(){
   erpVersao++;
   salvarDados();
   const n=p.resumo;
-  insUI.flash=gravadas+" linhas do ERP gravadas em "+fazenda(fz).nome+" ("+erpCompRot(p.competencia)+") · ⚠️ "+n.conf+" para conferir · 🔸 "+n.so_app+" só no app"+(superadas?" · "+superadas+" superada(s)":"");
+  insUI.flash=gravadas+" linhas do Agro1 gravadas em "+fazenda(fz).nome+" ("+erpCompRot(p.competencia)+") · ⚠️ "+n.conf+" para conferir · 🔸 "+n.so_app+" só no boletim"+(superadas?" · "+superadas+" superada(s)":"");
   insLimpar();
   insNav.push({v:"erpconf", id:impId}); ir("colar");
 }
@@ -7470,7 +7470,7 @@ function erpLancamentosPlano(fz){
   erpBaixasDe(fz).forEach(b=>{ if((b.casamento||{}).resultado!=="so_erp" || !b.talhaoId) return;
     const op=erpOpsApp(b.operacaoErp, atv)[0]; if(!op) return;
     out.push({ id:"erp:"+b.id, boletimId:"", data:String(b.lancadoErpIni||b.criadoEm||"").slice(0,10), op, onde:b.talhaoId, nome:planoOndeNome(fz,b.talhaoId),
-      area:n0(talhao(b.talhaoId).area), pessoas:0, por:"origem: ERP", parcial:false, origem:"erp" }); });
+      area:n0(talhao(b.talhaoId).area), pessoas:0, por:"origem: Agro1", parcial:false, origem:"erp" }); });
   return out;
 }
 
@@ -7482,7 +7482,7 @@ function erpEscolherPdf(){
   document.body.appendChild(inp); inp.click();
 }
 async function erpLerArquivo(file){
-  avisoInline("#bt-ins-pdf","Lendo o relatório do ERP…");
+  avisoInline("#bt-ins-pdf","Lendo o relatório do Agro1…");
   let buf; try{ buf=await file.arrayBuffer(); }catch(e){ avisoInline("#bt-ins-pdf","Não consegui abrir este arquivo."); return; }
   await erpAnexarBytes(buf, file.name||"relatório.pdf");
 }
@@ -7516,15 +7516,17 @@ const erpSelComp=(val)=>{ const ref=planMesDe(hojeBRT()); const ops=[0,1,2,3].ma
 function erpLinhaItem(it, unidade, o){
   o=o||{};
   const r=it.res||it.casamento||{}, R=ERP_RESULTADOS[r.resultado]||{ico:"",rot:""};
-  const texto=it.casamento?it.casamento.texto||erpTextoLinha(it,unidade):erpTextoLinha(it,unidade);
+  /* v98: o texto da linha é SEMPRE remontado na leitura — o `casamento.texto` gravado por uma versão
+     anterior fica no payload como estava e a tela mostra o vocabulário de hoje (regra da v76, item 2) */
+  const texto=erpTextoLinha(it,unidade)||(it.casamento||{}).texto||"";
   const conf=it.conf||{}, aberta=erpUI.aberto===it.id, resolvivel=o.resolver && R.grupo==="conf";
-  const chips=resolvivel && erpConfAberta(conf) ? [["mesmo","é o mesmo lançamento"],["diferentes","são aplicações diferentes"],["gerente","pedir conferência ao gerente"],["erp","ERP precisa de correção"]] : [];
+  const chips=resolvivel && erpConfAberta(conf) ? [["mesmo","é o mesmo lançamento"],["diferentes","são aplicações diferentes"],["gerente","pedir conferência ao gerente"],["erp","Agro1 precisa de correção"]] : [];
   const salvo=erpUI.salvo && erpUI.salvo.id===it.id;
   return `<div class="plan-linha" data-erp-item="${esc(it.id||("l"+it.i))}"><${o.resolver?"button":"div"} class="cad-item" style="margin:0${o.resolver?";text-align:left;width:100%":""}" ${o.resolver?`data-erp-abrir="${esc(it.id)}" aria-expanded="${aberta}"`:""}>
       <span class="cresce"><b>${R.ico} ${esc(R.rot)}</b><span class="mut">${esc(texto)}</span>${conf.estado&&conf.estado!=="aberta"?`<span class="mut" style="display:block;font-size:.74rem">${esc(ERP_CONF_ESTADOS[conf.estado]||conf.estado)}${conf.pedidoEm?" em "+esc(fmtDataCurta(String(conf.pedidoEm).slice(0,10))):""}</span>`:""}</span>
       ${o.resolver?`<span class="seta">${aberta?"⌃":"›"}</span>`:""}</${o.resolver?"button":"div"}>
     ${aberta?`<div class="plan-acoes">
-      <div class="ins-l"><span class="cresce"><b>ERP</b><br><span class="mut">${esc(it.glebaErp||it.gleba||"")} · ${esc(it.insumoErp||"")} · lançado no ERP em ${esc(fmtDataCurta(String(it.lancadoErpIni||it.lancadoIni||"").slice(0,10))||"—")}${it.doseHa!==null&&it.doseHa!==undefined?" · "+esc(insNumTxt(it.doseHa))+" kg/ha":""}</span></span><span class="num">${esc(insNumTxt(n0(it.qtde)))} ${esc(String(it.un||"kg").toLowerCase())}</span></div>
+      <div class="ins-l"><span class="cresce"><b>Agro1</b><br><span class="mut">${esc(it.glebaErp||it.gleba||"")} · ${esc(it.insumoErp||"")} · lançado no Agro1 em ${esc(fmtDataCurta(String(it.lancadoErpIni||it.lancadoIni||"").slice(0,10))||"—")}${it.doseHa!==null&&it.doseHa!==undefined?" · "+esc(insNumTxt(it.doseHa))+" kg/ha":""}</span></span><span class="num">${esc(insNumTxt(n0(it.qtde)))} ${esc(String(it.un||"kg").toLowerCase())}</span></div>
       ${(r.vinculos||[]).length?(r.vinculos||[]).map(v=>`<div class="ins-l"><span class="cresce"><b>Boletim</b><br><span class="mut">${esc(fmtDataCurta(v.data))} · ${esc(v.nome||"")} · ${esc(nomeAtual(v.op||""))}${v.por?" · "+esc(v.por):""}</span></span><span class="num">${v.kg?esc(insNumTxt(v.kg))+" kg":"sem kg"}</span></div>`).join("")
         :`<div class="ins-l"><span class="cresce"><b>Boletim</b><br><span class="mut">sem registro no boletim para este talhão e insumo</span></span></div>`}
       ${chips.length?`<div class="chips mt">${chips.map(([a,rt])=>`<button class="chip" data-erp-res="${esc(it.id)}|${a}">${esc(rt)}</button>`).join("")}</div>`:""}
@@ -7533,13 +7535,13 @@ function erpLinhaItem(it, unidade, o){
 }
 function erpLinhaSoApp(s, unidade, o){
   o=o||{}; const conf=s.conf||{}, aberta=erpUI.aberto===s.id, salvo=erpUI.salvo && erpUI.salvo.id===s.id;
-  const chips=o.resolver && erpConfAberta(conf) ? [["diferentes","são aplicações diferentes"],["gerente","pedir conferência ao gerente"],["erp","ERP precisa de correção"]] : [];
+  const chips=o.resolver && erpConfAberta(conf) ? [["diferentes","são aplicações diferentes"],["gerente","pedir conferência ao gerente"],["erp","Agro1 precisa de correção"]] : [];
   return `<div class="plan-linha" data-erp-item="${esc(s.id)}"><${o.resolver?"button":"div"} class="cad-item" style="margin:0${o.resolver?";text-align:left;width:100%":""}" ${o.resolver?`data-erp-abrir="${esc(s.id)}" aria-expanded="${aberta}"`:""}>
-      <span class="cresce"><b>🔸 Só no app</b><span class="mut">${esc(erpTextoSoApp(s))}</span>${conf.estado&&conf.estado!=="aberta"?`<span class="mut" style="display:block;font-size:.74rem">${esc(ERP_CONF_ESTADOS[conf.estado]||conf.estado)}</span>`:""}</span>
+      <span class="cresce"><b>🔸 Só no boletim</b><span class="mut">${esc(erpTextoSoApp(s))}</span>${conf.estado&&conf.estado!=="aberta"?`<span class="mut" style="display:block;font-size:.74rem">${esc(ERP_CONF_ESTADOS[conf.estado]||conf.estado)}</span>`:""}</span>
       ${o.resolver?`<span class="seta">${aberta?"⌃":"›"}</span>`:""}</${o.resolver?"button":"div"}>
     ${aberta?`<div class="plan-acoes">
       <div class="ins-l"><span class="cresce"><b>Boletim</b><br><span class="mut">${esc(fmtDataCurta(s.data))} · ${esc(s.nome||"")} · ${esc(nomeAtual(s.op||""))}${s.por?" · "+esc(s.por):""}</span></span><span class="num">${esc(insNumTxt(n0(s.kg)))} kg</span></div>
-      <div class="ins-l"><span class="cresce"><b>ERP</b><br><span class="mut">sem linha do ERP para este talhão e insumo na competência</span></span></div>
+      <div class="ins-l"><span class="cresce"><b>Agro1</b><br><span class="mut">sem linha do Agro1 para este talhão e insumo na competência</span></span></div>
       ${chips.length?`<div class="chips mt">${chips.map(([a,rt])=>`<button class="chip" data-erp-res="${esc(s.id)}|${a}">${esc(rt)}</button>`).join("")}</div>`:""}
       ${salvo?`<p class="mut" style="font-size:.78rem;margin:6px 0 0">✔ Salvo · ${esc(erpUI.salvo.texto)} · <button class="btn suave mini" style="display:inline-flex;padding:2px 8px" data-erp-res="${esc(s.id)}|desfazer">desfazer</button></p>`:""}
     </div>`:""}</div>`;
@@ -7550,30 +7552,30 @@ function erpGrupos(itens, soApp, unidade, o){
   const q=o.busca?cadNorm(o.busca):"";
   const bate=txt=>!q || cadNorm(txt).includes(q);
   return ERP_GRUPOS.map(([g,rot,aberto])=>{
-    const ls = g==="app" ? soApp.filter(s=>bate(erpTextoSoApp(s))) : itens.filter(it=>{ const r=(it.res||it.casamento||{}).resultado; return ERP_RESULTADOS[r] && ERP_RESULTADOS[r].grupo===g && bate(it.casamento?it.casamento.texto:erpTextoLinha(it,unidade)); });
+    const ls = g==="app" ? soApp.filter(s=>bate(erpTextoSoApp(s))) : itens.filter(it=>{ const r=(it.res||it.casamento||{}).resultado; return ERP_RESULTADOS[r] && ERP_RESULTADOS[r].grupo===g && bate(erpTextoLinha(it,unidade)||(it.casamento||{}).texto||""); });
     if(!ls.length && q) return "";
     const [ico,titulo]=[rot.slice(0,rot.indexOf(" ")), rot.slice(rot.indexOf(" ")+1)];
     return `<details class="secao" data-erp-grupo="${g}" ${aberto&&ls.length?"open":""}><summary><span class="ico">${ico}</span>${esc(titulo)}
       <span class="resumo neutro">${ls.length}</span><span class="seta">›</span></summary><div class="corpo">
-      ${ls.length?ls.map(x=>g==="app"?erpLinhaSoApp(x,unidade,o):erpLinhaItem(x,unidade,o)).join(""):`<p class="mut" style="font-size:.8rem;margin:8px 0">${esc(fraseVazio({que:g==="conf"?"linha do ERP para conferir":g==="app"?"lançamento só no app":g==="erp"?"linha completada pelo ERP":"linha que bate", unidade:unidade||"", onde:unidade?"":"neste relatório"}))}</p>`}</div></details>`;
+      ${ls.length?ls.map(x=>g==="app"?erpLinhaSoApp(x,unidade,o):erpLinhaItem(x,unidade,o)).join(""):`<p class="mut" style="font-size:.8rem;margin:8px 0">${esc(fraseVazio({que:g==="conf"?"linha do Agro1 para conferir":g==="app"?"lançamento só no boletim":g==="erp"?"linha completada pelo Agro1":"linha que bate", unidade:unidade||"", onde:unidade?"":"neste relatório"}))}</p>`}</div></details>`;
   }).join("");
 }
 /* pré-visualização (2.6): relatório da conferência ANTES de gravar */
 function erpCorpoPrev(p){
   const fz=p.unidade;
   if(p.soMensagem){
-    return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0 0 6px">Mensagem sem o relatório do ERP: fica registrado um RELATO de aplicação sem quantidade — unidade, operação, competência e os produtos. Nunca estimamos kg a partir da mensagem. Quando o PDF chegar, o relato liga a ele sozinho.</p>
+    return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0 0 6px">Mensagem sem o relatório do Agro1: fica registrado um RELATO de aplicação sem quantidade — unidade, operação, competência e os produtos. Nunca estimamos kg a partir da mensagem. Quando o PDF chegar, o relato liga a ele sozinho.</p>
       <label>Unidade</label>${fz?`<p style="margin:0 0 6px"><b>${esc(fazenda(fz).nome)}</b> <span class="mut">(${esc(p.nomeMsg||"nome da mensagem")})</span></p>`:erpSelUnidade(fz)}
       <label>Operação</label><p style="margin:0 0 6px"><b>${esc(erpOpRot(p.operacaoErp)||"—")}</b></p>
       <label>Mês da aplicação (competência)</label>${erpSelComp(p.competencia)}
       <label class="mt">Produtos citados</label>
       ${p.produtos.length?p.produtos.map((x,i)=>`<div class="ins-l"><span class="cresce">${esc(x.erp)}<br><span class="mut">${x.produto?"→ "+esc(x.produto):"produto do cadastro a escolher"}</span>${x.produto?"":erpSelProduto(i,x)}</span></div>`).join(""):`<p class="mut" style="font-size:.8rem">Nenhum produto reconhecido na mensagem.</p>`}
-      <p class="mut" style="font-size:.76rem;margin-top:8px">${p.finalizada?"A mensagem diz que a aplicação foi finalizada e baixada no sistema.":"A mensagem não diz que a baixa foi feita."} Na lista do escritório o relato aparece como "aguardando relatório do ERP".</p></div>`;
+      <p class="mut" style="font-size:.76rem;margin-top:8px">${p.finalizada?"A mensagem diz que a aplicação foi finalizada e baixada no sistema.":"A mensagem não diz que a baixa foi feita."} Na lista do escritório o relato aparece como "aguardando relatório do Agro1".</p></div>`;
   }
   const cab=p.leitura.cab, n=p.resumo||{};
   const chipC3=(it,a,rt)=>`<button class="chip ${it.conflito.resposta===a?"on":""}" data-erp-c3="${it.i}|${a}">${rt}</button>`;
   return `<div class="cartao">
-    <p class="mut" style="font-size:.8rem;margin:0 0 6px">Relatório do ERP lido por posição: ${p.leitura.n} linhas · ${p.leitura.glebas.length} glebas · ${fmtHa(p.leitura.somaArea)} ha${cab.emitidoEm?" · emitido em "+esc(fmtDataCurta(cab.emitidoEm.slice(0,10)))+" "+esc(cab.emitidoEm.slice(11,16)):""}. As horas do ERP são de LANÇAMENTO, não de aplicação. Nada é gravado antes do toque em "Importar".</p>
+    <p class="mut" style="font-size:.8rem;margin:0 0 6px">Relatório do Agro1 lido por posição: ${p.leitura.n} linhas · ${p.leitura.glebas.length} glebas · ${fmtHa(p.leitura.somaArea)} ha${cab.emitidoEm?" · emitido em "+esc(fmtDataCurta(cab.emitidoEm.slice(0,10)))+" "+esc(cab.emitidoEm.slice(11,16)):""}. As horas do Agro1 são de LANÇAMENTO, não de aplicação. Nada é gravado antes do toque em "Importar".</p>
     <label>Unidade</label>${fz?`<p style="margin:0 0 6px"><b>${esc(fazenda(fz).nome)}</b> <span class="mut">(${esc(cab.propriedade||cab.empreendimento||"—")})</span></p>`:`<p class="mut" style="font-size:.78rem;margin:0 0 4px">"${esc(cab.propriedade||cab.empreendimento||"propriedade não lida")}" não está no de-para — escolha a unidade (o app não adivinha nome de fazenda).</p>${erpSelUnidade(fz)}`}
     <label>Operação · competência</label><p style="margin:0 0 6px"><b>${esc(erpOpRot(p.operacaoErp)||"—")}</b> · ${p.competencia?`<b>${esc(erpCompRot(p.competencia))}</b> <span class="mut">(${p.msg&&p.msg.competencia?"da mensagem":"do período do relatório"})</span>`:erpSelComp("")}</p>
     ${p.hashIgual?`<div class="aviso">Este mesmo relatório já foi importado — as linhas iguais aparecem como "já importada" e não entram de novo.</div>`:""}
@@ -7581,17 +7583,17 @@ function erpCorpoPrev(p){
   </div>
   ${p.itens.some(it=>!it.ok)?`<div class="cartao"><h3>Leitura duvidosa</h3><p class="mut" style="font-size:.78rem;margin:0 0 6px">Linhas em que área × dose/ha não fecha com a quantidade (ou faltou um campo). Não entram no "Importar".</p>
     ${p.itens.filter(it=>!it.ok).map(it=>`<div class="ins-l"><span class="cresce">${esc(it.gleba)} · ${esc(it.insumoErp||"?")}<br><span class="mut">${esc(it.motivo)}</span></span><span class="num">${it.qtde!==null?esc(insNumTxt(it.qtde)):"—"}</span></div>`).join("")}</div>`:""}
-  ${p.conflitos.length?`<div class="cartao"><h3>Já importada com outra quantidade</h3><p class="mut" style="font-size:.78rem;margin:0 0 6px">O ERP foi corrigido ou relançado? Nada é apagado: "substituir" marca a anterior como superada e guarda a ligação.</p>
+  ${p.conflitos.length?`<div class="cartao"><h3>Já importada com outra quantidade</h3><p class="mut" style="font-size:.78rem;margin:0 0 6px">O Agro1 foi corrigido ou relançado? Nada é apagado: "substituir" marca a anterior como superada e guarda a ligação.</p>
     ${p.conflitos.map(it=>`<div class="plan-linha"><div class="cad-item" style="margin:0"><span class="cresce"><b>${esc(it.gleba)} · ${esc((it.produto||it.insumoErp).toLowerCase())}</b><span class="mut">já existe ${esc(insNumTxt(it.conflito.qtdeAnterior))} kg (lançado ${esc(fmtDataCurta(String(it.conflito.lancadoAnterior||"").slice(0,10))||"—")}); este relatório traz ${esc(insNumTxt(n0(it.qtde)))} kg</span></span></div>
       <div class="chips mt">${chipC3(it,"substituir","substituir")}${chipC3(it,"somar","somar como outra aplicação")}${chipC3(it,"ignorar","ignorar esta linha")}</div></div>`).join("")}</div>`:""}
-  ${fz?`<div class="cartao"><h3>Glebas do ERP → talhões do app</h3>
+  ${fz?`<div class="cartao"><h3>Glebas do Agro1 → talhões do cadastro</h3>
     ${p.glebas.map((g,i)=>`<div class="ins-l" style="flex-wrap:wrap"><span class="cresce"><b>${esc(g.nome)}</b> <span class="mut">${g.area!==null?fmtHa(g.area)+" ha · ":""}${g.n} linha${g.n===1?"":"s"}</span><br>
       <span class="mut">${g.talhaoId?"→ "+esc(planoOndeNome(fz,g.talhaoId)):"talhão a escolher — nunca por pedaço de nome"}</span>${g.aviso?`<span class="mut" style="display:block;color:var(--amarelo);font-size:.76rem">⚠ ${esc(g.aviso)}</span>`:""}</span>
       ${g.talhaoId?`<button class="btn suave mini" data-erp-gleba-troca="${i}" style="display:inline-flex;padding:2px 8px">trocar</button>`:`<span style="width:100%">${erpSelTalhao(fz,i,g.talhaoId)}</span>`}</div>`).join("")}</div>
-  <div class="cartao"><h3>Insumos do ERP → produtos do cadastro</h3>
+  <div class="cartao"><h3>Insumos do Agro1 → produtos do cadastro</h3>
     ${p.produtos.map((x,i)=>`<div class="ins-l" style="flex-wrap:wrap"><span class="cresce"><b>${esc(x.erp)}</b><br><span class="mut">${x.produto?"→ "+esc(x.produto):"produto do cadastro a escolher (ou criar)"}</span></span>
       ${x.produto?`<button class="btn suave mini" data-erp-prod-troca="${i}" style="display:inline-flex;padding:2px 8px">trocar</button>`:`<span style="width:100%">${erpSelProduto(i,x)}</span>`}</div>`).join("")}</div>`:""}
-  ${(fz && (p.itens.some(it=>it.res) || p.jaImportadas))?`<div class="cartao"><h3>🔎 Conferência ERP × App</h3>
+  ${(fz && (p.itens.some(it=>it.res) || p.jaImportadas))?`<div class="cartao"><h3>🔎 Conferência Agro1 × Boletim</h3>
     <p class="mut" style="font-size:.8rem;margin:0 0 8px">${esc(erpResumoTexto(p))}${p.jaImportadas?" · "+p.jaImportadas+" já importada"+(p.jaImportadas>1?"s":""):""}</p>
     ${(p.itens.filter(it=>it.res && !it.jaImportada).length+(p.soApp||[]).length)>12?`<input class="cad-busca" id="erp-busca" placeholder="Buscar talhão ou insumo…" value="${esc(erpUI.busca||"")}" autocomplete="off" autocapitalize="off">`:""}
     ${erpGrupos(p.itens.filter(it=>it.res && !it.jaImportada), p.soApp||[], fz, {busca:(p.itens.filter(it=>it.res && !it.jaImportada).length+(p.soApp||[]).length)>12?erpUI.busca:""})}
@@ -7607,35 +7609,35 @@ function erpChecagensHtml(p, fz, comChips){
   if(!plano.length && !dose.length && !tarefas.length) return "";
   return `<div class="mt" style="border-top:1px solid var(--linha);padding-top:8px">
     ${plano.map(x=>{ const c=x.conf||x; return `<p class="mut" style="margin:4px 0;font-size:.78rem;color:var(--amarelo)">⚠ ${esc(x.produto)}: baixado ${esc(insNumTxt(Math.round(c.kgHa)))} kg/ha × previsto pelo agrônomo ${esc(insNumTxt(Math.round(c.planoKgHa||(c.plano||{}).kgHa||0)))} kg/ha (plano v${esc(c.versao||(c.plano||{}).versao||"")}) — ${c.dif}% de diferença.</p>`; }).join("")}
-    ${dose.map(x=>`<p class="mut" style="margin:4px 0;font-size:.78rem;color:var(--amarelo)">⚠ ${esc(x.gleba)} · ${esc(String(x.produto).toLowerCase())}: ${esc(insNumTxt(Math.round(x.doseHa*100)/100))} kg/ha, dose/ha fora do padrão deste relatório (mediana ${esc(insNumTxt(Math.round(x.mediana*100)/100))}) — conferir o lançamento no ERP.</p>`).join("")}
+    ${dose.map(x=>`<p class="mut" style="margin:4px 0;font-size:.78rem;color:var(--amarelo)">⚠ ${esc(x.gleba)} · ${esc(String(x.produto).toLowerCase())}: ${esc(insNumTxt(Math.round(x.doseHa*100)/100))} kg/ha, dose/ha fora do padrão deste relatório (mediana ${esc(insNumTxt(Math.round(x.mediana*100)/100))}) — conferir o lançamento no Agro1.</p>`).join("")}
     ${tarefas.map(t=>`<div class="plan-linha"><div class="cad-item" style="margin:0"><span class="cresce"><b>📋 A tarefa «${esc(t.desc)}» casa com esta aplicação — concluir?</b><span class="mut">${esc(fazenda(t.unidade).nome)}${t.prazo?" · prazo "+esc(fmtDataCurta(t.prazo)):""} · ${esc(t.status.replace(/_/g," "))}</span></span></div>
       ${comChips?`<div class="chips mt"><button class="chip" data-erp-tar="${esc(t.id)}|concluir">Concluí</button><button class="chip" data-erp-tar="${esc(t.id)}|nao">ainda não</button></div>`:`<p class="mut" style="font-size:.76rem;margin:4px 0 0">O app sugere, nunca conclui sozinho — a resposta fica na tela da conferência, depois de importar.</p>`}</div>`).join("")}
   </div>`;
 }
-/* a tela "🔎 Conferência ERP × App" de UMA importação (nível 2 do módulo; também a tela da unidade no painel) */
+/* a tela "🔎 Conferência Agro1 × Boletim" de UMA importação (nível 2 do módulo; também a tela da unidade no painel) */
 function erpCorpoConferencia(imp, o){
   o=o||{};
   const fz=imp.unidade, linhas=erpBaixas().filter(b=>b.impId===imp.id && b.status==="vigente"), soApp=imp.soApp||[];
   const abertos=linhas.filter(b=>ERP_RESULTADOS[(b.casamento||{}).resultado].grupo==="conf" && erpConfAberta(b.conf)).length+soApp.filter(s=>erpConfAberta(s.conf)).length;
   const p={unidade:fz, operacaoErp:imp.operacaoErp, competencia:imp.competencia, resumo:erpResumo(linhas, soApp), plano:imp.plano||[], dose:imp.dose||[]};
   const total=linhas.length+soApp.length;
-  return `<div class="cartao"><h3>🔎 Conferência ERP × App</h3>
+  return `<div class="cartao"><h3>🔎 Conferência Agro1 × Boletim</h3>
     <p class="mut" style="font-size:.8rem;margin:0">${esc(erpResumoTexto(p))}</p>
-    <p class="mut" style="font-size:.76rem;margin:4px 0 0">${abertos?abertos+" para conferir":"nada em aberto"} · ${esc(imp.arquivo||"relatório do ERP")}${imp.emitidoEm?" · emitido em "+esc(fmtDataCurta(imp.emitidoEm.slice(0,10))):""} · importado em ${esc(fmtDataCurta(String(imp.em||"").slice(0,10)||hojeBRT()))}${imp.por?" por "+esc(imp.por):""}</p>
+    <p class="mut" style="font-size:.76rem;margin:4px 0 0">${abertos?abertos+" para conferir":"nada em aberto"} · ${esc(imp.arquivo||"relatório do Agro1")}${imp.emitidoEm?" · emitido em "+esc(fmtDataCurta(imp.emitidoEm.slice(0,10))):""} · importado em ${esc(fmtDataCurta(String(imp.em||"").slice(0,10)||hojeBRT()))}${imp.por?" por "+esc(imp.por):""}</p>
     ${(imp.avisos||[]).map(a=>`<div class="aviso mt">⚠ ${esc(a)}</div>`).join("")}
     ${(imp.glebas||[]).filter(g=>g.aviso).map(g=>`<p class="mut" style="margin:4px 0 0;font-size:.76rem;color:var(--amarelo)">⚠ ${esc(g.nome)}: ${esc(g.aviso)}</p>`).join("")}
   </div>
   ${total>12?`<input class="cad-busca" id="erp-busca" placeholder="Buscar talhão ou insumo…" value="${esc(erpUI.busca||"")}" autocomplete="off" autocapitalize="off">`:""}
   ${erpGrupos(linhas, soApp, fz, {resolver:true, busca:total>12?erpUI.busca:""})}
   <div class="cartao">${erpChecagensHtml(p, fz, true)||`<p class="mut" style="font-size:.78rem;margin:0">Sem aviso de plano, de dose ou de tarefa para esta importação.</p>`}
-    <p class="mut" style="font-size:.72rem;margin-top:8px">Fonte: baixa do ERP (AgroGestão) × lançamentos dos boletins da unidade. Nada se apaga: cada resposta fica no histórico com quem, quando e de → para. "Sem registro no boletim" e "sem baixa no ERP" relatam ausência de REGISTRO, nunca de trabalho.</p></div>`;
+    <p class="mut" style="font-size:.72rem;margin-top:8px">Fonte: baixa do Agro1 × lançamentos dos boletins da unidade. Nada se apaga: cada resposta fica no histórico com quem, quando e de → para. "Sem registro no boletim" e "sem baixa no Agro1" relatam ausência de REGISTRO, nunca de trabalho.</p></div>`;
 }
 /* texto pronto por grupo (botão "📲 copiar relatório") */
 function erpTextoRelatorio(imp){
   const fz=imp.unidade, linhas=erpBaixas().filter(b=>b.impId===imp.id && b.status==="vigente"), soApp=imp.soApp||[];
   const p={unidade:fz, operacaoErp:imp.operacaoErp, competencia:imp.competencia, resumo:erpResumo(linhas, soApp)};
-  const out=["🔎 Conferência ERP × App — "+erpResumoTexto(p)];
-  ERP_GRUPOS.forEach(([g,rot])=>{ const ls=g==="app"?soApp.map(erpTextoSoApp):linhas.filter(b=>ERP_RESULTADOS[(b.casamento||{}).resultado].grupo===g).map(b=>(b.casamento||{}).texto||"");
+  const out=["🔎 Conferência Agro1 × Boletim — "+erpResumoTexto(p)];
+  ERP_GRUPOS.forEach(([g,rot])=>{ const ls=g==="app"?soApp.map(erpTextoSoApp):linhas.filter(b=>ERP_RESULTADOS[(b.casamento||{}).resultado].grupo===g).map(b=>erpTextoLinha(b, fz));
     if(ls.length){ out.push(""); out.push(rot+" ("+ls.length+")"); ls.forEach(t=>out.push("• "+t)); } });
   return out.join("\n");
 }
@@ -7644,18 +7646,18 @@ function insVErp(){
   const relatos=erpRelatos().filter(r=>podeVer(r.unidade) && !r.pdfId);
   const n=erpAbertos().length, q=erpUI.busca;
   const ls=imps.filter(i=>cadBate(q, fazenda(i.unidade).nome, erpCompRot(i.competencia), erpOpRot(i.operacaoErp)));
-  return insTopo("Conferência ERP × App", n?n+" para conferir":"nada em aberto")
+  return insTopo("Conferência Agro1 × Boletim", n?n+" para conferir":"nada em aberto")
     +(imps.length>12?`<input class="cad-busca" id="erp-busca" placeholder="Buscar unidade ou mês…" value="${esc(q||"")}" autocomplete="off" autocapitalize="off">`:"")
     +(ls.length?ls.map(i=>{ const ab=erpAbertos(i.unidade).filter(x=>x.imp?x.imp.id===i.id:(x.item.impId===i.id)).length; const r=i.resumo||{};
       return cadItem("erpconf", i.id, "🔎 "+fazenda(i.unidade).nome+" · "+erpCompRot(i.competencia), erpOpRot(i.operacaoErp)+" · "+(r.total||0)+" linhas · ⚠️ "+(r.conf||0)+" · 🔸 "+(r.so_app||0)+" · ➕ "+(r.so_erp||0)+" · ✅ "+(r.ok||0)+(ab?" · "+ab+" para conferir":" · nada em aberto"), ab); }).join("")
-      :htmlEstado("vazio",{que:"relatório do ERP importado", filtro:q, onde:"nas unidades deste código", dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
-    +(relatos.length?`<div class="cartao"><h3>Relatos aguardando o relatório do ERP</h3>${relatos.map(r=>`<p class="mut" style="font-size:.8rem;margin:3px 0">🧾 ${esc(fazenda(r.unidade).nome)} · ${esc(erpOpRot(r.operacaoErp))} · ${esc(erpCompRot(r.competencia))} · ${esc((r.produtos||[]).join(", "))} — aguardando relatório do ERP</p>`).join("")}</div>`:"")
+      :htmlEstado("vazio",{que:"relatório do Agro1 importado", filtro:q, onde:"nas unidades deste código", dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
+    +(relatos.length?`<div class="cartao"><h3>Relatos aguardando o relatório do Agro1</h3>${relatos.map(r=>`<p class="mut" style="font-size:.8rem;margin:3px 0">🧾 ${esc(fazenda(r.unidade).nome)} · ${esc(erpOpRot(r.operacaoErp))} · ${esc(erpCompRot(r.competencia))} · ${esc((r.produtos||[]).join(", "))} — aguardando relatório do Agro1</p>`).join("")}</div>`:"")
     +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do Agro1</button>`);
 }
 function insVErpConf(id){
   const imp=erpImportacao(id);
-  if(!imp) return insTopo("Conferência ERP × App")+`<div class="cartao">${htmlEstado("vazio",{que:"importação do ERP",onde:"neste aparelho"})}</div>`;
-  return insTopo("Conferência ERP × App", fazenda(imp.unidade).nome+" · "+erpCompRot(imp.competencia))
+  if(!imp) return insTopo("Conferência Agro1 × Boletim")+`<div class="cartao">${htmlEstado("vazio",{que:"importação do Agro1",onde:"neste aparelho"})}</div>`;
+  return insTopo("Conferência Agro1 × Boletim", fazenda(imp.unidade).nome+" · "+erpCompRot(imp.competencia))
     +erpCorpoConferencia(imp,{})
     +cadRodape(`<button class="btn sec" data-erp-copiar="${esc(imp.id)}">📲 copiar relatório</button>`);
 }
@@ -7666,11 +7668,11 @@ function cadVInsBaixas(){
   erpBaixas().filter(b=>podeVer(b.unidade)).forEach(b=>{ const k=b.unidade+"|"+b.competencia; const g=grupos[k]=grupos[k]||{unidade:b.unidade, competencia:b.competencia, vig:0, sup:0, kg:0, imps:new Set(), ult:""};
     if(b.status==="vigente"){ g.vig++; g.kg+=erpKg(b); } else g.sup++; g.imps.add(b.impId); if(String(b.criadoEm)>g.ult) g.ult=String(b.criadoEm); });
   const ls=Object.values(grupos).filter(g=>cadBate(q, fazenda(g.unidade).nome, erpCompRot(g.competencia))).sort((a,b)=>b.ult.localeCompare(a.ult));
-  return cadTopo("Baixas do ERP", erpBaixas().filter(b=>b.status==="vigente").length+" linhas vigentes")
+  return cadTopo("Baixas do Agro1", erpBaixas().filter(b=>b.status==="vigente").length+" linhas vigentes")
     +(Object.keys(grupos).length>12?cadBusca("cad-erp-busca","Buscar unidade ou mês…"):"")
     +(ls.length?ls.map(g=>{ const ab=erpAbertos(g.unidade).length; const imp=[...g.imps].map(erpImportacao).filter(Boolean).sort((a,b)=>String(b.em).localeCompare(String(a.em)))[0];
-      return `<button class="cad-item" data-erp-abrirconf="${esc(imp?imp.id:"")}"><span class="cresce"><b>${esc(fazenda(g.unidade).nome)} · ${esc(erpCompRot(g.competencia))}</b><span class="mut">${g.vig} linhas · ${esc(insQtd(g.kg,"kg"))} baixados no ERP${g.sup?" · "+g.sup+" superada"+(g.sup>1?"s":""):""} · ${g.imps.size} importa${g.imps.size===1?"ção":"ções"}${ab?" · "+ab+" para conferir":""}</span></span><span class="seta">›</span></button>`; }).join("")
-      :htmlEstado("vazio",{que:q?"baixa do ERP":"baixa do ERP importada",filtro:q,dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
+      return `<button class="cad-item" data-erp-abrirconf="${esc(imp?imp.id:"")}"><span class="cresce"><b>${esc(fazenda(g.unidade).nome)} · ${esc(erpCompRot(g.competencia))}</b><span class="mut">${g.vig} linhas · ${esc(insQtd(g.kg,"kg"))} baixados no Agro1${g.sup?" · "+g.sup+" superada"+(g.sup>1?"s":""):""} · ${g.imps.size} importa${g.imps.size===1?"ção":"ções"}${ab?" · "+ab+" para conferir":""}</span></span><span class="seta">›</span></button>`; }).join("")
+      :htmlEstado("vazio",{que:q?"baixa do Agro1":"baixa do Agro1 importada",filtro:q,dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
     +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do Agro1</button>`);
 }
 /* entrada de dados da pré-visualização do ERP (chamado por insInput) */
@@ -7697,8 +7699,8 @@ function erpClique(t,d){
   if(d.erpRes!==undefined){ const [id,acao]=d.erpRes.split("|"); erpResolver(id, acao); erpRepintar(id); return true; }
   if(d.erpCopiar!==undefined){ const imp=erpImportacao(d.erpCopiar); if(imp) abrirTextoZap(erpTextoRelatorio(imp)); return true; }
   if(d.erpTar!==undefined){ const [id,acao]=d.erpTar.split("|"); const tt=planTarefa(id);
-    if(tt && acao==="concluir" && tt.status!=="finalizado") planMudarStatus(id,"finalizado",{texto:"concluída na conferência do ERP"});
-    else if(tt && acao==="nao") planLog(tt,"erp","","ainda não","a aplicação do ERP não conclui a tarefa"), planGravar(tt);
+    if(tt && acao==="concluir" && tt.status!=="finalizado") planMudarStatus(id,"finalizado",{texto:"concluída na conferência do Agro1"});
+    else if(tt && acao==="nao") planLog(tt,"erp","","ainda não","a aplicação do Agro1 não conclui a tarefa"), planGravar(tt);
     ir(telaAtual,null,true); return true; }
   if(telaAtual!=="colar" || !insUI.prev || insUI.prev.tipo!=="erp") return false;
   const p=insUI.prev;
@@ -9156,12 +9158,12 @@ const PAINEL_CARTOES={
         ${d.length?`<p class="mt" style="color:var(--vermelho,#a33)"><b>⚠️ Divergências:</b></p><ul class="lista-limpa">${d.map(r=>`<li class="mut" style="padding:4px 0">${fmtData(r.data)} ${esc(fazenda(r.origem).nome)}→${esc(fazenda(r.destino).nome)}: enviou ${r.carretas}, chegou ${r.recebidoQtd}${r.obsReceb?" — "+esc(r.obsReceb):""}</li>`).join("")}</ul>`:""}
       </div>`; }
   },
-  /* (6) v96: Conferência ERP × App — lista UNIDADES com relatório do ERP importado; a descrição inteira
+  /* (6) v96: Conferência Agro1 × Boletim — lista UNIDADES com relatório do Agro1 importado; a descrição inteira
      (linha do ERP lado a lado com o lançamento do app, chips de resolução) mora na tela da unidade.
      Some sem importação nenhuma (como Solinftec e café em trânsito). */
   erp:{
-    ico:"🔎", titulo:"Conferência ERP × App", some:true,
-    nota:"Baixa do ERP × lançamentos do boletim. Ordem: unidades com mais linhas para conferir. Divergência é assunto do escritório, nunca cobrança do campo.",
+    ico:"🔎", titulo:"Conferência Agro1 × Boletim", some:true,
+    nota:"Baixa do Agro1 × lançamentos do boletim. Ordem: unidades com mais linhas para conferir. Divergência é assunto do escritório, nunca cobrança do campo.",
     uns(){
       const m={};
       erpImportacoes().forEach(i=>{ if(!podeVer(i.unidade) || (filtroPainel.atv && atividadeDe(i.unidade)!==filtroPainel.atv) || (filtroPainel.fazenda && i.unidade!==filtroPainel.fazenda)) return;
@@ -9172,7 +9174,7 @@ const PAINEL_CARTOES={
         .sort((a,b)=>(b.dados.abertos-a.dados.abertos) || a.nome.localeCompare(b.nome,"pt-BR"));
     },
     resumo(uns){ const a=uns.reduce((s,u)=>s+u.dados.abertos,0); return `${uns.length} unidade${uns.length>1?"s":""} · ${a} para conferir`; },
-    vazio:()=>htmlEstado("vazio",{que:"relatório do ERP importado", onde:"nas unidades deste código"},{classe:"mut"}),
+    vazio:()=>htmlEstado("vazio",{que:"relatório do Agro1 importado", onde:"nas unidades deste código"},{classe:"mut"}),
     detalhe(u){ return u.dados.imps.map(imp=>erpCorpoConferencia(imp,{})).join("")
       +`<button class="btn sec mt no-print" data-erp-copiar="${esc(u.dados.imps[0].id)}" style="box-shadow:none;border-radius:0;">📲 copiar relatório</button>`; }
   },
@@ -9629,7 +9631,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v97";
+const APP_VERSAO="v98";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -11052,7 +11054,7 @@ function planPastilhas(){
       out.push({txt:"📅 Rodada de "+planMesNome(ref)+" não importada", v:"ritual", arg:"ata"});
     /* v96: baixa do ERP com linhas para conferir — só aparece com item em aberto */
     const erpN=erpAbertos().length;
-    if(erpN) out.push({txt:"🔎 "+erpN+" lançamento"+(erpN>1?"s":"")+" do ERP para conferir", v:"erp"});
+    if(erpN) out.push({txt:"🔎 "+erpN+" lançamento"+(erpN>1?"s":"")+" do Agro1 para conferir", v:"erp"});
   }
   if(sessao && sessao.papel==="gerente" && sessao.fazendaId){
     const ls=planAbertasDa(sessao.fazendaId).filter(t=>{ const d=planDiasParaPrazo(t); return d!==null && d<=7; });

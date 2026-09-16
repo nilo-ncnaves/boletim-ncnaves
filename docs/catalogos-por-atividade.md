@@ -1006,14 +1006,14 @@ IATF, bicheira, berro, desmama, brinco, sal mineral, proteinado,
 vermifugação, everminou, apartação, castração, pesagem, embarque,
 gado, aguadas, porteira, capataz, prenhes, gestação, carrapato
 
-## Operação do ERP → operações do app (v96) — `ERP_OPERACOES`
+## Operação do Agro1 → operações do app (v96) — `ERP_OPERACOES`
 Catálogo por chave, usado SÓ para dois fins: o escopo do 🔸 "só no app"
 (que lançamentos do boletim, na mesma operação e competência do relatório,
-ficaram sem linha do ERP) e a sugestão de tarefa (C8). O casamento linha a
+ficaram sem linha do Agro1) e a sugestão de tarefa (C8). O casamento linha a
 linha NÃO usa operação — a chave é talhão + insumo + janela + quantidade.
-Operação do ERP sem de-para: o casamento continua e o 🔸 fica vazio.
+Operação do Agro1 sem de-para: o casamento continua e o 🔸 fica vazio.
 
-| operação no ERP | ☕ Café | 🌾 Grãos | 🐂 Pecuária |
+| operação no Agro1 | ☕ Café | 🌾 Grãos | 🐂 Pecuária |
 | --- | --- | --- | --- |
 | FERTIRRIGAÇÃO | Adubação via fertirrigação | Adubação de cobertura · Aplicação foliar / micronutrientes | — |
 | ADUBAÇÃO | Adubação manual · Adubação via lanço · Adubação orgânica | Adubação de cobertura · Adubação de plantio (sulco) | — |
@@ -1027,5 +1027,5 @@ operação de `INS_OPS_CONSUMO` sem produto/dose; grãos = operação de adubaç
 calagem, gessagem ou aplicação sem produto; pecuária = evento com produto sem
 quantidade. Vocabulário dos resultados (igual nas três atividades): ✅ Bate ·
 ✅ Lançado sem quantidade · ⚠️ Quantidade diferente · ⚠️ Talhão diferente ·
-⚠️ Fora da janela · ➕ Só no ERP · 🔸 Só no app — relatam REGISTRO, nunca
+⚠️ Fora da janela · ➕ Só no Agro1 · 🔸 Só no boletim — relatam REGISTRO, nunca
 trabalho.

@@ -99,8 +99,9 @@ planejamento_tarefa da rodada do mês; a resposta do bloco "❓ é a mesma
 tarefa?" viaja dentro do payload da tarefa (quadroRotulo / quadroNao) e
 o produto da coluna entra no catálogo D.insumos que já existe.
 Desde a v96: insumo_baixa_erp (sql/057; espelho da baixa de insumo feita
-no ERP AgroGestão, uma linha por gleba × insumo, com o casamento contra o
-boletim e a conferência do escritório; o app lê E escreve, na mesma fila
+no ERP AgroGestão — "Agro1", como o escritório o chama —, uma linha por
+gleba × insumo, com o casamento contra o boletim e a conferência do
+escritório; o app lê E escreve, na mesma fila
 offline dos boletins; sem policy de delete — superada é status). A trilha
 (mensagem, nome do arquivo, hash e texto extraído do PDF) fica em
 mensagens_importadas; o PDF em si nunca é guardado. A biblioteca pdf.js
@@ -1060,29 +1061,37 @@ sobrou — e tarefa do planejamento fica parada "aguardando insumo".
   Insumos, agora item de primeiro nível), com categoria e fornecedor. NÃO foi
   criada uma coleção `D.produtos` em paralelo — duas listas de produto no
   mesmo app divergem no primeiro mês.
-- **Baixa do ERP (desde a v96) — a regra que fica:** baixa feita no ERP
-  entra no app como ESPELHO e conferência, nunca como segundo consumo; o app
-  casa sozinho cada linha do ERP com os lançamentos por unidade, talhão,
+- **Baixa do Agro1 (desde a v96; o nome nas telas desde a v97/v98) — a regra
+  que fica:** baixa feita no Agro1 (o ERP AgroGestão) entra no app como
+  ESPELHO e conferência, nunca como segundo consumo; o app
+  casa sozinho cada linha do Agro1 com os lançamentos por unidade, talhão,
   insumo, janela e quantidade (`erpCasar`, regras determinísticas, nunca
   IA/API); o que não bate vira aviso de conferência do ESCRITÓRIO
-  (`🔎 Conferência ERP × App`: pastilha, cartão c19 no painel, Cadastros ›
-  Insumos › Baixas do ERP), nunca cobrança do campo — o gerente não vê nada
-  novo; havendo baixa do ERP para unidade + insumo + competência, ela MANDA
-  no saldo (`insAplicadoFontes`) e completa o executado com "origem: ERP",
+  (`🔎 Conferência Agro1 × Boletim`: pastilha, cartão c19 no painel, Cadastros ›
+  Insumos › Baixas do Agro1), nunca cobrança do campo — o gerente não vê nada
+  novo; havendo baixa do Agro1 para unidade + insumo + competência, ela MANDA
+  no saldo (`insAplicadoFontes`) e completa o executado com "origem: Agro1",
   mas NÃO acende farol de registro nem mexe nos "dias sem registro"; hora do
-  ERP é de LANÇAMENTO, não de aplicação (`lancado_erp_ini/fim`; a competência
-  é o mês). Entrada pela MESMA porta única: tipo "Agro1" e o botão "📎 Anexar relatório do Agro1 (PDF)" (desde a v97 a porta de entrada chama o sistema pelo nome que o escritório usa, Agro1; as chaves internas continuam "erp") (pdf.js em
-  vendor/pdfjs/, lido por posição x,y — nunca por linha corrida). Identidade
-  por id: propriedade → unidade pelo de-para da ata (`D.deparaAta`, o
-  mesmo, ampliado — nenhum terceiro de-para), gleba → talhão aprendido na
+  Agro1 é de LANÇAMENTO, não de aplicação (`lancado_erp_ini/fim`; a
+  competência é o mês). Entrada pela MESMA porta única: tipo "Agro1" e o botão
+  "📎 Anexar relatório do Agro1 (PDF)" (pdf.js em vendor/pdfjs/, lido por
+  posição x,y — nunca por linha corrida). **O sistema é chamado pelo nome que
+  o escritório usa, Agro1, em TODAS as telas** — a porta de entrada desde a
+  v97, a conferência inteira desde a v98 ("🔎 Conferência Agro1 × Boletim",
+  "➕ Só no Agro1", "🔸 Só no boletim", "origem: Agro1"); as chaves internas
+  continuam "erp" e a frase de cada linha é remontada na leitura
+  (`erpTextoLinha`), então trocar o vocabulário nunca toca no que foi gravado
+  (regra da v76, item 2). Identidade por id: propriedade → unidade pelo
+  de-para da ata (`D.deparaAta`, o mesmo, ampliado — nenhum terceiro
+  de-para), gleba → talhão aprendido na
   pré-visualização (nunca "SETOR 1" por conter "1"), insumo → `D.insumos`
   pelo de-para de produtos. Só a mensagem = relato SEM quantidade (nunca kg
-  estimado). Nada se apaga (relançamento no ERP: linha anterior "superada").
+  estimado). Nada se apaga (relançamento no Agro1: linha anterior "superada").
   Resolver é chip com "desfazer" no lugar (v91); nenhuma confirmação nova.
 - Conferência: `node scripts/teste_insumos.cjs` (a validação da tarefa, com a
-  mensagem real do nitrato; desde a v96 também o PDF do ERP — cenários a–o)
+  mensagem real do nitrato; desde a v96 também o PDF do Agro1 — cenários a–o)
   e `scripts/checar-poluicao.cjs`, grupos "15. Insumos" e "19. Baixa do
-  ERP"; detalhe em docs/definicao-de-pronto.md, itens 21 e 27.
+  Agro1"; detalhe em docs/definicao-de-pronto.md, itens 21 e 27.
 
 ### c19) Cartão do painel em duas etapas: unidades primeiro, descrição só na tela da unidade (desde a v88)
 Pedido do Nilo em 12/09/2026, com as telas na mão: o painel da Diretoria

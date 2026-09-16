@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v97** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v98** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -2018,6 +2018,54 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## A conferência também fala Agro1 (v98)
+Pedido do Nilo em 16/09/2026, logo depois da v97: **"Quero q falem Agro1. E
+troca de texto, não mexe em nada gravado."** Na v97 só a PORTA de entrada
+tinha ganhado o nome da casa; as telas de conferência ainda diziam "ERP", que
+é como nós classificamos o software, não como o escritório o chama. Agora o
+app inteiro fala Agro1.
+- **O que mudou (só texto de tela):** o título das telas e do cartão do painel
+  ("🔎 Conferência ERP × App" → **"🔎 Conferência Agro1 × Boletim"**), os
+  grupos da lista ("➕ Completado pelo ERP" → "➕ Completado pelo Agro1";
+  "🔸 Só no app" → **"🔸 Só no boletim"**), os rótulos de resultado ("➕ Só no
+  ERP" → "➕ Só no Agro1"), as frases que explicam cada linha ("app 200 kg ×
+  ERP 250 kg" → **"boletim 200 kg × Agro1 250 kg"**; "sem baixa no ERP" → "sem
+  baixa no Agro1"; "possível setor trocado: app no Setor 5 … ERP no Setor 4" →
+  "… boletim no Setor 5 … Agro1 no Setor 4"), o lado a lado da linha aberta
+  ("ERP" × "Boletim" → **"Agro1" × "Boletim"**), o chip de resolução ("ERP
+  precisa de correção" → "Agro1 precisa de correção"), o selo do executado
+  ("origem: ERP" → **"origem: Agro1"**), a linha do saldo ("baixa do ERP de
+  15/09", "baixado no ERP"), a pastilha ("🔎 4 lançamentos do Agro1 para
+  conferir"), Cadastros › Insumos › **"🔎 Baixas do Agro1"**, os avisos de
+  leitura do PDF ("Não reconheci este relatório do Agro1.") e a lista de
+  relatos ("aguardando relatório do Agro1"). O par virou **Agro1 × Boletim**:
+  de um lado o sistema, do outro o que o gerente lançou — "app" não dizia nada
+  a quem lê.
+- **NADA gravado foi tocado, e isso é a regra da v76 (item 2) funcionando.**
+  As chaves continuam exatamente as mesmas: `tipo:"erp"`, a tabela
+  `insumo_baixa_erp`, as colunas `lancado_erp_ini`/`lancado_erp_fim`, os
+  resultados `so_erp`/`so_app`, a constante `ERP_TOL_PCT`, a fila offline
+  "erp". Nenhum `update` de payload, nenhum SQL novo, nenhuma migração.
+- **Quem traduz é a leitura.** A frase de cada linha da conferência é
+  REMONTADA na hora de mostrar (`erpTextoLinha`), e o `casamento.texto`
+  gravado pela v96/v97 fica no payload como estava. Resultado: as linhas
+  importadas ontem aparecem hoje com o vocabulário de hoje, sem ninguém
+  reescrever nada — e a busca da conferência procura no texto remontado, para
+  o que se vê e o que se procura serem a mesma coisa.
+- **Duas sobras da v96 que também falavam "ERP" na tela** foram junto: o
+  resumo mensal do relatório de custo físico ("R$ de insumo: Agro1") e o aviso
+  de dose fora do padrão ("conferir o lançamento no Agro1").
+- **O que NÃO mudou de propósito:** os talhões chamados "Área dos 20 (ERP)" e
+  "Represa (ERP)" na Rio Preto-Lagamar — Café. Ali "ERP" é parte do NOME do
+  talhão no cadastro, não referência ao sistema; mexer neles seria reescrever
+  cadastro (regra 3 do plano de safra: identidade por id, nome não se adivinha).
+- **Provas:** `node scripts/teste_insumos.cjs` 141 ✅ · 0 ❌ (todas as provas
+  do módulo passaram a exigir o texto novo); `scripts/checar-poluicao.cjs`
+  763 ✅ · 41 ❌ — os mesmos herdados, nenhum ❌ novo;
+  `scripts/regressao_render.cjs` contra o main: café, grãos, pecuária,
+  pós-colheita, Diretoria e Escritório byte a byte idênticos (a única
+  diferença nos arquivos é o minuto do relógio entre as duas rodadas).
+
 ## O sistema se chama Agro1 na porta de entrada (v97)
 Pedido do Nilo em 16/09/2026, com a tela na mão, no primeiro dia de uso da
 v96: o botão dizia "📎 Anexar relatório do ERP (PDF)" e ele pediu "📎 Anexar
@@ -2027,19 +2075,19 @@ vai anexar o arquivo reconhece "Agro1" (é o que está escrito no sistema onde
 ele acabou de dar baixa); "ERP" é como nós classificamos o software, não como
 o escritório o chama.
 - **O que mudou (só texto de tela da entrada):** o botão nos três lugares em
-  que aparece (porta única, Cadastros › Insumos › Baixas do ERP e a lista da
+  que aparece (porta única, Cadastros › Insumos › Baixas do Agro1 e a lista da
   conferência), a nota embaixo dele, o texto de exemplo do campo de colar, o
   chip do tipo ("🧾 Agro1"), a frase que o app diz ao reconhecer o
   arquivo e as duas dicas de vazio ("Anexe o PDF do Agro1 em 📥 Colar do
   WhatsApp"). O nome do fabricante que eu tinha usado ("AgroGestão") saiu das
   telas.
-- **O que NÃO mudou, de propósito:** as chaves internas (`tipo:"erp"`, a
+- **O que NÃO mudou nesta versão:** as chaves internas (`tipo:"erp"`, a
   tabela `insumo_baixa_erp`, as colunas `lancado_erp_ini`, a constante
-  `ERP_TOL_PCT`) e os textos de leitura que falam da CONFERÊNCIA ("🔎
-  Conferência ERP × App", "➕ Só no ERP", "sem baixa no ERP"). Chave
-  substituta nunca vira texto de tela, e trocá-la apagaria o sentido do que já
-  foi gravado (regra permanente da v76, item 2). A troca do vocabulário das
-  telas de conferência ficou como pergunta ao Nilo no resumo do PR.
+  `ERP_TOL_PCT`) — chave substituta nunca vira texto de tela, e trocá-la
+  apagaria o sentido do que já foi gravado (regra permanente da v76, item 2).
+  Os textos das telas de CONFERÊNCIA ainda diziam "ERP" aqui; a troca ficou
+  como pergunta ao Nilo no resumo do PR e ele respondeu no mesmo dia — é a
+  v98, acima. As chaves continuam intocadas.
 - **O chip do tipo cabe em 152 px, e isso é medida, não gosto.** A fileira de
   tipos tem 336 px a 390 px e "📋 Ata de reunião" ocupa 176, então o chip
   vizinho só cabe até 152. "🧾 Baixa Agro1" mede **153** — passa por UM pixel,
@@ -2048,25 +2096,28 @@ o escritório o chama.
   fileira voltou a 5 linhas. Regra que fica: **rótulo de chip numa fileira que
   quebra em linhas é medido antes, nunca estimado** — um pixel a mais custa uma
   linha inteira de 54 px.
-- **Provas:** `node scripts/teste_insumos.cjs` 141 ✅ · 0 ❌ (a prova "ERP a)"
-  passou a exigir o texto novo do botão); `scripts/checar-poluicao.cjs`
+- **Provas:** `node scripts/teste_insumos.cjs` 141 ✅ · 0 ❌ (a prova do botão
+  passou a exigir o texto novo); `scripts/checar-poluicao.cjs`
   763 ✅ · 41 ❌, os mesmos herdados; `scripts/regressao_render.cjs` contra o
   main: gerente e pós-colheita idênticos.
 
-## Baixa do ERP: registrar e conferir (v96) — o app casa sozinho, completa e abre aviso de conferência
+## Baixa do Agro1: registrar e conferir (v96) — o app casa sozinho, completa e abre aviso de conferência
+*(Nesta entrega as telas diziam "ERP"; o nome que o escritório usa, Agro1,
+entrou na porta em v97 e na conferência inteira em v98 — a descrição abaixo já
+está com o texto de hoje. Nada gravado mudou: as chaves seguem "erp".)*
 **O problema real (15/09/2026).** A fertirrigação é feita, o escritório dá
 baixa dos insumos no AgroGestão e alguém posta no grupo "Aplicações
 Realizadas" ("Ferti-irrigação mês de Setembro/26 Fazenda Vereda-Romaria,
 finalizada ✅ / Obs: Adubos já baixados no sistema! / Acido borico / Sulf.
 Manganês / Sulf. Zinco"). O app não ficava sabendo de nada. Agora a mensagem
-e o PDF "Aplicações de Insumos - Resumido" do ERP entram pela MESMA porta
+e o PDF "Aplicações de Insumos - Resumido" do Agro1 entram pela MESMA porta
 única "📥 Colar do WhatsApp", o app REGISTRA o espelho da baixa oficial e
 CONFERE, sozinho, o que já estava lançado no boletim. Premissa que não se
-discute: a baixa JÁ foi feita no ERP — o app nunca escreve no AgroGestão,
+discute: a baixa JÁ foi feita no Agro1 — o app nunca escreve no AgroGestão,
 nunca gera arquivo de baixa e nunca cria um segundo consumo.
 
 ### O que o app faz
-1. **Entrada.** Tipo novo na classificação da porta única, "🧾 Baixa ERP"
+1. **Entrada.** Tipo novo na classificação da porta única, "🧾 Baixa Agro1"
    (mensagem "finalizada / baixados no sistema"; rótulo curto para a fileira
    de chips continuar dentro de 2 telas na v93), e
    o botão **"📎 Anexar relatório do Agro1 (PDF)"** abaixo do campo de colar (o
@@ -2074,7 +2125,7 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    iPhone abre o app Arquivos). Mensagem e PDF vão juntos ou separados: com
    PDF, registro completo com kg; só a mensagem, um RELATO sem quantidade
    (unidade, operação, competência, produtos) que aparece como "aguardando
-   relatório do ERP" e liga sozinho ao PDF quando ele chegar; os dois juntos
+   relatório do Agro1" e liga sozinho ao PDF quando ele chegar; os dois juntos
    conferem entre si (fazenda, produtos, competência × período) e a diferença
    vira aviso âmbar, nunca bloqueio. Nunca kg estimado a partir da mensagem.
 2. **Leitura do PDF por posição (x, y)**, com pdf.js (Mozilla, Apache 2.0,
@@ -2091,23 +2142,23 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    Autoconferência antes de mostrar: área × dose/ha tem de bater com a
    quantidade (1 %) e a soma das glebas com o total; linha que falha fica
    "leitura duvidosa" e não entra no Importar. Layout não reconhecido: "Não
-   reconheci este relatório do ERP.", o texto extraído vai para a trilha e
-   nada é gravado. **Hora do ERP é hora de LANÇAMENTO** (16:22 a 16:34, fim
+   reconheci este relatório do Agro1.", o texto extraído vai para a trilha e
+   nada é gravado. **Hora do Agro1 é hora de LANÇAMENTO** (16:22 a 16:34, fim
    17:00 = o escritório digitando em lote): gravada como `lancado_erp_ini /
    lancado_erp_fim`; a competência é o mês; nenhuma tela diz "aplicado às".
    Nunca custo.
 3. **Identidade por id, nunca por pedaço de nome.** Propriedade/empreendimento
-   do ERP → unidade pelo de-para da ata (`D.deparaAta` / `DEPARA_ATA_PADRAO`,
+   do Agro1 → unidade pelo de-para da ata (`D.deparaAta` / `DEPARA_ATA_PADRAO`,
    o MESMO da v77/v86, ampliado com "Fazenda Vereda Romaria" e
    "Vereda-Romaria" → f23; igualdade exata pela chave) — não foi criado um
    terceiro de-para nem usado `unidade_alias`, porque o de-para da ata já vive
    no aparelho, já guarda talhão por id e é o que a porta única usa desde a
-   v86. Gleba do ERP → talhão: a pré-visualização pede a escolha por seletor
+   v86. Gleba do Agro1 → talhão: a pré-visualização pede a escolha por seletor
    da unidade na primeira vez ("SETOR 1" nunca casa com um talhão por conter
    "1"), a escolha confirmada vira de-para (`{ata:"SETOR 1 ROMARIA",
    unidade:"f23", talhao:"t101"}`) e a próxima importação não pergunta; área
    da gleba diferente do talhão em mais de `ERP_AREA_DIF_PCT` = 5 % vira aviso
-   "área diferente do cadastro". Insumo do ERP → `D.insumos` pelo
+   "área diferente do cadastro". Insumo do Agro1 → `D.insumos` pelo
    `D.deparaProdutos` (ampliado com os nomes do relatório: "Sulfato de
    manganês branco 31%" → Sulf. Manganês, "Sulfato de zinco 20%" → Sulf.
    Zinco); nome não casado é escolhido ou criado na própria pré-visualização.
@@ -2119,33 +2170,33 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    sem produto; grãos e pecuária, os equivalentes; mesmo motor nas três
    atividades) com a chave **mesma unidade + mesmo talhão + mesmo insumo +
    data na janela** (a competência inteira; sem competência, do 1º dia do mês
-   até a data do ERP; mais `ERP_JANELA_DEPOIS_DIAS` = 7 dias depois). Vários
+   até a data do Agro1; mais `ERP_JANELA_DEPOIS_DIAS` = 7 dias depois). Vários
    lançamentos do mesmo talhão e insumo na janela são SOMADOS; tolerância
    `ERP_TOL_PCT` = 5 % ou 2 kg. Ordem das passadas (a quantidade que bate vale
    mais que o talhão): ✅ Bate → ⚠️ Fora da janela → ✅ Lançado sem quantidade
    → ⚠️ Talhão diferente (menor diferença vence, depois a ordem do PDF) → ⚠️
-   Quantidade diferente → ➕ Só no ERP. Um lançamento casa com no máximo UMA
+   Quantidade diferente → ➕ Só no Agro1. Um lançamento casa com no máximo UMA
    linha; lançamento já ligado a baixa vigente de importação anterior não casa
-   de novo. O caminho contrário: 🔸 Só no app = lançamento com insumo, na
+   de novo. O caminho contrário: 🔸 Só no boletim = lançamento com insumo, na
    mesma operação (`ERP_OPERACOES`, por chave) e competência do relatório, sem
-   linha do ERP que case — um PDF de fertirrigação não acusa a adubação de
+   linha do Agro1 que case — um PDF de fertirrigação não acusa a adubação de
    solo. Cada linha recebe UM resultado explicado em palavras ("Setor 3 ·
-   ácido bórico · app 200 kg (12/09) × ERP 250 kg"; "possível setor trocado:
-   app no Setor 5, ERP no Setor 4").
+   ácido bórico · boletim 200 kg (12/09) × Agro1 250 kg"; "possível setor trocado:
+   boletim no Setor 5, Agro1 no Setor 4").
 5. **Completar.** ➕ e ✅ gravam; ⚠️ e 🔸 viram itens de conferência EM ABERTO.
-   A baixa do ERP completa o EXECUTADO com o selo "origem: ERP": saldo de
+   A baixa do Agro1 completa o EXECUTADO com o selo "origem: Agro1": saldo de
    insumo, planejado × executado das tarefas (`planLancamentos` recebe as
-   linhas ➕ como lançamentos de origem ERP; "fora do plano" continua só do
+   linhas ➕ como lançamentos de origem Agro1; "fora do plano" continua só do
    boletim) e relatórios. **Não escreve no boletim de ninguém e não acende
    farol de registro nem mexe nos "dias sem registro"** — esses continuam
-   medindo o boletim (se o ERP preenchesse o farol, esconderia justamente o
+   medindo o boletim (se o Agro1 preenchesse o farol, esconderia justamente o
    boletim que não foi feito).
 6. **Checagens do arquivo e complementares.** C1 mesmo relatório já importado
    (hash do texto extraído, ou unidade + gleba + insumo + lançamento +
    quantidade): linha "já importada em dd/mm por quem", e com tudo já
    importado o botão fica inativo ("Este relatório já foi importado em
    dd/mm."). C2 mesma mensagem = idempotência da v86. C3 mesma linha de
-   relatório ANTERIOR com quantidade diferente (ERP corrigido/relançado):
+   relatório ANTERIOR com quantidade diferente (Agro1 corrigido/relançado):
    chips `substituir` · `somar como outra aplicação` · `ignorar esta linha`,
    nenhum marcado, Importar inativo até responder; "substituir" marca a
    anterior como **superada** e guarda a ligação — nunca apaga. C5
@@ -2154,49 +2205,49 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
    vira aviso âmbar com "previsto pelo agrônomo" e "plano vN" (só telas do
    escritório/Diretoria). C7 dose/ha acima de `ERP_DOSE_FATOR` = 2,5 × a mediana
    das glebas do mesmo relatório: "dose/ha fora do padrão deste relatório —
-   conferir o lançamento no ERP" (no caso real dispara só no SETOR 8, bórico
+   conferir o lançamento no Agro1" (no caso real dispara só no SETOR 8, bórico
    e zinco; nunca "dose alta/errada/tóxica"). C8 tarefa aberta da unidade que
    casa com a operação (`planOperacoesDe` × `ERP_OPERACOES`): "A tarefa «Ferti
    Iniciou» casa com esta aplicação — concluir?" com `Concluí` · `ainda não`
    na tela da conferência — o app sugere, nunca conclui sozinho.
 7. **Regra de saldo (a mudança de comportamento desta versão).** Para cada
-   unidade + insumo + competência com baixa do ERP vigente, `insSaldos` usa a
+   unidade + insumo + competência com baixa do Agro1 vigente, `insSaldos` usa a
    baixa como aplicado oficial (`insAplicadoFontes`); os lançamentos do
    boletim desse insumo nesse mês viram só conferência e não somam. Sem baixa,
    o saldo é exatamente o da v86. Nunca as duas fontes somadas. O toque no
-   "aplicado" mostra de onde veio o número ("baixa do ERP de 15/09 · origem:
-   ERP"; "conferência · mês coberto pela baixa do ERP, não soma"). Exemplo da
-   tarefa: recebido 2.000 kg de ácido bórico + boletim com 100 kg + baixa ERP
+   "aplicado" mostra de onde veio o número ("baixa do Agro1 de 15/09 · origem:
+   Agro1"; "conferência · mês coberto pela baixa do Agro1, não soma"). Exemplo da
+   tarefa: recebido 2.000 kg de ácido bórico + boletim com 100 kg + baixa Agro1
    de 1.900 kg → saldo 100 kg (não 0).
 8. **Telas.** Colar do WhatsApp: anexa o PDF, o app lê e casa na hora, mostra
    o relatório da conferência (resumo em UMA linha — "Vereda Romaria ·
-   Fertirrigação · set/2026 · 24 linhas do ERP · ✅ 7 batem · ➕ 14
-   completadas pelo ERP · ⚠️ 3 para conferir · 🔸 1 só no app" —, leituras
+   Fertirrigação · set/2026 · 24 linhas do Agro1 · ✅ 7 batem · ➕ 14
+   completadas pelo Agro1 · ⚠️ 3 para conferir · 🔸 1 só no boletim" —, leituras
    duvidosas e conflitos C3 no topo, glebas → talhões, insumos → produtos,
    grupos ⚠️ → 🔸 → ➕ → ✅ com ⚠️ e 🔸 abertos e ➕ e ✅ recolhidos, avisos
    C6/C7/C8) e UM botão fixo "Importar e abrir conferência" (`botaoAvanco`).
-   **"🔎 Conferência ERP × App"** (nível 3 do módulo, classes cad-*, P10):
+   **"🔎 Conferência Agro1 × Boletim"** (nível 3 do módulo, classes cad-*, P10):
    cabeçalho com o resumo, os quatro grupos, busca a partir de 12 itens, cada
-   item em UMA linha; o toque abre NO LUGAR a linha do ERP lado a lado com
+   item em UMA linha; o toque abre NO LUGAR a linha do Agro1 lado a lado com
    o(s) lançamento(s) do app (data, talhão, quantidade, quem lançou) e os
-   chips `é o mesmo lançamento` (a quantidade do ERP manda) · `são aplicações
+   chips `é o mesmo lançamento` (a quantidade do Agro1 manda) · `são aplicações
    diferentes` · `pedir conferência ao gerente` (abre o WhatsApp com UMA linha
-   pronta, sem destinatário — mecanismo do "Falar com o Nilo") · `ERP precisa
+   pronta, sem destinatário — mecanismo do "Falar com o Nilo") · `Agro1 precisa
    de correção` (sai da contagem aberta); todo toque grava na hora, redesenha
    só a linha e deixa "✔ Salvo · … · desfazer" no lugar; nada se apaga, o
    histórico guarda quem, quando, de → para. "📲 copiar relatório" dá o texto
-   por grupo. **Aviso para conferência:** pastilha "🔎 N lançamentos do ERP
+   por grupo. **Aviso para conferência:** pastilha "🔎 N lançamentos do Agro1
    para conferir" na porta de entrada (só com item em aberto; some com N = 0;
-   sem push) e cartão "🔎 Conferência ERP × App" no painel no padrão c19
+   sem push) e cartão "🔎 Conferência Agro1 × Boletim" no painel no padrão c19
    (recolhido, unidades primeiro, detalhe e chips na tela da unidade; some
-   sem importação nenhuma). Cadastros › Insumos › **"🔎 Baixas do ERP"**
+   sem importação nenhuma). Cadastros › Insumos › **"🔎 Baixas do Agro1"**
    (nível 3): baixas por unidade e competência com link para a conferência. O
-   cartão "📦 Insumos" do painel ganha "baixado no ERP" na linha da unidade
+   cartão "📦 Insumos" do painel ganha "baixado no Agro1" na linha da unidade
    quando existe baixa. **Gerente: nada muda** — zero elemento novo na casa,
    no boletim e no apontamento (regressão idêntica ao main); a conferência
    chega a ele só se o escritório pedir pelo WhatsApp.
-9. **Vocabulário:** "sem registro no boletim", "sem baixa no ERP", "para
-   conferir", "completado pelo ERP"; proibidos "não lançou", "não fez", "erro
+9. **Vocabulário:** "sem registro no boletim", "sem baixa no Agro1", "para
+   conferir", "completado pelo Agro1"; proibidos "não lançou", "não fez", "erro
    do gerente", "pendente". Nenhuma tela mostra custo. Nenhuma confirmação
    nova (11 `perguntar(` no código, os mesmos da v95); conflito e resolução
    são chips.
@@ -2204,10 +2255,10 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
 ### Onde mora o dado
 | coleção | o que guarda | sincronização |
 | --- | --- | --- |
-| `D.baixasErp` | uma linha por gleba × insumo do relatório: unidade, talhão, gleba e área do ERP, produto/insumo, un, área, dose/ha, qtde, competência, operação, `lancadoErpIni/Fim`, emissão, hash, mensagem, status vigente/superada, `superadaPor`, quem/quando, o casamento (resultado, vínculos) e a conferência (estado, histórico) | fila offline `erp` → `insumo_baixa_erp` (sql/057) |
+| `D.baixasErp` | uma linha por gleba × insumo do relatório: unidade, talhão, gleba e área do Agro1, produto/insumo, un, área, dose/ha, qtde, competência, operação, `lancadoErpIni/Fim`, emissão, hash, mensagem, status vigente/superada, `superadaPor`, quem/quando, o casamento (resultado, vínculos) e a conferência (estado, histórico) | fila offline `erp` → `insumo_baixa_erp` (sql/057) |
 | `mensagens_importadas.criados` (tipo `erp`) | a importação: arquivo, hash, emissão, resumo, ids das linhas, os 🔸 só no app (com a conferência deles), avisos, doses C7, plano C6, glebas e o TEXTO EXTRAÍDO do PDF | fila `msg` (sql/055) |
 | `mensagens_importadas.criados` (tipo `erp_relato`) | o relato só-mensagem, sem quantidade, com `pdfId` quando o PDF chega | fila `msg` |
-| `D.deparaAta` / `D.deparaProdutos` | propriedade e glebas → unidade/talhão; insumo do ERP → produto (aprendizado) | junto com os dados do aparelho |
+| `D.deparaAta` / `D.deparaProdutos` | propriedade e glebas → unidade/talhão; insumo do Agro1 → produto (aprendizado) | junto com os dados do aparelho |
 
 O PDF binário nunca é guardado — nem no aparelho, nem no banco.
 
@@ -2222,30 +2273,30 @@ O PDF binário nunca é guardado — nem no aparelho, nem no banco.
   depois da v86 e, por ser a última, era a que valia — a tela "Insumos e
   remessas" da v86 (com o item Remessas programadas, categoria e fornecedor)
   nunca aparecia. A declaração antiga saiu; a v86 passou a valer e ganhou o
-  item "Baixas do ERP".
+  item "Baixas do Agro1".
 
 ### Provas (v96)
 - `node scripts/teste_insumos.cjs`: **141 ✅ · 0 ❌** (a v96 acrescentou 52
-  provas, cenários "ERP a" a "ERP o": leitura por posição do PDF da fixture,
+  provas, cenários "Agro1 a" a "Agro1 o": leitura por posição do PDF da fixture,
   datas de lançamento, identidade por id, os 10 resultados esperados do
   casamento linha a linha, reprodutibilidade, C1, C3, C7, C8, completar sem
   tocar boletim/farol/dias sem registro, regra de saldo (Zn 1.050 e o exemplo
   literal 2.000 + 100 + 1.900 → 100), resolver e desfazer com 2 entradas no
   histórico, pastilha com o N certo e sumindo, só a mensagem, layout
-  desconhecido, painel c19, Cadastros › Baixas do ERP). A checagem "texto não
+  desconhecido, painel c19, Cadastros › Baixas do Agro1). A checagem "texto não
   reconhecido" passou a esperar 6 tipos.
 - `scripts/checar-poluicao.cjs`: **763 ✅ · 41 ❌** — os mesmos 41 ❌
-  herdados, nenhum novo; grupo novo "19. Baixa do ERP" (11 ✅), o cartão
-  "Conferência ERP × App" no grupo 16 (6 ✅) e as telas "Colar do WhatsApp ›
-  Conferir o relatório do ERP", "… › Conferência ERP × App", "… › Conferência
-  ERP × App (lista)" e "Cadastros › Insumos › Baixas do ERP" medidas como
+  herdados, nenhum novo; grupo novo "19. Baixa do Agro1" (11 ✅), o cartão
+  "Conferência Agro1 × Boletim" no grupo 16 (6 ✅) e as telas "Colar do WhatsApp ›
+  Conferir o relatório do Agro1", "… › Conferência Agro1 × Boletim", "… › Conferência
+  Agro1 × App (lista)" e "Cadastros › Insumos › Baixas do Agro1" medidas como
   Cadastros.
 - `scripts/regressao_render.cjs` contra `origin/main`: casa, boletim e
   apontamento do gerente (café, grãos, pecuária) e pós-colheita **idênticos**
   (só o `localStorage` ganha a chave vazia `baixasErp`); painel da Diretoria
   idêntico a menos de uma linha em branco (o cartão c19 some sem importação);
-  Cadastros: o menu conta 25 nomes no de-para da ata (os dois nomes do ERP) e
-  Insumos ganha o item "Baixas do ERP".
+  Cadastros: o menu conta 25 nomes no de-para da ata (os dois nomes do Agro1) e
+  Insumos ganha o item "Baixas do Agro1".
 - `node --check` no JS extraído: ok.
 
 ### Fixture
@@ -2990,17 +3041,17 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   de cuidado" fechados ✅ em todas.
 - Escritório › Importar telemetria: formulário sem ação principal fixa
   no rodapé ❌ ("1 · Ler o arquivo" dentro do cartão).
-- Baixa do ERP (v96, grupo 19 e telas medidas como Cadastros): Colar do
-  WhatsApp › Conferir o relatório do ERP (lista, nível 2, com busca pelas
-  25 linhas) ✅ · Conferência ERP × App (detalhe, nível 3, "📲 copiar
-  relatório" fixo no rodapé, busca) ✅ · Conferência ERP × App (lista, nível
-  2) ✅ · Cadastros › Insumos › Baixas do ERP (lista, nível 3) ✅ · "📎
+- Baixa do Agro1 (v96, grupo 19 e telas medidas como Cadastros): Colar do
+  WhatsApp › Conferir o relatório do Agro1 (lista, nível 2, com busca pelas
+  25 linhas) ✅ · Conferência Agro1 × Boletim (detalhe, nível 3, "📲 copiar
+  relatório" fixo no rodapé, busca) ✅ · Conferência Agro1 × Boletim (lista, nível
+  2) ✅ · Cadastros › Insumos › Baixas do Agro1 (lista, nível 3) ✅ · "📎
   Anexar" ao lado do campo, tela com UM campo ✅ · gleba → talhão pergunta (8
   seletores, botão inativo) ✅ · grupos ⚠️/🔸 abertos e ➕/✅ recolhidos ✅ ·
   item de UMA linha ≥ 44 px, zero campo, chips só depois do toque ✅ · lado
   a lado no lugar, sem modal ✅ · resolver grava na hora com "desfazer", zero
   nativo ✅ · pastilha só com item em aberto ✅ · vocabulário de registro,
-  sem custo ✅ · painel: cartão "🔎 Conferência ERP × App" fechado, unidades
+  sem custo ✅ · painel: cartão "🔎 Conferência Agro1 × Boletim" fechado, unidades
   primeiro, tela da unidade com cabeçalho contextual e "‹ Voltar ao painel"
   ✅ (grupo 16). P10 ❌ herdado (chips e cartões do CSS-base).
 - Diretoria › painel › cartão "📋 Planejado × Executado" (v75, medido
@@ -3062,7 +3113,7 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Baixa do ERP (v96) — SQL RODADO em 16/09/2026.** O Nilo rodou o
+- **Baixa do Agro1 (v96) — SQL RODADO em 16/09/2026.** O Nilo rodou o
   `sql/057-insumo-baixa-erp.sql` no SQL Editor e a tabela `insumo_baixa_erp`
   responde vazia pela API. Retrato do banco conferido no mesmo dia (leitura
   pela chave publishable): já existem `boletins`, `pos_colheitas`,
@@ -3077,23 +3128,23 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   branco cai num cast para numeric no sql/050. O app não usa essa visão (lê as
   tarefas direto), então nenhum gerente sente nada; o relatório mensal do
   planejamento é que não sai. As duas são correção pequena, em tarefa própria.
-- **Baixa do ERP (v96) — trocar a fixture pelo PDF real.** O teste usa um PDF
+- **Baixa do Agro1 (v96) — trocar a fixture pelo PDF real.** O teste usa um PDF
   SINTÉTICO com o mesmo layout e números (`scripts/gerar_fixture_erp.cjs`).
   Quando o Nilo subir o relatório real em
   `tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf`, basta trocar o
   arquivo e rodar `node scripts/teste_insumos.cjs`: se o leitor por posição
-  não reconhecer alguma coluna do layout real, o teste "ERP a)" acusa.
-- **Baixa do ERP (v96) — para o Nilo conferir/decidir:**
+  não reconhecer alguma coluna do layout real, o teste "Agro1 a)" acusa.
+- **Baixa do Agro1 (v96) — para o Nilo conferir/decidir:**
   1. **Tolerâncias — decididas em 16/09/2026 para o cenário de implantação**
      (o Nilo pediu a decisão; ficam assim até o primeiro mês de uso mostrar
      outra coisa). O boletim começou em 11/09/2026 e os campos de insumo do
-     café são novos e opcionais: no começo quase tudo cai em "só no ERP" ou
+     café são novos e opcionais: no começo quase tudo cai em "só no Agro1" ou
      "lançado sem quantidade", e o pouco que casa vem de dose e área digitadas
      à mão. Tolerância apertada só encheria o escritório de aviso de
      arredondamento. Valores: `ERP_TOL_PCT` = **5 %** (ou `ERP_TOL_KG` = 2 kg,
      o piso das linhas pequenas) para "bate" — uma diferença real como 200 ×
      250 kg (20 %) continua aparecendo; `ERP_JANELA_DEPOIS_DIAS` = **7 dias**
-     depois da data do ERP, a mesma semana de `INS_COBRANCA_DIAS`, para o
+     depois da data do Agro1, a mesma semana de `INS_COBRANCA_DIAS`, para o
      boletim lançado com atraso ainda casar; `ERP_AREA_DIF_PCT` = **5 %** para
      "área diferente do cadastro" (2 % acusava 0,44 ha num talhão de 22 ha —
      ruído de cadastro); `ERP_DOSE_FATOR` = **2,5 ×** a mediana (C7), que no
@@ -3107,21 +3158,21 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
      "quantidade diferente" — é o que faz o SETOR 4/5 do caso real sair como a
      tarefa pediu. Setor marcado sem quantidade nunca rouba o lançamento de
      outro setor.
-  3. **De-para do ERP.** "Fazenda Vereda Romaria" e "Vereda-Romaria" entraram
+  3. **De-para do Agro1.** "Fazenda Vereda Romaria" e "Vereda-Romaria" entraram
      no de-para da ata → Vereda Romaria (f23); os oito "SETOR n ROMARIA" NÃO
      foram pré-ligados de propósito — o escritório liga uma vez na
      pré-visualização e o app aprende (regra "nunca por pedaço de nome").
   4. **O cartão do painel some sem importação** (como Solinftec e café em
-     trânsito), para o painel de quem não usa o ERP ficar idêntico. Se
+     trânsito), para o painel de quem não usa o Agro1 ficar idêntico. Se
      preferir o cartão sempre visível com o vazio da função única, é uma
      palavra (`some:true`).
-  5. **Operação do ERP sem de-para** (`ERP_OPERACOES` tem fertirrigação,
+  5. **Operação do Agro1 sem de-para** (`ERP_OPERACOES` tem fertirrigação,
      adubação, calagem, gessagem e pulverização): o casamento linha a linha
      continua, mas o 🔸 "só no app" e a sugestão de tarefa ficam vazios até o
      de-para entrar.
   6. **Bug achado e corrigido de passagem:** a tela "Cadastros › Insumos e
      remessas" da v86 nunca aparecia (declaração duplicada de `cadVInsumos`);
-     agora aparece, com "Remessas programadas" e "Baixas do ERP".
+     agora aparece, com "Remessas programadas" e "Baixas do Agro1".
 - **Ações da tarefa no lugar (v91) — para o Nilo testar no iPhone**, em
   Planejamento › Todas as tarefas: (1) "⋯" numa tarefa e "Comecei" — o
   cartão deve dizer "em execução" e mostrar "✔ Salvo · em execução ·
