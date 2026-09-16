@@ -22,6 +22,10 @@
       o app NÃO reconhece (pede o tipo em vez de adivinhar).
    9. Trilha de origem: a mensagem fica inteira em Mensagens importadas e a
       busca por "nitrato" a encontra.
+  v99 (leitor do WhatsApp, cenários a–i): a mensagem do Fabinho com "Lavamar"
+      — classificação por sinal, unidade uma vez por mensagem e aprendida,
+      número nunca some, produtos e doses como declarados, conferência com o
+      boletim antes do Importar, duas fazendas, idempotência, vocabulário.
 
  Uso (na raiz do repositório):
    node scripts/teste_insumos.cjs
@@ -73,6 +77,8 @@ const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermo
   'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
 /* v96: mensagem REAL do grupo "Aplicações Realizadas" (15/09/2026) — a baixa já feita no Agro1; o PDF é a fixture sintética
    tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf (mesmo layout e números do relatório real) */
+/* v99: a mensagem REAL do grupo "Aplicações Realizadas" (16/09/2026), colada pelo Nilo exatamente assim — com "Lavamar" */
+const MSG_FABINHO = ['Aplicação realizada via fértil irrigação café fazenda Lavamar Rodrigo setores 1,2,3,4,5,6', '', 'Doses por setor', '48 litros de klopan', '36 kg de Actara'].join('\n');
 const MSG_ERP = ['Ferti-irrigação mês de Setembro/26 Fazenda Vereda-Romaria , finalizada ✅', '', 'Obs : Adubos já baixados no sistema !', '', 'Acido borico', 'Sulf. Manganês', 'Sulf. Zinco'].join('\n');
 
 const provas = [];
@@ -406,7 +412,7 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
       insUI.texto = t; insUI.tipo = 'tarefas'; insAbrirPrev(); insUI.prev.itens.forEach(i => { i.unidade = 'f22c'; }); insImportar();
       return { semUn, falta, novas, depois: planTarefas().filter(x => x.unidade === 'f22c').length };
     }, MSG_TAREFAS);
-    ok('Tarefas avulsas — as duas linhas pedem a unidade antes de gravar', tar.semUn === 2 && /unidade/i.test(tar.falta), tar.semUn + ' sem unidade · botão: "' + tar.falta + '"');
+    ok('Tarefas avulsas — as duas linhas pedem a unidade antes de gravar', tar.semUn === 2 && /unidade|fazenda/i.test(tar.falta), tar.semUn + ' sem unidade · botão: "' + tar.falta + '"');
     ok('Tarefas avulsas — gravadas na unidade escolhida', tar.novas === 2, tar.novas + ' tarefa(s)');
     ok('Tarefas avulsas — reimportar a mesma lista não duplica', tar.depois === tar.novas, tar.novas + ' → ' + tar.depois);
 
@@ -932,6 +938,160 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     }, base);
     ok('Agro1 l) Saldo — recebido 2.000 kg de ácido bórico + boletim com 100 kg + baixa Agro1 de 1.900 kg dá saldo 100 kg (não 0): antes 1.900, depois 100',
       Lq.antes && Math.abs(Lq.antes.saldo - 1900) < 0.01 && Lq.depois && Math.abs(Lq.depois.aplicado - 1900) < 0.01 && Math.abs(Lq.depois.saldo - 100) < 0.01, JSON.stringify(Lq));
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+
+  /* ---------- v99: leitor do WhatsApp — relato de aplicação que se adapta à mensagem (D1–D4) ---------- */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-16T10:00:00-03:00');
+    /* boletins do Rodrigo: fertirrigação marcada nos setores 1–4 em 14, 15 e 16/09 (a fonte do período) */
+    await page.evaluate(() => {
+      ['2026-09-14', '2026-09-15', '2026-09-16'].forEach((d, i) => D.boletins.push({ id: 'bf20-' + i, fazendaId: 'f20', data: d, responsavel: 'Rodrigo', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '', diaristas: '', funcoes: [] },
+        irr: { fert: 'Sim', fertSetores: ['t077', 't078', 't079', 't080'] }, atividades: [], colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {}, enviadoEm: d + 'T18:00:00' }));
+      salvarDados();
+    });
+    /* (a) classificação */
+    const A = await page.evaluate(async t => {
+      const cls = insClassificar(t);
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; }); await new Promise(r => setTimeout(r, 120));
+      const ta = document.getElementById('ins-texto'); ta.value = t; ta.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 50));
+      document.getElementById('bt-ins-ler').click(); await new Promise(r => setTimeout(r, 150));
+      const chips = [...document.querySelectorAll('#app [data-ins-tipo]')];
+      return { cls, tipo: insUI.tipo, chips: chips.length, aceso: chips.filter(c => c.classList.contains('on')).map(c => c.dataset.insTipo), aviso: (document.querySelector('#app .aviso') || {}).textContent.replace(/\s+/g, ' ').trim(),
+        forma: insUI.prev && insUI.prev.forma, nativos: window.__nativos || 0 };
+    }, MSG_FABINHO);
+    ok('v99 a) A mensagem do Fabinho (com "Lavamar") é classificada como RELATO DE APLICAÇÃO pelo sinal do catálogo (verbo + doses + setores)',
+      A.cls.tipo === 'aplicacao' && A.tipo === 'aplicacao' && A.forma === 'setores', A.cls.tipo + ' · ' + A.cls.motivo);
+    ok('v99 a) O chip "🚜 Relato de aplicação" nasce aceso, os outros 5 continuam na fileira, e a frase diz o que o app entendeu (fazenda, ferti-irrigação, setores 1 a 6, 2 produtos)',
+      A.chips === 6 && A.aceso.join() === 'aplicacao' && /Entendi uma aplicação realizada em «Lavamar Rodrigo» \(fazenda a escolher\), ferti-irrigação, setores 1 a 6, 2 produtos\./.test(A.aviso) && A.nativos === 0, A.aviso.slice(0, 160));
+    /* (b) unidade: um seletor só, no cabeçalho; escolhida, tudo herda; a escolha vira de-para */
+    const B = await page.evaluate(async () => {
+      const antes = { selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), falta: document.getElementById('bt-ins-importar').getAttribute('data-falta') || '', rotulo: document.getElementById('bt-ins-importar').textContent.trim(),
+        fazendaLinha: (document.querySelector('#app select[data-insprev="msg|unidade"]') || {}).options ? document.querySelector('#app select[data-insprev="msg|unidade"]').options[0].textContent.trim() : '' };
+      const sel = document.querySelector('#app select[data-insprev="msg|unidade"]'); sel.value = 'f20'; sel.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 150));
+      const p = insUI.prev;
+      const depois = { unidade: p.itens[0].unidade, msgU: p.msgUnidade.unidade, falta: document.getElementById('bt-ins-importar').getAttribute('data-falta') || '', operacao: p.operacao,
+        selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), produtos: p.produtos.length, setores: p.setores.length, aviso: (document.querySelector('#app .aviso') || {}).textContent.replace(/\s+/g, ' ').trim(),
+        texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+      /* liga os 6 setores aos talhões (primeira vez: seletor; nunca por pedaço de nome) */
+      ['t077', 't078', 't079', 't080', 't081', 't082'].forEach((id, i) => { const s = document.querySelector('#app select[data-insprev="set|' + i + '"]'); s.value = id; s.dispatchEvent(new Event('input', { bubbles: true })); });
+      await new Promise(r => setTimeout(r, 150));
+      return { antes, depois, ligados: insUI.prev.setores.map(s => s.talhaoId).join(','), h: document.querySelector('#app').scrollHeight };
+    });
+    ok('v99 b) Unidade não casa ("Lavamar" ≠ "Lagamar"): UM seletor só, no cabeçalho ("Fazenda: escolher ›"), nenhum por linha; botão "Importar relato" inativo dizendo o que falta',
+      B.antes.selects.join() === 'msg|unidade' && /escolher/.test(B.antes.fazendaLinha) && B.antes.falta === 'Escolha a fazenda da mensagem' && B.antes.rotulo === 'Importar relato', B.antes.selects.join(' · ') + ' · "' + B.antes.falta + '"');
+    ok('v99 b) Escolhida Lagamar Café (Rodrigo): os 2 produtos e os 6 setores herdam a fazenda, a atividade vem do catálogo (ferti-irrigação → Adubação via fertirrigação) e o botão acende no lugar',
+      B.depois.unidade === 'f20' && B.depois.msgU === 'f20' && B.depois.falta === '' && B.depois.operacao === 'Adubação via fertirrigação' && B.depois.produtos === 2 && B.depois.setores === 6 && /Fazenda: Lagamar Café \(Rodrigo\)/.test(B.depois.texto) && /Entendi uma aplicação realizada em Lagamar Café \(Rodrigo\)/.test(B.depois.aviso),
+      B.depois.unidade + ' · ' + B.depois.operacao + ' · "' + B.depois.falta + '"');
+    ok('v99 b) Setores citados → talhões pergunta por seletor na primeira vez (6 seletores, nunca "1" casa com talhão por conter "1")', B.depois.selects.join() === 'set|0,set|1,set|2,set|3,set|4,set|5' && B.ligados === 't077,t078,t079,t080,t081,t082', B.depois.selects.join(' · '));
+    /* (d) + (e) produtos lidos e conferência com o boletim antes do Importar */
+    const E = await page.evaluate(() => {
+      const p = insUI.prev, c = p.conferencia;
+      const bloco = document.querySelector('#app [data-ins-conf-bloco]');
+      const linhas = bloco ? [...bloco.querySelectorAll('p')].map(x => x.textContent.replace(/\s+/g, ' ').trim()) : [];
+      return { produtos: p.produtos.map(x => x.produto + ' ' + x.qtd + ' ' + x.un), escopo: p.escopo, temKg: JSON.stringify(p.produtos).includes('"kg":'), saldoAntes: JSON.stringify(insSaldos('f20')),
+        linhas, conf: insConfLinhas(p).map(l => l.txt), periodo: c && c.periodo, cobertos: c ? c.cobertos.map(x => x.rotulo).join(',') : '', sem: c ? c.sem_registro.map(x => x.rotulo).join(',') : '',
+        ativo: !document.getElementById('bt-ins-importar').classList.contains('acao-off'), campos: document.querySelectorAll('#app input[type=date]').length,
+        texto: document.querySelector('#app').textContent.replace(/\s+/g, ' '), telas: +(document.querySelector('#app').scrollHeight / 844).toFixed(2),
+        largo: Math.max(...[...document.querySelectorAll('#app .chips, #app .cad-item, #app .ins-l, #app .grade2, #app .aviso')].map(e => e.getBoundingClientRect().right)) };
+    });
+    ok('v99 d) Produtos lidos como o funcionário escreveu: klopan 48 litros e Actara 36 kg, escopo "por setor", sem kg total (nada multiplicado por 6 setores nem por hectare)',
+      E.produtos.join(' | ') === 'klopan 48 litros | Actara 36 kg' && E.escopo === 'por setor' && !E.temKg, E.produtos.join(' | ') + ' · ' + E.escopo);
+    ok('v99 e) Bloco "📋 No boletim do gerente" ANTES do Importar: "setores 1, 2, 3, 4 · no boletim de 14, 15 e 16/09" (verde ✅) e "setores 5, 6 · sem registro no boletim nos últimos 14 dias" (âmbar, para conferir)',
+      E.conf.join(' | ') === 'setores 1, 2, 3, 4 · no boletim de 14, 15 e 16/09 | setores 5, 6 · sem registro no boletim nos últimos 14 dias' && E.linhas.some(l => /^✅ setores 1, 2, 3, 4 · no boletim de 14, 15 e 16\/09$/.test(l)) && E.linhas.some(l => /^para conferir · setores 5, 6 · sem registro/.test(l)),
+      E.conf.join(' | '));
+    ok('v99 e) O período da aplicação é o que o boletim diz — "Registrado no boletim: 14 a 16/09" — e "Importar" continua ativo (sem registro é aviso, nunca bloqueio); zero campo de data',
+      E.periodo && E.periodo.de === '2026-09-14' && E.periodo.ate === '2026-09-16' && /Registrado no boletim: 14 a 16\/09/.test(E.texto) && E.ativo && E.campos === 0, JSON.stringify(E.periodo) + ' · ativo ' + E.ativo + ' · ' + E.campos + ' campo(s) de data');
+    ok('v99 2.6) A tela "Conferir a mensagem" do exemplo, com a fazenda escolhida e o bloco do boletim aberto, cabe em uma tela e meia a 390 px; nenhuma fileira passa de 390 px',
+      E.telas <= 1.5 && E.largo <= 391, E.telas + ' telas · ' + Math.round(E.largo) + ' px');
+    ok('v99 i) Nenhum texto de custo e nenhum termo proibido na tela de conferência', !/não fez|não realizou|pendente|atrasad|faltou|esqueceu|\berro\b|R\$|custo/i.test(E.texto), '');
+    const G1 = await page.evaluate(async () => {
+      const antesMsgs = insMensagens().length, saldoAntes = JSON.stringify(insSaldos('f20'));
+      insImportar(); await new Promise(r => setTimeout(r, 120));
+      const rel = insAplicacoesRelatadas().find(c => c.talhoes);
+      const dp = deparaAta().find(x => planChaveAta(x.ata) === planChaveAta('lavamar rodrigo'));
+      const set = deparaAta().filter(x => x.soTalhao && x.unidade === 'f20').map(x => x.ata + '→' + x.talhao);
+      const m = insMensagens().find(x => (x.criados || []).some(c => c.tipo === 'depara'));
+      return { msgs: insMensagens().length - antesMsgs, rel, dp, set, aprendeu: m ? m.criados.filter(c => c.tipo === 'depara').map(c => c.ata + '→' + c.unidade) : [], saldoIgual: JSON.stringify(insSaldos('f20')) === saldoAntes,
+        boletins: D.boletins.filter(b => b.fazendaId === 'f20').length, status: rel ? insRelatoStatus(rel) : '', periodoTxt: rel ? insRelatoPeriodoTxt(rel) : '', relatosGerente: insRelatosDo('f20', hojeBRT()).length };
+    });
+    ok('v99 e) "Importar relato" grava o relato com conferencia_boletim preenchida (cobertos 1–4 com as datas, sem_registro 5–6, janela de 14 dias), sem tocar boletim nenhum',
+      G1.msgs === 1 && G1.rel && G1.rel.conferencia_boletim && G1.rel.conferencia_boletim.cobertos.map(x => x.rotulo).join() === '1,2,3,4' && G1.rel.conferencia_boletim.sem_registro.map(x => x.rotulo).join() === '5,6' && G1.rel.conferencia_boletim.janela.de === '2026-09-02' && G1.rel.conferencia_boletim.cobertos[0].datas.join() === '2026-09-14,2026-09-15,2026-09-16' && G1.boletins === 3,
+      G1.rel ? JSON.stringify(G1.rel.conferencia_boletim).slice(0, 200) : 'nada gravado');
+    ok('v99 d) O saldo de insumos de Lagamar Café (Rodrigo) não muda com o relato (dose declarada nunca vira kg)', G1.saldoIgual, '');
+    ok('v99 b) A escolha vira de-para: "Lavamar Rodrigo" → f20 na MESMA tabela (D.deparaAta), os 6 setores → talhões por id, e a trilha da mensagem registra o nome aprendido',
+      G1.dp && G1.dp.unidade === 'f20' && G1.set.length === 6 && G1.aprendeu.join() === 'Lavamar Rodrigo→f20', (G1.dp ? G1.dp.ata + '→' + G1.dp.unidade : 'não aprendeu') + ' · ' + G1.set.join(', ') + ' · trilha: ' + G1.aprendeu.join());
+    ok('v99 e) Mensagens importadas relata REGISTRO: "registrado no boletim de 14 a 16/09 · setores 5, 6 sem registro no boletim"; o relato NÃO vira pergunta no boletim do gerente (a mensagem não diz o dia)',
+      G1.status === 'registrado no boletim de 14 a 16/09 · setores 5, 6 sem registro no boletim' && G1.periodoTxt === 'Registrado no boletim: 14 a 16/09' && G1.relatosGerente === 0, G1.status + ' · ' + G1.relatosGerente + ' pergunta(s)');
+    /* (b) segunda colagem idêntica: não pergunta fazenda nem setores; (h) reimportar: 0 relatos novos */
+    const H = await page.evaluate(async t => {
+      insLimpar(); insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender(); await new Promise(r => setTimeout(r, 120));
+      const out = { selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), unidade: insUI.prev.itens[0].unidade, ligados: insUI.prev.setores.every(s => s.talhaoId), falta: document.getElementById('bt-ins-importar').getAttribute('data-falta') || '' };
+      const antes = insAplicacoesRelatadas().filter(c => c.talhoes).length; insImportar(); await new Promise(r => setTimeout(r, 100));
+      out.novos = insAplicacoesRelatadas().filter(c => c.talhoes).length - antes;
+      /* painel: a divergência do relato aparece no cartão 📦 Insumos, lida do payload */
+      sessao = { userId: 'u2', papel: 'proprietario', nome: 'Diretoria' }; ritualPuladoSessao = true; ir('painel'); await new Promise(r => setTimeout(r, 200));
+      const ins = [...document.querySelectorAll('#app details.secao')].find(d => /^\s*📦\s*Insumos/.test(d.querySelector('summary').textContent.replace(/\s+/g, ' ')));
+      out.painel = ins ? { fechado: !ins.open, texto: ins.textContent.replace(/\s+/g, ' ') } : null;
+      return out;
+    }, MSG_FABINHO);
+    ok('v99 b) Segunda colagem idêntica: nenhum seletor (fazenda e setores lembrados), botão já ativo', H.selects.length === 0 && H.unidade === 'f20' && H.ligados && H.falta === '', H.selects.join(' · ') + ' · "' + H.falta + '"');
+    ok('v99 h) Reimportar a mesma mensagem: 0 relatos novos (idempotência)', H.novos === 0, H.novos + ' novo(s)');
+    ok('v99 D4) Painel › 📦 Insumos (recolhido) lista a divergência do relato sem recalcular: "setores 5, 6 sem registro no boletim nos últimos 14 dias — para conferir"; nunca "não fez"',
+      H.painel && H.painel.fechado && /Lagamar Café \(Rodrigo\) · ferti-irrigação relatada no grupo em 16\/09: setores 5, 6 sem registro no boletim nos últimos 14 dias — para conferir/.test(H.painel.texto) && !/não fez|pendente|atrasad|faltou/i.test(H.painel.texto), H.painel ? H.painel.texto.slice(0, 200) : 'sem cartão');
+    /* (c) trocado para "tarefas avulsas": a linha 1 vira 1 tarefa inteira, as 3 linhas de dose NÃO viram tarefa, o aviso aparece; número no início nunca some */
+    const C = await page.evaluate(async t => {
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' };
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; }); await new Promise(r => setTimeout(r, 120));
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender(); await new Promise(r => setTimeout(r, 100));
+      document.querySelector('#app [data-ins-tipo="tarefas"]').click(); await new Promise(r => setTimeout(r, 150));
+      const p = insUI.prev, av = document.querySelector('#app [data-ins-aviso-doses]');
+      const out = { tipo: insUI.tipo, itens: p.itens.map(i => i.desc), doses: p.doses, aviso: av ? av.textContent.replace(/\s+/g, ' ').trim() : '', chipNoAviso: !!(av && av.querySelector('[data-ins-tipo="aplicacao"]')),
+        rotulo: document.getElementById('bt-ins-importar').textContent.trim(), sub: document.querySelector('#app .topo .sub').textContent.trim(), selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev),
+        marcador: [insLerTarefas('comprar 48 litros de klopan').itens[0].desc, insLerTarefas('1. comprar mourão').itens[0].desc, insLerTarefas('- trocar a bomba').itens[0].desc, insLerTarefas('2) 36 sacos de adubo para buscar').itens[0].desc] };
+      av.querySelector('[data-ins-tipo="aplicacao"]').click(); await new Promise(r => setTimeout(r, 150));
+      out.voltou = insUI.tipo + '|' + (insUI.prev && insUI.prev.forma);
+      return out;
+    }, MSG_FABINHO);
+    ok('v99 c) Como "tarefas avulsas": a linha 1 vira 1 tarefa com o texto INTEIRO; "Doses por setor", "48 litros de klopan" e "36 kg de Actara" não viram tarefa; cabeçalho e botão contam só o que vai ser importado ("Importar 1 tarefa")',
+      C.tipo === 'tarefas' && C.itens.length === 1 && C.itens[0] === 'Aplicação realizada via fértil irrigação café fazenda Lavamar Rodrigo setores 1,2,3,4,5,6' && C.doses.join(' | ') === 'Doses por setor | 48 litros de klopan | 36 kg de Actara' && C.rotulo === 'Importar 1 tarefa' && /^1 tarefas?$/.test(C.sub),
+      C.itens.length + ' tarefa(s) · doses: ' + C.doses.join(' | ') + ' · ' + C.rotulo + ' · sub "' + C.sub + '"');
+    ok('v99 c) O aviso "3 linhas parecem doses de aplicação, não tarefas — quer importar como relato de aplicação?" traz o chip 🚜 ao lado; tocar troca o tipo e reaproveita o texto',
+      /3 linhas parecem doses de aplicação, não tarefas .* quer importar como relato de aplicação\?/.test(C.aviso) && C.chipNoAviso && C.voltou === 'aplicacao|setores', C.aviso.slice(0, 120) + ' → ' + C.voltou);
+    ok('v99 c) Tarefas avulsas: a unidade é uma por mensagem (nenhum seletor por linha; "Lavamar Rodrigo" já aprendido → sem seletor) e o número no início da linha nunca some ("comprar 48 litros de klopan" fica inteiro; só "1. ", "- " e "2) " saem)',
+      C.selects.length === 0 && C.marcador.join(' | ') === 'comprar 48 litros de klopan | comprar mourão | trocar a bomba | 36 sacos de adubo para buscar', C.selects.join() + ' · ' + C.marcador.join(' | '));
+    /* (g) duas fazendas em linhas diferentes: seletor por linha e cabeçalho "várias fazendas" */
+    const Gg = await page.evaluate(async () => {
+      const t = 'Fazenda Xisto: trocar a bomba do pivô\nFazenda Ypsilon: comprar mourão';
+      insLimpar(); insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = 'tarefas'; insUI.lida = true; insAbrirPrev(); insRender(); await new Promise(r => setTimeout(r, 120));
+      return { varias: insUI.prev.msgUnidade.varias, selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+    });
+    ok('v99 g) Mensagem com duas fazendas em linhas diferentes: cabeçalho "várias fazendas" e o seletor volta a ser POR LINHA (o app nunca mistura)',
+      Gg.varias && Gg.selects.join() === '0|unidade,1|unidade' && /várias fazendas na mensagem/.test(Gg.texto), Gg.selects.join(' · '));
+    /* a mensagem do Agro1 continua sendo Agro1 (quem diz "baixados no sistema" não é relato do campo) e a da v93 continua na forma de um talhão */
+    const K = await page.evaluate(([erp, aplic]) => ({ erp: insClassificar(erp).tipo, v93: insClassificar(aplic).tipo + '|' + (insLerAplicacao(aplic).forma || 'talhao') }), [MSG_ERP, MSG_APLIC]);
+    ok('v99 2.1) A mensagem "finalizada / baixados no sistema" continua classificada como Agro1, e a mensagem da v93 (Quatermon, Caxico arrendo) continua na forma de um talhão', K.erp === 'erp' && K.v93 === 'aplicacao|talhao', K.erp + ' · ' + K.v93);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  /* (f) sem boletim algum: "6 setores · sem registro no boletim nos últimos 14 dias", "período: sem registro", importa mesmo assim */
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-16T10:00:00-03:00');
+    const F = await page.evaluate(async t => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; }); await new Promise(r => setTimeout(r, 120));
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender(); await new Promise(r => setTimeout(r, 100));
+      const sel = document.querySelector('#app select[data-insprev="msg|unidade"]'); sel.value = 'f20'; sel.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 120));
+      ['t077', 't078', 't079', 't080', 't081', 't082'].forEach((id, i) => { const s = document.querySelector('#app select[data-insprev="set|' + i + '"]'); s.value = id; s.dispatchEvent(new Event('input', { bubbles: true })); });
+      await new Promise(r => setTimeout(r, 150));
+      const out = { conf: insConfLinhas(insUI.prev).map(l => l.txt), texto: document.querySelector('#app').textContent.replace(/\s+/g, ' '), ativo: !document.getElementById('bt-ins-importar').classList.contains('acao-off') };
+      insImportar(); await new Promise(r => setTimeout(r, 100));
+      const rel = insAplicacoesRelatadas().find(c => c.talhoes);
+      out.gravou = !!rel; out.periodo = rel ? insRelatoPeriodoTxt(rel) : ''; out.status = rel ? insRelatoStatus(rel) : '';
+      return out;
+    }, MSG_FABINHO);
+    ok('v99 f) Sem boletim algum na unidade: "6 setores · sem registro no boletim nos últimos 14 dias", "período: sem registro", e o relato importa mesmo assim',
+      F.conf.join() === '6 setores · sem registro no boletim nos últimos 14 dias' && /período: sem registro/.test(F.texto) && F.ativo && F.gravou && F.periodo === 'período: sem registro' && F.status === 'sem registro no boletim nos últimos 14 dias', F.conf.join() + ' · ' + F.status);
     errosTodos.push(...erros);
     await ctx.close();
   }

@@ -1089,3 +1089,55 @@ telas "Colar do WhatsApp › Conferir o relatório do Agro1", "… › Conferên
 Agro1 × Boletim", "… › Conferência Agro1 × Boletim (lista)" e "Cadastros › Insumos ›
 Baixas do Agro1" medidas como Cadastros; o cartão "Conferência Agro1 × Boletim" no
 grupo 16 (painel em duas etapas).
+
+## 28. Leitor do WhatsApp: tipo certo, fazenda uma vez, número nunca some, boletim antes do Importar (desde a v99)
+Lição de 16/09/2026: a mensagem do grupo "Aplicações Realizadas" ("Aplicação
+realizada via fértil irrigação café fazenda Lavamar Rodrigo setores
+1,2,3,4,5,6 / Doses por setor / 48 litros de klopan / 36 kg de Actara") virou
+4 tarefas sem sentido, com o "48" apagado e a unidade perguntada quatro vezes.
+Regra que fica: **o funcionário manda do jeito que manda; quem se adapta é o
+leitor.** Tarefa que mexer na porta única "📥 Colar do WhatsApp" prova, com
+`node scripts/teste_insumos.cjs` (cenários v99 a–i, a mensagem exatamente como
+colada, com "Lavamar") e `scripts/checar-poluicao.cjs`, grupo "20. Leitor do
+WhatsApp":
+1. **Tipo pelo conteúdo:** verbo/expressão de aplicação + dose com unidade ou
+   setores com número (catálogo `MSG_SINAIS_APLICACAO`, nunca `if` espalhado)
+   → chip 🚜 aceso, os outros cinco na fileira, frase "Entendi uma aplicação
+   realizada em …, ferti-irrigação, setores 1 a 6, 2 produtos."; "baixados no
+   sistema"/"Agro1" continua 🧾 Agro1; sem sinal, pergunta.
+2. **Fazenda uma vez por mensagem, nos três tipos:** linha "Fazenda:" no
+   cabeçalho (nome + «como veio» + trocar, ou "escolher ›" na lista nativa);
+   escolhida, toda linha herda e o botão acende no lugar; a escolha vira
+   de-para na MESMA `D.deparaAta` pelo trecho identificado como nome, com a
+   trilha `{tipo:"depara"}` na mensagem; a segunda colagem não pergunta.
+   Seletor por linha SÓ com mais de uma fazenda na mensagem ("várias
+   fazendas"). "Lavamar" nunca casa com "Lagamar" por semelhança — casa porque
+   alguém ensinou.
+3. **Setores → talhões por id:** seletor por setor na primeira vez (44 px),
+   de-para `soTalhao` por unidade depois; `deparaAtaDe` ignora essas linhas.
+4. **Número nunca some:** só `^\d{1,3}[.)-]\s` ou `^[-•*]\s` saem; "48 litros
+   de klopan" e "36 kg de Actara" não viram tarefa — aviso "N linhas parecem
+   doses de aplicação, não tarefas — quer importar como relato de aplicação?"
+   com o chip 🚜; contagem e botão só com o que vai ser importado.
+5. **Produtos e doses como declarados** (`klopan · 48 litros`, `Actara · 36
+   kg`, escopo "por setor"); nunca kg total, nunca × setores, nunca × hectare;
+   saldo de insumos inalterado.
+6. **Conferência antes do Importar:** bloco "📋 No boletim do gerente", mesmo
+   motor da baixa do Agro1, talhões citados, janela de 14 dias (ou o período
+   citado); "setores 1, 2, 3, 4 · no boletim de 14, 15 e 16/09" ✅ · "setores
+   5, 6 · sem registro no boletim nos últimos 14 dias" (para conferir); "N
+   setores · no boletim de 14 a 16/09" quando todos; toque abre os boletins
+   (só leitura, sem nome de pessoa); "Importar relato" continua ativo; payload
+   com `conferencia_boletim`.
+7. **Período vem do boletim:** "Registrado no boletim: 14 a 16/09" ou
+   "período: sem registro"; nenhum campo de data, nenhuma data da mensagem ou
+   do Agro1 como dia de aplicação.
+8. **Nenhuma pergunta ao gerente** para a forma por setores (a mensagem não
+   diz o dia); o "sem registro" vai ao painel › 📦 Insumos, lido do payload.
+9. **Idempotência, vocabulário e layout:** reimportar = 0; nenhum "não fez",
+   "pendente", "atrasado", "faltou", "erro", custo; tela em ≤ 1,5 telas a
+   390 px, nenhuma fileira > 390 px, zero nativo, nenhuma confirmação nova.
+10. **Regressão:** casa, boletim e apontamento do gerente (três atividades) e
+    pós-colheita idênticos ao main; muda só Colar do WhatsApp, Mensagens
+    importadas, Cadastros › De-para da ata (talhão na linha) e o cartão 📦
+    Insumos do painel quando há relato sem registro.

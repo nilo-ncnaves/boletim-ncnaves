@@ -1088,10 +1088,35 @@ sobrou — e tarefa do planejamento fica parada "aguardando insumo".
   pelo de-para de produtos. Só a mensagem = relato SEM quantidade (nunca kg
   estimado). Nada se apaga (relançamento no Agro1: linha anterior "superada").
   Resolver é chip com "desfazer" no lugar (v91); nenhuma confirmação nova.
+- **Leitor do WhatsApp (desde a v99) — a regra que fica:** os funcionários
+  mandam a mensagem do jeito que mandam; quem se adapta é o leitor. **A
+  unidade é atributo da mensagem, perguntada uma vez (linha "Fazenda:" no
+  cabeçalho da conferência, nos três tipos) e aprendida** — a escolha vira
+  de-para na MESMA `D.deparaAta` pelo trecho identificado como nome ("Lavamar
+  Rodrigo" → f20) e fica na trilha; só com mais de uma fazenda na mensagem o
+  seletor volta a ser por linha. **O leitor nunca engole número em silêncio:**
+  só marcador de lista inequívoco ("1. ", "- ") sai da frente da linha; linha
+  de produto + dose não vira tarefa, vira aviso com o chip 🚜 ao lado. **O
+  período de uma aplicação vem do boletim do gerente, nunca da mensagem nem
+  do Agro1** ("Registrado no boletim: 14 a 16/09" ou "período: sem
+  registro"; sem campo "começou em / terminou em", decisão do Nilo em
+  16/09/2026), **e a conferência com o boletim aparece antes do Importar**
+  (bloco "📋 No boletim do gerente": mesmo motor da baixa do Agro1,
+  `erpLancamentos`, nos talhões citados, janela `MSG_JANELA_BOLETIM_DIAS` = 14
+  dias ou o período citado; "sem registro" é aviso âmbar, nunca bloqueio; a
+  divergência viaja em `conferencia_boletim` dentro do relato). A forma "por
+  setores" do relato (`MSG_SINAIS_APLICACAO`: verbo + dose com unidade ou
+  setores com número → chip 🚜 aceso; setores → talhões por seletor na
+  primeira vez, de-para `soTalhao` por unidade; produtos e doses como
+  declarados, nunca multiplicados) NÃO vira pergunta no boletim do gerente —
+  a mensagem não diz o dia, e datar pela colagem seria estimar; o que ficou
+  sem registro é assunto do escritório, no cartão "📦 Insumos" do painel.
 - Conferência: `node scripts/teste_insumos.cjs` (a validação da tarefa, com a
-  mensagem real do nitrato; desde a v96 também o PDF do Agro1 — cenários a–o)
-  e `scripts/checar-poluicao.cjs`, grupos "15. Insumos" e "19. Baixa do
-  Agro1"; detalhe em docs/definicao-de-pronto.md, itens 21 e 27.
+  mensagem real do nitrato; desde a v96 também o PDF do Agro1 — cenários a–o;
+  desde a v99 a mensagem do grupo de aplicações com "Lavamar", cenários a–i)
+  e `scripts/checar-poluicao.cjs`, grupos "15. Insumos", "19. Baixa do
+  Agro1" e "20. Leitor do WhatsApp"; detalhe em docs/definicao-de-pronto.md,
+  itens 21, 27 e 28.
 
 ### c19) Cartão do painel em duas etapas: unidades primeiro, descrição só na tela da unidade (desde a v88)
 Pedido do Nilo em 12/09/2026, com as telas na mão: o painel da Diretoria

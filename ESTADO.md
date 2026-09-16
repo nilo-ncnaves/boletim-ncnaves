@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v98** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v99** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -2018,6 +2018,162 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Leitor do WhatsApp: relato de aplicação lido da mensagem (v99)
+**O problema real (16/09/2026, iPhone a 390 px).** Mensagem do grupo
+"Aplicações Realizadas", colada pelo Nilo depois de trocar "café do Rodrigo"
+pelo nome da fazenda (com um erro de digitação que ficou):
+
+```
+Aplicação realizada via fértil irrigação café fazenda Lavamar Rodrigo setores 1,2,3,4,5,6
+
+Doses por setor
+48 litros de klopan
+36 kg de Actara
+```
+
+Em "📝 Tarefas avulsas" o app criou 4 "tarefas" — a linha inteira, "Doses por
+setor", "litros de klopan" e "kg de Actara" —, pediu a unidade QUATRO vezes e
+não aprendeu a resposta. Quatro defeitos da mesma colagem, corrigidos juntos.
+Decisão do Nilo que não se discute: **os funcionários continuam mandando as
+mensagens do jeito que mandam; quem se adapta é o leitor do app.**
+
+| defeito | antes (v98) | depois (v99) |
+| --- | --- | --- |
+| D1 números engolidos | "48 litros de klopan" virava "litros de klopan" (a regex `^[-–—•*\d.)\s]+` do parser de tarefas tratava qualquer número inicial como marcador de lista) | só marcador inequívoco sai ("1. ", "1) ", "- "); a linha de dose nem vira tarefa — vira aviso com o chip 🚜 ao lado |
+| D2 tipo sugerido | o cabeçalho "Aplicação…" já acendia 🚜, mas o leitor da v93 entendia UM local = o cabeçalho inteiro, produto vazio, sem unidade e sem setores; "Ferti realizada…" caía em Agro1 e "fértil" (com acento) em nada | sinal por catálogo (`MSG_SINAIS_APLICACAO`: verbo + dose com unidade ou setores com número) → 🚜 aceso, frase "Entendi uma aplicação realizada em «Lavamar Rodrigo» (fazenda a escolher), ferti-irrigação, setores 1 a 6, 2 produtos." |
+| D3 unidade perguntada 4× | seletor por linha (`selUn(i,…)`), tarefas sem `nomeMsg` → nada aprendido | linha "**Fazenda:** escolher ›" no cabeçalho, uma por mensagem; escolhida, toda linha herda; "Lavamar Rodrigo" → f20 entra em `D.deparaAta` e na trilha da mensagem; a 2ª colagem não pergunta |
+| D4 conferência tardia | só no painel, depois de importar | bloco "📋 No boletim do gerente" ANTES do Importar: "setores 1, 2, 3, 4 · no boletim de 14, 15 e 16/09" ✅ · "setores 5, 6 · sem registro no boletim nos últimos 14 dias" (para conferir); "Registrado no boletim: 14 a 16/09" |
+
+### O que o app faz
+1. **Classificação por sinal (`insSinalAplicacao`).** (a) verbo/expressão de
+   aplicação do catálogo + (b) evidência FORTE: dose com unidade
+   (`48 litros`, `36 kg`) ou setores/talhões com números. Com o sinal, o chip
+   🚜 nasce aceso e os outros cinco continuam na fileira. Quem diz "baixados no
+   sistema" / "Agro1" continua sendo 🧾 Agro1; sem sinal valem as regras de
+   antes (pergunta, não adivinha). Produto conhecido sozinho é evidência fraca.
+2. **Forma "por setores" do relato (`insLerAplicacao`, `p.forma="setores"`).**
+   Nasce quando a mensagem cita setores/talhões, ou quando não há UM produto
+   no cabeçalho e há operação citada ou duas linhas de dose. Lê: fazenda
+   ("fazenda <nome>", ou o que sobra do cabeçalho), operação pelo catálogo
+   (`ferti` → FERTIRRIGACAO → "Adubação via fertirrigação" no café, pela
+   `ERP_OPERACOES` — só quando o catálogo dá UMA para a atividade; senão a
+   lista nativa), setores citados ("1,2,3,4,5,6", "1 a 6", "3 e 5"), produtos
+   e doses **como o funcionário escreveu** (`klopan · 48 litros`, `Actara ·
+   36 kg`, escopo "por setor"), competência (mês da colagem, salvo mês citado)
+   e período citado ("de 10 a 16/09"). NUNCA multiplica por setores nem por
+   hectare; nada muda no saldo de insumos. A forma da v93 (um produto, um
+   talhão, calda, "Quatermon Caxico arrendo") continua exatamente como era.
+3. **Unidade é atributo da mensagem (`insUnidadeMensagem`), nos três tipos**
+   (tarefas avulsas, relato de aplicação, relato de chuva). Cabeçalho da
+   conferência: "Fazenda: Lagamar Café (Rodrigo)" + «Lavamar Rodrigo» na
+   mensagem + "trocar", ou "Fazenda: escolher ›" (lista nativa da v87, no
+   escopo do perfil). Só com MAIS de uma fazenda na mensagem (unidades próprias
+   diferentes ou nomes explícitos diferentes) o cabeçalho diz "várias
+   fazendas" e o seletor volta a ser por linha. O texto-chave aprendido é o
+   trecho identificado como nome, normalizado pela chave de sempre — nunca a
+   mensagem inteira. A trilha (`mensagens_importadas.criados`) ganha
+   `{tipo:"depara", ata, unidade}`.
+4. **Setores → talhões por id.** Primeira vez: um seletor por setor
+   (`grade2`, 44 px), nunca "1" casa com talhão por conter "1"; a escolha vira
+   de-para na MESMA tabela, marcada `soTalhao:true` e por unidade ("Setor 1" →
+   t077 em f20) — `deparaAtaDe` ignora essas linhas, então "Setor 1" numa
+   tarefa qualquer nunca vira nome de fazenda. Segunda colagem: uma linha
+   "Setores 1 a 6 · 6 talhões do cadastro ligados · trocar".
+5. **Conferência com o boletim antes do Importar (`insAplicConferir`).** Mesmo
+   motor da baixa do Agro1 (`erpLancamentos`: setores marcados em
+   "Fertirrigação hoje? › Em quais setores?", atividades de adubação/correção
+   com ou sem kg) mais as atividades da operação por talhão, nos talhões
+   citados, na janela `MSG_JANELA_BOLETIM_DIAS` = 14 dias contados da colagem
+   (ou o período citado). Uma linha por grupo de talhões com as mesmas datas;
+   "N setores · no boletim de 14 a 16/09" quando todos cobertos; "6 setores ·
+   sem registro no boletim nos últimos 14 dias" quando nenhum. Toque em "ver
+   os boletins" abre a lista (data · talhão · operação · fonte), só leitura,
+   sem nome de pessoa. **Não bloqueia:** "Importar relato" fica ativo; a
+   divergência vai no payload.
+6. **O período da aplicação é o que o boletim diz.** "Registrado no boletim:
+   14 a 16/09" ou "período: sem registro" — nunca a data da mensagem, nunca a
+   hora do Agro1. Por isso a tela NÃO ganhou campo "começou em / terminou em"
+   (decisão do Nilo, 16/09) e nenhum `input type=date`.
+7. **O que fica gravado** (`mensagens_importadas.criados`, tipo `aplicacao`
+   com `forma:"setores"` — nenhuma tabela nova): unidade, operação (app e
+   chave), `talhoes:[{rotulo, talhaoId}]`, `produtos:[{produto, termo, qtd,
+   un, escopo}]`, competência, data da colagem, `dataMsg`, `nomeMsg` e
+   `conferencia_boletim:{janela, periodo_citado, periodo, cobertos:[{rotulo,
+   talhaoId, datas, boletins}], sem_registro, sem_talhao}`. Idempotente:
+   mesma unidade + operação + competência + setores + produtos/doses = 0
+   relatos novos.
+8. **Este relato NÃO vira pergunta no boletim do gerente.** A regra da v93
+   (c21) pergunta "no dia" — e esta mensagem não diz o dia: perguntar no dia
+   da colagem seria datar a aplicação pela mensagem, o que a v96 e esta tarefa
+   proíbem. `insRelatosDo` ignora relatos com `talhoes`; o gerente não vê nada
+   novo. O que ficou "sem registro" aparece no painel › cartão "📦 Insumos"
+   (recolhido) como divergência lida do payload: "Lagamar Café (Rodrigo) ·
+   ferti-irrigação relatada no grupo em 16/09: setores 5, 6 sem registro no
+   boletim nos últimos 14 dias — para conferir". A devolutiva ao gerente, se
+   houver, continua sendo pelo WhatsApp depois de revisada.
+9. **Tarefas avulsas (D1).** `insLerTarefas` preserva a linha inteira; só
+   `^\d{1,3}[.)-] ` ou `^[-•*] ` saem. Linha de produto + dose (regex de dose
+   ou produto do de-para numa linha curta, sem pista de tarefa) e linha-rótulo
+   curta ("Doses por setor", "Obs:", "Produtos:") não viram tarefa: aviso
+   "3 linhas parecem doses de aplicação, não tarefas — quer importar como
+   relato de aplicação?" com o chip 🚜 ao lado; tocar troca o tipo e
+   reaproveita o texto. Cabeçalho e botão contam só o que vai ser importado
+   ("Importar 1 tarefa"). A mensagem inteira continua indo íntegra para a
+   trilha.
+10. **Mensagens importadas** relata REGISTRO: "🚜 ferti-irrigação relatada em
+    Lagamar Café (Rodrigo) · setores 1 a 6 · klopan 48 litros, Actara 36 kg
+    por setor · Registrado no boletim: 14 a 16/09 · registrado no boletim de
+    14 a 16/09 · setores 5, 6 sem registro no boletim" e "🔗 nome aprendido:
+    «Lavamar Rodrigo» → Lagamar Café (Rodrigo)". Cadastros › De-para da ata
+    passa a mostrar o talhão da linha quando existe.
+
+### Layout da tela "Conferir a mensagem" (390 px, de cima para baixo)
+cabeçalho fixo "‹ Voltar · Conferir a mensagem · ferti-irrigação · 6 setores ·
+2 produtos" (73 px) → fileira de chips de tipo, inteira, quebrando em linhas +
+frase de entendimento (375 px, a mesma da v93) → Fazenda (74) → Atividade no
+boletim (58) → Setores citados (56; na primeira vez, 6 seletores em duas
+colunas) → 📋 No boletim do gerente (146, 2 linhas + rodapé) → Produtos e
+doses (2 × 59) → nota (52) → rodapé fixo "Descartar · Importar relato" (75).
+**Medido: 1.267 px = 1,50 telas** com a fazenda escolhida, os setores ligados e
+o bloco do boletim aberto; nenhuma fileira passa de 390 px; zero campo de
+data; zero nativo. Nenhum CSS novo: `.cartao`, `.cad-item`, `.grade2`,
+`.ins-l`, `.chips`, `.btn.suave.mini` — todos já existiam.
+
+### Achados antes de codar (registrados para o PR)
+- O "v92" do prompt é a v96 do repositório (checagens C1–C8 da baixa do
+  Agro1) e o "relato de aplicação" é a v93; o "C5" do prompt corresponde ao
+  motor `erpLancamentos`/`erpCasar` (no repositório, "C5" é o recebimento/saldo
+  da v86). O de-para de fazenda é `DEPARA_ATA_PADRAO` / `D.deparaAta`
+  (`deparaAtaDe`, chave `planChaveAta`), a mesma tabela desde a v77.
+- O classificador de hoje JÁ sugeria 🚜 para a mensagem do Fabinho (cabeçalho
+  "Aplicação…" + linhas de calda) — mas o leitor da v93 não sabia ler
+  setores nem dois produtos, e a tela pedia produto e talhão únicos.
+- `insLerTarefas`, linha `l.replace(/^[-–—•*\d.)\s]+/,"")`: a causa do "48"
+  sumido. O seletor por linha era `selUn(i,…)` em `insCorpoPrev`, para
+  remessa, aplicação, chuva e tarefas; as tarefas não tinham `nomeMsg`, então
+  `insAprenderUnidade` nunca aprendia nada delas.
+- Contagem de confirmações: 11 `perguntar(` — a mesma da v95/v96.
+
+### Provas (v99)
+- `node scripts/teste_insumos.cjs`: __INSUMOS__ (a v99 acrescentou 22 provas,
+  cenários a–i com a mensagem do Fabinho exatamente como colada, com
+  "Lavamar": classificação e chip aceso; um seletor no cabeçalho, herança,
+  de-para aprendido e trilha; segunda colagem sem pergunta; tarefas avulsas
+  com a linha inteira e as 3 doses fora, aviso com chip, marcador de lista;
+  produtos e doses como declarados e saldo inalterado; bloco do boletim com
+  as datas e "sem registro", período do boletim, payload; sem boletim algum;
+  duas fazendas → seletor por linha; reimportar = 0; vocabulário e largura;
+  Agro1 e a mensagem da v93 inalterados; painel lendo o payload).
+- `scripts/checar-poluicao.cjs`: __POLUICAO__; grupo novo "20. Leitor do
+  WhatsApp" (10 ✅) e as telas "Colar do WhatsApp › Conferir a mensagem (relato
+  de aplicação por setores)" e "… (tarefas avulsas com aviso de doses)" medidas
+  como Cadastros.
+- `scripts/regressao_render.cjs` contra `origin/main`: __REGRESSAO__
+- `node --check` no JS extraído: ok. `teste_nomenclatura.cjs`: tudo certo.
+  `teste_planejamento.cjs`: 123 ✅ · 1 ❌ — o mesmo ❌ do `main` ("De-para da
+  ata — 23 nomes", que a v96 levou a 25; a expectativa da prova ficou
+  desatualizada, não é desta tarefa).
+
 ## A conferência também fala Agro1 (v98)
 Pedido do Nilo em 16/09/2026, logo depois da v97: **"Quero q falem Agro1. E
 troca de texto, não mexe em nada gravado."** Na v97 só a PORTA de entrada
@@ -3082,6 +3238,17 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   ✅ (busca a partir de 12) · mensagem (texto original) ✅ · níveis ≤ 3 ✅ ·
   cabeçalho fixo com voltar ✅ · ação principal fixa no rodapé ✅ · P10 ❌
   herdado (usa `.cartao`, `.btn` e `.chip` do CSS-base).
+- Colar do WhatsApp › Conferir a mensagem — relato de aplicação por
+  setores (v99, medida com as regras de Cadastros): 1,50 telas com a fazenda
+  escolhida, os 6 setores ligados e o bloco do boletim aberto ✅ · chip 🚜
+  aceso com os outros 5 na fileira, quebrando em linhas ✅ · fazenda perguntada
+  UMA vez no cabeçalho (lista nativa, alvo 44 px) ✅ · setores → talhões por
+  seletor só na primeira vez ✅ · bloco "📋 No boletim do gerente" antes do
+  Importar, relatando registro ("sem registro", "para conferir") ✅ · zero
+  `input type=date`, zero nativo ✅ · botão de avanço com o que falta ✅ ·
+  nenhuma fileira > 390 px ✅ · P10 ❌ herdado (mesmo CSS-base). A forma
+  "tarefas avulsas com aviso de doses": 1 tarefa, aviso com o chip 🚜, nenhum
+  seletor por linha ✅.
 - Cadastros › Insumos e remessas (v86): 1 tela ✅ · busca a partir de 12
   produtos ✅ · estado na própria linha (categoria, unidade, fornecedor,
   saldo do grupo) ✅ · Remessas programadas em nível 3, com o detalhe

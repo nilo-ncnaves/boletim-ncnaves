@@ -4249,8 +4249,11 @@ const planChaveAta = s => normTxt(s).replace(/[^a-z0-9]/g,"");
 function deparaAtaDe(nome){
   const k=planChaveAta(nome);
   if(!k) return null;
-  return deparaAta().find(x=>planChaveAta(x.ata)===k)
-    || deparaAta().find(x=>k.length>3 && planChaveAta(x.ata).length>3 && (k.includes(planChaveAta(x.ata))||planChaveAta(x.ata).includes(k)))
+  /* v99: a linha aprendida como "setor N → talhão" de uma unidade (soTalhao) NUNCA serve de nome de
+     fazenda — senão "Setor 1" de uma tarefa qualquer viraria a unidade em que o setor foi ensinado */
+  const ls=deparaAta().filter(x=>!x.soTalhao);
+  return ls.find(x=>planChaveAta(x.ata)===k)
+    || ls.find(x=>k.length>3 && planChaveAta(x.ata).length>3 && (k.includes(planChaveAta(x.ata))||planChaveAta(x.ata).includes(k)))
     || null;
 }
 
@@ -5771,6 +5774,12 @@ function insDivergencias(){
         texto:insQtd(l.aplicado,l.base)+" aplicados sem nenhum recebimento registrado"});
     });
   });
+  /* v99 (D4): relato de aplicação por setores com setor SEM registro no boletim — assunto do escritório, nunca
+     cobrança do campo; lido do payload gravado (conferencia_boletim), sem recalcular */
+  insAplicacoesRelatadas().forEach(c=>{ if(!c.talhoes || !podeVer(c.unidade)) return;
+    const cb=c.conferencia_boletim||{}, sem=(cb.sem_registro||[]).map(x=>x.rotulo); if(!sem.length) return;
+    out.push({tipo:"sem_registro_relato", unidade:c.unidade, produto:(c.opErp?insOperacaoRot(c.opErp):"aplicação")+" relatada no grupo em "+fmtDataCurta(c.data), base:"",
+      texto:insPlural(c.rotuloLocal||"talhão",sem.length)+" "+sem.join(", ")+" sem registro no boletim "+(cb.periodo_citado?"no período citado":"nos últimos "+MSG_JANELA_BOLETIM_DIAS+" dias")+" — para conferir"}); });
   return out;
 }
 /* ---- textos prontos, no molde do módulo de planejamento (botão copiar) ---- */
@@ -5909,8 +5918,9 @@ function insLerChuva(texto){
     const nome=linha.replace(INS_CHUVA_RE,"").replace(/[-–—:•*]/g," ").replace(/\s+/g," ").trim();
     const dp=nome?deparaAtaDe(nome):null;
     out.itens.push({bruto:linha.trim(), nomeMsg:nome, mm:insNumBR(m[1]),
-      unidade:(dp&&!dp.fora)?dp.unidade:"", incluir:!(dp&&dp.fora)});
+      unidade:(dp&&!dp.fora)?dp.unidade:"", unidadePropria:!!(dp&&!dp.fora), incluir:!(dp&&dp.fora)});
   });
+  insUnidadeMensagem(out, texto);   /* v99 (D3): a fazenda é da mensagem; por linha só com várias fazendas */
   return out;
 }
 /* pistas de que a linha é uma pendência, e não conversa do grupo. Sem nenhuma delas o app
@@ -5922,15 +5932,133 @@ const INS_PISTAS_TAREFA=["falta","faltou","precisa","preciso","comprar","trocar"
 const insPedacos = txt => String(txt||"").split(/\r?\n|;/).map(l=>l.trim()).filter(l=>l.length>3);
 const insTemPista = l => { const n=" "+normTxt(l).replace(/[^a-z0-9]+/g," ")+" ";
   return INS_PISTAS_TAREFA.some(p=>n.indexOf(" "+p)>=0); };
+/* ---- (v99) LEITOR DO WHATSAPP: o funcionário manda do jeito que manda; quem se adapta é o leitor ----
+   Lição de 16/09/2026 (mensagem real do grupo "Aplicações Realizadas", colada pelo Nilo): "Aplicação
+   realizada via fértil irrigação café fazenda Lavamar Rodrigo setores 1,2,3,4,5,6 / Doses por setor /
+   48 litros de klopan / 36 kg de Actara". Quatro defeitos da mesma colagem, corrigidos juntos:
+   D1 o parser de tarefas apagava o "48" (tratava número no início como marcador de lista);
+   D2 a mensagem é um RELATO DE APLICAÇÃO (verbo + operação + fazenda + setores + doses), não tarefas;
+   D3 a unidade era perguntada por LINHA e a resposta não era aprendida;
+   D4 a conferência com o boletim só aparecia depois, no painel.
+   Regra que fica: a unidade é atributo da MENSAGEM (perguntada uma vez, aprendida); o leitor nunca
+   engole número em silêncio; o período de uma aplicação vem do BOLETIM do gerente, nunca da
+   mensagem nem do Agro1; e a conferência com o boletim aparece ANTES do Importar.
+   Tudo o que o leitor reconhece mora neste catálogo — nunca em `if` espalhado pelas funções. */
+const MSG_SINAIS_APLICACAO={
+  /* (a) verbo/expressão de aplicação — comparado com o texto normalizado (minúsculas, sem acento) */
+  verbos:["aplicacao realizada","aplicacao feita","aplicacao concluida","aplicacao finalizada","aplicado","aplicada",
+    "aplicamos","aplicou","fertirrigacao","ferti irrigacao","fertil irrigacao","ferti-irrigacao","ferti",
+    "pulverizacao","pulverizamos","pulverizou","finalizada","finalizado","concluida","concluido"],
+  /* operação citada → chave do catálogo ERP_OPERACOES (por chave; a operação do boletim vem de lá, por atividade) */
+  operacoes:[
+    {re:/fertil?\s*-?\s*irriga|fertirriga|\bferti\b/, erp:"FERTIRRIGACAO", rot:"ferti-irrigação"},
+    {re:/pulveriz/, erp:"PULVERIZACAO", rot:"pulverização"},
+    {re:/gessag|\bgesso\b/, erp:"GESSAGEM", rot:"gessagem"},
+    {re:/calagem|calcario/, erp:"CALAGEM", rot:"calagem"},
+    {re:/adubac|adubo\b|adubamos|adubou/, erp:"ADUBACAO", rot:"adubação"}
+  ],
+  /* (b) evidências: dose com unidade; setores/talhões com números; produto do de-para numa linha curta */
+  dose:/\b\d[\d.,]*\s?(?:l|lts?|litros?|kgs?|quilos?|g|gr|ml)\b/i,
+  locais:/\b(setores|setor|talh[õo]es|talh[ãa]o|piv[ôo]s|piv[ôo]|pivos|pivo|quadras|quadra|glebas|gleba)\s*:?\s*(\d+(?:\s*(?:,|;|\be\b|\ba\b|\bate\b|\baté\b|-|–)\s*\d+)*)/i,
+  fazenda:/\bfazenda\s+(?:d[aeo]s?\s+)?([^,;:.\n]+?)(?=\s*(?:,|;|:|\.|—|–|\bsetor|\bsetores|\btalh|\bpiv|\bfinalizad|\brealizad|\bconclu|\bmes\b|\bmês\b|$))/i,
+  /* linha-rótulo curta, sem verbo, que não é tarefa ("Doses por setor", "Obs:", "Produtos:") */
+  rotulo:/^(?:doses?(?:\s+por\s+\S+)?|obs\.?|observa[çc][õo]es?|produtos?|calda|receita|insumos?)\s*:?\s*$/i,
+  escopo:/^doses?\s+(por\s+[A-Za-zÀ-ÿ]+)/i,
+  /* marcador de lista INEQUÍVOCO: "1. ", "1) ", "1 - ", "- ", "• " — "48 litros" não é marcador */
+  marcadorLista:/^(?:\d{1,3}\s?[.)\-–—]\s+|[-–—•*]\s+)/,
+  /* período citado na mensagem ("de 10 a 16/09", "10 a 16/09/26"): a janela da conferência passa a ser ele */
+  periodo:/\b(?:de\s+)?(\d{1,2})(?:\/(\d{1,2}))?\s+(?:a|até|ate)\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/i
+};
+const MSG_JANELA_BOLETIM_DIAS=14;   /* conferência com o boletim: últimos 14 dias contados da colagem (a janela do painel) */
+const insPalavras = l => String(l||"").trim().split(/\s+/).filter(Boolean).length;
+const insTemProdutoConhecido = l => { const n=" "+insNorm(l)+" "; return deparaProdutos().some(p=>insNorm(p.termo).length>2 && n.indexOf(insNorm(p.termo))>=0); };
+/* linha de produto + dose (ou produto conhecido numa linha curta) — nunca vira tarefa */
+const insLinhaDeDose = l => !insTemPista(l) && (MSG_SINAIS_APLICACAO.dose.test(l) || (insPalavras(l)<=6 && insTemProdutoConhecido(l)));
+const insLinhaRotulo = l => !insTemPista(l) && insPalavras(l)<=4 && (MSG_SINAIS_APLICACAO.rotulo.test(l.trim()) || (/:$/.test(l.trim()) && insPalavras(l)<=3));
+/* operação citada na mensagem → chave do catálogo (ou "") */
+function insOperacaoDoTexto(texto){
+  const n=normTxt(texto);
+  const o=MSG_SINAIS_APLICACAO.operacoes.find(x=>x.re.test(n));
+  return o?o.erp:"";
+}
+const insOperacaoRot = erp => (MSG_SINAIS_APLICACAO.operacoes.find(x=>x.erp===erp)||{}).rot || erpOpRot(erp).toLowerCase();
+/* setores/talhões citados ("setores 1,2,3,4,5,6", "talhões 3 e 5", "setor 1 a 6") → rótulo + lista de números */
+function insLocaisDoTexto(texto){
+  const m=MSG_SINAIS_APLICACAO.locais.exec(String(texto||""));
+  if(!m) return {rotulo:"", labels:[]};
+  const rot=normTxt(m[1]);
+  const rotulo = rot.startsWith("setor")?"setor" : rot.startsWith("talh")?"talhão" : rot.startsWith("piv")?"pivô" : rot.startsWith("quadra")?"quadra" : "gleba";
+  const labels=[];
+  const partes=m[2].split(/\s*(?:,|;|\be\b)\s*/i).map(x=>x.trim()).filter(Boolean);
+  partes.forEach(p=>{ const r=/^(\d+)\s*(?:a|até|ate|-|–)\s*(\d+)$/i.exec(p);
+    if(r){ const a=parseInt(r[1],10), b=parseInt(r[2],10); if(b>=a && b-a<40) for(let i=a;i<=b;i++) labels.push(String(i)); }
+    else if(/^\d+$/.test(p)) labels.push(p); });
+  return {rotulo, labels:[...new Set(labels)]};
+}
+/* nomes de fazenda citados explicitamente ("fazenda Lavamar Rodrigo") — o trecho, nunca a mensagem inteira */
+function insNomesFazendaDoTexto(texto){
+  const out=[]; const re=new RegExp(MSG_SINAIS_APLICACAO.fazenda.source,"gi"); let m;
+  String(texto||"").split(/\r?\n/).forEach(l=>{ re.lastIndex=0; while((m=re.exec(l))){ const nome=m[1].replace(/\s+/g," ").trim();
+    if(nome && insPalavras(nome)<=5 && !out.some(x=>planChaveAta(x)===planChaveAta(nome))) out.push(nome); } });
+  return out;
+}
+/* período citado ("de 10 a 16/09") → {de, ate} em ISO, ou null */
+function insPeriodoDoTexto(texto, ref){
+  const m=MSG_SINAIS_APLICACAO.periodo.exec(String(texto||"")); if(!m) return null;
+  const ano=m[5]?(m[5].length===2?"20"+m[5]:m[5]):String(ref||hojeBRT()).slice(0,4);
+  const mesFim=m[4].padStart(2,"0"), mesIni=(m[2]||m[4]).padStart(2,"0");
+  const de=ano+"-"+mesIni+"-"+m[1].padStart(2,"0"), ate=ano+"-"+mesFim+"-"+m[3].padStart(2,"0");
+  return de<=ate?{de,ate}:null;
+}
+/* sinal de "aplicação realizada": verbo + evidência FORTE (dose com unidade ou setores com números).
+   Produto conhecido sozinho é evidência fraca: mantém as regras de antes (pergunta, não adivinha). */
+function insSinalAplicacao(texto){
+  const n=" "+normTxt(texto).replace(/[^a-z0-9\-]+/g," ")+" ";
+  const verbo=MSG_SINAIS_APLICACAO.verbos.find(v=>n.indexOf(" "+v)>=0);
+  if(!verbo) return null;
+  const linhas=String(texto||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const doses=linhas.filter(l=>MSG_SINAIS_APLICACAO.dose.test(l)).length;
+  const locais=insLocaisDoTexto(texto).labels.length;
+  if(!doses && !locais) return null;
+  const ev=[doses?doses+" linha"+(doses>1?"s":"")+" de dose":"", locais?locais+" setor"+(locais>1?"es":"")+" citado"+(locais>1?"s":""):""].filter(Boolean).join(" e ");
+  return {verbo, motivo:"«"+verbo+"» com "+ev, frase:"parece um relato de aplicação realizada ("+ev+")"};
+}
+/* ---- (v99) a UNIDADE é atributo da MENSAGEM: resolvida no cabeçalho, herdada por toda linha ----
+   `p.msgUnidade`: {nomeMsg, unidade, varias}. Só quando a mensagem cita MAIS DE UMA fazenda (linhas
+   com unidades próprias diferentes, ou nomes explícitos diferentes) o seletor volta a ser por linha. */
+function insUnidadeMensagem(p, texto){
+  const nomes=insNomesFazendaDoTexto(texto);
+  const ids=new Set();
+  (p.itens||[]).forEach(i=>{ if(i.unidadePropria && i.unidade) ids.add(i.unidade); });
+  nomes.forEach(n=>{ const dp=deparaAtaDe(n); ids.add(dp&&!dp.fora?dp.unidade:(dp&&dp.fora?"fora:"+planChaveAta(n):"?"+planChaveAta(n))); });
+  const varias=ids.size>1;
+  const nome=nomes[0]||"";
+  const dp=nome?deparaAtaDe(nome):null;
+  const primeira=[...ids][0]||"";
+  const unidade = varias ? "" : ((dp&&!dp.fora)?dp.unidade : ((primeira && !/^[?]|^fora:/.test(primeira)) ? primeira : ""));
+  p.msgUnidade={nomeMsg:nome, unidade, varias, fora:!!(dp&&dp.fora), doDepara:!!unidade};
+  if(!varias) (p.itens||[]).forEach(i=>{ if(!i.unidadePropria && unidade) i.unidade=unidade; });
+  return p.msgUnidade;
+}
+/* a pessoa escolheu a unidade no cabeçalho: toda linha sem unidade própria herda */
+function insUnidadeMensagemEscolher(p, unidade){
+  p.msgUnidade=p.msgUnidade||{nomeMsg:"", unidade:"", varias:false};
+  p.msgUnidade.unidade=unidade; p.msgUnidade.doDepara=false;
+  (p.itens||[]).forEach(i=>{ if(!i.unidadePropria) i.unidade=unidade; });
+}
 /* mensagem inteira → tarefas soltas (sem o padrão de blocos da ata) */
 function insLerTarefas(texto){
-  const out={tipo:"tarefas", itens:[]};
+  const out={tipo:"tarefas", itens:[], doses:[]};
   String(texto||"").split(/\r?\n|;/).forEach(l=>{
-    const linha=l.replace(/ /g," ").replace(/^[-–—•*\d.)\s]+/,"").trim();
+    /* v99 (D1): só marcador de lista inequívoco sai da frente — "48 litros de klopan" fica inteiro */
+    const linha=l.replace(/ /g," ").trim().replace(MSG_SINAIS_APLICACAO.marcadorLista,"").trim();
     if(linha.length<4) return;
+    /* v99 (D1): linha de produto + dose e linha-rótulo curta não viram tarefa; ficam contadas para o aviso */
+    if(insLinhaDeDose(linha) || insLinhaRotulo(linha)){ out.doses.push(linha); return; }
     const dp=deparaAtaDe(linha.split(/[,:]/)[0]||"");
-    out.itens.push({bruto:l.trim(), desc:linha, unidade:(dp&&!dp.fora)?dp.unidade:"", incluir:true});
+    out.itens.push({bruto:l.trim(), desc:linha, unidade:(dp&&!dp.fora)?dp.unidade:"", unidadePropria:!!(dp&&!dp.fora), incluir:true});
   });
+  insUnidadeMensagem(out, texto);
   return out;
 }
 /* ---- (v93) RELATO DE APLICAÇÃO: "Aplicação de <produto> <local>" + linhas de calda ----
@@ -5963,16 +6091,17 @@ function insTirarCabecalhoZap(texto){
 const insTemPistaAplic = l => INS_APLIC_QTD.test(l)||INS_APLIC_QTD_B.test(l)||INS_APLIC_TANQUE.test(l)||INS_APLIC_GASTO.test(l)||INS_APLIC_VAZAO.test(l);
 function insLerAplicacao(texto){
   const zap=insTirarCabecalhoZap(texto);
-  const linhas=zap.texto.split(/\r?\n/).map(l=>l.replace(/ /g," ").trim()).filter(Boolean);
+  const linhas=zap.texto.split(/\r?\n/).map(l=>l.replace(/ /g," ").trim()).filter(Boolean);
   const out={tipo:"aplicacao", data:(zap.data && diasRegua().includes(zap.data))?zap.data:hojeBRT(), dataMsg:zap.data,
     produto:"", produtoTermo:"", operacao:"", receita:"", tanques:"", ltanque:"", vazao:"", obs:"", calda:[], itens:[], soltas:[],
     vinculo:null, semVinculo:false};
-  const calda=[], obs=[]; let cab="", local="";
+  const calda=[], obs=[]; let cab="", local="", escopo="";
   linhas.forEach((l,i)=>{
     let m;
     if(i===0 && (m=INS_APLIC_CAB.exec(l))){ cab=m[1].trim(); return; }
     if((m=/^obs\.?\s*:?\s*(.+)$/i.exec(l))){ obs.push(m[1].trim()); return; }
     if((m=INS_APLIC_LOCAL.exec(l))){ local=m[1].trim(); return; }
+    if((m=MSG_SINAIS_APLICACAO.escopo.exec(l))){ escopo=m[1].toLowerCase().replace(/\s+/g," "); return; }   /* v99: "Doses por setor" é o ESCOPO da dose, como veio */
     const t=INS_APLIC_TANQUE.exec(l), v=INS_APLIC_VAZAO.exec(l), g=INS_APLIC_GASTO.exec(l);
     if(t||v||g){ if(t&&!out.ltanque) out.ltanque=String(insNumBR(t[1])); if(v&&!out.vazao) out.vazao=String(insNumBR(v[1]));
       if(g&&!out.tanques) out.tanques=String(insNumBR(g[1])); return; }
@@ -5984,23 +6113,148 @@ function insLerAplicacao(texto){
      com uma linha só de calda, é ela. O que sobra do cabeçalho é o local. */
   const kc=planChaveAta(cab);
   let prod=calda.find(c=>kc && planChaveAta(c.nome) && kc.includes(planChaveAta(c.nome))) || (calda.length===1?calda[0]:null);
+  /* v99: a forma "por setores" — operação + fazenda + setores + produtos com dose (a mensagem do grupo
+     "Aplicações Realizadas"). Nasce quando a mensagem cita setores/talhões, ou quando não há UM produto
+     no cabeçalho e há operação citada ou mais de uma linha de dose. A forma da v93 (um produto, um
+     talhão, calda) continua exatamente como era. */
+  const opErp=insOperacaoDoTexto(zap.texto);
+  const locais=insLocaisDoTexto(zap.texto);
+  const nomesFz=insNomesFazendaDoTexto(zap.texto);
+  const multi = locais.labels.length>0 || (!prod && (calda.length>=2 || !!opErp));
+  if(multi) prod=null;
   if(prod){ out.produtoTermo=prod.nome;
     const re=new RegExp(prod.nome.trim().replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/\s+/g,"\\s+"),"i");
     if(!local) local=cab.replace(re," ").replace(/\s+/g," ").trim(); }
   else if(!local) local=cab;
+  if(multi){ if(nomesFz.length) local=nomesFz[0]; else local=insLocalSobra(local); }
   local=local.replace(/^(?:em|no|na|nos|nas|do|da|de|-|–|—|:)\s+/i,"").replace(/\s+(?:em|no|na|nos|nas|do|da|de)$/i,"").trim();
-  if(!local && !prod && cab) local=cab;
+  if(!local && !prod && cab && !multi) local=cab;
   out.produto=out.produtoTermo?insProdutoNome(out.produtoTermo):"";
   out.receita=calda.map(c=>c.bruto).join("\n");
   out.calda=calda.map(c=>({nome:c.nome, qtd:c.qtd, un:c.un}));
   out.obs=[out.vazao?"vazão "+insNumTxt(n0(out.vazao))+" L/ha":"", ...obs].filter(Boolean).join(" · ");
   const dp=local?deparaAtaDe(local):null;
   const unidade=(dp&&!dp.fora)?dp.unidade:"";
-  const talhaoId=(unidade && dp.talhao && talhoesDa(unidade).some(t=>t.id===dp.talhao))?dp.talhao:"";
+  const talhaoId=(!multi && unidade && dp.talhao && talhoesDa(unidade).some(t=>t.id===dp.talhao))?dp.talhao:"";
   out.itens=[{bruto:cab||linhas[0]||"", nomeMsg:local, unidade, talhaoId, fora:!!(dp&&dp.fora), incluir:!(dp&&dp.fora)}];
+  out.msgUnidade={nomeMsg:local, unidade, varias:false, fora:!!(dp&&dp.fora), doDepara:!!unidade};
+  if(multi){
+    out.forma="setores"; out.opErp=opErp; out.rotuloLocal=locais.rotulo||"talhão"; out.escopo=escopo;
+    out.setores=locais.labels.map(l=>({rotulo:l, talhaoId:""}));
+    out.produtos=calda.map(c=>{ const d=insDeparaDe(c.nome), pr=insProduto(c.nome);
+      return {termo:c.nome, produto:d?d.produto:(pr?pr.nome:c.nome), conhecido:!!(d||pr), qtd:c.qtd, un:c.un, bruto:c.bruto}; });
+    out.competencia=erpCompetenciaDoTexto(zap.texto)||hojeBRT().slice(0,7);
+    out.periodo=insPeriodoDoTexto(zap.texto, out.data);
+    out.operacao = unidade ? insOperacaoDoCatalogo(opErp, atividadeDe(unidade)) : "";
+    insAplicMapearSetores(out); insAplicConferir(out);
+    return out;
+  }
   if(unidade && out.produto) out.operacao=insOperacaoAprendida(out.produto, atividadeDe(unidade));
   insAplicProcurarVinculo(out);
   return out;
+}
+/* v99: o que sobra do cabeçalho depois de tirar verbo, operação, setores e palavras de ligação —
+   candidato a nome de fazenda (1 a 5 palavras); vazio quando não sobra nada legível */
+function insLocalSobra(cab){
+  let s=String(cab||"").replace(MSG_SINAIS_APLICACAO.locais," ");
+  s=s.replace(/\b(?:aplica[çc][ãa]o|realizad[ao]|feit[ao]|conclu[ií]d[ao]|finalizad[ao]|via|de|do|da|em|no|na|caf[ée]|lavoura|fert[ií]l?\s*-?\s*irriga[çc][ãa]o|fertirriga[çc][ãa]o|ferti|pulveriza[çc][ãa]o|aduba[çc][ãa]o|calagem|gessagem|fazenda)\b/gi," ");
+  s=s.replace(/[,;:.]+/g," ").replace(/\s+/g," ").trim();
+  return (s && insPalavras(s)<=5) ? s : "";
+}
+/* operação citada → a operação do boletim, SÓ quando o catálogo dá uma única para a atividade (senão a tela pergunta) */
+function insOperacaoDoCatalogo(opErp, atv){
+  const ops=erpOpsApp(opErp, atv).map(nomeAtual).filter((x,i,a)=>a.indexOf(x)===i);
+  return ops.length===1?ops[0]:"";
+}
+/* setores citados → talhões pelo de-para aprendido (unidade + "setor N" → id). Nunca por pedaço de nome:
+   a primeira vez pergunta por seletor, a escolha confirmada vira de-para (soTalhao) e a próxima não pergunta. */
+const insSetorNome = (p,s) => (p.rotuloLocal||"talhão")+" "+s.rotulo;
+function insAplicMapearSetores(p){
+  const fz=(p.itens[0]||{}).unidade;
+  (p.setores||[]).forEach(s=>{ if(!fz){ s.talhaoId=""; return; }
+    if(!s.talhaoId || !talhoesDa(fz).some(t=>t.id===s.talhaoId)) s.talhaoId=erpTalhaoDaGleba(insSetorNome(p,s), fz); });
+}
+function insAprenderSetor(p, s, fz){
+  if(!fz || !s.talhaoId) return;
+  D.deparaAta=(D.deparaAta && D.deparaAta.length)?D.deparaAta:DEPARA_ATA_PADRAO.map(x=>({...x}));
+  const nome=insSetorNome(p,s), k=planChaveAta(nome);
+  const x=D.deparaAta.find(y=>y.unidade===fz && y.soTalhao && planChaveAta(y.ata)===k);
+  if(x) x.talhao=s.talhaoId; else D.deparaAta.push({ata:nome.replace(/^./,c=>c.toUpperCase()), unidade:fz, talhao:s.talhaoId, soTalhao:true});
+}
+/* ---- (v99, D4) CONFERÊNCIA COM O BOLETIM, ANTES DO IMPORTAR ----
+   Mesmo motor da baixa do Agro1 (erpLancamentos: setores marcados na fertirrigação, atividades de
+   adubação/correção com ou sem quantidade) mais as atividades da operação por talhão — nos talhões
+   citados, na janela dos últimos MSG_JANELA_BOLETIM_DIAS dias (ou no período que a mensagem citar).
+   O PERÍODO da aplicação é o que o boletim diz; sem boletim, "sem registro" — nunca a data da
+   mensagem, nunca a hora do Agro1. Relata REGISTRO, nunca trabalho. */
+function insRegistrosOperacao(fz, ops, jan){
+  const out=[], vistos=new Set();
+  const add=(boletimId,data,talhaoId,op,fonte)=>{ const k=boletimId+"|"+talhaoId+"|"+op; if(vistos.has(k)) return; vistos.add(k); out.push({boletimId,data,talhaoId,op,fonte}); };
+  erpLancamentos(fz).forEach(l=>{ if(l.data>=jan.de && l.data<=jan.ate && ops.has(nomeAtual(l.op||""))) add(l.boletimId,l.data,l.talhaoId,nomeAtual(l.op||""),l.fonte||(l.kg>0?"insumo lançado":"atividade")); });
+  (D.boletins||[]).filter(b=>b.fazendaId===fz && !b.exemplo && b.data>=jan.de && b.data<=jan.ate).forEach(b=>
+    (b.atividades||[]).forEach(a=>{ const op=nomeAtual(a.tipo||""); if(ops.has(op) && a.talhaoId && a.talhaoId!=="geral") add(b.id,b.data,a.talhaoId,op,"atividade"); }));
+  out.sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:0);
+  return out;
+}
+function insAplicConferir(p){
+  const fz=(p.itens[0]||{}).unidade; p.conferencia=null;
+  if(p.forma!=="setores" || !fz || !p.operacao) return;
+  const hoje=p.data||hojeBRT();
+  const jan = p.periodo ? {de:p.periodo.de, ate:p.periodo.ate} : {de:diaISO(hoje,-MSG_JANELA_BOLETIM_DIAS), ate:hoje};
+  const ops=new Set(erpOpsApp(p.opErp, atividadeDe(fz)).concat([p.operacao]).map(nomeAtual));
+  const regs=insRegistrosOperacao(fz, ops, jan);
+  const cobertos=[], sem_registro=[], sem_talhao=[];
+  (p.setores||[]).forEach(s=>{
+    if(!s.talhaoId){ sem_talhao.push(s.rotulo); return; }
+    const rs=regs.filter(r=>r.talhaoId===s.talhaoId);
+    const datas=[...new Set(rs.map(r=>r.data))].sort();
+    if(datas.length) cobertos.push({rotulo:s.rotulo, talhaoId:s.talhaoId, datas, registros:rs.map(r=>({boletimId:r.boletimId, data:r.data, op:r.op, fonte:r.fonte}))});
+    else sem_registro.push({rotulo:s.rotulo, talhaoId:s.talhaoId});
+  });
+  const todas=[...new Set(cobertos.flatMap(c=>c.datas))].sort();
+  p.conferencia={ janela:jan, periodoCitado:!!p.periodo, cobertos, sem_registro, sem_talhao,
+    periodo: todas.length?{de:todas[0], ate:todas[todas.length-1]}:null };
+}
+/* textos: "14, 15 e 16/09" (dias do mesmo mês), "14 a 16/09" (intervalo), "setores 1, 2, 3, 4" */
+function insDatasTxt(datas){
+  const ds=(datas||[]).slice().sort(); if(!ds.length) return "";
+  const meses=[...new Set(ds.map(d=>d.slice(5,7)))];
+  if(meses.length===1){ const dias=ds.map(d=>d.slice(8,10)); return (dias.length>1?dias.slice(0,-1).join(", ")+" e "+dias[dias.length-1]:dias[0])+"/"+meses[0]; }
+  const partes=ds.map(fmtDataCurta); return partes.length>1?partes.slice(0,-1).join(", ")+" e "+partes[partes.length-1]:partes[0];
+}
+const insPeriodoTxt = (de,ate) => !de ? "" : (de===ate ? fmtDataCurta(de) : (de.slice(0,7)===ate.slice(0,7) ? de.slice(8,10)+" a "+fmtDataCurta(ate) : fmtDataCurta(de)+" a "+fmtDataCurta(ate)));
+const insPlural = (rot,n) => n===1 ? rot : (rot==="talhão"?"talhões":rot==="pivô"?"pivôs":rot==="setor"?"setores":rot+"s");
+function insSetoresTxt(rot, labels){
+  const ls=(labels||[]).slice(); if(!ls.length) return "";
+  const nums=ls.map(Number); const seq=ls.length>2 && nums.every(n=>!isNaN(n)) && nums.every((n,i)=>i===0||n===nums[i-1]+1);
+  return insPlural(rot,ls.length)+" "+(seq?ls[0]+" a "+ls[ls.length-1]:ls.join(", "));
+}
+const insJanelaTxt = c => c.periodoCitado ? "de "+insPeriodoTxt(c.janela.de,c.janela.ate) : "nos últimos "+MSG_JANELA_BOLETIM_DIAS+" dias";
+/* as linhas do bloco "📋 No boletim do gerente" — uma por grupo de talhões com as mesmas datas */
+function insConfLinhas(p){
+  const c=p.conferencia; if(!c) return [];
+  const rot=p.rotuloLocal||"talhão", total=(p.setores||[]).length, out=[];
+  if(c.cobertos.length===total && total){ out.push({ok:true, txt:total+" "+insPlural(rot,total)+" · no boletim de "+insPeriodoTxt(c.periodo.de,c.periodo.ate)}); return out; }
+  const grupos=new Map();
+  c.cobertos.forEach(x=>{ const k=x.datas.join(","); if(!grupos.has(k)) grupos.set(k,{datas:x.datas, labels:[]}); grupos.get(k).labels.push(x.rotulo); });
+  [...grupos.values()].forEach(g=>out.push({ok:true, txt:insPlural(rot,g.labels.length)+" "+g.labels.join(", ")+" · no boletim de "+insDatasTxt(g.datas)}));
+  if(c.sem_registro.length){ const n=c.sem_registro.length;
+    out.push({ok:false, txt:(!c.cobertos.length && n===total ? n+" "+insPlural(rot,n) : insPlural(rot,n)+" "+c.sem_registro.map(x=>x.rotulo).join(", "))+" · sem registro no boletim "+insJanelaTxt(c)}); }
+  if(c.sem_talhao.length) out.push({ok:null, txt:insPlural(rot,c.sem_talhao.length)+" "+c.sem_talhao.join(", ")+" · escolha o talhão para conferir"});
+  return out;
+}
+/* frase de entendimento: "Entendi uma aplicação realizada em Lagamar Café (Rodrigo), ferti-irrigação, setores 1 a 6, 2 produtos." */
+function insEntendimentoAplic(p){
+  const it=p.itens[0]||{}, u=p.msgUnidade||{};
+  const onde = it.unidade ? fazenda(it.unidade).nome : (u.nomeMsg ? "«"+u.nomeMsg+"» (fazenda a escolher)" : "fazenda a escolher");
+  const n=(p.produtos||[]).length;
+  return "Entendi uma aplicação realizada em "+onde+(p.opErp?", "+insOperacaoRot(p.opErp):"")+((p.setores||[]).length?", "+insSetoresTxt(p.rotuloLocal, p.setores.map(s=>s.rotulo)):"")+
+    (n?", "+n+(n===1?" produto":" produtos"):"")+".";
+}
+/* relato "por setores" já gravado: o período vem do boletim, nunca da mensagem */
+function insRelatoPeriodoTxt(c){
+  const cb=c.conferencia_boletim||{};
+  return cb.periodo ? "Registrado no boletim: "+insPeriodoTxt(cb.periodo.de, cb.periodo.ate) : "período: sem registro";
 }
 /* ---- (v93) a mensagem chega DEPOIS de a atividade estar no boletim (Nilo, 15/09/2026) ----
    Então, antes de perguntar a alguém, o app procura nos boletins ENVIADOS da unidade (últimos 7 dias)
@@ -6027,6 +6281,7 @@ function insBuscarLancamento(fz, c, excetoBoletimId){
 }
 function insAplicProcurarVinculo(p){
   const it=(p.itens||[])[0]; p.vinculo=null;
+  if(p.forma==="setores") return;   /* v99: a forma por setores confere pelo boletim (insAplicConferir), não liga a um lançamento */
   if(!it || !it.unidade || p.semVinculo) return;
   const v=insBuscarLancamento(it.unidade, {produto:p.produto, talhaoId:it.talhaoId});
   if(!v) return;
@@ -6061,9 +6316,13 @@ function insAprenderOperacao(produto, atv, operacao){
 /* o que falta para levar o relato ao boletim — a tela pergunta, nunca adivinha */
 function insFaltaAplicacao(p){
   const it=(p.itens||[])[0]||{};
-  if(!it.unidade) return "Escolha a unidade";
+  if(!it.unidade) return "Escolha a fazenda da mensagem";
   const cat=INS_APLIC_ATIVIDADE[atividadeDe(it.unidade)];
   if(!cat) return "Escolha uma unidade de café ou grãos";
+  if(p.forma==="setores"){   /* v99: fazenda resolvida, produtos com nome e a operação do boletim */
+    if((p.produtos||[]).some(x=>!String(x.produto||"").trim())) return "Escreva o nome de cada produto";
+    if(!p.operacao) return "Escolha a "+cat.rotulo.toLowerCase()+" do boletim";
+    return ""; }
   if(!String(p.produto||"").trim()) return "Escreva qual é o produto";
   if(p.vinculo) return "";
   if(!it.talhaoId) return "Escolha o talhão";
@@ -6083,9 +6342,14 @@ function insClassificar(texto){
   if(quadroDetectar(texto)) return {tipo:"ata", confianca:90, motivo:"quadro em matriz (fazenda × insumo)", frase:"parece o quadro de planejamento do escritório"};
   if(blocos>=2 && itens>=3) return {tipo:"ata", confianca:90, motivo:blocos+" blocos por fazenda e "+itens+" linhas de tarefa"};
   /* v96: aplicação anunciada como FINALIZADA / BAIXADA no sistema (o PDF do ERP não passa por aqui: com o
-     cabeçalho "Aplicações de Insumos" a classificação é certa e vem de erpAnexarBytes) */
-  if(ERP_MSG_RE.test(texto) && ERP_MSG_OP_RE.test(texto) && aloc<2 && !(blocos>=2))
+     cabeçalho "Aplicações de Insumos" a classificação é certa e vem de erpAnexarBytes).
+     v99: quem diz que a baixa já foi feita ("baixados no sistema", "Agro1") continua sendo Agro1; fora isso,
+     o sinal de aplicação realizada (verbo + dose/setores) vence — é um relato do campo, não uma baixa. */
+  const mencionaBaixa=/baixad[oa]s?\s+no\s+sistema|\bagro\s?1\b|\berp\b/i.test(texto);
+  const sinal=insSinalAplicacao(texto);
+  if(ERP_MSG_RE.test(texto) && ERP_MSG_OP_RE.test(texto) && aloc<2 && !(blocos>=2) && (mencionaBaixa || !sinal))
     return {tipo:"erp", confianca:70, motivo:"aplicação anunciada como finalizada / baixada no sistema"};
+  if(sinal && aloc<2 && !(blocos>=2)) return {tipo:"aplicacao", confianca:85, motivo:sinal.motivo, frase:sinal.frase};
   /* v93: relato do grupo de aplicações — cabeçalho "Aplicação de …" e pelo menos uma linha de calda/dose */
   const lz=insTirarCabecalhoZap(texto).texto.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(lz.length && INS_APLIC_CAB.test(lz[0]) && lz.slice(1).some(insTemPistaAplic) && aloc<2)
@@ -6123,13 +6387,20 @@ function insRegistrarMensagem(o){
 const insAplicacoesRelatadas = () => { const out=[];
   insMensagens().forEach(m=>(m.criados||[]).forEach(c=>{ if(c.tipo==="aplicacao" && c.id) out.push({...c, msgId:m.id, por:m.por||"", em:m.em||""}); }));
   return out; };
-const insRelatosDo = (fz, data) => insAplicacoesRelatadas().filter(c=>c.unidade===fz && c.data===data);
+/* v99: o relato "por setores" (sem dia na mensagem) NUNCA vira pergunta no boletim — perguntar no dia da colagem
+   seria datar a aplicação pela mensagem; ele fica na conferência do escritório (conferencia_boletim). */
+const insRelatosDo = (fz, data) => insAplicacoesRelatadas().filter(c=>c.unidade===fz && c.data===data && !c.talhoes);
 const insRelatoOnde = c => c.talhaoId==="geral" ? "Área geral / sede" : (c.talhaoId ? talhao(c.talhaoId).nome : (c.unidade?fazenda(c.unidade).nome:""));
 const insRelatoTexto = c => [insRelatoOnde(c), String(c.receita||"").replace(/\n/g,", "),
   n0(c.tanques)>0?insNumTxt(n0(c.tanques))+(n0(c.tanques)===1?" tanque":" tanques")+(n0(c.ltanque)>0?" × "+insNumTxt(n0(c.ltanque))+" L":""):(n0(c.ltanque)>0?insNumTxt(n0(c.ltanque))+" L por tanque":""),
   c.obs||""].filter(Boolean).join(" · ");
 /* situação do relato pelo BOLETIM (a resposta do gerente viaja em b.relatos): relata registro, nunca trabalho */
 function insRelatoStatus(c){
+  if(c.talhoes){ const cb=c.conferencia_boletim||{}, rot=c.rotuloLocal||"talhão";   /* v99: relata o que o BOLETIM registrou */
+    const sem=(cb.sem_registro||[]).map(x=>x.rotulo);
+    if(cb.periodo && !sem.length) return "registrado no boletim de "+insPeriodoTxt(cb.periodo.de,cb.periodo.ate);
+    if(cb.periodo) return "registrado no boletim de "+insPeriodoTxt(cb.periodo.de,cb.periodo.ate)+" · "+insPlural(rot,sem.length)+" "+sem.join(", ")+" sem registro no boletim";
+    return "sem registro no boletim "+insJanelaTxt(cb.janela?cb:{janela:{de:"",ate:""}}); }
   if(c.vinculo) return "ligada ao boletim de "+fmtDataCurta(c.vinculo.data||c.data);
   const b=(D.boletins||[]).find(x=>x.fazendaId===c.unidade && x.data===c.data && !x.exemplo);
   const r=b && b.relatos ? b.relatos[c.id] : null;
@@ -6163,7 +6434,8 @@ function insChuvaSugerida(fz, data){
    TELAS — componentes ÚNICOS nas três atividades (CLAUDE.md, c4)
    ============================================================ */
 let insUI={ texto:"", tipo:"", auto:null, prev:null, prevAta:null, lida:false, parte:"", nota:"", cons:"", busca:"",
-  prod:"", liberadas:[], flash:"", msg:"", edit:"", erp:null };
+  prod:"", liberadas:[], flash:"", msg:"", edit:"", erp:null,
+  trocarUn:false, trocarOp:false, trocarSet:false, confAberto:false, confMais:false };   /* v99: estados de tela da conferência */
 let insNav=[], insBuscaTimer=null, insMsgDaAta=null;
 const insIr = (v,id) => { insUI.busca=""; insUI.edit=""; insNav.push({v, id:id||""}); ir("colar"); };
 function insVoltar(){
@@ -6172,7 +6444,8 @@ function insVoltar(){
   else { insNav=[]; voltarDoModulo("colar"); }
 }
 const insRender = () => ir("colar",null,true);
-function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; }
+function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; insPrevReset(); }
+const insPrevReset = () => { insUI.trocarUn=false; insUI.trocarOp=false; insUI.trocarSet=false; insUI.confAberto=false; insUI.confMais=false; };
 
 /* ---- (3) cartão de chegada no topo do boletim: UM toque ----
    Único elemento novo SEMPRE visível do módulo — e só enquanto houver chegada
@@ -6371,7 +6644,8 @@ function cartaoInsumosPainel(){
   const uns=unidadesPermitidas().filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
   const linhas=uns.map(f=>({f, ls:insSaldos(f.id)})).filter(x=>x.ls.length);
   const prods=[...new Map(linhas.flatMap(x=>x.ls).map(l=>[l.chave,l])).values()].sort((a,b)=>a.nome.localeCompare(b.nome));
-  if(!linhas.length && !insRemessas().length) return "";
+  const div=insDivergencias();
+  if(!linhas.length && !insRemessas().length && !div.length) return "";   /* v99: o relato "sem registro" também abre o cartão */
   const prod=insUI.prod && prods.some(p=>p.chave===insUI.prod) ? insUI.prod : "";
   const vale=l=>!prod || l.chave===prod;
   const tot={programado:0, recebido:0, aplicado:0, saldo:0};
@@ -6396,7 +6670,7 @@ function cartaoInsumosPainel(){
       <div class="plan-barra" role="img" aria-label="${pctA}% do recebido tem lançamento"><span class="fora" style="width:${pctA}%"></span></div>
       ${per?`<p class="mut" style="margin:3px 0 0;font-size:.72rem">no período: recebido ${esc(insQtd(per.recebido,base))} · aplicado ${esc(insQtd(per.aplicado,base))}</p>`:""}</div>`;
   }).join("");
-  const cob=insACobrar(), div=insDivergencias();
+  const cob=insACobrar();
   return `<details class="secao"><summary><span class="ico">📦</span>Insumos
     <span class="resumo">${linhas.length} unidade${linhas.length===1?"":"s"}${cob.length?" · "+cob.length+" a cobrar":""}${div.length?" · "+div.length+" a conferir":""}</span><span class="seta">›</span></summary>
     <div class="corpo">
@@ -6527,8 +6801,11 @@ function insVColar(){
     +cadRodape(botaoAvanco("bt-ins-ler",{rotulo:"Ler a mensagem", falta:String(insUI.texto||"").trim()?"":"Cole a mensagem para o app ler"}));
   const a=insUI.auto||{tipo:"",motivo:""};
   const tipo=insUI.tipo;
+  /* v99: na forma por setores a frase diz o que o app ENTENDEU ("Entendi uma aplicação realizada em …, ferti-irrigação, setores 1 a 6, 2 produtos.") */
+  const frase = (insUI.prev && insUI.prev.tipo==="aplicacao" && insUI.prev.forma==="setores") ? insEntendimentoAplic(insUI.prev)
+    : (a.tipo===tipo&&a.motivo?a.frase||("o app achou "+a.motivo):"tipo escolhido por você")+".";
   const cab=`<div class="aviso">${tipo
-      ? `<b>${esc((INS_TIPOS_MSG.find(x=>x.id===tipo)||{ico:""}).ico)} ${esc(insTipoRot(tipo))}</b> — ${esc(a.tipo===tipo&&a.motivo?a.frase||("o app achou "+a.motivo):"tipo escolhido por você")}. Confere?`
+      ? `<b>${esc((INS_TIPOS_MSG.find(x=>x.id===tipo)||{ico:""}).ico)} ${esc(insTipoRot(tipo))}</b> — ${esc(frase)} Confere?`
       : `<b>O app não reconheceu o formato desta mensagem.</b> Escolha o tipo — ele não adivinha.`}
     <div class="chips mt">${INS_TIPOS_MSG.map(t=>`<button class="chip ${tipo===t.id?"on":""}" data-ins-tipo="${t.id}">${t.ico} ${esc(t.rot)}</button>`).join("")}</div></div>`;
   return insTopo("Conferir a mensagem", insResumoPrev())+cab+insCorpoPrev()
@@ -6547,6 +6824,8 @@ function insResumoPrev(){
     return ok.length+" fazendas · "+insNumTxt(kg)+" kg · "+insQtd(kg,"kg"); }
   if(p.tipo==="chuva")   return p.itens.filter(i=>i.incluir!==false).length+" unidades com chuva relatada";
   if(p.tipo==="aplicacao"){ const it=p.itens[0]||{};
+    if(p.forma==="setores") return [p.opErp?insOperacaoRot(p.opErp):"aplicação",
+      (p.setores||[]).length+" "+insPlural(p.rotuloLocal||"talhão",(p.setores||[]).length), (p.produtos||[]).length+((p.produtos||[]).length===1?" produto":" produtos")].join(" · ");   /* v99: a fazenda está na linha "Fazenda:" */
     return [p.produto||"produto a informar", it.unidade?fazenda(it.unidade).nome:"unidade a escolher", fmtDataCurta(p.data||hojeBRT())].join(" · "); }
   if(p.tipo==="tarefas") return p.itens.filter(i=>i.incluir!==false).length+" tarefas";
   return "";
@@ -6555,12 +6834,12 @@ function insBotaoImportar(){
   if(insUI.prevAta) return `<button class="btn" id="bt-ins-ata">Conferir e importar ${insUI.prevAta.formato==="quadro"?"o quadro":"a ata"} ›</button>`;
   const p=insUI.prev;
   if(!p) return botaoAvanco("bt-ins-importar",{rotulo:"Importar", falta:"Escolha o tipo da mensagem"});
-  if(p.tipo==="aplicacao") return botaoAvanco("bt-ins-importar",{rotulo:p.vinculo?"Ligar ao lançamento":"Levar ao boletim", falta:insFaltaAplicacao(p)});
+  if(p.tipo==="aplicacao") return botaoAvanco("bt-ins-importar",{rotulo:p.forma==="setores"?"Importar relato":p.vinculo?"Ligar ao lançamento":"Levar ao boletim", falta:insFaltaAplicacao(p)});
   if(p.tipo==="erp") return botaoAvanco("bt-ins-importar",{rotulo:p.soMensagem?"Importar relato":"Importar e abrir conferência", falta:erpFalta(p)});
   const n=p.itens.filter(i=>i.incluir!==false).length;
   const falta = !n ? "Deixe pelo menos uma linha marcada"
     : (p.tipo==="remessa" && !String(p.produto||"").trim()) ? "Escreva qual é o produto"
-    : (p.itens.some(i=>i.incluir!==false && !i.unidade)) ? "Escolha a unidade das linhas em aberto" : "";
+    : (p.itens.some(i=>i.incluir!==false && !i.unidade)) ? ((p.tipo==="remessa" || (p.msgUnidade&&p.msgUnidade.varias))?"Escolha a unidade das linhas em aberto":"Escolha a fazenda da mensagem") : "";
   const que = p.tipo==="remessa" ? (n===1?"alocação":"alocações")
     : p.tipo==="chuva" ? (n===1?"relato":"relatos") : (n===1?"tarefa":"tarefas");
   return botaoAvanco("bt-ins-importar",{rotulo:"Importar "+n+" "+que, falta});
@@ -6603,6 +6882,7 @@ function insCorpoPrev(){
     ${p.itens.length>INS_PREV_MAX?`<p class="mut centro" style="font-size:.78rem">mostrando ${INS_PREV_MAX} de ${p.itens.length}</p>`:""}`;
   }
   if(p.tipo==="aplicacao"){
+    if(p.forma==="setores") return insCorpoAplicSetores(p);   /* v99 */
     const it=p.itens[0]||{};
     const atv=it.unidade?atividadeDe(it.unidade):"", cat=atv?INS_APLIC_ATIVIDADE[atv]:null;
     const area=insAplicAreaCalc(p);
@@ -6611,6 +6891,7 @@ function insCorpoPrev(){
     return `<div class="cartao">
       <p class="mut" style="font-size:.8rem;margin:0 0 6px">${p.vinculo?"O gerente já lançou esta aplicação no boletim: o detalhe da mensagem fica ligado a esse lançamento, para leitura e para o consumo de insumo. Nada é criado."
         :"Vira PERGUNTA no boletim da unidade naquele dia: o gerente lança com um toque, com estes detalhes já preenchidos, ou responde que não foi assim. Nada entra sem o toque dele."}</p>
+      ${insLinhaFazenda(p)}
       <label>Produto</label>
       <input data-insprev="-|produto" list="dl-ins" value="${esc(p.produto||"")}" placeholder="Qual produto foi aplicado?">
       ${p.vinculo?`<div class="aviso verde mt" data-ins-vinculo="${esc(p.vinculo.atividadeId)}"><b>✔ Confere com o boletim de ${esc(fmtDataCurta(p.vinculo.data))}:</b> ${esc(p.vinculo.tipo)} — ${esc(insRelatoOnde({talhaoId:p.vinculo.talhaoId,unidade:p.vinculo.unidade}))} · ${esc(p.produto)}.
@@ -6632,11 +6913,8 @@ function insCorpoPrev(){
       ${area?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">≈ ${esc(fmtHa(area))} ha cobertos pela calda (${esc(insNumTxt(n0(p.tanques)))} tanques × ${esc(insNumTxt(n0(p.ltanque)))} L ÷ ${esc(insNumTxt(n0(p.vazao)))} L/ha) — só para conferir${p.vinculo?"":"; quem confirma é o gerente"}.</p>`:""}
       ${(p.soltas||[]).length?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">Linhas que o app não usou: ${esc(p.soltas.join(" · "))}</p>`:""}
     </div>
-    <div class="plan-linha"><div class="cad-item" style="margin:0">
-      <span class="cresce"><b>${esc(it.nomeMsg||"local não informado na mensagem")}</b>
-        <span class="mut">${it.unidade?esc(fazenda(it.unidade).nome)+(it.talhaoId?" · "+esc(insRelatoOnde(it)):""):"unidade não reconhecida"}</span></span></div>
-      ${!it.unidade?selUn(0,it.unidade):""}
-      ${it.unidade && !cat?`<div class="aviso">${esc(fazenda(it.unidade).nome)} é unidade de pecuária — o boletim de pecuária não tem aplicação por talhão. Escolha outra unidade ou descarte.</div>${selUn(0,it.unidade)}`:""}
+    <div class="plan-linha">
+      ${it.unidade && !cat?`<div class="aviso">${esc(fazenda(it.unidade).nome)} é unidade de pecuária — o boletim de pecuária não tem aplicação por talhão. Escolha outra unidade (em "trocar", acima) ou descarte.</div>`:""}
       ${it.unidade && cat && !p.vinculo?`<div class="plan-acoes"><label>Qual talhão?</label>
         <select data-insprev="0|talhaoId" style="width:100%;min-height:44px;padding:8px">
           <option value="">— escolher talhão —</option>
@@ -6649,17 +6927,69 @@ function insCorpoPrev(){
         <p class="mut" style="font-size:.76rem;margin:4px 0 0">${sug?"Sugerida pelo que você escolheu da última vez para este produto — troque se for outra.":"O app não adivinha a atividade pelo nome do produto: escolha uma vez e ele lembra para este produto."}</p></div>`:""}
     </div>`;
   }
+  const varias=!!(p.msgUnidade&&p.msgUnidade.varias);   /* v99 (D3): seletor por linha só com mais de uma fazenda na mensagem */
   if(p.tipo==="chuva") return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Relato de chuva é SUGESTÃO: o app não grava chuva no boletim de ninguém. Confirmado aqui, o número aparece no boletim da unidade com um "usar" — quem registra é o gerente.</p>
-      <label class="mt">Dia do relato</label><input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}"></div>`
+      <label class="mt">Dia do relato</label><input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}">
+      <div class="mt">${insLinhaFazenda(p)}</div></div>`
     +p.itens.map((it,i)=>`<div class="plan-linha${it.incluir===false?" fora":""}"><div class="cad-item" style="margin:0">
       <button class="plan-farol" data-ins-incl="${i}" aria-label="${it.incluir===false?"Incluir":"Deixar de fora"} ${esc(it.nomeMsg||it.bruto)}">${it.incluir===false?"○":"●"}</button>
-      <span class="cresce"><b>${esc(it.nomeMsg||it.bruto)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):"unidade não reconhecida"} · ${insNumTxt(it.mm)} mm</span></span></div>
-      ${!it.unidade?selUn(i,it.unidade):""}</div>`).join("");
-  return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Cada linha vira uma tarefa da semana. A unidade é obrigatória quando a linha não diz de qual fazenda é — o app não chuta.</p></div>`
+      <span class="cresce"><b>${esc(it.nomeMsg||it.bruto)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):(varias?"unidade não reconhecida":"fazenda a escolher no cabeçalho")} · ${insNumTxt(it.mm)} mm</span></span></div>
+      ${!it.unidade && varias?selUn(i,it.unidade):""}</div>`).join("");
+  /* v99 (D1): linhas de produto + dose não viram tarefa; o aviso oferece o tipo certo com o chip ao lado */
+  const nd=(p.doses||[]).length;
+  return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Cada linha vira uma tarefa da semana. A fazenda é a da mensagem — escolhida uma vez, no cabeçalho, quando a mensagem não diz de qual é.</p>
+      <div class="mt">${insLinhaFazenda(p)}</div></div>`
+    +(nd?`<div class="aviso" data-ins-aviso-doses="1">${nd} linha${nd>1?"s":""} parece${nd>1?"m":""} dose${nd>1?"s":""} de aplicação, não tarefa${nd>1?"s":""} (${esc(p.doses.slice(0,3).join(" · "))}) — quer importar como relato de aplicação?
+      <div class="chips mt"><button class="chip" data-ins-tipo="aplicacao">🚜 Relato de aplicação</button></div></div>`:"")
     +p.itens.map((it,i)=>`<div class="plan-linha${it.incluir===false?" fora":""}"><div class="cad-item" style="margin:0">
       <button class="plan-farol" data-ins-incl="${i}" aria-label="${it.incluir===false?"Incluir":"Deixar de fora"} ${esc(it.desc)}">${it.incluir===false?"○":"●"}</button>
-      <span class="cresce"><b>${esc(it.desc)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):"unidade não reconhecida"}</span></span></div>
-      ${!it.unidade?selUn(i,it.unidade):""}</div>`).join("");
+      <span class="cresce"><b>${esc(it.desc)}</b><span class="mut">${it.unidade?esc(fazenda(it.unidade).nome):(varias?"unidade não reconhecida":"fazenda a escolher no cabeçalho")}</span></span></div>
+      ${!it.unidade && varias?selUn(i,it.unidade):""}</div>`).join("");
+}
+/* ---- (v99, D3) a linha "Fazenda:" do cabeçalho da conferência — UMA por mensagem, herdada por toda linha ----
+   Casou pelo de-para: nome + o nome que veio na mensagem + "trocar". Não casou: o seletor nativo (v87),
+   dentro do escopo do perfil; escolhida, todas as linhas herdam e o botão de avanço acende. Mais de uma
+   fazenda na mensagem: "várias fazendas" e o seletor volta a ser por linha (nunca o app mistura). */
+function insLinhaFazenda(p){
+  const u=p.msgUnidade||{}, fz=u.unidade||"";
+  if(u.varias) return `<div class="cad-item" style="margin:0 0 6px"><span class="cresce"><b>Fazenda</b><span class="mut">várias fazendas na mensagem — a escolha é por linha</span></span></div>`;
+  if(fz && !insUI.trocarUn) return `<div class="cad-item" style="margin:0 0 6px"><span class="cresce"><b>Fazenda: ${esc(fazenda(fz).nome)}</b>${u.nomeMsg && planChaveAta(u.nomeMsg)!==planChaveAta(fazenda(fz).nome)?`<span class="mut">«${esc(u.nomeMsg)}» na mensagem</span>`:""}</span><button class="btn suave mini" data-ins-troca-un="1" style="flex:none">trocar</button></div>`;
+  return `<div class="plan-acoes" style="margin:0 0 6px"><label>Fazenda${u.nomeMsg?` <span class="mut">(«${esc(u.nomeMsg)}» não está no de-para — o app não adivinha nome de fazenda)</span>`:""}</label>
+    <select data-insprev="msg|unidade" style="width:100%;min-height:44px;padding:8px"><option value="">escolher ›</option>${unidadesPermitidas().map(f=>`<option value="${f.id}" ${fz===f.id?"selected":""}>${esc(f.nome)}</option>`).join("")}</select></div>`;
+}
+/* ---- (v99) pré-visualização do relato de aplicação POR SETORES (a mensagem do grupo "Aplicações Realizadas") ----
+   De cima para baixo: Fazenda (uma linha) · atividade do boletim (lida da mensagem pelo catálogo, ou lista nativa)
+   · setores citados → talhões (só na primeira vez; depois uma linha com "trocar") · 📋 No boletim do gerente
+   (antes do Importar; nunca bloqueia) · produtos e doses como o funcionário escreveu. Zero campo de data. */
+function insCorpoAplicSetores(p){
+  const it=p.itens[0]||{}, fz=it.unidade||"";
+  const atv=fz?atividadeDe(fz):"", cat=atv?INS_APLIC_ATIVIDADE[atv]:null;
+  const tals=fz?talhoesDa(fz).filter(t=>t.tipo!=="ARRENDADO"):[];
+  const rot=p.rotuloLocal||"talhão", nSet=(p.setores||[]).length;
+  const todosLigados=nSet>0 && p.setores.every(s=>s.talhaoId);
+  const linhas=insConfLinhas(p), c=p.conferencia;
+  const selSet=(s,i)=>`<div><label>${esc(rot)} ${esc(s.rotulo)}</label><select data-insprev="set|${i}" style="width:100%;min-height:44px;padding:8px"><option value="">— escolher talhão —</option>${tals.map(t=>`<option value="${t.id}" ${s.talhaoId===t.id?"selected":""}>${esc(t.nome)}</option>`).join("")}</select></div>`;
+  const desconhecidos=(p.produtos||[]).filter(x=>!x.conhecido).map(x=>x.termo);
+  return `<div class="cartao">
+    ${insLinhaFazenda(p)}
+    ${fz && !cat?`<div class="aviso">${esc(fazenda(fz).nome)} é unidade de pecuária — o boletim de pecuária não tem aplicação por talhão. Escolha outra unidade ou descarte.</div>`:""}
+    ${fz && cat ? (p.operacao && !insUI.trocarOp
+        ? `<div class="cad-item" style="margin:0 0 6px"><span class="cresce"><b>${esc(cat.rotulo)}: ${esc(p.operacao)}</b>${p.opErp && insOperacaoDoCatalogo(p.opErp,atv)===p.operacao?"":`<span class="mut">na mensagem: ${esc(p.opErp?insOperacaoRot(p.opErp):"não citada")}</span>`}</span><button class="btn suave mini" data-ins-troca-op="1" style="flex:none">trocar</button></div>`
+        : `<label>${esc(cat.rotulo)} no boletim <span class="mut">(na mensagem: ${esc(p.opErp?insOperacaoRot(p.opErp):"não citada")})</span></label><select data-insprev="-|operacao" style="width:100%;min-height:44px;padding:8px"><option value="">— toque para escolher —</option>${cat.grupos().map(([g,ops])=>`<optgroup label="${esc(g)}">${ops.map(o=>`<option value="${esc(o)}" ${p.operacao===o?"selected":""}>${esc(o)}</option>`).join("")}</optgroup>`).join("")}</select>`) : ""}
+    ${fz && cat && nSet ? (todosLigados && !insUI.trocarSet
+        ? `<div class="cad-item" style="margin:0 0 6px"><span class="cresce"><b>${esc(insSetoresTxt(rot,p.setores.map(s=>s.rotulo)).replace(/^./,x=>x.toUpperCase()))}</b><span class="mut">${nSet} ${nSet===1?"talhão do cadastro ligado":"talhões do cadastro ligados"}</span></span><button class="btn suave mini" data-ins-troca-set="1" style="flex:none">trocar</button></div>`
+        : `<label class="mt">${esc(insPlural(rot,2).replace(/^./,x=>x.toUpperCase()))} citados</label><p class="mut" style="font-size:.76rem;margin:0 0 4px">Ligue cada ${esc(rot)} ao talhão do cadastro — o app não casa "1" com um talhão por conter "1"; escolhido uma vez, ele lembra.</p><div class="grade2">${p.setores.map(selSet).join("")}</div>`) : ""}
+    ${fz && cat && c ? `<div class="mt" data-ins-conf-bloco="1"><b style="font-size:.86rem">📋 No boletim do gerente</b>
+      ${linhas.slice(0, insUI.confMais?99:3).map(l=>`<p style="margin:3px 0;font-size:.8rem;${l.ok===true?"color:var(--verde)":l.ok===false?"color:var(--amarelo)":"color:var(--tinta-2)"}">${l.ok===true?"✅ ":l.ok===false?"para conferir · ":""}${esc(l.txt)}</p>`).join("")}
+      ${linhas.length>3 && !insUI.confMais?`<button class="btn suave mini" data-ins-conf-mais="1" style="display:inline-flex;padding:2px 8px">ver mais ›</button>`:""}
+      <p class="mut" style="font-size:.76rem;margin:4px 0 0">${c.periodo?"Registrado no boletim: "+esc(insPeriodoTxt(c.periodo.de,c.periodo.ate)):"período: sem registro"} · ${esc(insJanelaTxt(c))}${c.cobertos.length?` · <button class="btn suave mini" data-ins-conf="1" style="display:inline-flex;padding:2px 8px">${insUI.confAberto?"fechar":"ver os boletins"}</button>`:""}</p>
+      ${insUI.confAberto?`<div style="margin-top:4px">${c.cobertos.flatMap(x=>x.registros.map(r=>`<p class="mut" style="margin:2px 0;font-size:.76rem">${esc(fmtDataCurta(r.data))} · ${esc(planoOndeNome(fz,x.talhaoId))} · ${esc(r.op)} (${esc(r.fonte)})</p>`)).join("")}</div>`:""}
+    </div>`:""}
+    <label>Produtos e doses${p.escopo?` <span class="mut">(${esc(p.escopo)})</span>`:""}</label>
+    ${(p.produtos||[]).length?p.produtos.map((x,i)=>`<div class="ins-l"><input data-insprev="prod|${i}" list="dl-ins" value="${esc(x.produto||"")}" placeholder="Qual produto?" class="cresce" style="min-width:0"><span class="num mut" style="flex:none;font-size:.8rem;margin-left:8px">${esc(insNumTxt(n0(x.qtd)))} ${esc(x.un)}${p.escopo?" "+esc(p.escopo):""}</span></div>`).join(""):`<p class="mut" style="font-size:.8rem">Nenhuma linha de dose na mensagem.</p>`}
+    <p class="mut" style="font-size:.74rem;margin:6px 0 0">${desconhecidos.length?esc(desconhecidos.join(", "))+": não "+(desconhecidos.length>1?"estão":"está")+" no cadastro — entra com este nome, ou escolha da lista. ":""}Dose como declarada, sem multiplicar por ${esc(insPlural(rot,2))} nem por hectare; o saldo de insumos não muda. Mês: ${esc(erpCompRot(p.competencia))}${p.dataMsg?" · mensagem de "+esc(fmtDataCurta(p.dataMsg)):""}.</p>
+    ${(p.soltas||[]).length?`<p class="mut" style="font-size:.74rem;margin:4px 0 0">Linhas que o app não usou: ${esc(p.soltas.join(" · "))}</p>`:""}
+  </div>`;
 }
 /* ---- (11.4) mensagens importadas: busca por texto, para reconstituir a origem ---- */
 function insVMensagens(){
@@ -6686,7 +7016,9 @@ function insVMensagem(id){
         c.tipo==="remessa"?"📦 remessa de "+esc(c.produto||"")+(c.fornecedor?" ("+esc(c.fornecedor)+")":"")+" · "+esc(insQtd(n0(c.kg),"kg"))+" em "+n0(c.unidades)+" unidades"
         :c.tipo==="chuva"?"🌧️ sugestão de "+insNumTxt(c.mm)+" mm em "+esc(fazenda(c.unidade).nome)+" ("+esc(fmtDataCurta(c.data))+")"
         :c.tipo==="tarefa"?"🗒️ tarefa "+esc(c.desc||"")+(c.unidade?" · "+esc(fazenda(c.unidade).nome):"")
+        :c.tipo==="aplicacao"&&c.talhoes?"🚜 "+esc(c.opErp?insOperacaoRot(c.opErp):"aplicação")+" relatada em "+esc(fazenda(c.unidade).nome)+" · "+esc(insSetoresTxt(c.rotuloLocal||"talhão",c.talhoes.map(t=>t.rotulo)))+" · "+esc((c.produtos||[]).map(x=>x.produto+" "+insNumTxt(n0(x.qtd))+" "+x.un).join(", "))+(c.escopo?" "+esc(c.escopo):"")+" · "+esc(insRelatoPeriodoTxt(c))+" · "+esc(insRelatoStatus(c))
         :c.tipo==="aplicacao"?"🚜 aplicação de "+esc(c.produto||"")+" em "+esc(fazenda(c.unidade).nome)+(c.talhaoId?" · "+esc(insRelatoOnde(c)):"")+" ("+esc(fmtDataCurta(c.data))+") · "+esc(insRelatoStatus(c))
+        :c.tipo==="depara"?"🔗 nome aprendido: «"+esc(c.ata||"")+"» → "+esc(fazenda(c.unidade).nome)
         :c.tipo==="erp"?"🔎 baixa do Agro1 em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+((c.linhas||[]).length)+" linhas · ⚠️ "+((c.resumo||{}).conf||0)+" · 🔸 "+((c.resumo||{}).so_app||0)+` <button class="btn suave mini" data-erp-abrirconf="${esc(c.id)}" style="display:inline-flex;padding:2px 8px">abrir conferência</button>`
         :c.tipo==="erp_relato"?"🧾 relato de "+esc(erpOpRot(c.operacaoErp).toLowerCase())+" em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+esc((c.produtos||[]).join(", "))+(c.pdfId?" · ligado ao relatório do Agro1":" — aguardando relatório do Agro1")
         :"📋 "+esc(c.desc||c.tipo||"")}</p>`).join("")
@@ -6709,6 +7041,10 @@ function insImportar(){
   const vao=p.itens.filter(i=>i.incluir!==false && i.unidade);
   const fora=p.itens.length-vao.length;
   if(!vao.length){ atualizarAvanco("bt-ins-importar","Deixe pelo menos uma linha marcada"); return; }
+  /* v99 (D3): a fazenda escolhida no cabeçalho vira de-para pelo trecho que o parser identificou como nome
+     ("Lavamar Rodrigo" → f20) e fica na trilha da mensagem; a próxima colagem não pergunta */
+  const u=p.msgUnidade||{}, aprendidos=[];
+  if(!u.varias && u.unidade && u.nomeMsg && !u.doDepara && !deparaAtaDe(u.nomeMsg)){ insAprenderUnidade(u.nomeMsg, u.unidade); aprendidos.push({tipo:"depara", ata:String(u.nomeMsg).trim(), unidade:u.unidade}); }
   vao.forEach(i=>insAprenderUnidade(i.nomeMsg, i.unidade));
   if(p.tipo==="remessa"){
     if(!String(p.produto||"").trim()){ atualizarAvanco("bt-ins-importar","Escreva qual é o produto"); return; }
@@ -6721,6 +7057,31 @@ function insImportar(){
       criados:[{tipo:"remessa", id:res.remessa.id, produto:res.remessa.produto, fornecedor:res.remessa.fornecedor, kg, unidades:vao.length}]});
     insUI.flash = res.repetida ? "Esta remessa já estava importada — nada foi duplicado."
       : vao.length+" unidades · "+insQtd(kg,"kg")+" programados";
+  } else if(p.tipo==="aplicacao" && p.forma==="setores"){
+    /* v99: o relato POR SETORES fica gravado com a conferência do boletim dentro (conferencia_boletim). Não vira
+       pergunta ao gerente (a mensagem não diz o dia; perguntar no dia da colagem seria datar pela mensagem) e
+       não muda saldo nenhum — o que ficou "sem registro" é assunto do escritório, no cartão 📦 Insumos. */
+    const it=vao[0], falta=insFaltaAplicacao(p);
+    if(falta){ atualizarAvanco("bt-ins-importar", falta); return; }
+    const fz=it.unidade;
+    insAprenderUnidade(it.nomeMsg, fz);
+    (p.setores||[]).forEach(s=>insAprenderSetor(p, s, fz));
+    (p.produtos||[]).forEach(x=>{ const nome=String(x.produto||"").trim(); if(!nome) return;
+      if(insChaveProd(x.termo)!==insChaveProd(nome)) insAprenderProduto(x.termo, nome);
+      insGarantirProduto(nome, {un:/^(l|lts?|litros?|ml)$/.test(String(x.un||""))?"L":"kg"}); });
+    const cb=p.conferencia||{janela:null, periodoCitado:false, cobertos:[], sem_registro:[], sem_talhao:(p.setores||[]).map(s=>s.rotulo), periodo:null};
+    const c={tipo:"aplicacao", forma:"setores", id:uid(), unidade:fz, operacao:p.operacao, opErp:p.opErp||"", rotuloLocal:p.rotuloLocal||"talhão",
+      talhoes:(p.setores||[]).map(s=>({rotulo:s.rotulo, talhaoId:s.talhaoId||""})),
+      produtos:(p.produtos||[]).map(x=>({produto:String(x.produto||"").trim(), termo:x.termo, qtd:x.qtd, un:x.un, escopo:p.escopo||""})), escopo:p.escopo||"",
+      competencia:p.competencia, data:hojeBRT(), dataMsg:p.dataMsg||"", nomeMsg:it.nomeMsg||"",
+      conferencia_boletim:{ janela:cb.janela, periodo_citado:!!cb.periodoCitado, periodo:cb.periodo,
+        cobertos:cb.cobertos.map(x=>({rotulo:x.rotulo, talhaoId:x.talhaoId, datas:x.datas, boletins:x.registros.map(r=>r.boletimId).filter((v,i,a)=>a.indexOf(v)===i)})),
+        sem_registro:cb.sem_registro, sem_talhao:cb.sem_talhao }};
+    const chave=x=>[x.unidade, x.opErp, x.competencia, (x.talhoes||[]).map(t=>t.rotulo).join(","), (x.produtos||[]).map(y=>insChaveProd(y.produto)+":"+y.qtd+y.un).join(",")].join("|");
+    if(insAplicacoesRelatadas().some(x=>x.talhoes && chave(x)===chave(c))) insUI.flash="Este relato já estava registrado — nada foi duplicado.";
+    else { insRegistrarMensagem({texto:insUI.texto, tipo:"aplicacao", criados:[c]});
+      const ls=insConfLinhas(p).map(l=>l.txt);
+      insUI.flash="Relato de "+(p.opErp?insOperacaoRot(p.opErp):"aplicação")+" em "+fazenda(fz).nome+" registrado"+(ls.length?" · "+ls.join(" · "):"")+"."; }
   } else if(p.tipo==="aplicacao"){
     const it=vao[0], falta=insFaltaAplicacao(p);
     if(falta){ atualizarAvanco("bt-ins-importar", falta); return; }
@@ -6762,6 +7123,7 @@ function insImportar(){
     insRegistrarMensagem({texto:insUI.texto, tipo:"tarefas", criados, descartados:fora});
     insUI.flash = novas+" tarefa(s) criada(s)"+(repetidas?" · "+repetidas+" já existia(m)":"");
   }
+  if(aprendidos.length) insRegistrarMensagem({texto:insUI.texto, tipo:p.tipo, criados:aprendidos});   /* v99: a trilha diz que a colagem ensinou um de-para */
   salvarDados();
   insLimpar();
   insRender();
@@ -6780,9 +7142,19 @@ function insInput(el){
     const [i,campo]=d.insprev.split("|");
     if(i==="-"){ insUI.prev[campo]=el.value; if(campo==="produto"||campo==="fornecedor") insUI.prev.produtoTermo=insUI.prev.produtoTermo||"";
       if(insUI.prev.tipo==="aplicacao"){
+        if(insUI.prev.forma==="setores"){ if(campo==="operacao"){ insUI.trocarOp=false; insAplicConferir(insUI.prev); insRender(); return true; }
+          atualizarAvanco("bt-ins-importar", insFaltaAplicacao(insUI.prev)); return true; }   /* v99 */
         if(campo==="produto"){ insUI.prev.produtoTermo=el.value; const tinha=!!insUI.prev.vinculo; insAplicProcurarVinculo(insUI.prev); if(tinha!==!!insUI.prev.vinculo){ insRender(); return true; } }
         atualizarAvanco("bt-ins-importar", insFaltaAplicacao(insUI.prev)); return true; }
       atualizarAvanco("bt-ins-importar", String(insUI.prev.produto||"").trim()||insUI.prev.tipo!=="remessa"?"":"Escreva qual é o produto"); return true; }
+    /* v99 (D3): a fazenda da MENSAGEM, escolhida no cabeçalho — toda linha herda; na aplicação, talhão/setores/atividade recomeçam */
+    if(i==="msg" && campo==="unidade"){ const pv=insUI.prev; insUnidadeMensagemEscolher(pv, el.value); insUI.trocarUn=false;
+      if(pv.tipo==="aplicacao"){ const it0=pv.itens[0]; if(it0) it0.talhaoId="";
+        if(pv.forma==="setores"){ pv.operacao=(it0&&it0.unidade)?insOperacaoDoCatalogo(pv.opErp, atividadeDe(it0.unidade)):""; (pv.setores||[]).forEach(x=>{ x.talhaoId=""; }); insAplicMapearSetores(pv); insAplicConferir(pv); }
+        else { pv.operacao=(it0&&it0.unidade&&pv.produto)?insOperacaoAprendida(pv.produto, atividadeDe(it0.unidade)):""; insAplicProcurarVinculo(pv); } }
+      insRender(); return true; }
+    if(i==="set" && insUI.prev.setores){ const sx=insUI.prev.setores[parseInt(campo,10)]; if(sx){ sx.talhaoId=el.value; insAplicConferir(insUI.prev); insRender(); } return true; }
+    if(i==="prod" && insUI.prev.produtos){ const px=insUI.prev.produtos[parseInt(campo,10)]; if(px){ px.produto=el.value; atualizarAvanco("bt-ins-importar", insFaltaAplicacao(insUI.prev)); } return true; }
     const it=insUI.prev.itens[parseInt(i,10)];
     if(it){ it[campo]=el.value;
       if(insUI.prev.tipo==="aplicacao" && campo==="unidade"){ it.talhaoId="";   /* v93: trocou a unidade, o talhão e a atividade são outros */
@@ -6848,6 +7220,11 @@ function insClique(t,d){
     insAbrirPrev();
     insRender(); return true; }
   if(d.insTipo!==undefined){ insUI.tipo=d.insTipo; insAbrirPrev(); insRender(); return true; }
+  if(d.insTrocaUn!==undefined && insUI.prev){ insUI.trocarUn=true; insRender(); return true; }      /* v99 */
+  if(d.insTrocaOp!==undefined && insUI.prev){ insUI.trocarOp=true; insRender(); return true; }
+  if(d.insTrocaSet!==undefined && insUI.prev){ insUI.trocarSet=true; insRender(); return true; }
+  if(d.insConf!==undefined && insUI.prev){ insUI.confAberto=!insUI.confAberto; insRender(); return true; }
+  if(d.insConfMais!==undefined && insUI.prev){ insUI.confMais=true; insRender(); return true; }
   if(d.insDesvinc!==undefined && insUI.prev){ insUI.prev.semVinculo=true; insUI.prev.vinculo=null; insUI.prev.data=hojeBRT(); insRender(); return true; }
   if(d.insRevinc!==undefined && insUI.prev){ insUI.prev.semVinculo=false; insAplicProcurarVinculo(insUI.prev); insRender(); return true; }
   if(t.id==="bt-ins-limpar"){ insLimpar(); insRender(); return true; }
@@ -6864,7 +7241,7 @@ function insClique(t,d){
 }
 /* abre a pré-visualização do tipo escolhido (a ata usa a do módulo de Planejamento) */
 function insAbrirPrev(){
-  insUI.prev=null; insUI.prevAta=null;
+  insUI.prev=null; insUI.prevAta=null; insPrevReset();
   if(insUI.tipo==="ata"){ insUI.prevAta=quadroDetectar(insUI.texto)?quadroParsear(insUI.texto):ataParsear(insUI.texto); return; }
   if(insUI.tipo==="erp" && insUI.erp && insUI.erp.ok){ insUI.prev=erpMontarPrev(insUI.erp, insUI.texto); return; }   /* v96: PDF anexado */
   insUI.prev=insLerPorTipo(insUI.tipo, insUI.texto);
@@ -9631,7 +10008,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v98";
+const APP_VERSAO="v99";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -9994,7 +10371,7 @@ function cadVDeparaAta(){
     cadBusca("cad-da-busca","Buscar nome da ata ou unidade…")+
     (ls.length?ls.map(x=>{ const i=deparaAta().indexOf(x);
       return `<div class="cad-item" style="flex-wrap:wrap">
-        <span class="cresce"><b>${esc(x.ata)}</b><span class="mut">${x.fora?"fora do escopo — ignorada sempre":(x.unidade?fazenda(x.unidade).nome+(x.area?" · área "+esc(x.area):""):"sem unidade ligada")}</span></span>
+        <span class="cresce"><b>${esc(x.ata)}</b><span class="mut">${x.fora?"fora do escopo — ignorada sempre":(x.unidade?fazenda(x.unidade).nome+(x.area?" · área "+esc(x.area):"")+(x.talhao?" · talhão "+esc(talhao(x.talhao).nome):""):"sem unidade ligada")}</span></span>
         <select data-cadc="depara:${i}" style="max-width:190px;min-height:44px;padding:8px">
           <option value="" ${!x.unidade&&!x.fora?"selected":""}>— sem ligação —</option>
           <option value="FORA" ${x.fora?"selected":""}>fora do escopo (ignorar sempre)</option>

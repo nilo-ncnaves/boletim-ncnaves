@@ -114,6 +114,13 @@
       o cartão "Insumos" nasce recolhido, com a cobrança por fornecedor e sem
       nenhum termo de cobrança ao campo.
 
+  20. Leitor do WhatsApp (v99): a mensagem do grupo de aplicações (com "Lavamar")
+      é lida como relato de aplicação por setores com o chip 🚜 já aceso; a fazenda
+      é perguntada UMA vez, no cabeçalho, e os setores → talhões por seletor na
+      primeira vez; o bloco "📋 No boletim do gerente" aparece ANTES do Importar,
+      com o período vindo do boletim; como tarefas avulsas, a linha inteira vira
+      tarefa e as linhas de dose viram aviso com o chip certo; tela em ≤ 1,5 telas.
+
  Uso (na raiz do repositório):
    node scripts/checar-poluicao.cjs                # imprime o checklist
    node scripts/checar-poluicao.cjs /tmp/poluicao  # + grava JSON e o .md
@@ -1410,6 +1417,8 @@ const MSG_INS = ['Relação de NITRATO que a Cooxupé vai entregar nas fazendas:
 /* v93: a mensagem REAL do grupo de aplicações (15/09/2026); "Caxico arrendo" = talhão t055 de f14c */
 const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermon', 'Dose/ 400lts , vazão 100lts / hectares',
   'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
+/* v99: a mensagem REAL do grupo "Aplicações Realizadas" (16/09/2026), como o Nilo colou — com "Lavamar" */
+const MSG_FABINHO = ['Aplicação realizada via fértil irrigação café fazenda Lavamar Rodrigo setores 1,2,3,4,5,6', '', 'Doses por setor', '48 litros de klopan', '36 kg de Actara'].join('\n');
 async function cenarioInsumos(browser, base, R) {
   const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
   await pularRitual(page);
@@ -1480,6 +1489,46 @@ async function cenarioInsumos(browser, base, R) {
     return out;
   }, [MSG_APLIC]);
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a aplicação (ligada ao lançamento)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
+  /* v99: leitor do WhatsApp — a mensagem REAL do grupo "Aplicações Realizadas" (16/09/2026), com "Lavamar":
+     tipo certo sugerido, fazenda perguntada UMA vez no cabeçalho, setores → talhões por seletor, bloco
+     "📋 No boletim do gerente" antes do Importar. Boletins semeados (setores 1–4 nos últimos 3 dias) e retirados depois. */
+  R.relatoSetores = await page.evaluate(async ([msg]) => {
+    const dias = [diaISO(hojeBRT(), -2), diaISO(hojeBRT(), -1), hojeBRT()];
+    dias.forEach((d, i) => D.boletins.push({ id: 'bf20-polu-' + i, fazendaId: 'f20', data: d, responsavel: 'Rodrigo', clima: { cond: 'Ensolarado', chuvaMm: '' }, mo: { proprios: '', diaristas: '', funcoes: [] },
+      irr: { fert: 'Sim', fertSetores: ['t077', 't078', 't079', 't080'] }, atividades: [], colheita: [], fito: [], ocorrencias: [], obsGeral: '', pendencias: '', secoes: {}, enviadoEm: d + 'T18:00:00' }));
+    salvarDados();
+    insLimpar(); insNav = [{ v: 'colar' }]; ir('colar'); await new Promise(r => setTimeout(r, 120));
+    const ta = document.getElementById('ins-texto'); ta.value = msg; ta.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 50));
+    document.getElementById('bt-ins-ler').click(); await new Promise(r => setTimeout(r, 150));
+    const chips = [...document.querySelectorAll('#app [data-ins-tipo]')];
+    const out = { tipo: insUI.tipo, forma: insUI.prev && insUI.prev.forma, chips: chips.length, aceso: chips.filter(c => c.classList.contains('on')).map(c => c.dataset.insTipo).join(),
+      aviso: (document.querySelector('#app .aviso') || {}).textContent.replace(/\s+/g, ' ').trim(),
+      selectsAntes: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), faltaAntes: document.getElementById('bt-ins-importar').getAttribute('data-falta') || '' };
+    const sel = document.querySelector('#app select[data-insprev="msg|unidade"]'); sel.value = 'f20'; sel.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 150));
+    out.selectsSetores = [...document.querySelectorAll('#app select[data-insprev^="set|"]')].length;
+    out.alvoSelect = Math.min(...[...document.querySelectorAll('#app select[data-insprev]')].map(s => s.getBoundingClientRect().height));
+    ['t077', 't078', 't079', 't080', 't081', 't082'].forEach((id, i) => { const s = document.querySelector('#app select[data-insprev="set|' + i + '"]'); if (s) { s.value = id; s.dispatchEvent(new Event('input', { bubbles: true })); } });
+    await new Promise(r => setTimeout(r, 150));
+    const p = insUI.prev;
+    out.conf = insConfLinhas(p).map(l => l.txt); out.operacao = p.operacao; out.unidade = p.itens[0].unidade;
+    out.ativo = !document.getElementById('bt-ins-importar').classList.contains('acao-off'); out.rotulo = document.getElementById('bt-ins-importar').textContent.trim();
+    out.camposData = document.querySelectorAll('#app input[type=date]').length; out.selectsDepois = document.querySelectorAll('#app select[data-insprev]').length;
+    out.bloco = !!document.querySelector('#app [data-ins-conf-bloco]');
+    out.largo = Math.max(...[...document.querySelectorAll('#app .chips, #app .cad-item, #app .ins-l, #app .grade2, #app .aviso, #app [data-ins-conf-bloco]')].map(e => e.getBoundingClientRect().right));
+    out.nativos = window.__nativos || 0; out.texto = document.querySelector('#app').textContent.replace(/\s+/g, ' ');
+    return out;
+  }, [MSG_FABINHO]);
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a mensagem (relato de aplicação por setores)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
+  /* trocado para "tarefas avulsas": 1 tarefa inteira, 3 linhas de dose fora, aviso com o chip 🚜; fazenda uma vez */
+  R.relatoTarefas = await page.evaluate(async () => {
+    document.querySelector('#app [data-ins-tipo="tarefas"]').click(); await new Promise(r => setTimeout(r, 150));
+    const p = insUI.prev, av = document.querySelector('#app [data-ins-aviso-doses]');
+    const out = { itens: p.itens.map(i => i.desc), doses: (p.doses || []).length, aviso: av ? av.textContent.replace(/\s+/g, ' ').trim() : '', chip: !!(av && av.querySelector('[data-ins-tipo="aplicacao"]')),
+      selects: [...document.querySelectorAll('#app select[data-insprev]')].map(s => s.dataset.insprev), rotulo: document.getElementById('bt-ins-importar').textContent.trim(), nativos: window.__nativos || 0 };
+    return out;
+  });
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a mensagem (tarefas avulsas com aviso de doses)', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  await page.evaluate(() => { D.boletins = D.boletins.filter(b => !/^bf20-polu-/.test(b.id)); salvarDados(); insLimpar(); });
   /* grava e mede a trilha de origem */
   await page.evaluate(msg => { insUI.texto = msg; insUI.tipo = 'remessa'; insAbrirPrev(); insImportar();
     /* anúncio de 10 dias atrás: é assim que a cobrança por fornecedor aparece (INS_COBRANCA_DIAS = 7) */
@@ -2000,6 +2049,30 @@ function avaliar(R) {
       /^🔎 \d+ lançamentos? do Agro1 para conferir$/.test(C.pastilha || ''), C.pastilha || 'sem pastilha');
     add(G, 'Conferência — relata REGISTRO ("sem registro no boletim", "sem baixa no Agro1", "para conferir"); nunca "não fez", "não lançou", "pendente", "erro do gerente"; nenhum custo',
       /sem registro no boletim/.test(C.texto || '') && /sem baixa no Agro1/.test(C.texto || '') && !/não fez|não lançou|erro do gerente|pendente|atrasad|R\$|custo/i.test(C.texto || ''), '');
+  }
+
+  /* 20. Leitor do WhatsApp (v99): tipo certo, unidade uma vez, número nunca some, conferência com o boletim antes do Importar */
+  if (R.relatoSetores) {
+    const G = '20. Leitor do WhatsApp: tipo certo, fazenda uma vez, número nunca some, boletim antes do Importar';
+    const P = R.relatoSetores, T = R.relatoTarefas || {};
+    add(G, 'Porta única — a mensagem do grupo "Aplicações Realizadas" (com "Lavamar") é lida como RELATO DE APLICAÇÃO por setores; o chip 🚜 nasce aceso e os outros 5 continuam na fileira',
+      P.tipo === 'aplicacao' && P.forma === 'setores' && P.chips === 6 && P.aceso === 'aplicacao', `${P.tipo}/${P.forma} · ${P.chips} chips · aceso: ${P.aceso}`);
+    add(G, 'Conferência — a frase diz o que o app entendeu (fazenda, ferti-irrigação, setores 1 a 6, 2 produtos), sem adivinhar a fazenda', /Entendi uma aplicação realizada em «Lavamar Rodrigo» \(fazenda a escolher\), ferti-irrigação, setores 1 a 6, 2 produtos/.test(P.aviso), P.aviso.slice(0, 140));
+    add(G, 'Conferência — a fazenda é perguntada UMA vez, no cabeçalho ("Fazenda: escolher ›"), nunca por linha; o botão nasce inativo dizendo o que falta',
+      P.selectsAntes.join() === 'msg|unidade' && P.faltaAntes === 'Escolha a fazenda da mensagem', P.selectsAntes.join(' · ') + ` · "${P.faltaAntes}"`);
+    add(G, 'Conferência — escolhida a fazenda, os 6 setores → talhões pedem seletor (primeira vez; alvo ≥ 44 px; nunca "1" casa por conter "1") e a atividade vem do catálogo',
+      P.selectsSetores === 6 && P.alvoSelect >= TOQUE_MIN && P.operacao === 'Adubação via fertirrigação' && P.unidade === 'f20', `${P.selectsSetores} seletor(es) · alvo ${Math.round(P.alvoSelect)} px · ${P.operacao}`);
+    add(G, 'Conferência — bloco "📋 No boletim do gerente" ANTES do Importar: setores 1–4 com as datas do boletim, setores 5–6 "sem registro no boletim nos últimos 14 dias"; "Importar relato" ativo; zero campo de data',
+      P.bloco && P.conf.length === 2 && /^setores 1, 2, 3, 4 · no boletim de /.test(P.conf[0]) && P.conf[1] === 'setores 5, 6 · sem registro no boletim nos últimos 14 dias' && P.ativo && P.rotulo === 'Importar relato' && P.camposData === 0,
+      P.conf.join(' | ') + ` · ${P.rotulo} · ${P.camposData} campo(s) de data`);
+    add(G, 'Conferência — período da aplicação vem do boletim ("Registrado no boletim: …"), nunca da mensagem; sem nativo; nenhuma fileira passa de 390 px', /Registrado no boletim: /.test(P.texto) && P.nativos === 0 && P.largo <= 391, `${Math.round(P.largo)} px · ${P.nativos} nativo(s)`);
+    add(G, 'Conferência — relata REGISTRO: "sem registro", "para conferir"; nunca "não fez", "pendente", "faltou", "erro"; nenhum custo', !/não fez|não realizou|pendente|atrasad|faltou|esqueceu|\berro\b|R\$|custo/i.test(P.texto), '');
+    const t = R.telas.find(x => x.nome === 'Colar do WhatsApp › Conferir a mensagem (relato de aplicação por setores)');
+    add(G, 'Conferência — a tela do exemplo, com a fazenda escolhida e o bloco do boletim aberto, cabe em uma tela e meia', !!t && t.telas <= 1.5, t ? `${t.telas} telas` : 'tela não medida');
+    add(G, 'Tarefas avulsas — a linha 1 vira 1 tarefa com o texto inteiro; "Doses por setor", "48 litros de klopan" e "36 kg de Actara" não viram tarefa; botão "Importar 1 tarefa"',
+      (T.itens || []).length === 1 && /^Aplicação realizada via fértil irrigação/.test((T.itens || [])[0] || '') && T.doses === 3 && T.rotulo === 'Importar 1 tarefa', `${(T.itens || []).length} tarefa(s) · ${T.doses} dose(s) · ${T.rotulo}`);
+    add(G, 'Tarefas avulsas — o aviso "parecem doses de aplicação, não tarefas" traz o chip 🚜 ao lado; nenhum seletor de unidade por linha; sem nativo',
+      /parecem doses de aplicação, não tarefas/.test(T.aviso || '') && T.chip && (T.selects || []).every(s => !/^\d+\|unidade$/.test(s)) && T.nativos === 0, (T.aviso || '').slice(0, 100));
   }
 
   /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */
