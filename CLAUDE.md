@@ -1071,7 +1071,7 @@ sobrou — e tarefa do planejamento fica parada "aguardando insumo".
   no saldo (`insAplicadoFontes`) e completa o executado com "origem: ERP",
   mas NÃO acende farol de registro nem mexe nos "dias sem registro"; hora do
   ERP é de LANÇAMENTO, não de aplicação (`lancado_erp_ini/fim`; a competência
-  é o mês). Entrada pela MESMA porta única: tipo "Baixa ERP" e o botão "📎 Anexar relatório do ERP (PDF)" (pdf.js em
+  é o mês). Entrada pela MESMA porta única: tipo "Agro1" e o botão "📎 Anexar relatório do Agro1 (PDF)" (desde a v97 a porta de entrada chama o sistema pelo nome que o escritório usa, Agro1; as chaves internas continuam "erp") (pdf.js em
   vendor/pdfjs/, lido por posição x,y — nunca por linha corrida). Identidade
   por id: propriedade → unidade pelo de-para da ata (`D.deparaAta`, o
   mesmo, ampliado — nenhum terceiro de-para), gleba → talhão aprendido na

@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v96** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v97** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -2018,6 +2018,41 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## O sistema se chama Agro1 na porta de entrada (v97)
+Pedido do Nilo em 16/09/2026, com a tela na mão, no primeiro dia de uso da
+v96: o botão dizia "📎 Anexar relatório do ERP (PDF)" e ele pediu "📎 Anexar
+relatório do **Agro1** (PDF)". Regra que fica: **na porta de entrada o sistema
+de fora é chamado pelo NOME que a casa usa, nunca pela categoria dele.** Quem
+vai anexar o arquivo reconhece "Agro1" (é o que está escrito no sistema onde
+ele acabou de dar baixa); "ERP" é como nós classificamos o software, não como
+o escritório o chama.
+- **O que mudou (só texto de tela da entrada):** o botão nos três lugares em
+  que aparece (porta única, Cadastros › Insumos › Baixas do ERP e a lista da
+  conferência), a nota embaixo dele, o texto de exemplo do campo de colar, o
+  chip do tipo ("🧾 Agro1"), a frase que o app diz ao reconhecer o
+  arquivo e as duas dicas de vazio ("Anexe o PDF do Agro1 em 📥 Colar do
+  WhatsApp"). O nome do fabricante que eu tinha usado ("AgroGestão") saiu das
+  telas.
+- **O que NÃO mudou, de propósito:** as chaves internas (`tipo:"erp"`, a
+  tabela `insumo_baixa_erp`, as colunas `lancado_erp_ini`, a constante
+  `ERP_TOL_PCT`) e os textos de leitura que falam da CONFERÊNCIA ("🔎
+  Conferência ERP × App", "➕ Só no ERP", "sem baixa no ERP"). Chave
+  substituta nunca vira texto de tela, e trocá-la apagaria o sentido do que já
+  foi gravado (regra permanente da v76, item 2). A troca do vocabulário das
+  telas de conferência ficou como pergunta ao Nilo no resumo do PR.
+- **O chip do tipo cabe em 152 px, e isso é medida, não gosto.** A fileira de
+  tipos tem 336 px a 390 px e "📋 Ata de reunião" ocupa 176, então o chip
+  vizinho só cabe até 152. "🧾 Baixa Agro1" mede **153** — passa por UM pixel,
+  quebra a linha e leva a tela "Conferir a aplicação" (v93) de 1,98 para 2,05
+  telas, o que vira ❌ na checagem de poluição. Ficou "🧾 Agro1" (103 px) e a
+  fileira voltou a 5 linhas. Regra que fica: **rótulo de chip numa fileira que
+  quebra em linhas é medido antes, nunca estimado** — um pixel a mais custa uma
+  linha inteira de 54 px.
+- **Provas:** `node scripts/teste_insumos.cjs` 141 ✅ · 0 ❌ (a prova "ERP a)"
+  passou a exigir o texto novo do botão); `scripts/checar-poluicao.cjs`
+  763 ✅ · 41 ❌, os mesmos herdados; `scripts/regressao_render.cjs` contra o
+  main: gerente e pós-colheita idênticos.
+
 ## Baixa do ERP: registrar e conferir (v96) — o app casa sozinho, completa e abre aviso de conferência
 **O problema real (15/09/2026).** A fertirrigação é feita, o escritório dá
 baixa dos insumos no AgroGestão e alguém posta no grupo "Aplicações
@@ -2034,7 +2069,7 @@ nunca gera arquivo de baixa e nunca cria um segundo consumo.
 1. **Entrada.** Tipo novo na classificação da porta única, "🧾 Baixa ERP"
    (mensagem "finalizada / baixados no sistema"; rótulo curto para a fileira
    de chips continuar dentro de 2 telas na v93), e
-   o botão **"📎 Anexar relatório do ERP (PDF)"** abaixo do campo de colar (o
+   o botão **"📎 Anexar relatório do Agro1 (PDF)"** abaixo do campo de colar (o
    campo de arquivo nasce só no toque; a tela continua com UM campo; no
    iPhone abre o app Arquivos). Mensagem e PDF vão juntos ou separados: com
    PDF, registro completo com kg; só a mensagem, um RELATO sem quantidade
@@ -3027,12 +3062,21 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Baixa do ERP (v96) — rodar UM SQL no Supabase:** `sql/057-insumo-baixa-erp.sql`
-  (tabela `insumo_baixa_erp`, sem policy de delete). Enquanto não rodar, o
-  módulo funciona INTEIRO no aparelho de quem importou (é offline first) — as
-  linhas ficam na fila ("N registro(s) aguardando internet") e sobem sozinhas
-  depois; nada se perde. Depende do `sql/055` (a trilha das mensagens) já
-  rodado.
+- **Baixa do ERP (v96) — SQL RODADO em 16/09/2026.** O Nilo rodou o
+  `sql/057-insumo-baixa-erp.sql` no SQL Editor e a tabela `insumo_baixa_erp`
+  responde vazia pela API. Retrato do banco conferido no mesmo dia (leitura
+  pela chave publishable): já existem `boletins`, `pos_colheitas`,
+  `aparelho_sync`, `planejamento_rodada/tarefa`, `insumo_remessa`,
+  `insumo_recebimento`, `mensagens_importadas`, `relatorios_gerados`,
+  `operacao_catalogo`, `vw_insumo_saldo` e `vw_insumo_aplicado` — ou seja, os
+  SQL da v77 e da v86 já tinham sido rodados. **Duas pendências de banco que
+  sobraram:** (a) `codigos_acesso` (sql/001) nunca foi criada — o app funciona
+  igual, só não guarda os códigos no servidor (é o 404 em silêncio previsto na
+  v82); (b) a visão `vw_planejamento_mes` existe mas falha na leitura com
+  `invalid input syntax for type numeric: ""` — uma tarefa com área ou meta em
+  branco cai num cast para numeric no sql/050. O app não usa essa visão (lê as
+  tarefas direto), então nenhum gerente sente nada; o relatório mensal do
+  planejamento é que não sai. As duas são correção pequena, em tarefa própria.
 - **Baixa do ERP (v96) — trocar a fixture pelo PDF real.** O teste usa um PDF
   SINTÉTICO com o mesmo layout e números (`scripts/gerar_fixture_erp.cjs`).
   Quando o Nilo subir o relatório real em

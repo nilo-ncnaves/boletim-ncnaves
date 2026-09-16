@@ -5819,10 +5819,16 @@ const INS_TIPOS_MSG=[
   {id:"remessa", ico:"📦", rot:"Remessa de insumo",  frase:"parece uma remessa de insumo"},
   {id:"ata",     ico:"📋", rot:"Ata de reunião",     frase:"parece uma ata de reunião"},
   /* v96: a baixa já feita no ERP (mensagem "finalizada ✅ / adubos já baixados no sistema" e/ou o PDF
-     "Aplicações de Insumos" do AgroGestão) entra como ESPELHO e conferência — nunca como segundo consumo.
-     Rótulo curto e nesta posição de propósito: cabe ao lado de "Ata de reunião" na fileira de chips a
-     390 px, e a tela "Conferir a aplicação" (v93) continua dentro de 2 telas. */
-  {id:"erp",     ico:"🧾", rot:"Baixa ERP",          frase:"parece uma aplicação já realizada e baixada no ERP"},
+     "Aplicações de Insumos" do Agro1) entra como ESPELHO e conferência — nunca como segundo consumo.
+     v97 (pedido do Nilo em 16/09/2026): na PORTA DE ENTRADA o sistema é chamado pelo nome que o
+     escritório usa — "Agro1" —, não por "ERP". Quem anexa o arquivo reconhece o nome do sistema,
+     não a sigla. Os nomes internos (chave "erp", tabela insumo_baixa_erp, colunas) não mudam:
+     são chaves substitutas e trocá-las apagaria o sentido do que já foi gravado (regra da v76).
+     Rótulo curto e nesta posição de propósito: a 390 px a fileira tem 336 px e "📋 Ata de reunião"
+     ocupa 176, então o chip do lado só cabe até 152 px. "🧾 Baixa Agro1" mede 153 (passa por UM pixel),
+     quebra a linha e leva a tela "Conferir a aplicação" (v93) para 2,05 telas — ❌ na checagem de
+     poluição. "🧾 Agro1" mede 103 e a fileira volta a 5 linhas. Medido, não estimado (v97). */
+  {id:"erp",     ico:"🧾", rot:"Agro1",              frase:"parece uma aplicação já realizada e baixada no Agro1"},
   {id:"tarefas", ico:"🗒️", rot:"Tarefas avulsas",    frase:"parecem tarefas soltas"},
   {id:"chuva",   ico:"🌧️", rot:"Relato de chuva",    frase:"parece um relato de chuva"},
   /* v93: o relato do grupo de aplicações ("Aplicação de <produto> <local>" + linhas de calda) vira
@@ -6512,10 +6518,10 @@ function insVColar(){
   if(!insUI.lida && !insUI.prev && !insUI.prevAta) return insTopo("Colar do WhatsApp","Uma mensagem, um toque")
     +`<div class="cartao">
       <label for="ins-texto">Cole aqui a mensagem</label>
-      <textarea id="ins-texto" rows="9" placeholder="Cole a mensagem do grupo: ata da reunião, remessa de insumo, tarefas soltas, relato de chuva ou aplicação já baixada no ERP.">${esc(insUI.texto||"")}</textarea>
+      <textarea id="ins-texto" rows="9" placeholder="Cole a mensagem do grupo: ata da reunião, remessa de insumo, tarefas soltas, relato de chuva ou aplicação já baixada no Agro1.">${esc(insUI.texto||"")}</textarea>
       <p class="mut" style="font-size:.78rem;margin-top:6px">O app lê, diz o que entendeu e mostra tudo para conferir — nada é gravado antes de você mandar.</p>
-      <button class="btn sec mt" id="bt-ins-pdf">📎 Anexar relatório do ERP (PDF)</button>
-      <p class="mut" style="font-size:.74rem;margin-top:4px">O relatório "Aplicações de Insumos" do AgroGestão, com ou sem a mensagem. O app lê, casa cada linha com o boletim e mostra a conferência antes de gravar.</p>
+      <button class="btn sec mt" id="bt-ins-pdf">📎 Anexar relatório do Agro1 (PDF)</button>
+      <p class="mut" style="font-size:.74rem;margin-top:4px">O relatório "Aplicações de Insumos" do Agro1, com ou sem a mensagem. O app lê, casa cada linha com o boletim e mostra a conferência antes de gravar.</p>
     </div>`
     +cadItem("mensagens","","🗂️ Mensagens importadas",insMensagens().length?insMensagens().length+" mensagens guardadas com o texto original":"nenhuma mensagem importada ainda",insMensagens().length)
     +cadRodape(botaoAvanco("bt-ins-ler",{rotulo:"Ler a mensagem", falta:String(insUI.texto||"").trim()?"":"Cole a mensagem para o app ler"}));
@@ -7493,7 +7499,7 @@ async function erpAnexarBytes(buf, nome){
     insUI.erp=null; insUI.msg=leitura.motivo+" O texto extraído ficou guardado em Mensagens importadas; nada foi gravado.";
     insRender(); return leitura;
   }
-  insUI.tipo="erp"; insUI.auto={tipo:"erp", motivo:"relatório «Aplicações de Insumos» do AgroGestão", frase:"é o relatório de aplicações do ERP"};
+  insUI.tipo="erp"; insUI.auto={tipo:"erp", motivo:"relatório «Aplicações de Insumos» do Agro1", frase:"é o relatório de aplicações do Agro1"};
   insUI.lida=true; insAbrirPrev(); insRender();
   return leitura;
 }
@@ -7642,9 +7648,9 @@ function insVErp(){
     +(imps.length>12?`<input class="cad-busca" id="erp-busca" placeholder="Buscar unidade ou mês…" value="${esc(q||"")}" autocomplete="off" autocapitalize="off">`:"")
     +(ls.length?ls.map(i=>{ const ab=erpAbertos(i.unidade).filter(x=>x.imp?x.imp.id===i.id:(x.item.impId===i.id)).length; const r=i.resumo||{};
       return cadItem("erpconf", i.id, "🔎 "+fazenda(i.unidade).nome+" · "+erpCompRot(i.competencia), erpOpRot(i.operacaoErp)+" · "+(r.total||0)+" linhas · ⚠️ "+(r.conf||0)+" · 🔸 "+(r.so_app||0)+" · ➕ "+(r.so_erp||0)+" · ✅ "+(r.ok||0)+(ab?" · "+ab+" para conferir":" · nada em aberto"), ab); }).join("")
-      :htmlEstado("vazio",{que:"relatório do ERP importado", filtro:q, onde:"nas unidades deste código", dica:"Anexe o PDF do AgroGestão em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
+      :htmlEstado("vazio",{que:"relatório do ERP importado", filtro:q, onde:"nas unidades deste código", dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
     +(relatos.length?`<div class="cartao"><h3>Relatos aguardando o relatório do ERP</h3>${relatos.map(r=>`<p class="mut" style="font-size:.8rem;margin:3px 0">🧾 ${esc(fazenda(r.unidade).nome)} · ${esc(erpOpRot(r.operacaoErp))} · ${esc(erpCompRot(r.competencia))} · ${esc((r.produtos||[]).join(", "))} — aguardando relatório do ERP</p>`).join("")}</div>`:"")
-    +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do ERP</button>`);
+    +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do Agro1</button>`);
 }
 function insVErpConf(id){
   const imp=erpImportacao(id);
@@ -7664,8 +7670,8 @@ function cadVInsBaixas(){
     +(Object.keys(grupos).length>12?cadBusca("cad-erp-busca","Buscar unidade ou mês…"):"")
     +(ls.length?ls.map(g=>{ const ab=erpAbertos(g.unidade).length; const imp=[...g.imps].map(erpImportacao).filter(Boolean).sort((a,b)=>String(b.em).localeCompare(String(a.em)))[0];
       return `<button class="cad-item" data-erp-abrirconf="${esc(imp?imp.id:"")}"><span class="cresce"><b>${esc(fazenda(g.unidade).nome)} · ${esc(erpCompRot(g.competencia))}</b><span class="mut">${g.vig} linhas · ${esc(insQtd(g.kg,"kg"))} baixados no ERP${g.sup?" · "+g.sup+" superada"+(g.sup>1?"s":""):""} · ${g.imps.size} importa${g.imps.size===1?"ção":"ções"}${ab?" · "+ab+" para conferir":""}</span></span><span class="seta">›</span></button>`; }).join("")
-      :htmlEstado("vazio",{que:q?"baixa do ERP":"baixa do ERP importada",filtro:q,dica:"Anexe o PDF do AgroGestão em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
-    +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do ERP</button>`);
+      :htmlEstado("vazio",{que:q?"baixa do ERP":"baixa do ERP importada",filtro:q,dica:"Anexe o PDF do Agro1 em 📥 Colar do WhatsApp."},{classe:"mut centro mt"}))
+    +cadRodape(`<button class="btn" id="bt-ins-colar2">📎 Anexar relatório do Agro1</button>`);
 }
 /* entrada de dados da pré-visualização do ERP (chamado por insInput) */
 function erpInput(el){
@@ -9623,7 +9629,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v96";
+const APP_VERSAO="v97";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
