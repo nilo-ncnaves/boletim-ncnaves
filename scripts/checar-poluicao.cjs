@@ -700,7 +700,7 @@ const PAINEL_CARTOES_CHK = [
   ['plano', 'Planejado × Executado'],
   ['solinftec', 'Solinftec — medição de ontem'],
   ['remessas', 'Café em trânsito'],
-  ['erp', 'Conferência ERP × App'],   /* v96 */
+  ['erp', 'Conferência Agro1 × Boletim'],   /* v96 */
   ['boletins', 'Boletins do período'],
 ];
 async function cenarioPainelCartoes(browser, base, R) {
@@ -719,11 +719,11 @@ async function cenarioPainelCartoes(browser, base, R) {
     D.remessas = [
       { id: 'rchk1', status: 'enviada', data: hoje, origem: cafes[0], destino: cafes[1], talhaoId: tal(cafes[0]), carretas: '2' },
       { id: 'rchk2', status: 'enviada', data: hoje, origem: cafes[2] || cafes[0], destino: cafes[1], talhaoId: tal(cafes[2] || cafes[0]), carretas: '1' }];
-    /* v96: duas linhas de baixa do ERP e a importação delas, para "Conferência ERP × App" ter o que listar */
+    /* v96: duas linhas de baixa do Agro1 e a importação delas, para "Conferência Agro1 × Boletim" ter o que listar */
     const agora = new Date().toISOString();
     const b1 = { id: 'erpchk1', impId: 'erpimp1', unidade: 'f23', talhaoId: 't103', glebaErp: 'SETOR 3 ROMARIA', areaGlebaErp: 22.15, produto: 'Ácido Bórico', chave: 'acidoborico', insumoErp: 'ACIDO BORICO', insumoId: '', un: 'KG', areaHa: 22.15, doseHa: 11.2867, qtde: 250,
       competencia: hoje.slice(0, 7), operacaoErp: 'FERTIRRIGACAO', lancadoErpIni: hoje + ' 16:27:54', lancadoErpFim: hoje + ' 17:00:00', emitidoErpEm: hoje + ' 16:39:47', origemHash: 'chk', mensagemId: 'erpmsg1', status: 'vigente', superadaPor: '', criadoPor: 'Escritório', criadoEm: agora,
-      casamento: { resultado: 'qtd_dif', soma: 200, vinculos: [{ id: 'x:1', boletimId: 'x', data: diaISO(hoje, -3), talhaoId: 't103', kg: 200, por: 'Gerente', op: 'Adubação via fertirrigação', nome: 'Setor 3' }], texto: 'Setor 3 · ácido bórico · app 200 kg (' + fmtDataCurta(diaISO(hoje, -3)) + ') × ERP 250 kg' }, conf: { estado: 'aberta', historico: [] } };
+      casamento: { resultado: 'qtd_dif', soma: 200, vinculos: [{ id: 'x:1', boletimId: 'x', data: diaISO(hoje, -3), talhaoId: 't103', kg: 200, por: 'Gerente', op: 'Adubação via fertirrigação', nome: 'Setor 3' }], texto: 'Setor 3 · ácido bórico · app 200 kg (' + fmtDataCurta(diaISO(hoje, -3)) + ') × Agro1 250 kg' }, conf: { estado: 'aberta', historico: [] } };
     const b2 = { ...b1, id: 'erpchk2', talhaoId: 't108', glebaErp: 'SETOR 8 ROMARIA', areaGlebaErp: 11, areaHa: 11, doseHa: 27.2727, qtde: 300, casamento: { resultado: 'so_erp', soma: 0, vinculos: [], texto: 'Setor 8 · ácido bórico · 300 kg — sem registro no boletim' }, conf: { estado: '', historico: [] } };
     D.baixasErp = [b1, b2];
     D.mensagensImportadas = (D.mensagensImportadas || []).concat([{ id: 'erpmsg1', chave: 'erpchk', tipo: 'erp', texto: '📎 relatorio-erp.pdf', por: 'Escritório', em: agora, data: hoje,
@@ -1379,7 +1379,7 @@ async function cenarioCadastros(browser, base, R) {
     ['Cadastros › Catálogos › Máquinas', [{ v: 'catalogos' }, { v: 'maquinas' }], 'lista'],
     ['Cadastros › Insumos e remessas', [{ v: 'insumos' }], 'lista'],
     ['Cadastros › Insumos › Remessas programadas', [{ v: 'insumos' }, { v: 'insremessas' }], 'lista'],
-    ['Cadastros › Insumos › Baixas do ERP', [{ v: 'insumos' }, { v: 'insbaixas' }], 'lista'],   /* v96 */
+    ['Cadastros › Insumos › Baixas do Agro1', [{ v: 'insumos' }, { v: 'insbaixas' }], 'lista'],   /* v96 */
     ['Cadastros › Integrações e robôs', [{ v: 'integracoes' }], 'detalhe'],
     ['Cadastros › Importações manuais', [{ v: 'importacoes' }], 'lista'],
     ['Cadastros › Sincronização e dados', [{ v: 'sync' }], 'detalhe'],
@@ -1491,7 +1491,7 @@ async function cenarioInsumos(browser, base, R) {
   await page.evaluate(id => { insNav = [{ v: 'colar' }, { v: 'mensagens' }, { v: 'mensagem', id }]; ir('colar'); }, msgId);
   await page.waitForTimeout(200);
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Mensagem (texto original)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
-  /* v96: baixa do ERP — o PDF da fixture entra pela mesma porta, o app casa sozinho e abre a conferência */
+  /* v96: baixa do Agro1 — o PDF da fixture entra pela mesma porta, o app casa sozinho e abre a conferência */
   R.erpPrev = await page.evaluate(async base => {
     /* dois lançamentos de fertirrigação em Vereda Romaria (set/2026, a competência do relatório): um com quantidade
        diferente da baixa (⚠️) e um com insumo que não está no PDF (🔸) — para a conferência ter o que abrir */
@@ -1519,7 +1519,7 @@ async function cenarioInsumos(browser, base, R) {
       texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
     return out;
   }, base);
-  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir o relatório do ERP', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir o relatório do Agro1', 'cadastros', { tipo: 'lista', niveis: 2 }));
   R.erpConf = await page.evaluate(async () => {
     window.__nativos = 0;
     const antesB = erpBaixas().length, antesBol = JSON.stringify(D.boletins);
@@ -1536,17 +1536,17 @@ async function cenarioInsumos(browser, base, R) {
     primeiro.click(); await new Promise(r => setTimeout(r, 120));
     const chips = [...document.querySelectorAll('#app [data-erp-res^="' + id + '|"]')];
     out.aberto = { chips: chips.map(c => c.textContent.trim()), alvo: chips.length ? Math.min(...chips.map(c => c.getBoundingClientRect().height)) : 0, mesmaTela: telaAtual === telaAntes, modal: !!document.querySelector('dialog[open], .folha'),
-      ladoALado: /ERP\s*SETOR/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent.replace(/\s+/g, ' ')) && /Boletim/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent) };
+      ladoALado: /Agro1\s*SETOR/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent.replace(/\s+/g, ' ')) && /Boletim/.test(document.querySelector('[data-erp-item="' + id + '"]').textContent) };
     chips[0].click(); await new Promise(r => setTimeout(r, 120));
     out.resolvido = { abertos: erpAbertos().length, desfazer: !!document.querySelector('[data-erp-res="' + id + '|desfazer"]'), mesmaTela: telaAtual === telaAntes, nativos: window.__nativos, cresceu: document.documentElement.scrollHeight - altura };
     document.querySelector('[data-erp-res="' + id + '|desfazer"]').click(); await new Promise(r => setTimeout(r, 120));
     out.desfeito = { abertos: erpAbertos().length };
     return out;
   });
-  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência ERP × App', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência Agro1 × Boletim', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   await page.evaluate(() => { insNav = [{ v: 'colar' }, { v: 'erp' }]; ir('colar'); }); await page.waitForTimeout(200);
-  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência ERP × App (lista)', 'cadastros', { tipo: 'lista', niveis: 2 }));
-  /* o gerente e o painel de baixo NÃO recebem o dado do ERP — a medição deles continua a da v86 */
+  R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferência Agro1 × Boletim (lista)', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  /* o gerente e o painel de baixo NÃO recebem o dado do Agro1 — a medição deles continua a da v86 */
   await page.evaluate(() => { D.baixasErp = []; insMensagens().forEach(m => { m.criados = (m.criados || []).filter(c => c.tipo !== 'erp' && c.tipo !== 'erp_relato'); }); D.deparaAta = null; D.boletins = D.boletins.filter(b => !/^erp-b/.test(b.id)); salvarDados(); });
   /* painel da Diretoria: o cartão nasce recolhido */
   R.insPainel = await page.evaluate(async () => {
@@ -1928,7 +1928,7 @@ function avaliar(R) {
       C.inativo && /Cole a mensagem/.test(C.falta || '') && C.telaDepois === 'colar' && C.nativos === 0 && C.alvo >= TOQUE_MIN,
       `"${C.falta || ''}" · alvo ${C.alvo} px · ${C.nativos} nativo(s)`);
     add(G, 'Classificação automática — a mensagem do grupo é reconhecida e o tipo pode ser trocado',
-      P.tipo === 'remessa' && (P.chipsTipo || []).length === 6, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));   /* v96: + "Aplicação realizada (baixa do ERP)" */
+      P.tipo === 'remessa' && (P.chipsTipo || []).length === 6, P.tipo + ' · ' + (P.chipsTipo || []).join(' · '));   /* v96: + "Aplicação realizada (baixa do Agro1)" */
     add(G, 'Pré-visualização — totais de conferência antes de gravar', /fazendas/.test(P.resumo || '') && /kg|t$/.test(P.resumo || ''), P.resumo || '');
     add(G, 'Pré-visualização — nome não casado NÃO é adivinhado: a tela pede a unidade',
       P.naoCasado === 1 && /unidade/i.test(P.falta || ''), P.naoCasado + ' linha(s) para decidir · botão: "' + (P.falta || '') + '"');
@@ -1971,35 +1971,35 @@ function avaliar(R) {
     add(G, 'Ligar ao lançamento — nada é criado e o boletim do gerente não é reescrito (nunca duas vezes)', L.criou === 0 && L.ligados === 1, `${L.criou} criado(s) · ${L.ligados} ligado(s)`);
   }
 
-  /* 19. Baixa do ERP (v96): o app casa sozinho, completa e abre aviso de conferência */
+  /* 19. Baixa do Agro1 (v96): o app casa sozinho, completa e abre aviso de conferência */
   if (R.erpPrev) {
-    const G = '19. Baixa do ERP: o app casa sozinho, completa e abre a conferência';
+    const G = '19. Baixa do Agro1: o app casa sozinho, completa e abre a conferência';
     const P = R.erpPrev, D = P.depois || {}, C = R.erpConf || {};
     add(G, 'Porta única — "📎 Anexar relatório do Agro1 (PDF)" ao lado do campo de colar; a tela continua com UM campo e o botão tem ≥ 44 px',
       P.botao === '📎 Anexar relatório do Agro1 (PDF)' && P.campos === 1 && P.alvo >= TOQUE_MIN, `"${P.botao}" · ${P.campos} campo(s) · ${P.alvo} px`);
     add(G, 'PDF anexado — leitura por posição (24 linhas), classificação certa e a pré-visualização abre na hora, sem outro toque e sem nativo',
       P.ok && P.n === 24 && P.tipo === 'erp' && P.tela === 'colar' && P.nativos === 0, `${P.n} linhas · tipo ${P.tipo}`);
-    add(G, 'Pré-visualização — gleba do ERP → talhão NÃO é adivinhada: 8 seletores e o botão nasce inativo dizendo o que falta',
+    add(G, 'Pré-visualização — gleba do Agro1 → talhão NÃO é adivinhada: 8 seletores e o botão nasce inativo dizendo o que falta',
       P.selects === 8 && P.inativo && /Ligue cada gleba/.test(P.falta), `${P.selects} seletor(es) · "${P.falta}"`);
     add(G, 'Relatório da conferência — grupos na ordem ⚠️ → 🔸 → ➕ → ✅, com ⚠️ e 🔸 abertos e ➕ e ✅ recolhidos (P5); resumo em UMA linha no topo',
-      (D.grupos || []).join(',') === 'conf:aberto,app:aberto,erp:fechado,ok:fechado' && /24 linhas do ERP · ✅ \d+ batem · ➕ \d+ completadas pelo ERP · ⚠️ \d+ para conferir · 🔸 \d+ só no app/.test(D.texto || ''), (D.grupos || []).join(' · '));
+      (D.grupos || []).join(',') === 'conf:aberto,app:aberto,erp:fechado,ok:fechado' && /24 linhas do Agro1 · ✅ \d+ batem · ➕ \d+ completadas pelo Agro1 · ⚠️ \d+ para conferir · 🔸 \d+ só no boletim/.test(D.texto || ''), (D.grupos || []).join(' · '));
     add(G, 'Relatório da conferência — UM botão "Importar e abrir conferência", ativo depois de ligar as glebas', D.rotulo === 'Importar e abrir conferência' && !D.inativo, D.rotulo);
-    add(G, 'Relatório da conferência — hora do ERP é de LANÇAMENTO; sem custo, sem prescrição e sem termo de cobrança ao campo',
+    add(G, 'Relatório da conferência — hora do Agro1 é de LANÇAMENTO; sem custo, sem prescrição e sem termo de cobrança ao campo',
       /LANÇAMENTO, não de aplicação/.test(D.texto || '') && !/aplicad[oa]s? às|R\$|custo|não fez|não lançou|erro do gerente|pendente|atrasad|dose alta|tóxic/i.test(D.texto || ''), '');
-    add(G, 'Importar — grava as 24 linhas, NÃO reescreve boletim nenhum e abre a tela "🔎 Conferência ERP × App" (até 3 níveis no módulo)',
-      C.gravadas === 24 && C.boletinsIguais && C.tela === 'colar' && C.nav === 'erpconf' && C.nivel >= 2 && C.nivel <= 3 && /Conferência ERP × App/.test(C.h1 || ''), `${C.gravadas} gravadas · ${C.nav} · nível ${C.nivel}`);
+    add(G, 'Importar — grava as 24 linhas, NÃO reescreve boletim nenhum e abre a tela "🔎 Conferência Agro1 × Boletim" (até 3 níveis no módulo)',
+      C.gravadas === 24 && C.boletinsIguais && C.tela === 'colar' && C.nav === 'erpconf' && C.nivel >= 2 && C.nivel <= 3 && /Conferência Agro1 × Boletim/.test(C.h1 || ''), `${C.gravadas} gravadas · ${C.nav} · nível ${C.nivel}`);
     add(G, 'Conferência — ⚠️ e 🔸 abertos, ➕ e ✅ recolhidos; cada item é UMA linha tocável ≥ 44 px; zero campo de digitação; chips só depois do toque',
       (C.grupos || []).join(',') === 'conf:aberto,app:aberto,erp:fechado,ok:fechado' && C.itens >= 4 && C.alvo >= TOQUE_MIN && C.campos === 0 && C.chipsAntes === 0, `${C.itens} itens · alvo ${Math.round(C.alvo || 0)} px · ${C.campos} campo(s) · ${C.chipsAntes} chip(s) antes do toque`);
-    add(G, 'Conferência — o toque abre NO LUGAR a linha do ERP lado a lado com o lançamento do app, com os quatro chips de resolução (≥ 44 px), sem modal',
-      C.aberto && C.aberto.ladoALado && C.aberto.chips.join(' · ') === 'é o mesmo lançamento · são aplicações diferentes · pedir conferência ao gerente · ERP precisa de correção' && C.aberto.alvo >= TOQUE_MIN && C.aberto.mesmaTela && !C.aberto.modal,
+    add(G, 'Conferência — o toque abre NO LUGAR a linha do Agro1 lado a lado com o lançamento do app, com os quatro chips de resolução (≥ 44 px), sem modal',
+      C.aberto && C.aberto.ladoALado && C.aberto.chips.join(' · ') === 'é o mesmo lançamento · são aplicações diferentes · pedir conferência ao gerente · Agro1 precisa de correção' && C.aberto.alvo >= TOQUE_MIN && C.aberto.mesmaTela && !C.aberto.modal,
       C.aberto ? C.aberto.chips.join(' · ') + ` · alvo ${Math.round(C.aberto.alvo)} px` : '');
     add(G, 'Conferência — um toque resolve, grava na hora, no lugar, com "desfazer" (nunca diálogo, nunca nativo); "desfazer" devolve o item à contagem',
       C.resolvido && C.resolvido.desfazer && C.resolvido.mesmaTela && C.resolvido.nativos === 0 && C.desfeito && C.desfeito.abertos === C.resolvido.abertos + 1,
       C.resolvido ? `${C.resolvido.abertos} → ${C.desfeito.abertos} em aberto · ${C.resolvido.nativos} nativo(s)` : '');
-    add(G, 'Aviso para conferência — pastilha "🔎 N lançamentos do ERP para conferir" na porta de entrada (só com item em aberto; sem push)',
-      /^🔎 \d+ lançamentos? do ERP para conferir$/.test(C.pastilha || ''), C.pastilha || 'sem pastilha');
-    add(G, 'Conferência — relata REGISTRO ("sem registro no boletim", "sem baixa no ERP", "para conferir"); nunca "não fez", "não lançou", "pendente", "erro do gerente"; nenhum custo',
-      /sem registro no boletim/.test(C.texto || '') && /sem baixa no ERP/.test(C.texto || '') && !/não fez|não lançou|erro do gerente|pendente|atrasad|R\$|custo/i.test(C.texto || ''), '');
+    add(G, 'Aviso para conferência — pastilha "🔎 N lançamentos do Agro1 para conferir" na porta de entrada (só com item em aberto; sem push)',
+      /^🔎 \d+ lançamentos? do Agro1 para conferir$/.test(C.pastilha || ''), C.pastilha || 'sem pastilha');
+    add(G, 'Conferência — relata REGISTRO ("sem registro no boletim", "sem baixa no Agro1", "para conferir"); nunca "não fez", "não lançou", "pendente", "erro do gerente"; nenhum custo',
+      /sem registro no boletim/.test(C.texto || '') && /sem baixa no Agro1/.test(C.texto || '') && !/não fez|não lançou|erro do gerente|pendente|atrasad|R\$|custo/i.test(C.texto || ''), '');
   }
 
   /* 16. Cartão do painel em duas etapas (v88): unidades primeiro, descrição só na tela da unidade */
