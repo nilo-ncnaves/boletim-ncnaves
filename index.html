@@ -5720,14 +5720,14 @@ function insConsumos(fz){
   /* v93: detalhe do grupo LIGADO a um lançamento — a calda diz quanto por tanque, a mensagem quantos
      tanques: consumo = qtd × tanques; área = tanques × L ÷ vazão (ou a do talhão). Sem tanques, não conta. */
   insAplicacoesRelatadas().filter(c=>c.vinculo && c.unidade===fz && n0(c.tanques)>0).forEach(c=>{
-    const area=insAplicAreaCalc(c) || ((c.talhaoId && c.talhaoId!=="geral") ? n0(talhao(c.talhaoId).area) : 0);
+    const area=insAplicAreaCalc(c) || insRelatoTalhoes(c).filter(t=>t!=="geral").reduce((s,t)=>s+n0(talhao(t).area),0);
     (c.calda||[]).forEach((x,i)=>{
       const un=String(x.un||"").toLowerCase(), fator=/^(l|lts?|litros?)$/.test(un)?1:un==="ml"?0.001:/^(kgs?|quilos?)$/.test(un)?1:(un==="g"||un==="gr")?0.001:0;
       if(!x.nome || !(n0(x.qtd)>0) || !fator) return;
       const kg=n0(x.qtd)*fator*n0(c.tanques);
       out.push({ id:c.id+":cal"+i, boletimId:c.vinculo.boletimId, data:c.data, produto:insProdutoNome(x.nome),
         chave:insChaveProd(x.nome), base:/^(l|lts?|litros?|ml)$/.test(un)?"L":"kg", kg, dose:area>0?kg/area:0, area,
-        onde:c.talhaoId||"", nome:(c.talhaoId && c.talhaoId!=="geral")?planoOndeNome(fz,c.talhaoId):"", op:c.vinculo.tipo||"",
+        onde:c.talhaoId||"", nome:insRelatoTalhoes(c).filter(t=>t!=="geral").map(t=>planoOndeNome(fz,t)).join(" · "), op:c.vinculo.tipo||"",
         detalhe:insNumTxt(n0(x.qtd))+" "+esc(x.un)+" × "+insNumTxt(n0(c.tanques))+" tanques (detalhe do grupo)", por:"" });
     });
   });
@@ -6103,7 +6103,10 @@ function insLerAplicacao(texto){
   const dp=local?deparaAtaDe(local):null;
   const unidade=(dp&&!dp.fora)?dp.unidade:"";
   const talhaoId=(unidade && dp.talhao && talhoesDa(unidade).some(t=>t.id===dp.talhao))?dp.talhao:"";
-  out.itens=[{bruto:cab||linhas[0]||"", nomeMsg:local, unidade, talhaoId, fora:!!(dp&&dp.fora), incluir:!(dp&&dp.fora)}];
+  /* v100: o local pode citar MAIS DE UM talhão ("Caxico topázio e mundo novo") — vem do de-para (um) ou do
+     nome inteiro do cadastro (um ou vários); a lista é a verdade, talhaoId é só o primeiro (leitores antigos) */
+  const talhoes=talhaoId?[talhaoId]:insTalhoesDoLocal(local, unidade, dp);
+  out.itens=[{bruto:cab||linhas[0]||"", nomeMsg:local, unidade, talhaoId:talhoes[0]||"", talhoes, sugeridos:talhaoId?0:talhoes.length, fora:!!(dp&&dp.fora), incluir:!(dp&&dp.fora)}];
   if(unidade && out.produto) out.operacao=insOperacaoAprendida(out.produto, atividadeDe(unidade));
   insAplicProcurarVinculo(out);
   return out;
@@ -6113,12 +6116,51 @@ function insLerAplicacao(texto){
    o lançamento que confere: mesmo produto (na calda, no insumo aplicado ou na receita dos grãos) e o
    mesmo talhão quando os dois são conhecidos. Achou: o detalhe da mensagem fica LIGADO àquele
    lançamento — nada é criado, nada é reescrito, nenhuma pergunta vai ao gerente. */
+/* v100: "Aplicação de sais Caxico topázio e mundo novo" — o local pode citar MAIS DE UM talhão. O app separa
+   por " e ", vírgula, ";", "/", "+" ou "&" e cada parte só entra se casar com UM talhão da unidade pelo nome
+   INTEIRO do cadastro, no fim da parte (a palavra do produto pode vir antes: "sais Caxico topázio"), com ou
+   sem o prefixo de área do de-para ("mundo novo" = "Caxico — Mundo Novo"). Parte que casa com nenhum ou com
+   mais de um talhão não é adivinhada — fica para o escritório escolher. Talhão arrendado fica fora. */
+function insTalhoesDoLocal(local, unidade, dp){
+  if(!local || !unidade) return [];
+  const tals=talhoesDa(unidade).filter(t=>t.tipo!=="ARRENDADO");
+  const pref=(dp&&dp.area)?planChaveAta(dp.area):"";
+  const chaves=t=>{ const k=planChaveAta(t.nome), ks=[k];
+    if(pref && k.startsWith(pref) && k.length>pref.length) ks.push(k.slice(pref.length));
+    return ks.filter(x=>x.length>=4); };
+  const casa=parte=>{ const kp=planChaveAta(parte); if(kp.length<4) return [];
+    return tals.filter(t=>chaves(t).some(k=>kp===k || kp.endsWith(k))); };
+  const kl=planChaveAta(local), inteiro=tals.filter(t=>chaves(t).some(k=>kl===k)); if(inteiro.length===1) return [inteiro[0].id];
+  const out=[];
+  String(local).split(/\s*(?:,|;|\/|\+|&|\be\b)\s*/i).map(s=>s.trim()).filter(Boolean).forEach(p=>{
+    const achou=casa(p); if(achou.length===1 && !out.includes(achou[0].id)) out.push(achou[0].id); });
+  return insOrdenarTalhoes(unidade, out);
+}
+/* v100: a fileira de chips nasce CURTA (mecanismo "＋N" da v80, P5): com talhão escolhido mostra SÓ os escolhidos
+   e "＋N" (o resto é "mais opções"); sem nenhum, os primeiros INS_TAL_MAX do cadastro e "＋N". O ＋N abre todos no
+   lugar (só na memória da tela). Sem rolar de lado, sem lista nativa. Medida: a tela fica em 2 telas (c/ P3). */
+const INS_TAL_MAX=4;
+function insChipsTalhao(tals, sel){
+  const ops=tals.map(t=>({id:t.id, nome:t.nome})).concat([{id:"geral", nome:"Área geral / sede"}]);
+  const aberta = insUI.talTodos || ops.length<=INS_TAL_MAX, base = sel.length ? 0 : INS_TAL_MAX;
+  const vis = aberta ? ops : ops.filter((o,i)=>i<base || sel.includes(o.id));
+  const resto = ops.length - vis.length;
+  return vis.map(o=>`<button type="button" class="chip ${sel.includes(o.id)?"on":""}" data-ins-tal="${esc(o.id)}">${esc(o.nome)}</button>`).join("")
+    + (resto>0?`<button type="button" class="chip sal-mais" data-ins-tal-mais="1" aria-label="Mostrar mais ${resto} talhão(ões)">＋${resto}</button>`:"");
+}
+/* a lista de talhões de um relato ou item da pré-visualização: a lista quando existe, senão o talhão único */
+const insRelatoTalhoes = c => (c && Array.isArray(c.talhoes) && c.talhoes.length) ? c.talhoes.filter(Boolean) : (c && c.talhaoId ? [c.talhaoId] : []);
+/* ordem do cadastro (talhoesDa), "Área geral / sede" por último — para o cartão, a atividade e o texto */
+const insOrdenarTalhoes = (fz, ts) => { const ordem=talhoesDa(fz).map(t=>t.id);
+  return [...new Set(ts)].sort((a,b)=>(a==="geral"?1e9:ordem.indexOf(a))-(b==="geral"?1e9:ordem.indexOf(b))); };
 function insAtivConfere(a, c){
   const kp=insChaveProd(c.produto||"");
   if(c.relatoId && a.relatoId===c.relatoId) return false;
   if(c.talhaoId && a.talhaoId && c.talhaoId!=="geral" && a.talhaoId!=="geral" && a.talhaoId!==c.talhaoId) return false;
+  /* v100: mistura ("sais": ureia, cloreto, MAP…) — a calda do gerente pode citar qualquer produto da calda da mensagem */
+  const kcs=[...new Set((c.calda||[]).flatMap(x=>[insChaveProd(x.nome||""), insNorm(x.nome||"")]).filter(k=>k.length>=3))];
   const temProd = !!kp && (insNorm(a.receita||"").includes(kp) || insChaveProd(a.insProduto||"")===kp ||
-    (a.produtos||[]).some(p=>insChaveProd(p.nome||"")===kp));
+    (a.produtos||[]).some(p=>insChaveProd(p.nome||"")===kp) || kcs.some(k=>insNorm(a.receita||"").includes(k)));
   const semProd = !String(a.receita||"").trim() && !a.insProduto && !(a.produtos||[]).some(p=>String(p.nome||"").trim());
   return temProd || (semProd && !!c.operacao && insNorm(nomeAtual(a.tipo||""))===insNorm(nomeAtual(c.operacao)));
 }
@@ -6132,12 +6174,15 @@ function insBuscarLancamento(fz, c, excetoBoletimId){
   return null;
 }
 function insAplicProcurarVinculo(p){
-  const it=(p.itens||[])[0]; p.vinculo=null;
+  const it=(p.itens||[])[0]; p.vinculo=null; p.vinculos=null;
   if(!it || !it.unidade || p.semVinculo) return;
-  const v=insBuscarLancamento(it.unidade, {produto:p.produto, talhaoId:it.talhaoId});
-  if(!v) return;
-  p.vinculo=v; p.data=v.data;
-  if(!it.talhaoId && v.talhaoId) it.talhaoId=v.talhaoId;
+  /* v100: com mais de um talhão, procura um lançamento por talhão e só liga quando TODOS têm o seu;
+     faltando algum, o relato inteiro vira pergunta — e o cartão do gerente é que marca o que já confere */
+  const ts=insRelatoTalhoes(it);
+  const vs=(ts.length?ts:[""]).map(t=>insBuscarLancamento(it.unidade, {produto:p.produto, talhaoId:t, calda:p.calda}));
+  if(vs.some(v=>!v)) return;
+  p.vinculo=vs[0]; p.vinculos=vs; p.data=vs[0].data;
+  if(!ts.length && vs[0].talhaoId){ it.talhoes=[vs[0].talhaoId]; it.talhaoId=vs[0].talhaoId; }
 }
 /* área que a calda cobre, só para conferir (tanques × litros ÷ vazão) — nunca vira campo do gerente */
 const insAplicAreaCalc = p => (n0(p.tanques)>0 && n0(p.ltanque)>0 && n0(p.vazao)>0) ? n0(p.tanques)*n0(p.ltanque)/n0(p.vazao) : 0;
@@ -6172,7 +6217,7 @@ function insFaltaAplicacao(p){
   if(!cat) return "Escolha uma unidade de café ou grãos";
   if(!String(p.produto||"").trim()) return "Escreva qual é o produto";
   if(p.vinculo) return "";
-  if(!it.talhaoId) return "Escolha o talhão";
+  if(!insRelatoTalhoes(it).length) return "Escolha o talhão";
   if(!p.operacao) return "Escolha a "+cat.rotulo.toLowerCase()+" do boletim";
   return "";
 }
@@ -6230,7 +6275,8 @@ const insAplicacoesRelatadas = () => { const out=[];
   insMensagens().forEach(m=>(m.criados||[]).forEach(c=>{ if(c.tipo==="aplicacao" && c.id) out.push({...c, msgId:m.id, por:m.por||"", em:m.em||""}); }));
   return out; };
 const insRelatosDo = (fz, data) => insAplicacoesRelatadas().filter(c=>c.unidade===fz && c.data===data);
-const insRelatoOnde = c => c.talhaoId==="geral" ? "Área geral / sede" : (c.talhaoId ? talhao(c.talhaoId).nome : (c.unidade?fazenda(c.unidade).nome:""));
+const insRelatoOnde = c => { const ts=insRelatoTalhoes(c);
+  return ts.length ? ts.map(t=>t==="geral"?"Área geral / sede":talhao(t).nome).join(" · ") : (c.unidade?fazenda(c.unidade).nome:""); };
 const insRelatoTexto = c => [insRelatoOnde(c), String(c.receita||"").replace(/\n/g,", "),
   n0(c.tanques)>0?insNumTxt(n0(c.tanques))+(n0(c.tanques)===1?" tanque":" tanques")+(n0(c.ltanque)>0?" × "+insNumTxt(n0(c.ltanque))+" L":""):(n0(c.ltanque)>0?insNumTxt(n0(c.ltanque))+" L por tanque":""),
   c.obs||""].filter(Boolean).join(" · ");
@@ -6247,7 +6293,7 @@ function insRelatoStatus(c){
 /* detalhe do grupo ligado a um lançamento: linha de leitura no boletim enviado (c3: diz de quando é) */
 function insDetalheGrupo(b, a){
   if(!b || !a) return "";
-  const ls=insAplicacoesRelatadas().filter(c=>c.vinculo && c.vinculo.atividadeId===a.id);
+  const ls=insAplicacoesRelatadas().filter(c=>(c.vinculos||(c.vinculo?[c.vinculo]:[])).some(v=>v.atividadeId===a.id));
   return ls.map(c=>{ const area=insAplicAreaCalc(c);
     const partes=[String(c.receita||"").replace(/\n/g,", "),
       n0(c.tanques)>0?insNumTxt(n0(c.tanques))+(n0(c.tanques)===1?" tanque":" tanques")+(n0(c.ltanque)>0?" × "+insNumTxt(n0(c.ltanque))+" L":""):(n0(c.ltanque)>0?insNumTxt(n0(c.ltanque))+" L por tanque":""),
@@ -6278,7 +6324,7 @@ function insVoltar(){
   else { insNav=[]; voltarDoModulo("colar"); }
 }
 const insRender = () => ir("colar",null,true);
-function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; }
+function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; insUI.talTodos=false; }
 
 /* ---- (3) cartão de chegada no topo do boletim: UM toque ----
    Único elemento novo SEMPRE visível do módulo — e só enquanto houver chegada
@@ -6433,13 +6479,18 @@ function linhaChuvaRelato(r){
    outra; "remover" é o desfazer. "Não lançar" some com o cartão e deixa "desfazer" no lugar. Relato
    que já confere com um lançamento do dia (mesmo talhão, mesmo produto) não pergunta de novo —
    é assim que a aplicação nunca conta duas vezes. */
-function insRelatoJaNoBoletim(r, c){
-  const q={produto:c.produto, talhaoId:c.talhaoId, operacao:c.operacao, relatoId:c.id};
-  const a=(r.atividades||[]).find(a=>insAtivConfere(a,q));
-  if(a) return {talhaoId:a.talhaoId, data:r.data};
-  const v=insBuscarLancamento(r.fazendaId, q, r.id||"");   /* boletim já enviado de outro dia dos últimos 7 */
-  return v ? {talhaoId:v.talhaoId, data:v.data} : null;
+function insRelatoConferencia(r, c){
+  /* v100: talhão a talhão — o que já tem lançamento igual (hoje ou nos 7 dias) e o que ainda não tem */
+  const ts=insRelatoTalhoes(c), feitos=[], faltam=[];
+  (ts.length?ts:[""]).forEach(t=>{
+    const q={produto:c.produto, talhaoId:t, operacao:c.operacao, relatoId:c.id, calda:c.calda};
+    const a=(r.atividades||[]).find(a=>insAtivConfere(a,q));
+    if(a){ feitos.push({talhaoId:a.talhaoId||t, data:r.data, alvo:t}); return; }
+    const v=insBuscarLancamento(r.fazendaId, q, r.id||"");   /* boletim já enviado de outro dia dos últimos 7 */
+    if(v) feitos.push({talhaoId:v.talhaoId||t, data:v.data, alvo:t}); else faltam.push(t); });
+  return {feitos, faltam};
 }
+const insRelatoJaNoBoletim = (r, c) => { const x=insRelatoConferencia(r,c); return x.faltam.length ? null : x.feitos[0]; };
 function cartaoAplicacaoRelato(r){
   if(!r || !r.fazendaId) return "";
   const cat=INS_APLIC_ATIVIDADE[atividadeDe(r.fazendaId)]; if(!cat) return "";
@@ -6451,17 +6502,20 @@ function cartaoAplicacaoRelato(r){
     if(resp && resp.resposta==="lancada" && (r.atividades||[]).some(a=>a.relatoId===c.id)) return "";
     if(resp && resp.resposta==="nao") return `<p class="mut" style="font-size:.78rem;margin:-6px 0 12px" data-ins-relato-linha="${esc(c.id)}">🚜 Aplicação de ${esc(c.produto)} relatada no grupo — não lançada
       <button class="btn suave mini" data-ins-aplic="${esc(c.id)}|desfazer" style="display:inline-flex;margin-left:6px;padding:2px 8px">desfazer</button></p>`;
-    const ja=insRelatoJaNoBoletim(r,c);
-    if(ja) return `<p class="mut" style="font-size:.78rem;margin:-6px 0 12px" data-ins-relato-linha="${esc(c.id)}">🚜 Aplicação de ${esc(c.produto)} relatada no grupo confere com o lançamento em ${esc(insRelatoOnde({talhaoId:ja.talhaoId,unidade:r.fazendaId}))}${ja.data!==r.data?" de "+esc(fmtDataCurta(ja.data)):""} ✔</p>`;
+    const conf=insRelatoConferencia(r,c);
+    if(!conf.faltam.length){ const ja=conf.feitos[0], datas=[...new Set(conf.feitos.map(f=>f.data))];
+      return `<p class="mut" style="font-size:.78rem;margin:-6px 0 12px" data-ins-relato-linha="${esc(c.id)}">🚜 Aplicação de ${esc(c.produto)} relatada no grupo confere com ${conf.feitos.length>1?"os lançamentos":"o lançamento"} em ${esc(insRelatoOnde({talhoes:conf.feitos.map(f=>f.talhaoId).filter(Boolean),unidade:r.fazendaId}))}${datas.length===1&&ja.data!==r.data?" de "+esc(fmtDataCurta(ja.data)):""} ✔</p>`; }
+    /* v100: parte dos talhões já tem lançamento — o toque lança só nos que faltam */
+    const parcial=conf.feitos.length?`<span class="mut" style="display:block;font-size:.78rem">${esc(insRelatoOnde({talhoes:conf.feitos.map(f=>f.alvo||f.talhaoId),unidade:r.fazendaId}))} já ${conf.feitos.length>1?"têm":"tem"} lançamento ✔ — o toque lança só em ${esc(insRelatoOnde({talhoes:conf.faltam,unidade:r.fazendaId}))}.</span>`:"";
     return `<div class="cartao" data-ins-relato="${esc(c.id)}" style="border-color:var(--verde)">
       <div class="linha-flex"><span class="cresce">
         <b>🚜 Aplicação relatada no grupo — ${esc(c.produto)}</b>
-        <span class="mut" style="display:block;font-size:.82rem">${esc(insRelatoTexto(c))} · foi assim?</span></span></div>
+        <span class="mut" style="display:block;font-size:.82rem">${esc(insRelatoTexto(c))} · foi assim?</span>${parcial}</span></div>
       <div class="chips mt">
         <button class="chip" data-ins-aplic="${esc(c.id)}|lancar">✅ Lançar no boletim</button>
         <button class="chip" data-ins-aplic="${esc(c.id)}|nao">❌ Não lançar</button>
       </div>
-      <p class="mut" style="font-size:.74rem;margin:6px 0 0">Um toque cria a atividade com estes detalhes — depois é só conferir e ajustar. Nada é gravado sem o seu toque.</p>
+      <p class="mut" style="font-size:.74rem;margin:6px 0 0">Um toque cria ${insRelatoTalhoes(c).length>1?"uma atividade por talhão":"a atividade"} com estes detalhes — depois é só conferir e ajustar. Nada é gravado sem o seu toque.</p>
     </div>`;
   }).join("");
 }
@@ -6714,20 +6768,22 @@ function insCorpoPrev(){
     const area=insAplicAreaCalc(p);
     const tals=it.unidade?talhoesDa(it.unidade).filter(t=>t.tipo!=="ARRENDADO"):[];
     const sug=p.operacao && p.produto && insOperacaoAprendida(p.produto,atv)===p.operacao;
+    const selT=insRelatoTalhoes(it), areaSel=selT.filter(t=>t!=="geral").reduce((s,t)=>s+n0(talhao(t).area),0);
+    const vincs=p.vinculos||(p.vinculo?[p.vinculo]:[]);
     return `<div class="cartao">
       <p class="mut" style="font-size:.8rem;margin:0 0 6px">${p.vinculo?"O gerente já lançou esta aplicação no boletim: o detalhe da mensagem fica ligado a esse lançamento, para leitura e para o consumo de insumo. Nada é criado."
-        :"Vira PERGUNTA no boletim da unidade naquele dia: o gerente lança com um toque, com estes detalhes já preenchidos, ou responde que não foi assim. Nada entra sem o toque dele."}</p>
+        :"Vira PERGUNTA no boletim da unidade, no dia: o gerente lança com um toque (uma atividade por talhão) ou diz que não foi assim."}</p>
       <label>Produto</label>
       <input data-insprev="-|produto" list="dl-ins" value="${esc(p.produto||"")}" placeholder="Qual produto foi aplicado?">
-      ${p.vinculo?`<div class="aviso verde mt" data-ins-vinculo="${esc(p.vinculo.atividadeId)}"><b>✔ Confere com o boletim de ${esc(fmtDataCurta(p.vinculo.data))}:</b> ${esc(p.vinculo.tipo)} — ${esc(insRelatoOnde({talhaoId:p.vinculo.talhaoId,unidade:p.vinculo.unidade}))} · ${esc(p.produto)}.
-        O detalhe desta mensagem fica ligado a esse lançamento; nada é criado e o boletim não é reescrito.
+      ${p.vinculo?`<div class="aviso verde mt" data-ins-vinculo="${esc(p.vinculo.atividadeId)}"><b>✔ Confere com o boletim de ${esc(fmtDataCurta(p.vinculo.data))}:</b> ${vincs.map(v=>esc(v.tipo)+" — "+esc(insRelatoOnde({talhaoId:v.talhaoId,unidade:v.unidade}))+(v.data!==p.vinculo.data?" ("+esc(fmtDataCurta(v.data))+")":"")).join(" · ")} · ${esc(p.produto)}.
+        O detalhe desta mensagem fica ligado a ${vincs.length>1?"esses lançamentos":"esse lançamento"}; nada é criado e o boletim não é reescrito.
         <div class="chips mt"><button class="chip" data-ins-desvinc="1">Não é este lançamento</button></div></div>`
       :`<label>Dia da aplicação</label>
       <input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}" max="${hojeBRT()}">
       ${p.semVinculo?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Sem ligação com lançamento: vira pergunta no boletim do dia escolhido. <button class="btn suave mini" data-ins-revinc="1" style="display:inline-flex;padding:2px 8px">procurar de novo</button></p>`
-      :`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Nenhum lançamento deste produto nos boletins dos últimos 7 dias da unidade — vira pergunta no boletim do dia escolhido.</p>`}`}
+      :``}`}
       ${p.dataMsg && p.dataMsg!==p.data?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">A mensagem traz a data ${esc(fmtDataCurta(p.dataMsg))}, fora dos últimos 7 dias — confira o dia.</p>`:""}
-      <label>Calda / receita (como veio na mensagem)</label>
+      <label>Calda / receita (como veio)</label>
       <textarea data-insprev="-|receita" rows="3" style="width:100%" placeholder="Ex.: 2lts Quatermon">${esc(p.receita||"")}</textarea>
       <div class="grade2 mt">
         <div><label>Tanques gastos</label><input inputmode="numeric" data-insprev="-|tanques" value="${esc(p.tanques||"")}" placeholder="Ex.: 5"></div>
@@ -6735,24 +6791,23 @@ function insCorpoPrev(){
       </div>
       <label>Observação</label>
       <input data-insprev="-|obs" value="${esc(p.obs||"")}" placeholder="Opcional">
-      ${area?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">≈ ${esc(fmtHa(area))} ha cobertos pela calda (${esc(insNumTxt(n0(p.tanques)))} tanques × ${esc(insNumTxt(n0(p.ltanque)))} L ÷ ${esc(insNumTxt(n0(p.vazao)))} L/ha) — só para conferir${p.vinculo?"":"; quem confirma é o gerente"}.</p>`:""}
+      ${area?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">≈ ${esc(fmtHa(area))} ha pela calda (${esc(insNumTxt(n0(p.tanques)))} × ${esc(insNumTxt(n0(p.ltanque)))} L ÷ ${esc(insNumTxt(n0(p.vazao)))} L/ha) — só para conferir.</p>`:""}
       ${(p.soltas||[]).length?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">Linhas que o app não usou: ${esc(p.soltas.join(" · "))}</p>`:""}
     </div>
     <div class="plan-linha"><div class="cad-item" style="margin:0">
       <span class="cresce"><b>${esc(it.nomeMsg||"local não informado na mensagem")}</b>
-        <span class="mut">${it.unidade?esc(fazenda(it.unidade).nome)+(it.talhaoId?" · "+esc(insRelatoOnde(it)):""):"unidade não reconhecida"}</span></span></div>
+        <span class="mut">${it.unidade?esc(fazenda(it.unidade).nome)+(selT.length?" · "+esc(insRelatoOnde(it))+(areaSel>0?" ("+esc(fmtHa(areaSel))+" ha)":""):""):"unidade não reconhecida"}</span></span></div>
       ${!it.unidade?selUn(0,it.unidade):""}
       ${it.unidade && !cat?`<div class="aviso">${esc(fazenda(it.unidade).nome)} é unidade de pecuária — o boletim de pecuária não tem aplicação por talhão. Escolha outra unidade ou descarte.</div>${selUn(0,it.unidade)}`:""}
-      ${it.unidade && cat && !p.vinculo?`<div class="plan-acoes"><label>Qual talhão?</label>
-        <select data-insprev="0|talhaoId" style="width:100%;min-height:44px;padding:8px">
-          <option value="">— escolher talhão —</option>
-          ${tals.map(t=>`<option value="${t.id}" ${it.talhaoId===t.id?"selected":""}>${esc(t.nome)} — ${t.area} ha</option>`).join("")}
-          <option value="geral" ${it.talhaoId==="geral"?"selected":""}>Área geral / sede</option></select>
+      ${it.unidade && cat && !p.vinculo?`<div class="plan-acoes"><label>Em quais talhões?</label>
+        ${chipsSelecao("ins-tal",{um:"talhão selecionado",varios:"talhões selecionados"})}
+        <div class="chips">${insChipsTalhao(tals, selT)}</div>
+        ${it.sugeridos?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Sugeridos pelo nome que veio na mensagem — confira.</p>`:""}
         <label class="mt">${esc(cat.rotulo)} no boletim</label>
         <select data-insprev="-|operacao" style="width:100%;min-height:44px;padding:8px">
           <option value="">— toque para escolher —</option>
           ${cat.grupos().map(([g,ops])=>`<optgroup label="${esc(g)}">${ops.map(o=>`<option value="${esc(o)}" ${p.operacao===o?"selected":""}>${esc(o)}</option>`).join("")}</optgroup>`).join("")}</select>
-        <p class="mut" style="font-size:.76rem;margin:4px 0 0">${sug?"Sugerida pelo que você escolheu da última vez para este produto — troque se for outra.":"O app não adivinha a atividade pelo nome do produto: escolha uma vez e ele lembra para este produto."}</p></div>`:""}
+        <p class="mut" style="font-size:.76rem;margin:4px 0 0">${sug?"Sugerida pela sua última escolha para este produto — troque se for outra.":"Escolha uma vez: o app lembra para este produto."}</p></div>`:""}
     </div>`;
   }
   if(p.tipo==="chuva") return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Relato de chuva é SUGESTÃO: o app não grava chuva no boletim de ninguém. Confirmado aqui, o número aparece no boletim da unidade com um "usar" — quem registra é o gerente.</p>
@@ -6792,7 +6847,7 @@ function insVMensagem(id){
         c.tipo==="remessa"?"📦 remessa de "+esc(c.produto||"")+(c.fornecedor?" ("+esc(c.fornecedor)+")":"")+" · "+esc(insQtd(n0(c.kg),"kg"))+" em "+n0(c.unidades)+" unidades"
         :c.tipo==="chuva"?"🌧️ sugestão de "+insNumTxt(c.mm)+" mm em "+esc(fazenda(c.unidade).nome)+" ("+esc(fmtDataCurta(c.data))+")"
         :c.tipo==="tarefa"?"🗒️ tarefa "+esc(c.desc||"")+(c.unidade?" · "+esc(fazenda(c.unidade).nome):"")
-        :c.tipo==="aplicacao"?"🚜 aplicação de "+esc(c.produto||"")+" em "+esc(fazenda(c.unidade).nome)+(c.talhaoId?" · "+esc(insRelatoOnde(c)):"")+" ("+esc(fmtDataCurta(c.data))+") · "+esc(insRelatoStatus(c))
+        :c.tipo==="aplicacao"?"🚜 aplicação de "+esc(c.produto||"")+" em "+esc(fazenda(c.unidade).nome)+(insRelatoTalhoes(c).length?" · "+esc(insRelatoOnde(c)):"")+" ("+esc(fmtDataCurta(c.data))+") · "+esc(insRelatoStatus(c))
         :c.tipo==="erp"?"🔎 baixa do Agro1 em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+((c.linhas||[]).length)+" linhas · ⚠️ "+((c.resumo||{}).conf||0)+" · 🔸 "+((c.resumo||{}).so_app||0)+` <button class="btn suave mini" data-erp-abrirconf="${esc(c.id)}" style="display:inline-flex;padding:2px 8px">abrir conferência</button>`
         :c.tipo==="erp_relato"?"🧾 relato de "+esc(erpOpRot(c.operacaoErp).toLowerCase())+" em "+esc(fazenda(c.unidade).nome)+" · "+esc(erpCompRot(c.competencia))+" · "+esc((c.produtos||[]).join(", "))+(c.pdfId?" · ligado ao relatório do Agro1":" — aguardando relatório do Agro1")
         :"📋 "+esc(c.desc||c.tipo||"")}</p>`).join("")
@@ -6830,19 +6885,23 @@ function insImportar(){
   } else if(p.tipo==="aplicacao"){
     const it=vao[0], falta=insFaltaAplicacao(p);
     if(falta){ atualizarAvanco("bt-ins-importar", falta); return; }
-    const atv=atividadeDe(it.unidade), v=p.vinculo||null;
-    insAprenderUnidade(it.nomeMsg, it.unidade, it.talhaoId);
+    const atv=atividadeDe(it.unidade), v=p.vinculo||null, vs=p.vinculos||(v?[v]:null);
+    const tsItem=insRelatoTalhoes(it);
+    /* v100: os talhões do relato — pelos lançamentos ligados (um por talhão) ou pelos chips; talhaoId é só o primeiro */
+    const talhoes=insOrdenarTalhoes(it.unidade, v ? vs.map((x,i)=>x.talhaoId||tsItem[i]||"").filter(Boolean) : tsItem);
+    insAprenderUnidade(it.nomeMsg, it.unidade, talhoes.length===1?talhoes[0]:"");
     if(p.produtoTermo) insAprenderProduto(p.produtoTermo, p.produto);
     if(!v) insAprenderOperacao(p.produto, atv, p.operacao);
     /* a calda diz a unidade de medida do produto (L ou kg): o catálogo passa a saber, para o consumo somar certo */
     const un0=((p.calda||[]).find(x=>insChaveProd(x.nome)===insChaveProd(p.produto))||{}).un||"";
     if(un0) insGarantirProduto(p.produto, {un:/^(l|lts?|litros?|ml)$/.test(un0)?"L":"kg"});
-    const c={tipo:"aplicacao", id:uid(), unidade:it.unidade, talhaoId:v?(v.talhaoId||it.talhaoId):it.talhaoId, data:v?v.data:(p.data||hojeBRT()),
+    const vinc=x=>({boletimId:x.boletimId, atividadeId:x.atividadeId, data:x.data, tipo:x.tipo, talhaoId:x.talhaoId});
+    const c={tipo:"aplicacao", id:uid(), unidade:it.unidade, talhaoId:talhoes[0]||"", talhoes, data:v?v.data:(p.data||hojeBRT()),
       produto:String(p.produto).trim(), operacao:v?v.tipo:p.operacao, receita:String(p.receita||"").trim(), calda:p.calda||[],
       tanques:String(p.tanques||"").trim(), ltanque:String(p.ltanque||"").trim(), vazao:String(p.vazao||"").trim(), obs:String(p.obs||"").trim(),
-      nomeMsg:it.nomeMsg||"", vinculo:v?{boletimId:v.boletimId, atividadeId:v.atividadeId, data:v.data, tipo:v.tipo, talhaoId:v.talhaoId}:null};
+      nomeMsg:it.nomeMsg||"", vinculo:v?vinc(v):null, ...(vs&&vs.length>1?{vinculos:vs.map(vinc)}:{})};
     const repetida=insAplicacoesRelatadas().some(x=>x.unidade===c.unidade && insChaveProd(x.produto)===insChaveProd(c.produto) &&
-      (v ? (x.vinculo && x.vinculo.atividadeId===v.atividadeId) : (x.data===c.data && x.talhaoId===c.talhaoId && !x.vinculo)));
+      (v ? (x.vinculo && x.vinculo.atividadeId===v.atividadeId) : (x.data===c.data && insRelatoTalhoes(x).join()===talhoes.join() && !x.vinculo)));
     if(repetida) insUI.flash = v ? "Este detalhe já estava ligado ao lançamento de "+fmtDataCurta(c.data)+" — nada foi duplicado."
       : "Esta aplicação já estava sugerida no boletim de "+fmtDataCurta(c.data)+" — nada foi duplicado.";
     else { insRegistrarMensagem({texto:insUI.texto, tipo:"aplicacao", criados:[c]});
@@ -6891,7 +6950,7 @@ function insInput(el){
       atualizarAvanco("bt-ins-importar", String(insUI.prev.produto||"").trim()||insUI.prev.tipo!=="remessa"?"":"Escreva qual é o produto"); return true; }
     const it=insUI.prev.itens[parseInt(i,10)];
     if(it){ it[campo]=el.value;
-      if(insUI.prev.tipo==="aplicacao" && campo==="unidade"){ it.talhaoId="";   /* v93: trocou a unidade, o talhão e a atividade são outros */
+      if(insUI.prev.tipo==="aplicacao" && campo==="unidade"){ it.talhaoId=""; it.talhoes=[]; it.sugeridos=0;   /* v93: trocou a unidade, o talhão e a atividade são outros */
         insUI.prev.operacao = (it.unidade && insUI.prev.produto) ? insOperacaoAprendida(insUI.prev.produto, atividadeDe(it.unidade)) : "";
         insAplicProcurarVinculo(insUI.prev); }
       if(campo==="unidade" || campo==="talhaoId") insRender(); }
@@ -6931,8 +6990,17 @@ function insClique(t,d){
     rascunho.relatos=rascunho.relatos||{};
     if(modo==="lancar"){
       const cat=INS_APLIC_ATIVIDADE[atividadeDe(rascunho.fazendaId)]; if(!cat) return true;
-      const a=cat.registro(c); rascunho.atividades=rascunho.atividades||[]; rascunho.atividades.push(a);
-      rascunho.relatos[id]={resposta:"lancada", atividadeId:a.id, por:rascunho.responsavel||"", em:new Date().toISOString()};
+      /* v100: uma atividade por talhão, só nos que ainda não têm lançamento; os tanques da mensagem são o TOTAL
+         dos talhões — entram uma vez, no primeiro, e as outras atividades dizem onde a calda foi contada */
+      const conf=insRelatoConferencia(rascunho,c), ts=conf.faltam.length?conf.faltam:(insRelatoTalhoes(c).length?insRelatoTalhoes(c):[""]);
+      const nomes=ts.map(t=>insRelatoOnde({talhaoId:t,unidade:c.unidade})), nT=n0(c.tanques), ids=[];
+      rascunho.atividades=rascunho.atividades||[];
+      ts.forEach((t,i)=>{ const base={...c, talhaoId:t, talhoes:[t]};
+        if(ts.length>1 && nT>0){
+          if(i>0){ base.tanques=""; base.obs=[c.obs, "calda contada em "+nomes[0]+" ("+insNumTxt(nT)+" tanques no total)"].filter(Boolean).join(" · "); }
+          else base.obs=[c.obs, insNumTxt(nT)+" tanques no total, junto com "+nomes.slice(1).join(", ")].filter(Boolean).join(" · "); }
+        const a=cat.registro(base); rascunho.atividades.push(a); ids.push(a.id); });
+      rascunho.relatos[id]={resposta:"lancada", atividadeId:ids[0], ...(ids.length>1?{atividadeIds:ids}:{}), por:rascunho.responsavel||"", em:new Date().toISOString()};
     } else if(modo==="nao") rascunho.relatos[id]={resposta:"nao", por:rascunho.responsavel||"", em:new Date().toISOString()};
     else delete rascunho.relatos[id];
     salvarRascunho(); ir(telaAtual,null,true); return true; }
@@ -6954,7 +7022,14 @@ function insClique(t,d){
     insAbrirPrev();
     insRender(); return true; }
   if(d.insTipo!==undefined){ insUI.tipo=d.insTipo; insAbrirPrev(); insRender(); return true; }
-  if(d.insDesvinc!==undefined && insUI.prev){ insUI.prev.semVinculo=true; insUI.prev.vinculo=null; insUI.prev.data=hojeBRT(); insRender(); return true; }
+  if(d.insTalMais!==undefined && insUI.prev){ insUI.talTodos=true; insRender(); return true; }
+  if(d.insTal!==undefined && insUI.prev && insUI.prev.tipo==="aplicacao"){   /* v100: um toque liga/desliga o talhão; "Área geral" é excludente */
+    const it=insUI.prev.itens[0]; if(!it) return true;
+    let ts=insRelatoTalhoes(it), id=d.insTal;
+    if(ts.includes(id)) ts=ts.filter(x=>x!==id); else ts = id==="geral" ? ["geral"] : ts.filter(x=>x!=="geral").concat(id);
+    it.talhoes=insOrdenarTalhoes(it.unidade, ts); it.talhaoId=it.talhoes[0]||""; it.sugeridos=0;
+    insRender(); return true; }
+  if(d.insDesvinc!==undefined && insUI.prev){ insUI.prev.semVinculo=true; insUI.prev.vinculo=null; insUI.prev.vinculos=null; insUI.prev.data=hojeBRT(); insRender(); return true; }
   if(d.insRevinc!==undefined && insUI.prev){ insUI.prev.semVinculo=false; insAplicProcurarVinculo(insUI.prev); insRender(); return true; }
   if(t.id==="bt-ins-limpar"){ insLimpar(); insRender(); return true; }
   if(d.insIncl!==undefined && insUI.prev){ const it=insUI.prev.itens[parseInt(d.insIncl,10)];
@@ -9734,7 +9809,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v99";
+const APP_VERSAO="v100";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};

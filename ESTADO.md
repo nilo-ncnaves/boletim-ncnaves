@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v98** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v100** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -2616,9 +2616,64 @@ do de-para recebe o talhão que faltava na linha que já existia (mesma regra da
 v86). Nome de local confirmado uma vez na pré-visualização entra no de-para
 com o talhão; linha que já tinha talhão não é sobrescrita.
 
+### Vários talhões na mesma mensagem (v100)
+Relato do Nilo em 17/09/2026, com a mensagem real "Aplicação de sais Caxico
+topázio e mundo novo / Ureia 5kg / Cloreto pó 10kg / Map purificado 10kg /
+Sulfato magnésio 15kg / Sulfato zinco 5kg / Dose / 2000lts / Gastou 10 arbus":
+a tela só deixava escolher UM talhão. Regra que fica: **um relato pode citar
+vários talhões; o gerente lança uma atividade por talhão com um toque; os
+tanques da mensagem contam uma vez.**
+- **Leitura (`insTalhoesDoLocal`):** o local é separado por " e ", vírgula,
+  ";", "/", "+" ou "&"; cada parte entra só se casar com UM talhão da unidade
+  pelo nome INTEIRO do cadastro, no fim da parte (a palavra do produto pode vir
+  antes: "sais Caxico topázio"), com ou sem o prefixo de área do de-para
+  ("mundo novo" = "Caxico — Mundo Novo"). Parte que casa com nenhum ou com mais
+  de um talhão (ex.: "área geral" com a área Igrejinha) não é adivinhada; só a
+  área ("Caxico") também não. Talhão do de-para (`talhao`) continua vencendo.
+- **Pré-visualização:** "Em quais talhões?" em chips de multi-seleção com os
+  chips removíveis da v74 (`chipsSelecao("ins-tal")`: "2 talhões
+  selecionados", × "Remover Caxico — Topázio" ≥ 44 px, fileira que quebra em
+  linhas), "Área geral / sede" excludente; a fileira NASCE CURTA pelo mecanismo
+  "＋N" da v80 (`INS_TAL_MAX` = 4 do cadastro + os escolhidos sempre visíveis;
+  "＋7" abre os 11 no lugar) — sem isso a tela passava de 2 telas (2,64) e
+  virava ❌ novo; a linha da unidade soma a área dos
+  talhões ("Caxico — Mundo Novo · Caxico — Topázio (55,00 ha)"); a nota diz
+  "Talhões sugeridos pelo nome que veio na mensagem — confira e ajuste". A
+  atividade continua na lista nativa. Produto e atividade continuam não
+  adivinhados (a mensagem dos sais nasce com "produto a informar").
+- **Dado:** o relato leva `talhoes` (lista, na ordem do cadastro) e `talhaoId`
+  (o primeiro — leitores antigos continuam funcionando; `insRelatoTalhoes(c)`
+  lê os dois). Reimportar com os mesmos talhões não duplica. Com mais de um
+  talhão, o de-para aprende só a unidade do nome composto (nenhum talhão
+  entra pelo nome composto).
+- **Boletim do gerente:** UMA pergunta com os talhões listados; "Lançar no
+  boletim" cria UMA atividade por talhão (`INS_APLIC_ATIVIDADE[].registro`,
+  como antes); os tanques (total da mensagem) entram uma vez, na primeira
+  atividade, com "10 tanques no total, junto com Caxico — Topázio" na
+  observação, e as outras levam "calda contada em Caxico — Mundo Novo (10
+  tanques no total)" — nada é somado duas vezes e nada é dividido por
+  palpite. `b.relatos[id]` ganha `atividadeIds` (além de `atividadeId`).
+  Parte já lançada à mão: o cartão diz "Caxico — Topázio já tem lançamento ✔
+  — o toque lança só em Caxico — Mundo Novo" (`insRelatoConferencia`, talhão a
+  talhão). Todos lançados: "confere com os lançamentos em … ✔", sem pergunta.
+- **Mensagem depois do boletim:** só liga quando TODOS os talhões têm o seu
+  lançamento (um por talhão, `vinculos`; `vinculo` continua sendo o primeiro);
+  faltando algum, vira pergunta e o cartão do gerente marca o que já confere. O
+  detalhe do grupo aparece embaixo de cada atividade ligada; o consumo conta
+  UMA vez (área = calda, ou a soma dos talhões quando a mensagem não traz
+  vazão: 5 kg × 10 tanques = 50 kg de ureia em 55 ha).
+- **Casamento por calda:** a calda do gerente pode citar qualquer produto da
+  calda da mensagem — "Ureia 5kg, Cloreto pó 10kg" confere com o relato cujo
+  produto o escritório chamou de "Sais" (`insAtivConfere`, v100).
+- **"Aplicação de sais" no catálogo do café:** é adubação foliar com
+  pulverizador ("Gastou 10 arbus", calda de 2.000 L) — a atividade que o
+  escritório escolhe é **Pulverização mecanizada** (Tratos culturais); o app
+  lembra a escolha por produto (`D.deparaOperacao`), como antes.
+
 ### Limites conhecidos
-- Uma aplicação por mensagem colada (uma unidade, um talhão). Mensagem com
-  várias aplicações: colar uma de cada vez.
+- Uma aplicação (um produto/calda, uma unidade) por mensagem colada; desde a
+  v100 com um ou vários talhões da mesma unidade. Mensagem com várias
+  aplicações de produtos diferentes: colar uma de cada vez.
 - A pergunta (sem lançamento que confira) aparece só no boletim DAQUELE dia.
   Se o boletim do dia já foi enviado sem a aplicação, o gerente vê a pergunta
   ao corrigir (48 h); depois disso a situação fica em Mensagens importadas como
@@ -2640,8 +2695,19 @@ com o talhão; linha que já tinha talhão não é sobrescrita.
   situação "ligada ao boletim de 14/09", detalhe no boletim enviado, consumo
   de 10 L em 20 ha, nenhuma pergunta ao gerente em 15/09 e relato solto que
   confere com o lançamento de ontem).
-- `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (10 ✅) e as
+- `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (10 ✅; 11 ✅
+  desde a v100, com a checagem dos chips de talhão) e as
   telas "Colar do WhatsApp › Conferir a aplicação" (as duas formas, ≤ 2 telas).
+- v100 (`node scripts/teste_insumos.cjs` → **164 ✅ · 0 ❌**; 23 provas novas
+  com a mensagem real dos sais; `scripts/regressao_render.cjs` `origin/main` ×
+  v100: café, grãos, pecuária e pós-colheita idênticos — só o minuto do relógio
+  no localStorage —, Diretoria e ADMIN só com o número da versão): leitura dos dois talhões pelo nome inteiro (e os casos que NÃO
+  entram), chips removíveis na pré-visualização (× remove, chip devolve, "Área
+  geral" excludente, alvo ≥ 44 px, sem rolar de lado), relato com `talhoes`,
+  idempotência, de-para só da unidade, pergunta única no boletim, um toque =
+  duas atividades com os tanques contados uma vez, parte já lançada, tudo
+  lançado ("confere ✔"), mensagem depois do boletim ligada aos dois
+  lançamentos e consumo contado uma vez (50 kg em 55 ha).
 
 ## Aparelho sem unidade aberta no monitor de chegada (v84)
 Fecha o diagnóstico de 11/09/2026. O Nilo confirmou: o código era
@@ -2869,6 +2935,11 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v100, 17/09/2026: **804 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v99, nenhum
+novo. A v100 acrescentou 1 checagem ao grupo "18. Relato de aplicação" (talhão
+em chips removíveis) e manteve a tela "Colar do WhatsApp › Conferir a aplicação"
+em 1,99 telas (o main mede 1,98): a fileira de talhões nasce com só os escolhidos
++ "＋N", e dois textos de explicação da tela ficaram mais curtos. Medição anterior,
 v99, 16/09/2026: **803 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o `origin/main`
 da v98 mede 763 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v99 acrescentou
 o grupo "20. Relatórios em três níveis" (20 ✅) e as telas "Relatórios (menu,
