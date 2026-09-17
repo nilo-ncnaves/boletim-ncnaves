@@ -458,6 +458,7 @@ gênero do substantivo. Tabela vigente:
 | Cadastros › Códigos › novo combinado › Unidades avulsas | `combo-uni` | 1 unidade selecionada | N unidades selecionadas |
 | Cadastros › Catálogos › Máquinas › vínculo com fazendas | `vinc-faz` | 1 fazenda selecionada | N fazendas selecionadas |
 | Cadastros › Fazendas › detalhe › Estrutura de pós-colheita | `estr` | 1 item selecionado | N itens selecionados |
+| Colar do WhatsApp › Conferir a aplicação › "Em quais talhões?" (v100; café e grãos, tela do escritório) | `ins-tal` | 1 talhão selecionado | N talhões selecionados |
 
 🌾 Grãos: a única multi-seleção ("Qual foi o problema?" no cartão do
 pivô, `igpb`) mora DENTRO da tela de apontamento em 3 passos e por isso

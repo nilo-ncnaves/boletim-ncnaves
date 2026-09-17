@@ -73,6 +73,10 @@ const MSG_APLIC = ['Aplicação de Quatermon Caxico arrendo', '', '2lts Quatermo
   'Gastou 5 arbus', '', 'Obs: daqui a 15 dias vamos repetir a aplicação'].join('\n');
 /* v96: mensagem REAL do grupo "Aplicações Realizadas" (15/09/2026) — a baixa já feita no Agro1; o PDF é a fixture sintética
    tests/fixtures/erp-ferti-vereda-romaria-2026-09-15.pdf (mesmo layout e números do relatório real) */
+/* v100: mensagem REAL do grupo (17/09/2026) — DOIS talhões no mesmo relato ("Caxico topázio e mundo novo"),
+   calda de cinco sais, 10 tanques de 2.000 L; a atividade que o escritório escolhe é Pulverização mecanizada */
+const MSG_SAIS = ['Aplicação de sais Caxico topázio e mundo novo', '', 'Ureia 5kg', 'Cloreto pó 10kg', 'Map purificado 10kg',
+  'Sulfato magnésio 15kg', 'Sulfato zinco 5kg', '', 'Dose / 2000lts', 'Gastou 10 arbus'].join('\n');
 const MSG_ERP = ['Ferti-irrigação mês de Setembro/26 Fazenda Vereda-Romaria , finalizada ✅', '', 'Obs : Adubos já baixados no sistema !', '', 'Acido borico', 'Sulf. Manganês', 'Sulf. Zinco'].join('\n');
 
 const provas = [];
@@ -452,17 +456,17 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
       const bt = document.getElementById('bt-ins-importar');
       const faltaAntes = bt ? bt.getAttribute('data-falta') || '' : 'sem botão';
       const selOp = document.querySelector('#app select[data-insprev="-|operacao"]');
-      const selTal = document.querySelector('#app select[data-insprev="0|talhaoId"]');
+      const talSel = [...document.querySelectorAll('#app .chip.on[data-ins-tal]')].map(b => b.dataset.insTal).join();
       const grupos = selOp ? [...selOp.querySelectorAll('optgroup')].map(g => g.label) : [];
       selOp.value = 'Pulverização mecanizada'; selOp.dispatchEvent(new Event('input', { bubbles: true })); selOp.dispatchEvent(new Event('change', { bubbles: true }));
       const faltaDepois = document.getElementById('bt-ins-importar').getAttribute('data-falta') || '';
-      return { faltaAntes, faltaDepois, grupos, talSel: selTal ? selTal.value : 'sem select', rotulo: bt ? bt.textContent.trim() : '',
+      return { faltaAntes, faltaDepois, grupos, talSel, rotulo: bt ? bt.textContent.trim() : '',
         nativos: window.__nativos || 0, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
     }, MSG_APLIC);
     ok('Pré-visualização — pede a atividade do boletim antes de levar ao gerente (botão inativo diz o que falta)',
       /Escolha a atividade/.test(prev.faltaAntes) && prev.faltaDepois === '' && prev.rotulo === 'Levar ao boletim',
       '"' + prev.faltaAntes + '" → "' + prev.faltaDepois + '" · ' + prev.rotulo);
-    ok('Pré-visualização — a lista de atividades é o catálogo do café por natureza; o talhão já vem escolhido pelo de-para',
+    ok('Pré-visualização — a lista de atividades é o catálogo do café por natureza; o talhão já vem escolhido pelo de-para (chip aceso)',
       prev.grupos.length >= 4 && prev.talSel === 't055', prev.grupos.join(' · ') + ' · talhão ' + prev.talSel);
     ok('Pré-visualização — sem termo de cobrança e sem nativo', !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto) && prev.nativos === 0, prev.nativos + ' nativo(s)');
 
@@ -577,12 +581,12 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     const desl = await page.evaluate(async () => {
       document.querySelector('#app [data-ins-desvinc]').click(); await new Promise(r => setTimeout(r, 150));
       const semV = { vinculo: insUI.prev.vinculo, rotulo: document.getElementById('bt-ins-importar').textContent.trim(), data: insUI.prev.data,
-        selects: document.querySelectorAll('#app select[data-insprev]').length };
+        selects: document.querySelectorAll('#app select[data-insprev]').length, chips: document.querySelectorAll('#app [data-ins-tal]').length };
       document.querySelector('#app [data-ins-revinc]').click(); await new Promise(r => setTimeout(r, 150));
       return { semV, deNovo: !!insUI.prev.vinculo };
     });
-    ok('"Não é este lançamento" volta ao caminho da pergunta (dia de hoje, talhão e atividade a escolher); "procurar de novo" religa',
-      desl.semV.vinculo === null && desl.semV.rotulo === 'Levar ao boletim' && desl.semV.selects === 2 && desl.deNovo, JSON.stringify(desl.semV.rotulo) + ' · religou: ' + desl.deNovo);
+    ok('"Não é este lançamento" volta ao caminho da pergunta (dia de hoje, talhão em chips e atividade em lista); "procurar de novo" religa',
+      desl.semV.vinculo === null && desl.semV.rotulo === 'Levar ao boletim' && desl.semV.selects === 1 && desl.semV.chips > 0 && desl.deNovo, JSON.stringify(desl.semV.rotulo) + ' · ' + desl.semV.selects + ' lista(s) · ' + desl.semV.chips + ' chip(s) · religou: ' + desl.deNovo);
     const grav = await page.evaluate(() => {
       const antesB = D.boletins.length, antesA = D.boletins.find(b => b.id === 'b-rubens-1409').atividades.length;
       insImportar();
@@ -632,6 +636,186 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     await ctx.close();
   }
 
+
+  /* ======================================================================
+     v100 — DOIS TALHÕES NO MESMO RELATO (mensagem real de 17/09/2026: "Aplicação de sais
+     Caxico topázio e mundo novo"). O escritório marca os talhões em chips removíveis; o
+     gerente lança uma atividade por talhão com um toque; os tanques contam uma vez.
+     ====================================================================== */
+  let estadoSais = null;
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-17T09:00:00-03:00');
+    const lido = await page.evaluate(t => {
+      const cls = insClassificar(t), p = insLerAplicacao(t), it = p.itens[0];
+      return { cls: cls.tipo, unidade: it.unidade, talhoes: it.talhoes, nomes: insRelatoOnde(it), sugeridos: it.sugeridos, produto: p.produto,
+        tanques: p.tanques, ltanque: p.ltanque, calda: p.calda.map(c => c.nome + ' ' + c.qtd + c.un).join(' · '), operacao: p.operacao,
+        /* o mesmo leitor com UM talhão pelo nome inteiro, e com um nome que casa com dois talhões (não adivinha) */
+        um: insTalhoesDoLocal('sais Caxico topázio', 'f14c', deparaAtaDe('Caxico')).join(),
+        /* com a área "Igrejinha" no de-para, "área geral" casa com "Área geral" (sede) E com "Igrejinha — Área geral": dois talhões → não entra */
+        ambiguo: insTalhoesDoLocal('sais área geral', 'f14c', deparaAtaDe('FMC Igrejinha')).join(),
+        soUnidade: insTalhoesDoLocal('Caxico', 'f14c', deparaAtaDe('Caxico')).join() };
+    }, MSG_SAIS);
+    ok('Sais — a mensagem real é reconhecida como relato de aplicação, na unidade Monte Carmelo — Café (de-para "Caxico", por id)', lido.cls === 'aplicacao' && lido.unidade === 'f14c', lido.cls + ' · ' + lido.unidade);
+    ok('Sais — "Caxico topázio e mundo novo" vira DOIS talhões sugeridos pelo nome inteiro do cadastro, na ordem do cadastro (t020 Mundo Novo, t021 Topázio)',
+      (lido.talhoes || []).join() === 't020,t021' && lido.sugeridos === 2 && lido.nomes === 'Caxico — Mundo Novo · Caxico — Topázio', (lido.talhoes || []).join() + ' · ' + lido.nomes);
+    ok('Sais — calda com os cinco sais, 10 tanques de 2.000 L; produto e atividade NÃO são adivinhados (nascem vazios)',
+      lido.tanques === '10' && lido.ltanque === '2000' && /Ureia 5kg .* Sulfato zinco 5kg/.test(lido.calda) && lido.produto === '' && lido.operacao === '',
+      lido.tanques + ' × ' + lido.ltanque + ' · ' + lido.calda + ' · produto "' + lido.produto + '"');
+    ok('Sais — um talhão só pelo nome inteiro entra ("sais Caxico topázio" → t021); nome que casa com mais de um talhão ou só a área NÃO entra',
+      lido.um === 't021' && lido.ambiguo === '' && lido.soUnidade === '', lido.um + ' · "' + lido.ambiguo + '" · "' + lido.soUnidade + '"');
+
+    const prev = await page.evaluate(async t => {
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev(); insRender();
+      await new Promise(r => setTimeout(r, 120));
+      const q = s => document.querySelector('#app ' + s), qa = s => [...document.querySelectorAll('#app ' + s)];
+      const bt = () => document.getElementById('bt-ins-importar');
+      const out = { falta0: bt().getAttribute('data-falta') || '', selects: qa('select[data-insprev]').length, nativos: window.__nativos || 0,
+        acesos: qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join(), chips: qa('[data-ins-tal]').length,
+        contador: (q('.sel-box .sel-cont') || {}).textContent || '', removiveis: qa('.sel-box .sel-x').map(b => b.getAttribute('aria-label')).join(' · '),
+        alvoX: Math.min(...qa('.sel-box .sel-x').map(b => b.getBoundingClientRect().height)), alvoChip: Math.min(...qa('[data-ins-tal]').map(b => b.getBoundingClientRect().height)),
+        rola: document.querySelector('#app .plan-acoes .chips').scrollWidth > 390, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
+      /* × remove Topázio; tocar o chip de novo devolve */
+      qa('.sel-box .sel-x').find(b => /Topázio/.test(b.getAttribute('aria-label'))).click(); await new Promise(r => setTimeout(r, 120));
+      out.depoisX = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join(); out.contadorX = (q('.sel-box .sel-cont') || {}).textContent || '';
+      q('[data-ins-tal="t021"]').click(); await new Promise(r => setTimeout(r, 120));
+      out.deVolta = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join();
+      /* "Área geral / sede" é excludente */
+      q('[data-ins-tal="geral"]').click(); await new Promise(r => setTimeout(r, 120));
+      out.geral = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join();
+      q('[data-ins-tal="t020"]').click(); await new Promise(r => setTimeout(r, 120)); q('[data-ins-tal="t021"]').click(); await new Promise(r => setTimeout(r, 120));
+      out.final = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join();
+      const inp = q('input[data-insprev="-|produto"]'); inp.value = 'Sais'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      out.falta1 = bt().getAttribute('data-falta') || '';
+      const selOp = q('select[data-insprev="-|operacao"]'); selOp.value = 'Pulverização mecanizada'; selOp.dispatchEvent(new Event('input', { bubbles: true })); selOp.dispatchEvent(new Event('change', { bubbles: true }));
+      out.falta2 = bt().getAttribute('data-falta') || ''; out.rotulo = bt().textContent.trim();
+      return out;
+    }, MSG_SAIS);
+    ok('Pré-visualização — os dois talhões vêm acesos em chips (nunca lista nativa para multi-seleção) e "Levar ao boletim" pede o produto',
+      prev.acesos === 't020,t021' && prev.selects === 1 && prev.nativos === 0 && /Escreva qual é o produto/.test(prev.falta0), prev.acesos + ' · ' + prev.selects + ' lista(s) · "' + prev.falta0 + '"');
+    ok('Pré-visualização — chips removíveis (c12): "2 talhões selecionados", um × por talhão com "Remover <nome>", alvo ≥ 44 px, fileira sem rolar de lado',
+      /^2 talhões selecionados$/.test(prev.contador.trim()) && prev.removiveis === 'Remover Caxico — Mundo Novo · Remover Caxico — Topázio' && prev.alvoX >= 44 && prev.alvoChip >= 44 && !prev.rola,
+      prev.contador.trim() + ' · ' + prev.removiveis + ' · × ' + prev.alvoX + ' px · chip ' + prev.alvoChip + ' px');
+    ok('Pré-visualização — o × tira o talhão na hora ("1 talhão selecionado"), tocar o chip devolve; "Área geral / sede" é excludente',
+      prev.depoisX === 't020' && /^1 talhão selecionado$/.test(prev.contadorX.trim()) && prev.deVolta === 't020,t021' && prev.geral === 'geral' && prev.final === 't020,t021',
+      prev.depoisX + ' · ' + prev.contadorX.trim() + ' · ' + prev.deVolta + ' · ' + prev.geral + ' · ' + prev.final);
+    ok('Pré-visualização — a tela diz que os talhões foram sugeridos pelo nome e que o gerente lança uma atividade por talhão; sem termo de cobrança',
+      /sugeridos pelo nome/.test(prev.texto) && /uma atividade por talhão/.test(prev.texto) && !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto), '');
+    ok('Pré-visualização — com produto escrito falta só a atividade; escolhida, "Levar ao boletim" fica ativo',
+      /Escolha a atividade/.test(prev.falta1) && prev.falta2 === '' && prev.rotulo === 'Levar ao boletim', '"' + prev.falta1 + '" → "' + prev.falta2 + '" · ' + prev.rotulo);
+
+    const grav = await page.evaluate(() => {
+      insImportar();
+      const rel = insAplicacoesRelatadas().filter(c => /sais/i.test(c.produto));
+      insUI.texto = insUI.texto; insUI.tipo = 'aplicacao'; insAbrirPrev(); insUI.prev.produto = 'Sais'; insUI.prev.operacao = 'Pulverização mecanizada'; insImportar();
+      const c = rel[0] || {};
+      return { n: rel.length, depois: insAplicacoesRelatadas().filter(c => /sais/i.test(c.produto)).length, talhoes: (c.talhoes || []).join(), talhaoId: c.talhaoId,
+        onde: insRelatoOnde(c), tanques: c.tanques, ltanque: c.ltanque, calda: (c.calda || []).length, boletins: (D.boletins || []).filter(x => x.fazendaId === 'f14c' && !x.exemplo).length,
+        depara: (D.deparaAta || []).filter(x => /topazio|mundo/i.test(planChaveAta(x.ata))).map(x => x.ata + '→' + (x.talhao || '—')).join(' · '), flash: insUI.flash,
+        linha: (document.querySelector('#app') || {}).textContent };
+    });
+    ok('Levar ao boletim — UM relato com os dois talhões (talhoes = t020,t021; talhaoId = o primeiro, para leitores antigos), 10 tanques × 2.000 L, calda de 5 itens; nenhum boletim gravado',
+      grav.n === 1 && grav.talhoes === 't020,t021' && grav.talhaoId === 't020' && grav.tanques === '10' && grav.ltanque === '2000' && grav.calda === 5 && grav.boletins === 0,
+      grav.talhoes + ' · ' + grav.talhaoId + ' · ' + grav.tanques + ' × ' + grav.ltanque + ' · ' + grav.calda + ' itens · ' + grav.boletins + ' boletim');
+    ok('Levar ao boletim — reimportar a mesma mensagem (mesmos talhões) não duplica', grav.depois === 1, grav.n + ' → ' + grav.depois + ' · ' + grav.flash);
+    ok('De-para — com mais de um talhão o app aprende só a unidade do nome composto; nenhum talhão é gravado no de-para', grav.depara === 'sais Caxico topázio e mundo novo→—', grav.depara || 'nada gravado');
+    estadoSais = await lerD(page);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'CC-6081', chave: 'f14c' },
+      '2026-09-17T10:00:00-03:00', { userId: 'u1', papel: 'gerente', nome: 'Gerente — Monte Carmelo — Café', atividade: 'CAFE', fazendaId: 'f14c' });
+    await porD(page, estadoSais);
+    await page.evaluate(() => { rascunho = null; ir('casa'); });
+    await page.waitForTimeout(300);
+    const cartao = await page.evaluate(async () => {
+      rascunho = novoRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      const c = document.querySelector('#app [data-ins-relato]');
+      const out = { existe: !!c, texto: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', campos: c ? c.querySelectorAll('input,textarea,select').length : -1,
+        botoes: c ? [...c.querySelectorAll('[data-ins-aplic]')].map(b => b.textContent.trim()) : [] };
+      window.__nativos = 0;
+      c.querySelector('[data-ins-aplic$="|lancar"]').click(); await new Promise(r => setTimeout(r, 250));
+      const as = rascunho.atividades;
+      out.n = as.length; out.ativs = as.map(a => [a.tipo, a.talhaoId, a.tanques, a.ltanque, a.obs].join(' | '));
+      out.relatoIds = as.map(a => !!a.relatoId).join(); out.resp = JSON.stringify(rascunho.relatos); out.sumiu = !document.querySelector('#app [data-ins-relato]');
+      out.nativos = window.__nativos || 0; out.tela = telaAtual;
+      out.cards = as.map(a => !!document.querySelector('#app [data-ativ="' + a.id + '"] [data-troca-op]')).join();
+      /* remover as duas devolve a pergunta */
+      [...document.querySelectorAll('#app [data-rm-ativ]')].forEach(b => b.click()); await new Promise(r => setTimeout(r, 200)); ir('form'); await new Promise(r => setTimeout(r, 150));
+      out.voltou = !!document.querySelector('#app [data-ins-relato]');
+      return out;
+    });
+    ok('Boletim do gerente — a pergunta lista os DOIS talhões, uma vez só ("foi assim?"), com duas respostas e nenhum campo',
+      cartao.existe && /Caxico — Mundo Novo · Caxico — Topázio/.test(cartao.texto) && /foi assim\?/.test(cartao.texto) && /uma atividade por talhão/.test(cartao.texto) && cartao.botoes.length === 2 && cartao.campos === 0,
+      cartao.botoes.join(' · ') + ' · ' + cartao.texto.slice(0, 160));
+    ok('UM toque em "Lançar no boletim" cria UMA atividade por talhão (2), Pulverização mecanizada, no lugar, sem nativo, as duas editáveis',
+      cartao.n === 2 && cartao.ativs.every(a => /^Pulverização mecanizada \| t02[01] \|/.test(a)) && cartao.tela === 'form' && cartao.nativos === 0 && cartao.cards === 'true,true' && cartao.sumiu,
+      cartao.ativs.join(' || '));
+    ok('Os 10 tanques da mensagem entram UMA vez (na primeira, Mundo Novo) e a de Topázio diz onde a calda foi contada — nada é somado duas vezes',
+      /\| t020 \| 10 \| 2000 \| 10 tanques no total, junto com Caxico — Topázio$/.test(cartao.ativs[0] || '') && /\| t021 \|  \| 2000 \| calda contada em Caxico — Mundo Novo \(10 tanques no total\)$/.test(cartao.ativs[1] || ''),
+      cartao.ativs.join(' || '));
+    ok('A resposta viaja no boletim com as duas atividades ligadas ao relato; remover as duas devolve a pergunta',
+      /lancada/.test(cartao.resp) && /atividadeIds/.test(cartao.resp) && cartao.relatoIds === 'true,true' && cartao.voltou, cartao.resp + ' · voltou: ' + cartao.voltou);
+
+    const parcial = await page.evaluate(async () => {
+      /* o gerente já lançou Topázio à mão, com a calda dos sais: o cartão pergunta só por Mundo Novo */
+      rascunho.atividades = [{ id: uid(), talhaoId: 't021', tipo: 'Pulverização mecanizada', pessoas: '2', obs: '', status: '', falta: '', receita: 'Ureia 5kg, Cloreto pó 10kg', tanques: '5', ltanque: '2000', insumos: [], maquinas: [] }];
+      salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      const c = document.querySelector('#app [data-ins-relato]');
+      const out = { texto: c ? c.textContent.replace(/\s+/g, ' ').trim() : 'sem pergunta' };
+      c.querySelector('[data-ins-aplic$="|lancar"]').click(); await new Promise(r => setTimeout(r, 250));
+      out.n = rascunho.atividades.length; out.novas = rascunho.atividades.filter(a => a.relatoId).map(a => a.talhaoId + ':' + a.tanques).join();
+      /* tudo lançado à mão (os dois talhões): "confere ✔", sem pergunta */
+      rascunho.atividades = ['t020', 't021'].map(t => ({ id: uid(), talhaoId: t, tipo: 'Pulverização mecanizada', pessoas: '2', obs: '', status: '', falta: '', receita: 'Ureia 5kg', tanques: '5', ltanque: '2000', insumos: [], maquinas: [] }));
+      salvarRascunho(); ir('form'); await new Promise(r => setTimeout(r, 150));
+      const l = document.querySelector('#app [data-ins-relato-linha]');
+      out.pergunta = !!document.querySelector('#app [data-ins-relato]'); out.confere = l ? l.textContent.replace(/\s+/g, ' ').trim() : '';
+      return out;
+    });
+    ok('Parte já lançada à mão (Topázio, com a calda dos sais): o cartão diz que Topázio já tem lançamento e que o toque lança só em Mundo Novo',
+      /Caxico — Topázio já tem lançamento ✔ — o toque lança só em Caxico — Mundo Novo/.test(parcial.texto), parcial.texto.slice(0, 220));
+    ok('O toque cria só a atividade que faltava (Mundo Novo), com os 10 tanques inteiros', parcial.n === 2 && parcial.novas === 't020:10', parcial.n + ' atividade(s) · ' + parcial.novas);
+    ok('Os dois talhões lançados à mão: "confere com os lançamentos em … ✔", sem pergunta (nunca conta duas vezes)',
+      !parcial.pergunta && /confere com os lançamentos em Caxico — Mundo Novo · Caxico — Topázio ✔/.test(parcial.confere), parcial.confere);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
+  {
+    /* a mensagem chega DEPOIS: os dois talhões já estão no boletim enviado de ontem → liga aos dois lançamentos, conta o consumo uma vez */
+    const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, '2026-09-17T09:00:00-03:00');
+    const liga = await page.evaluate(async t => {
+      const s0 = sessao; sessao = { userId: 'u1', papel: 'gerente', nome: 'Rubens', atividade: 'CAFE', fazendaId: 'f14c' };
+      const b = novoRascunho('2026-09-16'); sessao = s0; b.id = 'b-sais-1609'; b.responsavel = 'Rubens'; b.data = '2026-09-16'; b.fazendaId = 'f14c';
+      b.atividades = ['t020', 't021'].map((tal, i) => ({ id: 'a-sais-' + i, talhaoId: tal, tipo: 'Pulverização mecanizada', pessoas: '2', obs: '', status: '', falta: '', receita: 'Ureia 5kg, Cloreto 10kg', tanques: '', ltanque: '', insumos: [], maquinas: [] }));
+      D.boletins.push(b); salvarDados();
+      abrirModulo('colar', () => { insLimpar(); insNav = [{ v: 'colar' }]; });
+      insUI.texto = t; insUI.auto = insClassificar(t); insUI.tipo = insUI.auto.tipo; insUI.lida = true; insAbrirPrev();
+      insUI.prev.produto = 'Sais'; insUI.prev.produtoTermo = 'Sais'; insAplicProcurarVinculo(insUI.prev); insRender();
+      await new Promise(r => setTimeout(r, 120));
+      const p = insUI.prev, bt = document.getElementById('bt-ins-importar'), av = document.querySelector('#app [data-ins-vinculo]');
+      const out = { vinculos: (p.vinculos || []).map(v => v.atividadeId + '@' + v.talhaoId).join(), rotulo: bt.textContent.trim(), inativo: bt.classList.contains('acao-off'),
+        aviso: av ? av.textContent.replace(/\s+/g, ' ').trim() : '', chips: document.querySelectorAll('#app [data-ins-tal]').length };
+      const antesA = b.atividades.length; insImportar(); await new Promise(r => setTimeout(r, 100));
+      const c = insAplicacoesRelatadas().find(x => /sais/i.test(x.produto) && x.vinculo);
+      out.ativNovas = D.boletins.find(x => x.id === 'b-sais-1609').atividades.length - antesA;
+      out.rel = c ? (c.talhoes || []).join() + ' · ' + (c.vinculos || []).length + ' vínculos · ' + c.data : 'sem relato';
+      const cons = insConsumos('f14c').filter(x => /ureia/i.test(x.produto));
+      out.cons = cons.map(x => x.kg + ' ' + x.base + ' · ' + x.area + ' ha · ' + x.nome).join(' | ');
+      sessao = { userId: 'u3', papel: 'admin', nome: 'Escritório' }; ir('detalhe', 'b-sais-1609'); await new Promise(r => setTimeout(r, 100));
+      out.detalhes = (document.querySelector('#app').textContent.match(/Detalhe do grupo/g) || []).length;
+      return out;
+    }, MSG_SAIS);
+    ok('Mensagem depois do boletim — com os DOIS talhões lançados ontem, o app liga aos dois lançamentos (um por talhão) e o botão é "Ligar ao lançamento", sem chips',
+      liga.vinculos === 'a-sais-0@t020,a-sais-1@t021' && liga.rotulo === 'Ligar ao lançamento' && !liga.inativo && liga.chips === 0 && /Confere com o boletim de 16\/09/.test(liga.aviso) && /Mundo Novo/.test(liga.aviso) && /Topázio/.test(liga.aviso),
+      liga.vinculos + ' · ' + liga.rotulo + ' · ' + liga.aviso.slice(0, 120));
+    ok('Ligar — nada é criado no boletim; o relato guarda os dois talhões e os dois vínculos; o detalhe aparece embaixo das duas atividades',
+      liga.ativNovas === 0 && liga.rel === 't020,t021 · 2 vínculos · 2026-09-16' && liga.detalhes === 2, liga.rel + ' · ' + liga.ativNovas + ' nova(s) · ' + liga.detalhes + ' detalhe(s)');
+    ok('Insumos — a calda ligada conta UMA vez: 5 kg × 10 tanques = 50 kg de ureia em 55 ha (soma dos dois talhões, sem vazão na mensagem)',
+      /^50 kg · 55 ha · Caxico — Mundo Novo · Caxico — Topázio$/.test(liga.cons), liga.cons);
+    errosTodos.push(...erros);
+    await ctx.close();
+  }
   /* ======================================================================
      v96 — BAIXA DO AGRO1 × BOLETIM: o app casa sozinho, completa e abre a conferência
      (cenários a–o da tarefa, com o PDF da fixture — sintético, mesmo layout e

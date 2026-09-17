@@ -1570,6 +1570,11 @@ async function cenarioInsumos(browser, base, R) {
     return { tipo: insUI.tipo, unidade: it.unidade, talhao: it.talhaoId, operacao: insUI.prev.operacao,
       falta: bt ? bt.getAttribute('data-falta') || '' : '', inativo: !!bt && bt.classList.contains('acao-off'),
       selects: document.querySelectorAll('#app select[data-insprev]').length, nativos: window.__nativos,
+      /* v100: o talhão é multi-seleção em chips (c12) — chips removíveis com o × ≥ 44 px, fileira sem rolar de lado */
+      chipsTal: document.querySelectorAll('#app [data-ins-tal]').length, acesos: document.querySelectorAll('#app .chip.on[data-ins-tal]').length,
+      contador: ((document.querySelector('#app .sel-box .sel-cont') || {}).textContent || '').trim(),
+      alvoX: Math.min(...[...document.querySelectorAll('#app .sel-box .sel-x')].map(b => b.getBoundingClientRect().height), 999),
+      rola: (() => { const f = document.querySelector('#app .plan-acoes .chips'); return !!f && f.scrollWidth > f.clientWidth + 1; })(),
       texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
   }, [MSG_APLIC]);
   R.telas.push(await medirTela(page, 'Colar do WhatsApp › Conferir a aplicação', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
@@ -2072,7 +2077,9 @@ function avaliar(R) {
     add(G, 'Porta única — a mensagem do grupo de aplicações é reconhecida e o talhão vem do de-para por id',
       P.tipo === 'aplicacao' && P.unidade === 'f14c' && P.talhao === 't055', P.tipo + ' · ' + P.unidade + ' / ' + P.talhao);
     add(G, 'Pré-visualização — a atividade do boletim NÃO é adivinhada: o botão nasce inativo dizendo o que falta, lista nativa para escolher',
-      P.operacao === '' && P.inativo && /Escolha a atividade/.test(P.falta) && P.selects >= 2 && P.nativos === 0, `"${P.falta}" · ${P.selects} lista(s) · ${P.nativos} nativo(s)`);
+      P.operacao === '' && P.inativo && /Escolha a atividade/.test(P.falta) && P.selects >= 1 && P.nativos === 0, `"${P.falta}" · ${P.selects} lista(s) · ${P.nativos} nativo(s)`);
+    add(G, 'Pré-visualização — talhão é multi-seleção em chips (v100, c12): chip do de-para aceso, "1 talhão selecionado" com × ≥ 44 px, fileira que não rola de lado',
+      P.chipsTal >= 2 && P.acesos === 1 && P.contador === '1 talhão selecionado' && P.alvoX >= TOQUE_MIN && !P.rola, `${P.chipsTal} chip(s) · ${P.acesos} aceso(s) · "${P.contador}" · × ${P.alvoX} px`);
     add(G, 'Pré-visualização — sem termo de cobrança e sem prescrição', !/não fez|não realizou|faltou|esqueceu|pendente|aplicar\b/i.test(P.texto), '');
     add(G, 'Boletim do gerente — a aplicação relatada é PERGUNTA no topo ("foi assim?"), com duas respostas e nenhum campo de digitação',
       B.existe && (B.botoes || []).length === 2 && /foi assim\?/.test(B.texto || '') && B.campos === 0, (B.botoes || []).join(' · ') + ` · ${B.campos} campo(s)`);

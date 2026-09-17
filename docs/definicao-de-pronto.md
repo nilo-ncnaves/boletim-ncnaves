@@ -1004,8 +1004,29 @@ Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
    como vieram; área coberta calculada (tanques × L ÷ L/ha) só para conferir;
    a atividade do boletim nasce VAZIA (nunca deduzida do nome do produto).
 2. **Pré-visualização pergunta:** "Levar ao boletim" inativo até haver
-   unidade, talhão, produto e atividade; listas nativas; sem termo de
-   cobrança; a escolha da atividade fica aprendida por produto.
+   unidade, talhão, produto e atividade; a atividade em lista nativa, o
+   talhão em CHIPS de multi-seleção (v100) com os chips removíveis da c12
+   ("2 talhões selecionados", × ≥ 44 px, fileira que não rola de lado,
+   "Área geral / sede" excludente); sem termo de cobrança; a escolha da
+   atividade fica aprendida por produto.
+2b. **Mais de um talhão na mesma mensagem (v100, mensagem real "Aplicação de
+   sais Caxico topázio e mundo novo"):** o local é separado por " e ",
+   vírgula, ";", "/", "+" ou "&" e cada parte só entra se casar com UM
+   talhão da unidade pelo nome inteiro do cadastro (com ou sem o prefixo
+   de área do de-para); parte ambígua ou só a área NÃO entra; a tela diz
+   "sugeridos pelo nome — confira". O relato guarda `talhoes` (lista) e
+   `talhaoId` (o primeiro, para leitores antigos); reimportar com os mesmos
+   talhões não duplica; com mais de um talhão o de-para aprende só a
+   unidade. No boletim do gerente a pergunta lista os talhões UMA vez e o
+   toque cria UMA atividade por talhão; os tanques da mensagem (total)
+   entram uma vez, na primeira, e as outras dizem onde a calda foi
+   contada; parte já lançada à mão → o cartão diz qual talhão já tem
+   lançamento e lança só o que falta; todos lançados → "confere com os
+   lançamentos em … ✔". Mensagem depois do boletim com todos os talhões
+   lançados → liga a um lançamento por talhão (`vinculos`), o detalhe
+   aparece embaixo de cada atividade e o consumo conta UMA vez (área = calda
+   ou soma dos talhões). A calda do gerente pode citar qualquer produto da
+   calda da mensagem ("Ureia" confere com o relato "Sais").
 3. **Nenhum boletim gravado** pela colagem; reimportar não duplica.
 4. **No boletim do gerente**, no dia: cartão no topo com "foi assim?", duas
    respostas, zero campo, alvo ≥ 44 px, menos de meia tela; um toque cria a
