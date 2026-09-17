@@ -675,9 +675,13 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
         contador: (q('.sel-box .sel-cont') || {}).textContent || '', removiveis: qa('.sel-box .sel-x').map(b => b.getAttribute('aria-label')).join(' · '),
         alvoX: Math.min(...qa('.sel-box .sel-x').map(b => b.getBoundingClientRect().height)), alvoChip: Math.min(...qa('[data-ins-tal]').map(b => b.getBoundingClientRect().height)),
         rola: document.querySelector('#app .plan-acoes .chips').scrollWidth > 390, texto: document.querySelector('#app').textContent.replace(/\s+/g, ' ') };
-      /* × remove Topázio; tocar o chip de novo devolve */
+      /* a fileira nasce curta (＋N, v80, P5): só os escolhidos; "＋N" abre o resto no lugar */
+      out.curta = qa('[data-ins-tal]').length; out.mais = (q('[data-ins-tal-mais]') || {}).textContent || ''; out.geralAntes = !!q('[data-ins-tal="geral"]');
+      /* × remove Topázio (o chip some da fileira curta); abrir o ＋N e tocar o chip de novo devolve */
       qa('.sel-box .sel-x').find(b => /Topázio/.test(b.getAttribute('aria-label'))).click(); await new Promise(r => setTimeout(r, 120));
       out.depoisX = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join(); out.contadorX = (q('.sel-box .sel-cont') || {}).textContent || '';
+      q('[data-ins-tal-mais]').click(); await new Promise(r => setTimeout(r, 120));
+      out.aberta = qa('[data-ins-tal]').length; out.maisDepois = !!q('[data-ins-tal-mais]');
       q('[data-ins-tal="t021"]').click(); await new Promise(r => setTimeout(r, 120));
       out.deVolta = qa('.chip.on[data-ins-tal]').map(b => b.dataset.insTal).join();
       /* "Área geral / sede" é excludente */
@@ -699,8 +703,10 @@ const porD = (page, d) => page.evaluate(x => { D = JSON.parse(x); salvarDados();
     ok('Pré-visualização — o × tira o talhão na hora ("1 talhão selecionado"), tocar o chip devolve; "Área geral / sede" é excludente',
       prev.depoisX === 't020' && /^1 talhão selecionado$/.test(prev.contadorX.trim()) && prev.deVolta === 't020,t021' && prev.geral === 'geral' && prev.final === 't020,t021',
       prev.depoisX + ' · ' + prev.contadorX.trim() + ' · ' + prev.deVolta + ' · ' + prev.geral + ' · ' + prev.final);
+    ok('Pré-visualização — a fileira de talhões nasce curta (só os 2 escolhidos + ＋9; "Área geral" atrás do ＋N, P5) e o ＋N abre os 11 no lugar',
+      prev.curta === 2 && prev.mais === '＋9' && !prev.geralAntes && prev.aberta === 11 && !prev.maisDepois, prev.curta + ' chip(s) · ' + prev.mais + ' → ' + prev.aberta + ' chip(s)');
     ok('Pré-visualização — a tela diz que os talhões foram sugeridos pelo nome e que o gerente lança uma atividade por talhão; sem termo de cobrança',
-      /sugeridos pelo nome/.test(prev.texto) && /uma atividade por talhão/.test(prev.texto) && !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto), '');
+      /[Ss]ugeridos pelo nome/.test(prev.texto) && /uma atividade por talhão/.test(prev.texto) && !/não fez|não realizou|faltou|esqueceu|pendente/i.test(prev.texto), '');
     ok('Pré-visualização — com produto escrito falta só a atividade; escolhida, "Levar ao boletim" fica ativo',
       /Escolha a atividade/.test(prev.falta1) && prev.falta2 === '' && prev.rotulo === 'Levar ao boletim', '"' + prev.falta1 + '" → "' + prev.falta2 + '" · ' + prev.rotulo);
 

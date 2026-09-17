@@ -2633,7 +2633,10 @@ tanques da mensagem contam uma vez.**
 - **Pré-visualização:** "Em quais talhões?" em chips de multi-seleção com os
   chips removíveis da v74 (`chipsSelecao("ins-tal")`: "2 talhões
   selecionados", × "Remover Caxico — Topázio" ≥ 44 px, fileira que quebra em
-  linhas), "Área geral / sede" excludente; a linha da unidade soma a área dos
+  linhas), "Área geral / sede" excludente; a fileira NASCE CURTA pelo mecanismo
+  "＋N" da v80 (`INS_TAL_MAX` = 4 do cadastro + os escolhidos sempre visíveis;
+  "＋7" abre os 11 no lugar) — sem isso a tela passava de 2 telas (2,64) e
+  virava ❌ novo; a linha da unidade soma a área dos
   talhões ("Caxico — Mundo Novo · Caxico — Topázio (55,00 ha)"); a nota diz
   "Talhões sugeridos pelo nome que veio na mensagem — confira e ajuste". A
   atividade continua na lista nativa. Produto e atividade continuam não
@@ -2695,8 +2698,10 @@ tanques da mensagem contam uma vez.**
 - `scripts/checar-poluicao.cjs`, grupo "18. Relato de aplicação" (10 ✅; 11 ✅
   desde a v100, com a checagem dos chips de talhão) e as
   telas "Colar do WhatsApp › Conferir a aplicação" (as duas formas, ≤ 2 telas).
-- v100 (`node scripts/teste_insumos.cjs`, 22 provas novas com a mensagem real
-  dos sais): leitura dos dois talhões pelo nome inteiro (e os casos que NÃO
+- v100 (`node scripts/teste_insumos.cjs` → **164 ✅ · 0 ❌**; 23 provas novas
+  com a mensagem real dos sais; `scripts/regressao_render.cjs` `origin/main` ×
+  v100: café, grãos, pecuária e pós-colheita idênticos — só o minuto do relógio
+  no localStorage —, Diretoria e ADMIN só com o número da versão): leitura dos dois talhões pelo nome inteiro (e os casos que NÃO
   entram), chips removíveis na pré-visualização (× remove, chip devolve, "Área
   geral" excludente, alvo ≥ 44 px, sem rolar de lado), relato com `talhoes`,
   idempotência, de-para só da unidade, pergunta única no boletim, um toque =
@@ -2930,6 +2935,11 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v100, 17/09/2026: **804 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v99, nenhum
+novo. A v100 acrescentou 1 checagem ao grupo "18. Relato de aplicação" (talhão
+em chips removíveis) e manteve a tela "Colar do WhatsApp › Conferir a aplicação"
+em 1,99 telas (o main mede 1,98): a fileira de talhões nasce com só os escolhidos
++ "＋N", e dois textos de explicação da tela ficaram mais curtos. Medição anterior,
 v99, 16/09/2026: **803 ✅ · 41 ❌** — os mesmos 41 ❌ herdados (o `origin/main`
 da v98 mede 763 ✅ · 41 ❌ com o mesmo script), nenhum novo. A v99 acrescentou
 o grupo "20. Relatórios em três níveis" (20 ✅) e as telas "Relatórios (menu,

@@ -1007,8 +1007,9 @@ Tarefa que mexer na porta única, no cartão do boletim ou no de-para prova:
    unidade, talhão, produto e atividade; a atividade em lista nativa, o
    talhão em CHIPS de multi-seleção (v100) com os chips removíveis da c12
    ("2 talhões selecionados", × ≥ 44 px, fileira que não rola de lado,
-   "Área geral / sede" excludente); sem termo de cobrança; a escolha da
-   atividade fica aprendida por produto.
+   "Área geral / sede" excludente, fileira que nasce curta com "＋N" —
+   `INS_TAL_MAX` = 4 + os escolhidos — para a tela ficar em 2 telas); sem
+   termo de cobrança; a escolha da atividade fica aprendida por produto.
 2b. **Mais de um talhão na mesma mensagem (v100, mensagem real "Aplicação de
    sais Caxico topázio e mundo novo"):** o local é separado por " e ",
    vírgula, ";", "/", "+" ou "&" e cada parte só entra se casar com UM

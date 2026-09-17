@@ -2079,7 +2079,7 @@ function avaliar(R) {
     add(G, 'Pré-visualização — a atividade do boletim NÃO é adivinhada: o botão nasce inativo dizendo o que falta, lista nativa para escolher',
       P.operacao === '' && P.inativo && /Escolha a atividade/.test(P.falta) && P.selects >= 1 && P.nativos === 0, `"${P.falta}" · ${P.selects} lista(s) · ${P.nativos} nativo(s)`);
     add(G, 'Pré-visualização — talhão é multi-seleção em chips (v100, c12): chip do de-para aceso, "1 talhão selecionado" com × ≥ 44 px, fileira que não rola de lado',
-      P.chipsTal >= 2 && P.acesos === 1 && P.contador === '1 talhão selecionado' && P.alvoX >= TOQUE_MIN && !P.rola, `${P.chipsTal} chip(s) · ${P.acesos} aceso(s) · "${P.contador}" · × ${P.alvoX} px`);
+      P.chipsTal >= 1 && P.acesos === 1 && P.contador === '1 talhão selecionado' && P.alvoX >= TOQUE_MIN && !P.rola, `${P.chipsTal} chip(s) · ${P.acesos} aceso(s) · "${P.contador}" · × ${P.alvoX} px`);
     add(G, 'Pré-visualização — sem termo de cobrança e sem prescrição', !/não fez|não realizou|faltou|esqueceu|pendente|aplicar\b/i.test(P.texto), '');
     add(G, 'Boletim do gerente — a aplicação relatada é PERGUNTA no topo ("foi assim?"), com duas respostas e nenhum campo de digitação',
       B.existe && (B.botoes || []).length === 2 && /foi assim\?/.test(B.texto || '') && B.campos === 0, (B.botoes || []).join(' · ') + ` · ${B.campos} campo(s)`);

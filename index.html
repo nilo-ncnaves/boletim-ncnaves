@@ -6136,6 +6136,18 @@ function insTalhoesDoLocal(local, unidade, dp){
     const achou=casa(p); if(achou.length===1 && !out.includes(achou[0].id)) out.push(achou[0].id); });
   return insOrdenarTalhoes(unidade, out);
 }
+/* v100: a fileira de chips nasce CURTA (mecanismo "＋N" da v80, P5): com talhão escolhido mostra SÓ os escolhidos
+   e "＋N" (o resto é "mais opções"); sem nenhum, os primeiros INS_TAL_MAX do cadastro e "＋N". O ＋N abre todos no
+   lugar (só na memória da tela). Sem rolar de lado, sem lista nativa. Medida: a tela fica em 2 telas (c/ P3). */
+const INS_TAL_MAX=4;
+function insChipsTalhao(tals, sel){
+  const ops=tals.map(t=>({id:t.id, nome:t.nome})).concat([{id:"geral", nome:"Área geral / sede"}]);
+  const aberta = insUI.talTodos || ops.length<=INS_TAL_MAX, base = sel.length ? 0 : INS_TAL_MAX;
+  const vis = aberta ? ops : ops.filter((o,i)=>i<base || sel.includes(o.id));
+  const resto = ops.length - vis.length;
+  return vis.map(o=>`<button type="button" class="chip ${sel.includes(o.id)?"on":""}" data-ins-tal="${esc(o.id)}">${esc(o.nome)}</button>`).join("")
+    + (resto>0?`<button type="button" class="chip sal-mais" data-ins-tal-mais="1" aria-label="Mostrar mais ${resto} talhão(ões)">＋${resto}</button>`:"");
+}
 /* a lista de talhões de um relato ou item da pré-visualização: a lista quando existe, senão o talhão único */
 const insRelatoTalhoes = c => (c && Array.isArray(c.talhoes) && c.talhoes.length) ? c.talhoes.filter(Boolean) : (c && c.talhaoId ? [c.talhaoId] : []);
 /* ordem do cadastro (talhoesDa), "Área geral / sede" por último — para o cartão, a atividade e o texto */
@@ -6312,7 +6324,7 @@ function insVoltar(){
   else { insNav=[]; voltarDoModulo("colar"); }
 }
 const insRender = () => ir("colar",null,true);
-function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; }
+function insLimpar(){ insUI.texto=""; insUI.tipo=""; insUI.auto=null; insUI.prev=null; insUI.prevAta=null; insUI.lida=false; insUI.msg=""; insUI.erp=null; insUI.talTodos=false; }
 
 /* ---- (3) cartão de chegada no topo do boletim: UM toque ----
    Único elemento novo SEMPRE visível do módulo — e só enquanto houver chegada
@@ -6760,7 +6772,7 @@ function insCorpoPrev(){
     const vincs=p.vinculos||(p.vinculo?[p.vinculo]:[]);
     return `<div class="cartao">
       <p class="mut" style="font-size:.8rem;margin:0 0 6px">${p.vinculo?"O gerente já lançou esta aplicação no boletim: o detalhe da mensagem fica ligado a esse lançamento, para leitura e para o consumo de insumo. Nada é criado."
-        :"Vira PERGUNTA no boletim da unidade naquele dia: o gerente lança com um toque, com estes detalhes já preenchidos, ou responde que não foi assim. Nada entra sem o toque dele."}</p>
+        :"Vira PERGUNTA no boletim da unidade, no dia: o gerente lança com um toque (uma atividade por talhão) ou diz que não foi assim."}</p>
       <label>Produto</label>
       <input data-insprev="-|produto" list="dl-ins" value="${esc(p.produto||"")}" placeholder="Qual produto foi aplicado?">
       ${p.vinculo?`<div class="aviso verde mt" data-ins-vinculo="${esc(p.vinculo.atividadeId)}"><b>✔ Confere com o boletim de ${esc(fmtDataCurta(p.vinculo.data))}:</b> ${vincs.map(v=>esc(v.tipo)+" — "+esc(insRelatoOnde({talhaoId:v.talhaoId,unidade:v.unidade}))+(v.data!==p.vinculo.data?" ("+esc(fmtDataCurta(v.data))+")":"")).join(" · ")} · ${esc(p.produto)}.
@@ -6769,9 +6781,9 @@ function insCorpoPrev(){
       :`<label>Dia da aplicação</label>
       <input type="date" data-insprev="-|data" value="${esc(p.data||hojeBRT())}" max="${hojeBRT()}">
       ${p.semVinculo?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Sem ligação com lançamento: vira pergunta no boletim do dia escolhido. <button class="btn suave mini" data-ins-revinc="1" style="display:inline-flex;padding:2px 8px">procurar de novo</button></p>`
-      :`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Nenhum lançamento deste produto nos boletins dos últimos 7 dias da unidade — vira pergunta no boletim do dia escolhido.</p>`}`}
+      :``}`}
       ${p.dataMsg && p.dataMsg!==p.data?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">A mensagem traz a data ${esc(fmtDataCurta(p.dataMsg))}, fora dos últimos 7 dias — confira o dia.</p>`:""}
-      <label>Calda / receita (como veio na mensagem)</label>
+      <label>Calda / receita (como veio)</label>
       <textarea data-insprev="-|receita" rows="3" style="width:100%" placeholder="Ex.: 2lts Quatermon">${esc(p.receita||"")}</textarea>
       <div class="grade2 mt">
         <div><label>Tanques gastos</label><input inputmode="numeric" data-insprev="-|tanques" value="${esc(p.tanques||"")}" placeholder="Ex.: 5"></div>
@@ -6779,7 +6791,7 @@ function insCorpoPrev(){
       </div>
       <label>Observação</label>
       <input data-insprev="-|obs" value="${esc(p.obs||"")}" placeholder="Opcional">
-      ${area?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">≈ ${esc(fmtHa(area))} ha cobertos pela calda (${esc(insNumTxt(n0(p.tanques)))} tanques × ${esc(insNumTxt(n0(p.ltanque)))} L ÷ ${esc(insNumTxt(n0(p.vazao)))} L/ha) — só para conferir${p.vinculo?"":"; quem confirma é o gerente"}.</p>`:""}
+      ${area?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">≈ ${esc(fmtHa(area))} ha pela calda (${esc(insNumTxt(n0(p.tanques)))} × ${esc(insNumTxt(n0(p.ltanque)))} L ÷ ${esc(insNumTxt(n0(p.vazao)))} L/ha) — só para conferir.</p>`:""}
       ${(p.soltas||[]).length?`<p class="mut" style="font-size:.76rem;margin:6px 0 0">Linhas que o app não usou: ${esc(p.soltas.join(" · "))}</p>`:""}
     </div>
     <div class="plan-linha"><div class="cad-item" style="margin:0">
@@ -6789,13 +6801,13 @@ function insCorpoPrev(){
       ${it.unidade && !cat?`<div class="aviso">${esc(fazenda(it.unidade).nome)} é unidade de pecuária — o boletim de pecuária não tem aplicação por talhão. Escolha outra unidade ou descarte.</div>${selUn(0,it.unidade)}`:""}
       ${it.unidade && cat && !p.vinculo?`<div class="plan-acoes"><label>Em quais talhões?</label>
         ${chipsSelecao("ins-tal",{um:"talhão selecionado",varios:"talhões selecionados"})}
-        <div class="chips">${tals.map(t=>`<button type="button" class="chip ${selT.includes(t.id)?"on":""}" data-ins-tal="${t.id}">${esc(t.nome)}</button>`).join("")}<button type="button" class="chip ${selT.includes("geral")?"on":""}" data-ins-tal="geral">Área geral / sede</button></div>
-        <p class="mut" style="font-size:.76rem;margin:4px 0 0">${it.sugeridos?"Talhões sugeridos pelo nome que veio na mensagem — confira e ajuste.":"A mensagem pode citar mais de um talhão: toque em cada um."} No boletim, o gerente lança uma atividade por talhão com um toque.</p>
+        <div class="chips">${insChipsTalhao(tals, selT)}</div>
+        ${it.sugeridos?`<p class="mut" style="font-size:.76rem;margin:4px 0 0">Sugeridos pelo nome que veio na mensagem — confira.</p>`:""}
         <label class="mt">${esc(cat.rotulo)} no boletim</label>
         <select data-insprev="-|operacao" style="width:100%;min-height:44px;padding:8px">
           <option value="">— toque para escolher —</option>
           ${cat.grupos().map(([g,ops])=>`<optgroup label="${esc(g)}">${ops.map(o=>`<option value="${esc(o)}" ${p.operacao===o?"selected":""}>${esc(o)}</option>`).join("")}</optgroup>`).join("")}</select>
-        <p class="mut" style="font-size:.76rem;margin:4px 0 0">${sug?"Sugerida pelo que você escolheu da última vez para este produto — troque se for outra.":"O app não adivinha a atividade pelo nome do produto: escolha uma vez e ele lembra para este produto."}</p></div>`:""}
+        <p class="mut" style="font-size:.76rem;margin:4px 0 0">${sug?"Sugerida pela sua última escolha para este produto — troque se for outra.":"Escolha uma vez: o app lembra para este produto."}</p></div>`:""}
     </div>`;
   }
   if(p.tipo==="chuva") return `<div class="cartao"><p class="mut" style="font-size:.82rem;margin:0">Relato de chuva é SUGESTÃO: o app não grava chuva no boletim de ninguém. Confirmado aqui, o número aparece no boletim da unidade com um "usar" — quem registra é o gerente.</p>
@@ -7010,6 +7022,7 @@ function insClique(t,d){
     insAbrirPrev();
     insRender(); return true; }
   if(d.insTipo!==undefined){ insUI.tipo=d.insTipo; insAbrirPrev(); insRender(); return true; }
+  if(d.insTalMais!==undefined && insUI.prev){ insUI.talTodos=true; insRender(); return true; }
   if(d.insTal!==undefined && insUI.prev && insUI.prev.tipo==="aplicacao"){   /* v100: um toque liga/desliga o talhão; "Área geral" é excludente */
     const it=insUI.prev.itens[0]; if(!it) return true;
     let ts=insRelatoTalhoes(it), id=d.insTal;
