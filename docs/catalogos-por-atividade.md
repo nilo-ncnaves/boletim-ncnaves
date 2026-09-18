@@ -598,7 +598,7 @@ do nome, como manda a regra "letra que apareça no nome". "Outras
 | **L** | Manejo de lote | Marcação / brincagem · Castração · Apartação · Pesagem · Embarque / venda · Compra / entrada de animais |
 | **P** | Pastagem e estrutura | Roçada · Adubação de pastagem · Reforma de pasto · Manutenção de cerca / cocho / bebedouro · Controle de formiga |
 
-Onde o badge aparece (v67): Diretoria › Faróis › unidade (todas as
+Onde o badge aparece (v67): Visão Geral › Faróis › unidade (todas as
 operações da unidade, pelo id da visão) e boletim enviado (cartão
 "Atividades" / "Operações do dia" do café e grãos; "Outros manejos" da
 pecuária), pelo nome exato gravado no boletim. Onde NÃO aparece, por

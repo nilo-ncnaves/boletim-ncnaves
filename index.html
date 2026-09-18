@@ -2390,7 +2390,7 @@ function vFarois(){
       <span class="cresce"><b>${esc(u.nome)}</b><span class="mut">${u.pior?["vermelho","amarelo","verde","cinza"].filter(k=>u.n[k]).map(k=>u.n[k]+" "+rot[k]).join(" · "):"sem janela · "+u.comRegistro+" de "+u.semJanela+" operações com registro"}</span></span>
       <span class="seta">›</span></button>`;
   const fechadas=uns.filter(u=>u.n.vermelho).length;
-  return topo("Faróis de registro", (sessao&&sessao.papel==="admin")?"Administrador":"Diretoria", true)+`
+  return topo("Faróis de registro", "Visão Geral", true)+`
     ${syncAtivo()?`<p class="mut no-print" style="font-size:.75rem;margin-bottom:10px">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px;min-height:44px;box-shadow:none;border-radius:0;">🔄 Atualizar</button></p>`:""}
     <p class="mut" style="font-size:.8rem">Por unidade: quantas operações com janela estão em dia, com a janela aberta ou com a janela fechada. ${uns.length?(fechadas?fechadas+" unidade"+(fechadas>1?"s":"")+" com janela fechada.":"Nenhuma janela fechada."):""}</p>
     ${uns.length?`<input class="cad-busca" id="farol-busca" placeholder="Buscar unidade" value="${esc(farolVista.q||"")}" autocomplete="off" autocapitalize="off">
@@ -2523,7 +2523,7 @@ function relTextosPorAba(tx){
   const abas=(porAba.GRUPO.length?["GRUPO"]:[]).concat(ATIVIDADES.map(([k])=>k).filter(k=>uns.some(f=>atividadeDe(f.id)===k)));
   return {porAba, abas, uns};
 }
-const relTopo=(titulo)=>topo(titulo, sessao.papel==="admin"?"Administrador":"Diretoria", true);
+const relTopo=(titulo)=>topo(titulo, "Visão Geral", true);
 /* Nível 1: o menu */
 function vRelatorios(){
   const cab=relTopo("Relatórios")+`
@@ -3126,7 +3126,7 @@ async function upCarregar(){
 async function upRecarregar(){ await upCarregar(); if(telaAtual==="unidplano") ir("unidplano",null,true); }
 function vUnidPlano(){
   const e=upEstado, d=e.dados;
-  const cab=cadTopo("Unidades e Plano de safra","Escritório · referência do agrônomo");
+  const cab=cadTopo("Unidades e Plano de safra","Referência do agrônomo");
   /* v65: carregando · erro · vazio pela função única (antes tinha textos próprios); o "Tentar de novo" continua
      recarregando só o plano (data-up), por isso não usa o botão data-sync de htmlEstado */
   if(e.erro) return cab+`<div class="cartao">${htmlEstado("erro",{que:"o plano de safra"})}<p class="mut" style="font-size:.78rem">${esc(e.erro)}</p></div><button class="btn sec mt" data-up="recarregar">Tentar de novo</button>`;
@@ -3696,8 +3696,8 @@ function vEntrada(){
       <span><b>Pecuária</b><span class="mut">Boletim do gado e dos pastos</span></span></button>`:""}
     ${temPos?`<button class="perfil-btn" data-perfil="pos"><span class="ava">🏭</span>
       <span><b>Terreiro / Secador / Benefício</b><span class="mut">Registro diário do pós-colheita</span></span></button>`:""}
-    ${acaoOk("painel_diretoria")?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
-      <span><b>Diretoria</b><span class="mut">Acompanha todas as fazendas</span></span></button>`:""}
+    ${acaoOk("painel_diretoria")?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">🔭</span>
+      <span><b>Visão Geral</b><span class="mut">Todas as fazendas num lugar só</span></span></button>`:""}
     ${acaoOk("relatorios_diretoria")?`<button class="perfil-btn" data-perfil="relatorios"><span class="ava">📊</span>
       <span><b>Relatórios</b><span class="mut">Textos para revisar e números prontos</span></span></button>`:""}
     ${acaoOk("planejamento")?`<button class="perfil-btn" data-perfil="planejamento"><span class="ava">📋</span>
@@ -3705,7 +3705,7 @@ function vEntrada(){
     ${acaoOk("colar_whatsapp")?`<button class="perfil-btn" data-perfil="colar"><span class="ava">📥</span>
       <span><b>Colar do WhatsApp</b><span class="mut">Ata, remessa de insumo, tarefas ou chuva</span></span></button>`:""}
     ${acaoOk("escritorio")?`<button class="perfil-btn" data-perfil="admin"><span class="ava">⚙️</span>
-      <span><b>Escritório / Administrador</b><span class="mut">Cadastros e relatórios</span></span></button>`:""}
+      <span><b>Cadastros</b><span class="mut">Fazendas, talhões e insumos</span></span></button>`:""}
     <p class="mut centro" style="font-size:.72rem;margin-top:24px">Boletim NCNaves · ${APP_VERSAO} ·
       <button id="bt-sair-aparelho" style="font-size:inherit;color:inherit;text-decoration:underline;padding:0;min-height:0;display:inline">Sair</button></p>
   </div>`;
@@ -9224,7 +9224,7 @@ function vPainelUn(){
   const c=PAINEL_CARTOES[painelVista.chave], un=painelVista.unidade;
   const voltar=`<button class="btn sec mt no-print" data-voltar="1" style="box-shadow:none;border-radius:0;">‹ Voltar ao painel</button>`;
   if(!c || !un || !D.fazendas.some(f=>f.id===un))
-    return topo("Painel", sessao&&sessao.papel==="admin"?"Administrador":"Diretoria", true)
+    return topo("Painel", "Visão Geral", true)
       +`<div class="cartao">${htmlEstado("vazio",{que:"unidade"})}</div>`+voltar;
   const u=c.uns().find(x=>x.id===un);
   return cabecalhoContexto(un,{sub:c.titulo, voltar:true})
@@ -9388,7 +9388,7 @@ function vPainel(){
   const unidadesAtv = D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
   const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
   const i7 = indicadores(7), i30 = indicadores(30);
-  return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
+  return topo("Grupo LGS — Fazendas", "Visão Geral")+`
     ${chipsAtividade("atv-filtro", filtroPainel.atv||"", {todas:"Todas"})}
     <div class="cartao"><div class="linha-flex"><span class="farol ${enviadasHoje?"ok":"espera"}"></span>
       <div class="cresce"><h2>${enviadasHoje} de ${unidadesAtv.length} unidades enviaram hoje</h2>
@@ -9809,7 +9809,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v100";
+const APP_VERSAO="v101";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -9952,7 +9952,7 @@ function cadVMenu(){
     ["sobre","ℹ️","Sobre","versão "+APP_VERSAO+" · LEIA-ME · contato",APP_VERSAO]
   ];
   const q=cadUI.busca;
-  return cadTopo("Cadastros","Escritório · administrador")+`
+  return cadTopo("Cadastros","Fazendas, talhões e insumos")+`
     <input class="cad-busca" id="cad-busca-global" placeholder="Buscar em cadastros (fazenda, talhão, lote, código, termo)…" value="${esc(q)}" autocomplete="off" autocapitalize="off">
     ${q?cadResultadosBusca(q):itens.map(([v,ico,nome,sub,n])=>`<button class="cad-menu" data-cadv="${v}">
       <span class="ico">${ico}</span><span class="txt"><b>${nome}</b><span class="mut">${esc(sub)}</span></span><span class="num">${n}</span></button>`).join("")}`;
@@ -10130,7 +10130,7 @@ const MESES_PT=["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","
 function cadVPlano(){
   const fzs=Object.keys(PLANO_FAZENDA_APP);
   return cadTopo("Plano do mês","Plano de safra · referência do agrônomo")+`
-    <p class="mut" style="font-size:.78rem">O plano entra só como referência e comparação — nunca receituário. kg aparecem aqui (tela do Escritório) rotulados pela versão; o gerente não vê nada disto.</p>
+    <p class="mut" style="font-size:.78rem">O plano entra só como referência e comparação — nunca receituário. kg aparecem aqui (tela de Cadastros) rotulados pela versão; o gerente não vê nada disto.</p>
     ${fzs.map(fz=>{ const p=planoDe(fz), f=fazenda(fz);
       return cadItem("planofz",fz,esc(f.nome),p?"plano v"+p.versao+" · vigente desde "+fmtData(p.vigente_de)+" · "+p.unidades.length+" unidades · baixado "+new Date(p.baixado_em).toLocaleDateString("pt-BR"):"sem plano vigente baixado",p?"v"+p.versao:""); }).join("")}
     ${cadGrupo("Cadastro mestre")}
@@ -10735,7 +10735,7 @@ function planVMenu(){
       unidadesPermitidas().reduce((a,f)=>a+planForaDoPlano(f.id,planMesDe(hojeBRT())).fora,0)],
     ["saidas","📲","Textos prontos","pauta da sexta · cobrança · fechamento · rascunho da ata",4]
   ];
-  return planTopo("Planejamento", podeCadastros()?"Escritório · administrador":"Diretoria")
+  return planTopo("Planejamento", "Reunião do mês e semana")
     +planCabecalho()
     +planPastilhasHtml()
     +`<button class="cad-menu" id="bt-ins-colar"><span class="ico">📥</span><span class="txt"><b>Colar do WhatsApp</b><span class="mut">ata, remessa de insumo, tarefas ou chuva — o app identifica</span></span><span class="num">${insMensagens().length}</span></button>`

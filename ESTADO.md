@@ -58,8 +58,14 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   e o botão "novo código combinado". Códigos nunca aparecem em telas
   que não sejam de ADMIN.
 - Perfis: Gerente preenche o boletim da unidade; Diretoria acompanha o
-  painel; Escritório/Admin cadastra, importa e tira relatórios;
-  Pós-colheita tem boletim próprio de terreiro/secador/tulha (café).
+  painel (porta "🔭 Visão Geral" desde a v101; até a v100 a porta se
+  chamava "Diretoria"); Escritório/Admin cadastra, importa e tira
+  relatórios (porta "⚙️ Cadastros" desde a v101; era "Escritório /
+  Administrador"); Pós-colheita tem boletim próprio de
+  terreiro/secador/tulha (café). Nas seções mais antigas deste arquivo,
+  "Diretoria"/"Escritório" como nome de TELA são a Visão Geral e os
+  Cadastros de hoje; como nome de PESSOA ou área (perfil D/A, "ação da
+  diretoria", "cobrança do escritório") continuam valendo.
 - **Ação de outro papel (v71):** toda ação sujeita a perfil passa por
   `estadoAcao(id)` / catálogo `ACOES_PERFIL` (permitido ·
   bloqueado_visivel · oculto). Três ações aparecem esmaecidas em vez de
@@ -247,7 +253,7 @@ e sanidade — oferecem o par de chips "Nada a registrar hoje" ·
   cafeicultor): cartão iCrop do boletim do gerente (café e grãos),
   cartão Solinftec da casa do gerente (café, grãos e pecuária), cartões
   "iCrop — medição de ontem" e "Solinftec — medição de ontem" do painel
-  da Diretoria, bloco "Estado dos robôs" em Escritório › Integrações e
+  da Diretoria, bloco "Estado dos robôs" em Cadastros › Integrações e
   robôs. Sem linha: pós-colheita e a dica de chuva na seção Clima.
   Detalhe em docs/relatorios.md, "Estado das integrações".
 
@@ -279,7 +285,7 @@ Detalhes em docs/PLANO-DE-SAFRA.md. Resumo do que existe hoje:
   unidades, apelidos app, adubo do mês e do próximo, calagem, fito,
   Gantt do modelo da empresa, parâmetros. Sem rede fica o cache; sem
   cache o app é a v51. Tabelas ainda não criadas → silêncio.
-- Tela **Escritório › Cadastros › Unidades e Plano** (só ADMIN, precisa
+- Tela **Cadastros › Unidades e Plano** (só ADMIN, precisa
   de rede): editar unidades (nome curto, status, área, obs — cada
   campo alterado vira linha de log), adicionar/encerrar apelidos,
   inativar; por fazenda, versões do plano com **Rodar auditoria**
@@ -597,7 +603,7 @@ filtro, sem imputar omissão.
   pós-colheita em Vereda Romaria. …"), tela do relatório para o gerente
   de café ("Sem relatório calculado em Vereda Romaria para
   05/09/2026."), cartão "Café em trânsito" do painel ("Sem carga de café
-  aguardando confirmação do destino.") e Escritório › Unidades e Plano
+  aguardando confirmação do destino.") e Cadastros › Unidades e Plano
   (carregando "Carregando o plano de safra…", erro "Não foi possível
   carregar o plano de safra." + motivo + Tentar de novo próprio, vazios
   "Sem fazenda com plano de safra cadastrada." / "Sem versão do plano
@@ -643,7 +649,7 @@ dias sem registro é normal; com 60, vale olhar.
   `ritmoCache` / `bdf:ritmoOperacoes`; em `syncTudo` só para códigos com
   painel e só GRAOS + PECUARIA), `baixarIntervaloOperacoes` (pares, sob
   demanda), `ritmoDe`, `textoRitmo` ("a cada 18 dias"; vazio sem
-  intervalo). Única tela: **Diretoria › Faróis de registro › unidade**
+  intervalo). Única tela: **Visão Geral › Faróis de registro › unidade**
   ganha o texto secundário "ritmo: a cada N dias" na linha da operação
   (com janela: depois da janela; sem janela: abaixo do nome), só com
   dois registros ou mais — sem intervalo a linha é omitida (nada de
@@ -666,7 +672,7 @@ espaço.
   substitui `topo()` nas telas de leitura com unidade escolhida: casa
   do gerente (café, grãos, pecuária), boletim enviado (as três), casa e
   registro do pós-colheita (café), tela do relatório quando aberta pelo
-  gerente (as três) e Diretoria › Faróis de registro › unidade (as
+  gerente (as três) e Visão Geral › Faróis de registro › unidade (as
   três). Painel, Relatórios, Faróis (lista) e Resumo do período são de
   grupo (sem unidade escolhida) e ficam com `topo()`; home das abas,
   escolha de unidade, boletim em 3 passos, formulário do pós e Cadastros
@@ -701,7 +707,7 @@ espaço.
 Regra permanente em CLAUDE.md, item c7; checagem em
 docs/definicao-de-pronto.md, item 10; comportamento da tela em
 docs/relatorios.md, "Tela Textos para revisar (v68)".
-- **Problema resolvido:** em Diretoria › 📊 Relatórios cada texto do
+- **Problema resolvido:** em Visão Geral › 📊 Relatórios cada texto do
   robô-redator nascia inteiro (mais de uma tela do iPhone), escondia a
   seção "Números" e deixava o "copiar para WhatsApp" no fim de uma
   tela e meia de leitura.
@@ -764,7 +770,7 @@ adubo) NÃO foram copiadas.
 - **Legenda sob demanda:** toque no badge mostra o nome da categoria
   numa etiqueta por 2,5 s (2º toque ou toque fora fecha). Nenhuma
   legenda fixa. Área de toque de 44 px por `::before`.
-- **Onde entra:** Diretoria › Faróis › unidade (com janela e "sem
+- **Onde entra:** Visão Geral › Faróis › unidade (com janela e "sem
   janela", pelo `operacao_id` da visão) e boletim enviado (cartão
   "Atividades" do café, "Operações do dia" dos grãos e "Outros
   manejos" da pecuária, pelo nome exato gravado). **Onde não entra,
@@ -1144,7 +1150,7 @@ em vez de "OK".
   resposta (v70 continua com o aviso âmbar).
 
 ## Carteira de relatórios: ver docs/relatorios.md
-Desde a v54 o app aponta para ela: em Escritório › Cadastros › Sobre
+Desde a v54 o app aponta para ela: em Cadastros › Sobre
 (só ADMIN; na v54 era um cartão da tela única) "Carteira de relatórios" abre `relatorios.html`, página
 nova do site (fora do index.html e do cache do sw.js) que lê
 `docs/relatorios.md` e os prompts da pasta `docs/relatorios/` e mostra
@@ -2022,13 +2028,104 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Portas por função (v101) — a porta se chama pelo que a pessoa faz, não pelo cargo
+Regra permanente em CLAUDE.md, item c23; checagem em
+docs/definicao-de-pronto.md, item 29.
+
+**O problema real.** 17/09/2026, o Nilo com a tela inicial na mão, iPhone a
+390 px. Duas portas tinham nome de cargo: "📋 Diretoria — Acompanha todas as
+fazendas" e "⚙️ Escritório / Administrador — Cadastros e relatórios". O
+acesso está liberado a todos os funcionários de propósito (para explorarem
+e aprenderem), mas o gerente lia o cargo e concluía que aquilo não era para
+ele — não tocava, não explorava, não aprendia. Dois defeitos de apoio:
+"Cadastros e relatórios" prometia relatórios (que têm porta própria logo
+acima) e "Diretoria" usava o mesmo 📋 de Planejamento.
+
+**O que mudou (texto visível, e só).**
+| onde | antes | depois |
+|---|---|---|
+| tela inicial, porta | 📋 Diretoria — Acompanha todas as fazendas | 🔭 Visão Geral — Todas as fazendas num lugar só |
+| tela inicial, porta | ⚙️ Escritório / Administrador — Cadastros e relatórios | ⚙️ Cadastros — Fazendas, talhões e insumos |
+| painel ("Grupo LGS — Fazendas"), subtítulo | DIRETORIA / ADMINISTRADOR | VISÃO GERAL |
+| Faróis de registro, subtítulo | DIRETORIA / ADMINISTRADOR | VISÃO GERAL |
+| Relatórios (menu, Textos, Números, relatório), subtítulo | DIRETORIA / ADMINISTRADOR | VISÃO GERAL |
+| tela da unidade do painel sem unidade, subtítulo | DIRETORIA / ADMINISTRADOR | VISÃO GERAL |
+| Cadastros (menu), subtítulo | ESCRITÓRIO · ADMINISTRADOR | FAZENDAS, TALHÕES E INSUMOS |
+| Cadastros › Unidades e Plano, subtítulo | ESCRITÓRIO · REFERÊNCIA DO AGRÔNOMO (cortado) | REFERÊNCIA DO AGRÔNOMO |
+| Cadastros › Plano do mês, nota | "kg aparecem aqui (tela do Escritório)" | "kg aparecem aqui (tela de Cadastros)" |
+| Planejamento (menu), subtítulo | ESCRITÓRIO · ADMINISTRADOR / DIRETORIA | REUNIÃO DO MÊS E SEMANA |
+
+- **Por que 🔭:** é o único ícone livre que diz "ver de longe, tudo de uma
+  vez"; 🗺️ já é o ícone de "Talhões, pivôs e pastos" em Cadastros e repetiria
+  o problema. Nenhum ícone se repete entre as nove portas (☕ 🌾 🐂 🏭 🔭 📊
+  📋 📥 ⚙️).
+- **Por que "Fazendas, talhões e insumos"** e não "…, códigos e insumos" ou
+  "…, máquinas e insumos": máquinas moram dentro de Catálogos (não são item
+  do menu), e as duas formas longas quebravam em duas linhas na porta
+  (coluna de texto de 260 px) e passavam dos 222 px do subtítulo do
+  cabeçalho, que é `nowrap` com reticências. Os três substantivos são itens
+  de primeiro nível do menu de Cadastros.
+- **Rótulo é rótulo:** nenhum nome de código mudou (`podeCadastros`,
+  `vPainel`, `painelun`, `ACOES_PERFIL`, papéis "admin"/"proprietario",
+  chaves ADMIN/DIRETORIA, `D.usuarios` u2 "Diretoria" e u3 "Escritório",
+  que são o `por`/`quem` gravado nos registros). Nenhuma permissão,
+  escopo ou visibilidade mudou: as portas Visão Geral e Cadastros continuam
+  aparecendo só para os códigos que já as abriam (DIRETORIA e ADMIN) — os
+  gerentes as veem porque estão no código de administrador.
+- **Porta ≠ pessoa — o que ficou como estava, de propósito:** "Ação da
+  diretoria" / "Ação do escritório (administrador)" (texto do toque em
+  botão de outro papel, c9); "alerta da Diretoria" (tarefa arrastada); os
+  rótulos "Diretoria" e "Administrador" e o grupo "Diretoria e
+  administrador" em Cadastros › Códigos de acesso (o código é da pessoa que
+  o recebe); "peça ao escritório" na tela de código; "cobrança do
+  escritório", "conferência do escritório", "quadro do escritório" no
+  planejamento e nos insumos. Tudo isso nomeia gente ou área da empresa,
+  não um botão.
+
+**Medidas a 390 px.** Porta de uma linha de título + uma de subtítulo:
+80 px (≥ 44); as duas renomeadas ficam assim. Coluna de texto da porta:
+260 px. Subtítulo do cabeçalho `topo()`: 222 px úteis, `nowrap` com
+reticências — "Fazendas, talhões, códigos e insumos" media 273 px e
+"Reunião do mês e planejamento da semana" 302 px, por isso as formas
+curtas. Quatro portas que a v101 NÃO tocou já tinham 104 px (título ou
+subtítulo em duas linhas): Terreiro / Secador / Benefício, Relatórios,
+Planejamento e Colar do WhatsApp — registradas em PENDÊNCIAS.
+
+### Provas (v101)
+- `scripts/checar-poluicao.cjs` → **815 ✅ · 45 ❌**; o `origin/main` da v100 mede
+  **800 ✅ · 45 ❌** com o script anterior: os MESMOS 45 ❌ herdados, nenhum
+  novo, e 15 checagens novas no grupo "21. Portas por função", todas
+  ✅ (tela inicial sem cargo nos códigos ADMIN e DIRETORIA; as duas portas
+  com texto e ícone novos; as duas em 1+1 linhas; toda porta ≥ 44 px dentro
+  dos 390 px; ícones únicos; ordem inalterada; DIRETORIA sem Cadastros;
+  cabeçalhos de painel, Faróis, Relatórios, Planejamento e Cadastros sem
+  cargo e sem cortar; zero erro de JavaScript). Os rótulos de tela do
+  checklist passaram a dizer "Visão Geral —" / "Visão Geral ›" / "Cadastros
+  ›" / "Painel (Visão Geral)" no lugar de "Diretoria" / "Escritório" (só os
+  rótulos impressos; nenhuma função do script mudou de nome).
+- `scripts/regressao_render.cjs` `origin/main` × v101: café, grãos, pecuária e
+  pós-colheita **idênticos em todas as telas** (só o minuto do relógio no
+  `localStorage` difere); no cenário da DIRETORIA mudam só o `00-inicio` (a
+  porta 🔭 Visão Geral e o rodapé v101) e o subtítulo `<span class="sub">`
+  de painel, tela da unidade, Relatórios (5 telas) e Faróis ("Diretoria" →
+  "Visão Geral"); no cenário do ADMIN mudam só o `00-inicio` (as duas portas
+  e o rodapé), o subtítulo do painel ("Administrador" → "Visão Geral"), o de
+  Cadastros ("Escritório · administrador" → "Fazendas, talhões e insumos"),
+  o de Planejamento ("Escritório · administrador" → "Reunião do mês e
+  semana") e "versão v100" → "v101" em Sobre. Erros de página e chamadas de
+  rede idênticos nos seis cenários.
+- `node --check` no JS extraído ok; `node scripts/teste_nomenclatura.cjs`,
+  `teste_relatorios.cjs` (17 ✅ · 0 ❌), `teste_planejamento.cjs` (123 ✅ ·
+  1 ❌ — o MESMO ❌ herdado da v96, "De-para da ata — 23 nomes ligados … —
+  25") e `teste_insumos.cjs` (164 ✅ · 0 ❌) sem ❌ novo.
+
 ## Relatórios da Diretoria em três níveis (v99) — menu › abas por atividade › folha
 Regra permanente em CLAUDE.md, item c22; checagem em
 docs/definicao-de-pronto.md, item 28; comportamento da tela em
 docs/relatorios.md, "Tela Textos para revisar em três níveis (v99)".
 
 **O problema real.** 16/09/2026, o Nilo com a tela na mão, iPhone a 390 px:
-Diretoria › 📊 Relatórios abria com a seção "📝 Textos para revisar" já
+Visão Geral › 📊 Relatórios abria com a seção "📝 Textos para revisar" já
 aberta e **24 cartões** (um por unidade, devolutiva semanal), cada um com
 tag, título, prévia de 3 linhas, origem e dois botões. Quatro defeitos, nas
 palavras dele: **D1** "uma simples recomendação de mensagem ocupa a maior
@@ -3183,8 +3280,20 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 - Botão principal do boletim (Enviar/Descartar) fixo no rodapé ✅ nas
   três atividades.
 
-### Diretoria e Escritório (padrões b e c)
-- Painel da Diretoria: renderiza ✅ · 3,2 telas de altura com a busca
+### Visão Geral e Cadastros (padrões b e c; até a v100 "Diretoria e Escritório")
+- Tela inicial › portas por função (v101, grupo 21, medida com o código
+  de administrador — 8 portas — e com o da diretoria): nenhum texto
+  visível diz "Diretoria", "Escritório" ou "Administrador" ✅ nos dois
+  códigos · "🔭 Visão Geral — Todas as fazendas num lugar só" ✅ ·
+  "⚙️ Cadastros — Fazendas, talhões e insumos", sem "relatórios" ✅ · as
+  duas em uma linha de título + uma de subtítulo ✅ (as quatro que já
+  quebravam antes — Terreiro 2+1, Relatórios, Planejamento e Colar 1+2 —
+  ficam registradas no detalhe, sem mudança; ver PENDÊNCIAS) · toda porta
+  ≥ 44 px dentro dos 390 px ✅ (80 px as de uma linha) · nenhum ícone
+  repetido ✅ · ordem inalterada ✅ · código da diretoria sem Cadastros ✅ ·
+  cabeçalhos de painel, Faróis e Relatórios com "Visão Geral", de
+  Planejamento e Cadastros com o texto da porta, sem cortar ✅ · zero erro ✅.
+- Painel (Visão Geral): renderiza ✅ · 3,2 telas de altura com a busca
   de boletins ✅ (referência; v71: 4 botões em duas linhas, 390 px sem
   rolar de lado ✅) · Relatórios (menu, v99, com 24 textos + 1 de grupo)
   1 tela ✅ · Resumo do período 1,2 telas ✅.
@@ -3196,14 +3305,14 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   escolher o clima / digitar a lata ✅ · Descartar abre o diálogo com 2
   botões, 0 campos, "?" no fim, "Cancelar" · "Descartar rascunho", ambos
   neutros ✅ · zero nativos nos cenários ✅.
-- Ação desabilitada por perfil (v71, grupo 9): painel da Diretoria
+- Ação desabilitada por perfil (v71, grupo 9): painel (Visão Geral)
   ("⚙ Cadastros") e boletim enviado visto pela Diretoria ("✏️
   Corrigir") e pelo gerente de café, grãos e pecuária ("Marcar como
   visto") — aria-disabled e sem id/data ✅ · cinza neutro, tracejado,
   sem vermelho/ícone ✅ · toque mostra o papel sem modal/alert/troca de
   tela ✅ · texto "Ação do/da …" sem termo proibido ✅ · 1 de 4 botões
   ✅ · zero na tela de apontamento (três atividades) ✅.
-- Diretoria › Relatórios em três níveis (v99, medida com 24 textos por
+- Visão Geral › Relatórios em três níveis (v99, medida com 24 textos por
   unidade + 1 de grupo): grupo "20. Relatórios em três níveis" ✅ — menu
   em 1 tela com duas linhas de 53 px e zero prévia; abas 🏢 1 · ☕ 10 ·
   🌾 5 · 🐂 9 numa fileira de 362 px que quebra em linhas; aba ☕ Café
@@ -3213,7 +3322,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   (anterior/próximo, Compartilhar, PDF); voltar um degrau; sem termo
   proibido. Telas "Textos para revisar", "(☕ Café)" e "Números" medidas
   como Cadastros: 1 / 1,18 / 1 telas, nível 2, cabeçalho fixo com voltar ✅.
-- Diretoria › Relatório narrativo ("ver com os números ›", v68, medido
+- Visão Geral › Relatório narrativo ("ver com os números ›", v68, medido
   desde a v99 nesta tela, com um texto longo e um curto): 13 itens do
   grupo "8. Texto longo em lista" ✅ — cartão colapsado de 3 linhas, cabe
   em menos de uma tela, bloco "Números" visível sem rolar, copiar sem
@@ -3221,7 +3330,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   reticências, origem compacta, "todas para conferir" (na tela Números),
   folha em tela cheia com cabeçalho e ação fixos, origem completa,
   padrão visual da folha, rolagem devolvida.
-- Diretoria › Faróis de registro (v60, medida como Cadastros): lista 1,5
+- Visão Geral › Faróis de registro (v60, medida como Cadastros): lista 1,5
   telas com busca ✅ (14 unidades > 12 → busca) · nível 2 ✅ · cabeçalho
   fixo com voltar ✅ · blocos fechados ✅. Faróis › unidade: 1 tela ✅ ·
   só leitura ✅ · nível 3 ✅ · "Operações sem janela" fechado ✅ · v62:
@@ -3239,7 +3348,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   formulário; Lotes › detalhe, Plano › fazenda e Códigos › detalhe são
   só de leitura (ações na Zona de cuidado) ✅ · P5 "Mais opções"/"Zona
   de cuidado" fechados ✅ em todas.
-- Escritório › Importar telemetria: formulário sem ação principal fixa
+- Cadastros › Importar telemetria: formulário sem ação principal fixa
   no rodapé ❌ ("1 · Ler o arquivo" dentro do cartão).
 - Baixa do Agro1 (v96, grupo 19 e telas medidas como Cadastros): Colar do
   WhatsApp › Conferir o relatório do Agro1 (lista, nível 2, com busca pelas
@@ -3254,7 +3363,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   sem custo ✅ · painel: cartão "🔎 Conferência Agro1 × Boletim" fechado, unidades
   primeiro, tela da unidade com cabeçalho contextual e "‹ Voltar ao painel"
   ✅ (grupo 16). P10 ❌ herdado (chips e cartões do CSS-base).
-- Diretoria › painel › cartão "📋 Planejado × Executado" (v75, medido
+- Visão Geral › painel › cartão "📋 Planejado × Executado" (v75, medido
   com três boletins de exemplo em duas unidades): P1 um propósito ✅ ·
   só leitura, sem campo ✅ · uma linha por unidade com plano, ordenada
   por desvios evitáveis ✅ · vazio pela função única nomeando o recorte
@@ -3295,11 +3404,11 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 - Boletim do gerente › seção "📦 Insumos na fazenda" (v86): nasce fechada
   ✅ · só leitura ✅ · recebido/aplicado/saldo com barra ✅ · toque no
   aplicado abre os lançamentos no lugar ✅ · zero termo de cobrança ✅.
-- Diretoria › painel › cartão "📦 Insumos" (v86): nasce recolhido ✅ · uma
+- Visão Geral › painel › cartão "📦 Insumos" (v86): nasce recolhido ✅ · uma
   linha por unidade, sem nome de pessoa ✅ · filtro por produto em chips que
   quebram em linhas (sem rolagem lateral) ✅ · cobrança por fornecedor com
   botão copiar ✅ · divergências sem termo de cobrança ✅ · P10 ❌ herdado.
-- Escritório › Unidades e Plano: precisa de rede — fora da medição
+- Cadastros › Unidades e Plano: precisa de rede — fora da medição
   offline (conferir à mão quando for tocada).
 
 ### P10 — padrão visual (❌ em TODAS as telas: é o CSS-base do app)
@@ -3313,8 +3422,29 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Portas por função (v101) — para o Nilo testar no iPhone:** na tela
+  inicial, "🔭 Visão Geral — Todas as fazendas num lugar só" no lugar de
+  "📋 Diretoria" e "⚙️ Cadastros — Fazendas, talhões e insumos" no lugar
+  de "Escritório / Administrador — Cadastros e relatórios"; ao entrar, o
+  cabeçalho do painel, dos Faróis e dos Relatórios lê "VISÃO GERAL" no
+  subtítulo (antes, "DIRETORIA" ou "ADMINISTRADOR"). Nada mudou de
+  permissão: quem pode o quê é o código de acesso.
+- **Quatro portas quebram o subtítulo (ou o título) em duas linhas a
+  390 px — herdado, fora do escopo da v101** ("não mexer nas outras
+  portas"): "Terreiro / Secador / Benefício" (título em 2 linhas),
+  "Relatórios — Textos para revisar e números prontos", "Planejamento —
+  Reunião do mês e planejamento da semana" e "Colar do WhatsApp — Ata,
+  remessa de insumo, tarefas ou chuva" (subtítulo em 2 linhas; a coluna de
+  texto da porta tem 260 px). Ficam com 104 px de altura em vez de 80. Se
+  o Nilo quiser, é uma tarefa curta de encurtar quatro subtítulos.
+- **Ver × editar em Cadastros (backlog, sem mudança na v101).** Com o
+  acesso liberado a todos, as ações de efeito amplo de Cadastros estão
+  abertas a qualquer código ADMIN (nenhuma passa por `ACOES_PERFIL`): o
+  levantamento, com o que cada uma tem de rede de proteção (diálogo,
+  status em vez de apagar, desfazer), está no PR da v101. Decisão do Nilo
+  se vira entrega.
 - **Relatórios em três níveis (v99) — para o Nilo testar no iPhone:**
-  Diretoria › 📊 Relatórios abre com duas linhas ("📝 Textos para revisar"
+  Visão Geral › 📊 Relatórios abre com duas linhas ("📝 Textos para revisar"
   com "Devolutiva semanal · dd a dd/mm · N textos" e "📊 Números" com
   "último: …"); um toque em Textos mostra as abas ☕ Café · 🌾 Grãos · 🐂
   Pecuária (e 🏢 Grupo quando houver painel executivo) com uma linha por
@@ -3638,14 +3768,14 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   docs/catalogos-por-atividade.md (C Colheita · A Aplicação · T Trato
   cultural · M Monitoramento · I Irrigação e infraestrutura) e as letras
   de grãos (R Pré-plantio · D Condução · S Pós-colheita, porque P e C
-  já são de Plantio e Colheita). Testar no iPhone: Diretoria › Faróis ›
+  já são de Plantio e Colheita). Testar no iPhone: Visão Geral › Faróis ›
   unidade (uma de cada atividade) e um boletim enviado — o quadradinho
   fica à esquerda do nome, na mesma linha; tocar nele mostra o nome da
   categoria e some sozinho. Só depois de aprovar, rodar o sql/046
   (opcional: espelho do catálogo no Supabase; o app não depende dele).
 - **Cabeçalho contextual (v66) — para o Nilo testar no iPhone:** abrir
   a casa do gerente de uma unidade de cada atividade (e o pós-colheita,
-  um boletim enviado, Diretoria › Faróis › unidade): linha 1 "Fazenda ›
+  um boletim enviado, Visão Geral › Faróis › unidade): linha 1 "Fazenda ›
   Atividade (área)", linha 2 abaixo; rolar e ver a linha 2 sumir por
   baixo da barra sem tranco; voltar ao topo. Decidir: (a) nome completo
   da unidade na linha 1 ("Mata Preta › Mata Preta — Café") em vez de
@@ -3671,7 +3801,7 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   respostas no diário `integracao_execucoes`, 8 jobs no de-para. Ainda
   manual: sincronizar com código de grãos/pecuária e ver a linha no
   rodapé dos cartões iCrop/Solinftec; com ADMIN, o bloco "Estado dos
-  robôs" em Escritório › Integrações e robôs. Decidido pelo Nilo em
+  robôs" em Cadastros › Integrações e robôs. Decidido pelo Nilo em
   08/09/2026 (v64): a linha vale para café e para o painel da Diretoria.
   Ainda com o Nilo: (b) a dica de chuva da estação iCrop na seção Clima
   segue sem linha (o cartão iCrop do mesmo boletim já a carrega); (c)
@@ -3732,7 +3862,7 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   grava só um aviso), depois `sql/020-relatorios-motor.sql` e, para não
   esperar a madrugada, `sql/021-relatorios-teste.sql` (gera tudo na hora e
   traz as consultas de conferência). Depois sincronizar o app e abrir
-  Diretoria › 📊 Relatórios. Unidade nova no app: inserir também em
+  Visão Geral › 📊 Relatórios. Unidade nova no app: inserir também em
   `rel_unidades`. Fase 2 (futuro): texto pronto na coluna `texto`, custo
   em R$ de insumo (ERP AgroGestão), lotação (área de pasto no Supabase),
   percentímetro executado (se a iCrop mandar no bruto).

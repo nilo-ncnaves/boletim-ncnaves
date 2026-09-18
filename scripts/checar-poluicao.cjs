@@ -117,6 +117,16 @@
       texto lê "sem texto neste período" sem ação; "Números" é o conteúdo de
       antes em tela própria (filtro, lista, relatório com anterior/próximo,
       Compartilhar e PDF) e o voltar devolve um degrau por vez.
+  21. Portas por função (v101): a tela inicial (código de administrador, com
+      as 8 portas, e código da diretoria) não traz "Diretoria", "Escritório"
+      nem "Administrador" em texto visível; as portas "Visão Geral — Todas as
+      fazendas num lugar só" (🔭) e "Cadastros — Fazendas, talhões e insumos"
+      (⚙️) existem, as duas cabem em uma linha de título + uma de subtítulo a
+      390 px, toda porta tem alvo ≥ 44 px dentro da tela (as quatro portas que
+      já quebravam o subtítulo antes da v101 ficam registradas no detalhe, sem
+      mudança), nenhum ícone se repete, as outras portas e a ordem são as de
+      sempre; e os cabeçalhos de dentro (painel,
+      Faróis, Relatórios, Planejamento, Cadastros) também não dizem o cargo.
   15. Insumos (v86): a porta única "Colar do WhatsApp" tem uma tela e um campo,
       com o botão de avanço inativo dizendo a próxima ação (sem nativo e sem sair
       da tela); a mensagem do grupo é classificada sozinha e o tipo pode ser
@@ -731,7 +741,7 @@ async function cenarioRelatorios(browser, base, R) {
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
   const V = {};
   /* nível 1: o menu */
-  const menu = await medirTela(page, 'Diretoria — Relatórios (menu, 24 textos + 1 de grupo)', 'diretoria');
+  const menu = await medirTela(page, 'Visão Geral — Relatórios (menu, 24 textos + 1 de grupo)', 'diretoria');
   menu.menu = await page.evaluate(() => {
     const app = document.querySelector('#app'), it = [...app.querySelectorAll('.cad-item')];
     return { linhas: it.map(b => ({ titulo: (b.querySelector('b') || {}).textContent || '', estado: (b.querySelector('.mut') || {}).textContent || '', botao: b.tagName === 'BUTTON', seta: !!b.querySelector('.seta'), off: b.classList.contains('acao-off'), alt: b.getBoundingClientRect().height })),
@@ -741,7 +751,7 @@ async function cenarioRelatorios(browser, base, R) {
   R.telas.push(menu); V.menu = menu.menu; V.menuTelas = menu.telas;
   /* nível 2: Textos para revisar */
   await page.click('#bt-rel-textos'); await page.waitForTimeout(300);
-  const tx = await medirTela(page, 'Diretoria › Relatórios › Textos para revisar', 'cadastros', { tipo: 'lista', niveis: 2 });
+  const tx = await medirTela(page, 'Visão Geral › Relatórios › Textos para revisar', 'cadastros', { tipo: 'lista', niveis: 2 });
   tx.abas = await page.evaluate(() => {
     const fila = document.querySelector('#app .rel-abas'); if (!fila) return null;
     const chips = [...fila.querySelectorAll('[data-relaba]')];
@@ -752,7 +762,7 @@ async function cenarioRelatorios(browser, base, R) {
   R.telas.push(tx); V.tx = tx.abas; V.txTelas = tx.telas;
   /* aba ☕ Café: 10 unidades, uma linha cada */
   await page.click('[data-relaba="CAFE"]'); await page.waitForTimeout(300);
-  const cafe = await medirTela(page, 'Diretoria › Relatórios › Textos para revisar (☕ Café)', 'cadastros', { tipo: 'lista', niveis: 2 });
+  const cafe = await medirTela(page, 'Visão Geral › Relatórios › Textos para revisar (☕ Café)', 'cadastros', { tipo: 'lista', niveis: 2 });
   const LISTA = () => {
     const app = document.querySelector('#app'), it = [...app.querySelectorAll('.cad-item')];
     return { aba: relTextosVista.aba, on: [...app.querySelectorAll('[data-relaba].on')].map(b => b.dataset.relaba),
@@ -786,7 +796,7 @@ async function cenarioRelatorios(browser, base, R) {
   V.voltouTextos = await page.evaluate(() => telaAtual);
   /* nível 2: Números — o conteúdo de antes em tela própria */
   await page.click('#bt-rel-numeros').catch(() => {}); await page.waitForTimeout(300);
-  const num = await medirTela(page, 'Diretoria › Relatórios › Números', 'cadastros', { tipo: 'lista', niveis: 2 });
+  const num = await medirTela(page, 'Visão Geral › Relatórios › Números', 'cadastros', { tipo: 'lista', niveis: 2 });
   num.numeros = await page.evaluate(() => ({ tela: telaAtual, filtros: [...document.querySelectorAll('#app [data-relper]')].map(b => b.textContent.trim()), itens: document.querySelectorAll('#app [data-relab]').length,
     conferir: /para conferir/.test(document.querySelector('#app').innerText), texto: document.querySelector('#app').innerText.replace(/\s+/g, ' ').trim() }));
   await page.click('#app [data-relab] >> nth=0').catch(() => {}); await page.waitForTimeout(300);
@@ -966,6 +976,53 @@ async function cenarioVoltar(browser, base, R) {
   await ctx.close();
 }
 
+/* v101: portas por função — a porta se chama pelo que a pessoa FAZ ou ENCONTRA lá dentro, nunca pelo cargo
+   (Diretoria → Visão Geral, Escritório / Administrador → Cadastros). O cargo no rótulo fazia o gerente se
+   autoexcluir de telas que ele pode e deve usar. Aqui: tela inicial com o código de administrador (as 8 portas)
+   e com o da diretoria; cabeçalhos de dentro da Visão Geral, de Planejamento e de Cadastros. */
+const PORTAS_LER = () => {
+  const vis = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const linhas = el => { const cs = getComputedStyle(el); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4; return Math.round(el.getBoundingClientRect().height / lh); };
+  const portas = [...document.querySelectorAll('#app .perfil-btn')].filter(vis).map(b => {
+    const tit = b.querySelector('b'), sub = b.querySelector('.mut'), ava = b.querySelector('.ava'), r = b.getBoundingClientRect();
+    return { titulo: tit ? tit.textContent.trim() : '', sub: sub ? sub.textContent.trim() : '', icone: ava ? ava.textContent.trim() : '',
+      alt: r.height, larg: r.width, direita: r.right, linhasTitulo: tit ? linhas(tit) : 0, linhasSub: sub ? linhas(sub) : 0 };
+  });
+  return { portas, texto: (document.getElementById('app') || {}).innerText || '' };
+};
+const CABECALHO_LER = () => {
+  const h = document.querySelector('#app .topo h1'), s = document.querySelector('#app .topo .sub');
+  return { titulo: h ? (h.firstChild ? h.firstChild.textContent : '').trim() : '', sub: s ? s.textContent.trim() : '',
+    cabe: h ? h.scrollWidth <= h.clientWidth + 1 : false, texto: (document.getElementById('app') || {}).innerText || '' };
+};
+async function cenarioPortas(browser, base, R) {
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: CODIGOS.ADMIN, chave: 'ADMIN' }, null);
+  await pularRitual(page);
+  const toca = async sel => { await page.click(sel, { timeout: 4000 }).catch(() => {}); await page.waitForTimeout(350); };
+  const V = { admin: await page.evaluate(PORTAS_LER), cabecalhos: {} };
+  /* telas de dentro: painel → Faróis → Relatórios → Planejamento → Cadastros */
+  await toca('[data-perfil="proprietario"]'); await pularRitual(page);
+  V.cabecalhos.painel = await page.evaluate(CABECALHO_LER);
+  await toca('#bt-farois-tela'); V.cabecalhos.farois = await page.evaluate(CABECALHO_LER);
+  await page.evaluate(() => ir('painel')); await page.waitForTimeout(300);
+  await toca('#bt-relatorios-tela'); V.cabecalhos.relatorios = await page.evaluate(CABECALHO_LER);
+  await page.evaluate(() => ir('painel')); await page.waitForTimeout(300);
+  await toca('#bt-planejamento'); V.cabecalhos.planejamento = await page.evaluate(CABECALHO_LER);
+  /* Cadastros: pela porta "Cadastros" da tela inicial (papel admin), como o escritório entra */
+  await page.evaluate(() => ir('painel')); await page.waitForTimeout(300);
+  await toca('#bt-sair'); await toca('[data-perfil="admin"]'); await pularRitual(page);
+  await toca('#bt-cad'); V.cabecalhos.cadastros = await page.evaluate(CABECALHO_LER);
+  V.erros = erros.slice();
+  await ctx.close();
+  /* código da diretoria: a mesma tela inicial, com menos portas */
+  const d = await novaPagina(browser, base, { codigo: CODIGOS.DIRETORIA, chave: 'DIRETORIA' }, null);
+  await pularRitual(d.page);
+  V.diretoria = await d.page.evaluate(PORTAS_LER);
+  V.erros = V.erros.concat(d.erros);
+  await d.ctx.close();
+  R.portas = V;
+}
+
 async function medirTela(page, nome, grupo, extra) {
   const m = await page.evaluate(NA_PAGINA.medir);
   const v = await page.evaluate(NA_PAGINA.visual);
@@ -1116,21 +1173,21 @@ async function cenarioDiretoria(browser, base, R) {
     D.icropDados = [{ fazenda: 'NC Naves - Floramill', equipamento: 'Pivô 01', parcela: 'Gleba A', data: ontem, atualizado_em: new Date().toISOString(), irrigacao_mm: 4.2, precipitacao_mm: 0, etc: 3, eto: 4 }];
     ir('painel');
   }, statusIntegracoesExemplo()); await page.waitForTimeout(300);
-  const painel = await medirTela(page, 'Diretoria — painel', 'diretoria');
+  const painel = await medirTela(page, 'Visão Geral — painel', 'diretoria');
   painel.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);   /* v71: "⚙ Cadastros" do administrador, desabilitado */
   R.telas.push(painel);
   /* v71: boletim enviado visto pela Diretoria — "Corrigir" (ação do gerente) aparece desabilitado */
   await page.evaluate(() => ir('detalhe', (D.boletins.find(b => b.fazendaId === 'f22c') || D.boletins[0] || {}).id)); await page.waitForTimeout(300);
-  const det = await medirTela(page, 'Diretoria — boletim enviado', 'diretoria');
+  const det = await medirTela(page, 'Visão Geral — boletim enviado', 'diretoria');
   det.acoesOff = await page.evaluate(NA_PAGINA.acoesOff);
   R.telas.push(det);
   await page.evaluate(() => ir('relatorios')); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria — Relatórios', 'diretoria'));
+  R.telas.push(await medirTela(page, 'Visão Geral — Relatórios', 'diretoria'));
   /* v68: textos do robô-redator semeados — cartão colapsado, "Números" sem rolar, folha de leitura, rolagem devolvida.
      v99: o cartão colapsado saiu da lista (que passou a ter uma linha por unidade, sem prévia) e vive na tela do relatório
      narrativo, aberta por "ver com os números ›" — é lá que o componente da v68 é medido agora */
   await page.evaluate(ex => { relCache = ex; relEstado.erro = false; relVista = { rel: 'devolutiva_semanal', ini: ex[0].periodo_ini, fim: ex[0].periodo_fim, de: 'reltextos' }; ir('relat'); }, relatoriosExemplo()); await page.waitForTimeout(300);
-  const relTx = await medirTela(page, 'Diretoria — Relatório narrativo (texto do redator, "ver com os números")', 'diretoria');
+  const relTx = await medirTela(page, 'Visão Geral — Relatório narrativo (texto do redator, "ver com os números")', 'diretoria');
   relTx.textoLongo = await page.evaluate(NA_PAGINA.textoLongo);
   relTx.antesY = await page.evaluate(() => { window.scrollTo(0, 120); return window.scrollY; });
   await page.click('#app .txt-ler >> nth=0').catch(() => {}); await page.waitForTimeout(250);
@@ -1147,7 +1204,7 @@ async function cenarioDiretoria(browser, base, R) {
   R.telas.push(relTx);
   await page.evaluate(() => { relCache = []; window.scrollTo(0, 0); });
   await page.evaluate(() => ir('relatorio')); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria — Resumo do período', 'diretoria'));
+  R.telas.push(await medirTela(page, 'Visão Geral — Resumo do período', 'diretoria'));
   /* Faróis de registro (v60): tela nova da Diretoria, medida com os padrões de Cadastros (P1–P10).
      Offline não há visão baixada, então a página recebe linhas de exemplo no formato de vw_farol_registro. */
   await page.evaluate(() => {
@@ -1167,14 +1224,14 @@ async function cenarioDiretoria(browser, base, R) {
     ritmoCache = farolCache.map((l, i) => ({ unidade_id: l.unidade_id, operacao_id: l.operacao_id, atividade: l.atividade, qtd_registros: i % 2 ? 1 : 6, qtd_intervalos: i % 2 ? 0 : 5, intervalo_mediano_dias: i % 2 ? null : 7 + (i % 3) * 5, intervalo_minimo_dias: i % 2 ? null : 5, intervalo_maximo_dias: i % 2 ? null : 30, data_ultimo_registro: '2026-08-20' }));
     ir('farois');
   }); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria › Faróis de registro', 'cadastros', { tipo: 'lista', niveis: 2 }));
+  R.telas.push(await medirTela(page, 'Visão Geral › Faróis de registro', 'cadastros', { tipo: 'lista', niveis: 2 }));
   const unFarol = await page.evaluate(() => (D.fazendas.find(f => temCultura(f.id, 'PECUARIA')) || {}).id || '');
   await page.evaluate(u => ir('farol', u), unFarol); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria › Faróis › unidade', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  R.telas.push(await medirTela(page, 'Visão Geral › Faróis › unidade', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   /* v65: unidade de café (sem janela): vazio pela função única + bloco "Operações sem janela" fechado, com dias sem registro e ritmo */
   const unFarolCafe = await page.evaluate(() => (D.fazendas.find(f => temCultura(f.id, 'CAFE')) || {}).id || '');
   await page.evaluate(u => ir('farol', u), unFarolCafe); await page.waitForTimeout(300);
-  R.telas.push(await medirTela(page, 'Diretoria › Faróis › unidade (café)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  R.telas.push(await medirTela(page, 'Visão Geral › Faróis › unidade (café)', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   R.errosDiretoria = erros.slice();
   await ctx.close();
 }
@@ -1509,7 +1566,7 @@ async function cenarioCadastros(browser, base, R) {
     R.telas.push(await medirTela(page, nome, 'cadastros', { tipo, niveis: pilha.length }));
   }
   await page.evaluate(() => ir('importar')); await page.waitForTimeout(250);
-  R.telas.push(await medirTela(page, 'Escritório › Importar telemetria', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
+  R.telas.push(await medirTela(page, 'Cadastros › Importar telemetria', 'cadastros', { tipo: 'detalhe', niveis: 3 }));
   /* v74: chips removíveis na multi-seleção de Cadastros › Códigos › novo combinado (9 unidades → 6 + "+3"; a tela redesenha a cada toque) */
   await page.evaluate(() => { cadNav = [{ v: 'menu' }, { v: 'codigos' }, { v: 'codigonovo' }]; novoCombo = { ativs: [], unis: [] }; ir('cadastros'); }); await page.waitForTimeout(250);
   const unis = await page.evaluate(() => D.fazendas.slice(0, 9).map(f => '[data-combo-uni="' + f.id + '"]'));
@@ -1805,7 +1862,7 @@ function avaliar(R) {
   /* 7. padrão visual */
   const porGrupo = {};
   R.telas.forEach(t => { const g = porGrupo[t.grupo] = porGrupo[t.grupo] || { raio: new Set(), sombra: new Set(), gradiente: new Set(), toque: new Set() }; ['raio', 'sombra', 'gradiente', 'toque'].forEach(k => t.visual[k].forEach(x => g[k].add(x))); });
-  const rotG = { gerente: 'Gerente (casa)', boletim: 'Boletim (café, grãos, pecuária, pós)', diretoria: 'Diretoria', cadastros: 'Cadastros / Escritório' };
+  const rotG = { gerente: 'Gerente (casa)', boletim: 'Boletim (café, grãos, pecuária, pós)', diretoria: 'Visão Geral', cadastros: 'Cadastros' };
   Object.entries(porGrupo).forEach(([g, v]) => {
     const ex = s => [...s].slice(0, 4).join('; ') + (s.size > 4 ? ` … (+${s.size - 4})` : '');
     add('7. Padrão visual — sem gradiente', rotG[g], !v.gradiente.size, v.gradiente.size ? ex(v.gradiente) : '');
@@ -2064,9 +2121,9 @@ function avaliar(R) {
       B.recebido === 1 && B.mesmaTela && !B.modal && B.nativos === 0, `${B.recebido} recebimento · tela ${B.mesmaTela ? 'a mesma' : 'trocou'} · ${B.nativos} nativo(s)`);
     add(G, 'Boletim — respondida a chegada, o cartão sai da tela (nada fica cobrando)', B.sumiu === true, B.sumiu ? 'saiu' : 'continuou na tela');
     add(G, 'Boletim — o cartão não cobra quem recebe', !/não fez|pendente|atrasad|faltou|esqueceu/i.test(B.texto || ''), (B.texto || '').slice(0, 90));
-    add(G, 'Painel da Diretoria — o cartão "Insumos" nasce recolhido (P5) e traz a cobrança por fornecedor',
+    add(G, 'Painel (Visão Geral) — o cartão "Insumos" nasce recolhido (P5) e traz a cobrança por fornecedor',
       PA.existe && PA.aberto === false && PA.cobranca, PA.existe ? (PA.aberto ? 'nasceu aberto' : 'recolhido') + (PA.cobranca ? ' · com cobrança' : ' · sem cobrança') : 'cartão não encontrado');
-    add(G, 'Painel da Diretoria — divergência é assunto do escritório, sem termo de cobrança ao campo', PA.existe && !PA.proibido, PA.proibido ? 'termo proibido na tela' : '');
+    add(G, 'Painel (Visão Geral) — divergência é assunto do escritório, sem termo de cobrança ao campo', PA.existe && !PA.proibido, PA.proibido ? 'termo proibido na tela' : '');
     add(G, 'Nenhum erro de JavaScript no módulo', !(R.errosInsumos || []).length, (R.errosInsumos || []).join(' | '));
   }
 
@@ -2131,10 +2188,10 @@ function avaliar(R) {
   if (R.painelCartoes) {
     const G = '16. Painel: cartão fecha, lista unidades, descrição na tela da unidade';
     const P = R.painelCartoes;
-    add(G, 'Painel da Diretoria — nenhum dos cinco cartões em duas etapas nasce aberto (P5)',
+    add(G, 'Painel (Visão Geral) — nenhum dos cinco cartões em duas etapas nasce aberto (P5)',
       PAINEL_CARTOES_CHK.every(([k]) => P.cartoes[k] && P.cartoes[k].fechado),
       PAINEL_CARTOES_CHK.filter(([k]) => !(P.cartoes[k] || {}).fechado).map(([, t]) => t).join(' · ') || 'todos recolhidos');
-    add(G, `Painel da Diretoria — a altura ao abrir cabe em ${ALVO_PAINEL} telas`,
+    add(G, `Painel (Visão Geral) — a altura ao abrir cabe em ${ALVO_PAINEL} telas`,
       P.altura / VP.height <= ALVO_PAINEL, `${(P.altura / VP.height).toFixed(2)} telas`);
     PAINEL_CARTOES_CHK.forEach(([chave, titulo]) => {
       const c = P.cartoes[chave];
@@ -2237,6 +2294,41 @@ function avaliar(R) {
     add(G, 'Nenhum erro de JavaScript na navegação de volta', !V.erros.length, V.erros[0] || 'sem erro');
   }
 
+  /* 21. Portas por função (v101): a porta se chama pelo que a pessoa faz ou encontra lá dentro, nunca pelo cargo */
+  if (R.portas) {
+    const G = '21. Portas por função: rótulo diz o que se faz lá dentro, nunca o cargo';
+    const V = R.portas, PROIBIDO = /Diretoria|Escrit[oó]rio|Administrador/, A = V.admin.portas;
+    const ORDEM = ['Café', 'Grãos', 'Pecuária', 'Terreiro / Secador / Benefício', 'Visão Geral', 'Relatórios', 'Planejamento', 'Colar do WhatsApp', 'Cadastros'];
+    const acha = (L, t) => L.find(p => p.titulo === t);
+    add(G, 'Tela inicial (código de administrador, todas as portas) — nenhum texto visível diz "Diretoria", "Escritório" ou "Administrador"',
+      !PROIBIDO.test(V.admin.texto), (V.admin.texto.match(PROIBIDO) || ['sem cargo na tela'])[0]);
+    add(G, 'Tela inicial (código da diretoria) — nenhum texto visível diz "Diretoria", "Escritório" ou "Administrador"',
+      !PROIBIDO.test(V.diretoria.texto), (V.diretoria.texto.match(PROIBIDO) || ['sem cargo na tela'])[0]);
+    const vg = acha(A, 'Visão Geral'), cd = acha(A, 'Cadastros');
+    add(G, 'Porta "Visão Geral — Todas as fazendas num lugar só", ícone 🔭 (era "Diretoria — Acompanha todas as fazendas", 📋)',
+      !!vg && vg.sub === 'Todas as fazendas num lugar só' && vg.icone === '🔭', vg ? `${vg.icone} ${vg.titulo} — ${vg.sub}` : 'porta não encontrada');
+    add(G, 'Porta "Cadastros — Fazendas, talhões e insumos" (era "Escritório / Administrador — Cadastros e relatórios"); "relatórios" saiu do subtítulo',
+      !!cd && cd.sub === 'Fazendas, talhões e insumos' && !/relat/i.test(cd.sub), cd ? `${cd.icone} ${cd.titulo} — ${cd.sub}` : 'porta não encontrada');
+    const umaLinha = p => !!p && p.linhasTitulo === 1 && p.linhasSub === 1;
+    const quebram = A.filter(p => !umaLinha(p)).map(p => `${p.titulo} ${p.linhasTitulo}+${p.linhasSub}`);
+    add(G, `As duas portas renomeadas cabem em uma linha de título + uma de subtítulo a ${VP.width} px`,
+      umaLinha(vg) && umaLinha(cd), `Visão Geral ${vg ? vg.linhasTitulo + '+' + vg.linhasSub : '?'} · Cadastros ${cd ? cd.linhasTitulo + '+' + cd.linhasSub : '?'} linhas` + (quebram.length ? ` (as outras que já quebravam antes da v101, sem mudança: ${quebram.join(', ')})` : ''));
+    add(G, `Toda porta tem alvo ≥ ${TOQUE_MIN} px e fica dentro dos ${VP.width} px`,
+      A.length > 0 && A.every(p => p.alt >= TOQUE_MIN && p.direita <= VP.width + 1), `${A.length} portas, ${Math.round(Math.min(...A.map(p => p.alt)))} px a menor`);
+    add(G, 'Nenhum ícone se repete entre as portas (📋 fica só no Planejamento)',
+      new Set(A.map(p => p.icone)).size === A.length && A.filter(p => p.icone === '📋').every(p => p.titulo === 'Planejamento'), A.map(p => p.icone).join(' '));
+    add(G, 'As outras portas e a ordem não mudaram (Café · Grãos · Pecuária · Terreiro · Visão Geral · Relatórios · Planejamento · Colar · Cadastros)',
+      A.map(p => p.titulo).join('|') === ORDEM.join('|'), A.map(p => p.titulo).join(' · '));
+    add(G, 'Código da diretoria — as portas são Visão Geral · Relatórios · Planejamento · Colar do WhatsApp (sem Cadastros: quem pode o quê não mudou)',
+      V.diretoria.portas.map(p => p.titulo).join('|') === 'Visão Geral|Relatórios|Planejamento|Colar do WhatsApp', V.diretoria.portas.map(p => p.titulo).join(' · '));
+    const C = V.cabecalhos;
+    ['painel', 'farois', 'relatorios'].forEach(k => add(G, `Cabeçalho de dentro da Visão Geral (${k}) — subtítulo "Visão Geral", sem cargo e sem cortar`,
+      !!C[k] && C[k].sub === 'Visão Geral' && C[k].cabe && !PROIBIDO.test(C[k].titulo + ' ' + C[k].sub), C[k] ? `${C[k].titulo} / ${C[k].sub}` : 'cabeçalho não encontrado'));
+    ['planejamento', 'cadastros'].forEach(k => add(G, `Cabeçalho de ${k === 'cadastros' ? 'Cadastros' : 'Planejamento'} — o subtítulo diz o que a porta diz, sem cargo e sem cortar`,
+      !!C[k] && C[k].cabe && !PROIBIDO.test(C[k].titulo + ' ' + C[k].sub) && (k === 'cadastros' ? C[k].sub === 'Fazendas, talhões e insumos' : C[k].sub === 'Reunião do mês e semana'), C[k] ? `${C[k].titulo} / ${C[k].sub}` : 'cabeçalho não encontrado'));
+    add(G, 'Nenhum erro de JavaScript nas portas e nos cabeçalhos', !V.erros.length, V.erros[0] || 'sem erro');
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -2275,6 +2367,7 @@ function relatorio(itens, R) {
     await cenarioPainelCartoes(browser, base, R);
     await cenarioRelatorios(browser, base, R);   /* v99 */
     await cenarioVoltar(browser, base, R);
+    await cenarioPortas(browser, base, R);   /* v101 */
     await cenarioPlanejamento(browser, base, R);
     await cenarioInsumos(browser, base, R);
   } finally { await browser.close(); srv.close(); }
