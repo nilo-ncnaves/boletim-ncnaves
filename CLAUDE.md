@@ -47,7 +47,7 @@ integracao_execucoes e a visão vw_status_integracoes (sql/045; de
 quando é o dado do iCrop/Solinftec — tentativa, sucesso e dado
 gravado são horários distintos; o app só lê). Desde a v64 a linha de
 origem vale também para café e para o painel da Diretoria. Desde a
-v65 as unidades de café aparecem em Diretoria › Faróis de registro
+v65 as unidades de café aparecem em Visão Geral › Faróis de registro
 (sem janela, só "dias sem registro" e ritmo).
 Desde a v67 (opcional, o app não lê): operacao_categoria e a coluna
 operacao_catalogo.categoria_id (sql/046; espelho do catálogo de
@@ -300,7 +300,7 @@ pelo componente ÚNICO `cabecalhoContexto(fazendaId, {sub, voltar})`
 do index.html — nunca uma variante por atividade e nunca `topo()` com
 o nome da fazenda montado à mão. Telas: casa do gerente, boletim
 enviado, casa e registro do pós-colheita, relatório do gerente,
-Diretoria › Faróis › unidade e, desde a v88, Diretoria › <cartão do
+Visão Geral › Faróis › unidade e, desde a v88, Visão Geral › <cartão do
 painel> › unidade (item c19), nas três atividades. Fora, por desenho:
 a home das três abas e a escolha de unidade (contexto ainda não
 escolhido), a tela de apontamento em 3 passos e o formulário do
@@ -378,7 +378,7 @@ app Sigma (Fundação ABC): só o mecanismo visual, nunca as categorias.
 
 ### c7) Texto longo em lista nasce colapsado (desde a v68)
 Todo texto longo numa lista de leitura (hoje: os textos do robô-redator
-em Diretoria › Relatórios › "Textos para revisar" e na tela do relatório
+em Visão Geral › Relatórios › "Textos para revisar" e na tela do relatório
 narrativo) entra pelo componente ÚNICO `cartaoTextoLongo(o)` do
 index.html — nunca uma variante por atividade ou por perfil. O cartão
 nasce COLAPSADO, nesta ordem: tag de aviso ("gerado automaticamente —
@@ -1126,7 +1126,7 @@ lista de unidades e a descrição inteira mora na tela da unidade.**
   (Solinftec, café em trânsito) continuam sumindo.
 - **A tela da unidade usa o cabeçalho contextual (c5)** —
   `cabecalhoContexto(unidade,{sub:<título do cartão>, voltar:true})`, como
-  Diretoria › Faróis › unidade — e termina em "‹ Voltar ao painel". A conta
+  Visão Geral › Faróis › unidade — e termina em "‹ Voltar ao painel". A conta
   mostrada é exatamente a de antes: a v88 mudou ONDE o número aparece, nunca
   o número.
 - **Agrupamento por id, nunca por pedaço de nome** (mesma regra 3 do plano de
@@ -1219,7 +1219,7 @@ variante por atividade.
   docs/definicao-de-pronto.md, item 26.
 
 ### c22) Lista de leitura com uma entrada por unidade nasce em três níveis (desde a v99)
-Relato do Nilo em 16/09/2026, iPhone a 390 px: Diretoria › 📊 Relatórios
+Relato do Nilo em 16/09/2026, iPhone a 390 px: Visão Geral › 📊 Relatórios
 abria com 24 cartões de texto (um por unidade), café e pecuária misturados
 em ordem alfabética, cada cartão ocupando um quarto da tela, e "📊 Números"
 só depois de oito telas de rolagem. Mesmo diagnóstico da v88. Regra que
@@ -1271,6 +1271,54 @@ aparecem na mesma lista.**
   e `scripts/checar-poluicao.cjs`, grupo "20. Relatórios em três níveis"
   (o grupo 8 da v68 passou a medir o cartão colapsado na tela do relatório
   narrativo); detalhe em docs/definicao-de-pronto.md, item 28.
+
+### c23) Porta de módulo se chama pelo que a pessoa FAZ ou ENCONTRA lá dentro, nunca pelo cargo (desde a v101)
+Relato do Nilo em 17/09/2026, iPhone a 390 px: na tela inicial, duas portas
+tinham nome de cargo — "Diretoria — Acompanha todas as fazendas" e
+"Escritório / Administrador — Cadastros e relatórios". O acesso está
+liberado a todos os funcionários de propósito (para explorarem e
+aprenderem), mas o gerente lia o cargo e concluía que aquilo não era para
+ele: não tocava, não explorava, não aprendia. O nome barrava na cabeça o
+que o código não barra. Regra que fica: **porta de módulo se chama pelo que
+a pessoa FAZ ou ENCONTRA lá dentro, nunca pelo cargo de quem "deveria"
+entrar; rótulo não é controle de acesso — quem pode o quê é
+`estadoAcao`/`ACOES_PERFIL` (c9) e `escopoDaChave`, nunca o texto do
+botão.**
+- **As portas:** "🔭 Visão Geral — Todas as fazendas num lugar só" (era
+  "📋 Diretoria") e "⚙️ Cadastros — Fazendas, talhões e insumos" (era
+  "Escritório / Administrador — Cadastros e relatórios"). O subtítulo
+  lista o que existe lá dentro hoje e cabe em UMA linha a 390 px (medido:
+  a coluna de texto da porta tem 260 px e o subtítulo do cabeçalho 222 px —
+  "Fazendas, talhões, códigos e insumos" quebrava nos dois); "relatórios"
+  saiu do subtítulo de Cadastros porque relatório tem porta própria (duas
+  portas prometendo a mesma coisa é uma escolha a mais). O 🔭 substitui o
+  📋, que era o mesmo ícone de Planejamento (duas portas com o mesmo
+  desenho não se distinguem na rolagem); nenhum ícone se repete entre as
+  portas. As outras portas e a ordem não mudam.
+- **Os cabeçalhos de dentro seguem a porta:** o subtítulo do `topo()` que
+  dizia o cargo ("Diretoria" / "Administrador") passa a dizer o módulo —
+  "Visão Geral" no painel, em Faróis de registro e em Relatórios (caminho
+  "Visão Geral › Faróis de registro"); Cadastros leva no subtítulo o mesmo
+  texto da porta e Planejamento a forma curta que cabe nos 222 px ("Reunião
+  do mês e semana"). Subtítulo de cabeçalho é `nowrap` com reticências:
+  texto que não cabe é texto cortado, então se mede antes de escrever. O mecanismo de volta
+  (`abrirModulo`/`voltarDoModulo`, c20) não muda.
+- **Rótulo é rótulo:** nada de código muda de nome — `podeCadastros()`,
+  `vPainel`, `painelun`, `ACOES_PERFIL`, os papéis "admin"/"proprietario",
+  as chaves ADMIN/DIRETORIA e os nomes gravados (`por`, `quem`) ficam
+  exatamente como estão (regra 2 da nomenclatura, v76: quem traduz é a
+  leitura). Nenhuma permissão, escopo ou visibilidade muda com a troca.
+- **Porta ≠ pessoa.** "Diretoria" e "escritório" continuam valendo onde
+  nomeiam gente ou área da empresa — "Ação da diretoria" (c9), "alerta da
+  Diretoria", "peça ao escritório", "a cobrança é do escritório", o grupo
+  "Diretoria e administrador" dos códigos de acesso (o código é da pessoa).
+  Renomeia-se a porta; não se apaga a empresa do vocabulário.
+- Conferência: `scripts/checar-poluicao.cjs`, grupo "21. Portas por função"
+  (tela inicial sem "Diretoria", "Escritório" e "Administrador" nos dois
+  códigos; as duas portas com o texto e o ícone novos; cada porta em uma
+  linha de título + uma de subtítulo a 390 px, alvo ≥ 44 px; ícones únicos;
+  ordem inalterada; cabeçalhos de dentro sem cargo); detalhe em
+  docs/definicao-de-pronto.md, item 29.
 
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.

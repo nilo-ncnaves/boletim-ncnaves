@@ -391,7 +391,7 @@ guarda em `dsrCache` e em `bdf:diasSemRegistro`; `diasSemRegistroDe(unidade,
 operacao)` e `textoDiasSemRegistro(linha)` ("há 12 dias" / "hoje" / "sem
 registro") ficam prontos para telas futuras. A função não roda na
 sincronização; quem mostra o número é a `vw_farol_registro` (v60), em
-Diretoria › Faróis de registro › unidade. Desde a v65 as unidades de café
+Visão Geral › Faróis de registro › unidade. Desde a v65 as unidades de café
 também aparecem lá (sem janela: só "há N dias" / "sem registro" por
 operação, no bloco "Operações sem janela").
 
@@ -541,7 +541,7 @@ atividade pode ser uma ou uma lista), guarda em `ritmoCache` /
 demanda, sem cache; `ritmoDe(unidade, operacao)` e `textoRitmo(linha)`
 ("a cada 18 dias"; vazio quando `qtd_intervalos = 0`) servem as telas. Em
 `syncTudo`, só códigos com painel baixam (até a v64 só GRAOS e PECUARIA;
-desde a v65 as três atividades). Onde aparece: Diretoria › Faróis de
+desde a v65 as três atividades). Onde aparece: Visão Geral › Faróis de
 registro › unidade, como texto secundário "ritmo: a cada N dias" ao lado
 de "sem registro há N dias" — as duas métricas juntas — nas três
 atividades e apenas com dois registros ou mais; sem intervalo a linha é
@@ -627,7 +627,7 @@ aparece (v64, decisão do Nilo em 08/09/2026 de incluir o café): cartão
 iCrop do boletim do gerente (café e grãos), cartão Solinftec da casa do
 gerente (café, grãos e pecuária), cartões "iCrop — medição de ontem" e
 "Solinftec — medição de ontem" do painel da Diretoria, e o bloco "Estado
-dos robôs" em Escritório › Integrações e robôs. Sem linha: pós-colheita
+dos robôs" em Cadastros › Integrações e robôs. Sem linha: pós-colheita
 (não tem dado de integração) e a dica de chuva na seção Clima (o cartão
 iCrop do mesmo boletim já a carrega).
 
@@ -676,7 +676,7 @@ rodar são reprocessados pelo próprio bloco (passo 6).
 
 ## Como rodar um relatório PRONTO no Cowork
 
-Caminho curto (v54): no app, com código ADMIN, Escritório › Cadastros ›
+Caminho curto (v54): no app, com código ADMIN, Cadastros ›
 "Abrir carteira de relatórios" abre a página
 https://boletim-ncnaves.netlify.app/relatorios.html, que lê esta carteira
 e os prompts direto da pasta docs e tem o botão "copiar prompt" em cada

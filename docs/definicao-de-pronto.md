@@ -144,7 +144,7 @@ Regras:
 ## 8. Cabeçalho contextual nas telas de leitura (desde a v66)
 Toda tela de leitura com unidade escolhida (casa do gerente, boletim
 enviado, casa e registro do pós-colheita, relatório do gerente,
-Diretoria › Faróis › unidade) abre pelo componente único
+Visão Geral › Faróis › unidade) abre pelo componente único
 `cabecalhoContexto(fazendaId, {sub, voltar})` do `index.html`
 (CLAUDE.md, item c5) — nunca por `topo()` com nome de fazenda montado
 na tela. Antes do PR, conferir:
@@ -1168,3 +1168,60 @@ passou a medir o cartão colapsado na tela do relatório narrativo.
 `scripts/regressao_render.cjs` contra `origin/main`: gerente das três
 atividades, pós-colheita, apontamento e painel da Diretoria idênticos; só
 `vRelatorios` e as duas telas novas mudam.
+
+## 29. Porta de módulo se chama pelo que a pessoa faz ou encontra, nunca pelo cargo (desde a v101)
+
+Origem: 17/09/2026, o Nilo com a tela inicial na mão, iPhone a 390 px.
+Duas portas tinham nome de cargo ("Diretoria", "Escritório /
+Administrador"); o acesso está liberado a todos de propósito, mas o gerente
+lia o cargo e se autoexcluía. Além disso "Escritório / Administrador —
+Cadastros e relatórios" prometia relatórios (que têm porta própria) e
+"Diretoria" repetia o 📋 de Planejamento.
+
+Regras que ficam (CLAUDE.md, item c23):
+
+1. **Porta pelo que se faz lá dentro:** "🔭 Visão Geral — Todas as fazendas
+   num lugar só" e "⚙️ Cadastros — Fazendas, talhões e insumos". O
+   subtítulo lista o que existe hoje (conferir o menu real antes de
+   escrever), cabe em UMA linha a 390 px (coluna de texto da porta: 260 px;
+   subtítulo do cabeçalho: 222 px, `nowrap` com reticências — medir antes
+   de escrever) e não promete o que mora em outra porta.
+2. **Rótulo não é controle de acesso.** Quem pode o quê continua sendo
+   `escopoDaChave` / `ACOES_PERFIL` / `estadoAcao`. Trocar o texto de uma
+   porta nunca muda permissão, escopo, visibilidade, id, classe, papel de
+   sessão, chave de catálogo, tabela ou nome de função. Quem via, continua
+   vendo; quem não via, continua não vendo.
+3. **Cabeçalho de dentro segue a porta:** o subtítulo do `topo()` diz o
+   módulo ("Visão Geral" no painel, Faróis e Relatórios), repete o
+   subtítulo da porta (Cadastros) ou a forma curta que cabe (Planejamento:
+   "Reunião do mês e semana") — nunca o cargo.
+4. **Porta ≠ pessoa.** Onde "Diretoria"/"escritório" nomeia gente ou área
+   ("Ação da diretoria", "peça ao escritório", o grupo "Diretoria e
+   administrador" dos códigos de acesso), o texto fica. Caso duvidoso vai
+   ao PR como pergunta, nunca adivinhado.
+5. **Ícone de porta é único na tela inicial.** Trocar o ícone de uma porta
+   é substituição de identidade, não emoji decorativo novo (P10 continua
+   valendo para todo o resto).
+6. **Histórico intacto:** nomes gravados nos registros (`por`, `quem`,
+   `nome` dos usuários u2/u3) não mudam (regra da v76, item 1).
+
+Antes do PR, conferir:
+
+- [ ] `node scripts/checar-poluicao.cjs`, grupo "21. Portas por função",
+      todo ✅: tela inicial sem "Diretoria", "Escritório" e "Administrador"
+      no código de administrador (8 portas) e no da diretoria; as duas
+      portas com texto e ícone novos; as duas em uma linha de título + uma
+      de subtítulo; toda porta com alvo ≥ 44 px dentro dos 390 px; nenhum
+      ícone repetido; ordem inalterada; código da diretoria sem Cadastros;
+      cabeçalhos de painel, Faróis, Relatórios, Planejamento e Cadastros
+      sem cargo e sem cortar; zero erro de JavaScript.
+- [ ] `grep -n "Diretoria\|Escritório\|Administrador" index.html`: toda
+      ocorrência restante é comentário, identificador, nome gravado ou
+      texto sobre pessoa/área — e as duvidosas estão listadas no PR.
+- [ ] `scripts/regressao_render.cjs` contra `origin/main`: café, grãos,
+      pecuária e pós-colheita idênticos fora o rodapé de versão; painel,
+      Faróis, Relatórios, Planejamento e Cadastros mudam SÓ o subtítulo do
+      cabeçalho; a tela inicial muda SÓ as duas portas e o rodapé.
+- [ ] Nenhuma linha de `ACOES_PERFIL`, `escopoDaChave`, `podePainel`,
+      `podeCadastros`, `soLeitura` tocada.
+
