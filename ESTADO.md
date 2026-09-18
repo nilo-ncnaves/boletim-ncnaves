@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v100** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v101** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -608,10 +608,12 @@ filtro, sem imputar omissão.
   farol do painel passou de "○ faltou" para "○ sem registro" na v61.
 - **Fica de fora, por desenho:** listas de lançamento do boletim (só o
   "＋", padrão a), cartões que somem sem dado (Solinftec, iCrop, Meus
-  relatórios), avisos dos robôs. Para decisão do Nilo: os títulos
-  "Boletim de hoje pendente" / "Registro de hoje pendente" (rótulo de
-  situação nas casas do gerente e do pós-colheita, mexer toca o café)
-  e "pendente" no relatório de rebanho (GMD/lotação, texto do motor).
+  relatórios), avisos dos robôs. **Resolvido na v101:** os títulos
+  "Boletim de hoje pendente" / "Registro de hoje pendente" viraram
+  "Boletim de hoje" / "Registro de hoje" nas casas do gerente e do
+  pós-colheita, com a frase da espera pela função única
+  `fraseEsperaBoletim` (c23). Continua com "pendente" só o relatório de
+  rebanho (GMD/lotação, texto do motor no Supabase).
   Enriquecer com `vw_dias_sem_registro` (por operação) fica para o
   item "janela por operação e farol".
 
@@ -2022,6 +2024,75 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## O boletim fecha o expediente (v101) — a ausência durante o dia é normal
+Regra permanente em CLAUDE.md, item c23; checagem em
+docs/definicao-de-pronto.md, item 29.
+
+**O que mudou no campo.** 18/09/2026, decisão do Nilo: os funcionários passam
+a enviar o boletim **ao final do expediente**, e não mais no começo da manhã,
+como vinham fazendo. O app sempre foi desenhado para isso — a ajuda começa com
+"todo fim de expediente" e o corte do painel é às 19h —, mas as telas de
+acompanhamento contavam o dia desde a meia-noite. Com a rotina da manhã isso
+não incomodava (às 9h os boletins já tinham chegado e tudo ficava verde); com a
+rotina nova, o app passaria o dia inteiro cobrando um dia que ainda nem
+aconteceu:
+- casa do gerente às 7h: farol + "**Boletim de hoje pendente**" — e "pendente"
+  é palavra proibida pela regra dos estados de lista (c2) desde a v61, onde já
+  estava listada como decisão pendente do Nilo;
+- painel da Diretoria às 7h: farol âmbar + "0 de 24 unidades enviaram hoje";
+- monitor de chegada (v82): "0 de 24 · 24 sem nada recebido", o dia inteiro;
+- chips das unidades no painel: todos âmbar até as 17h.
+
+**O que é agora.** Uma fonte só, `EXPEDIENTE` ({fim: 17, corte: 19}, horas de
+Brasília como "hoje", por `horaBRT()`), com `expedienteAberto()`,
+`farolDoDia(tem)` e `fraseEsperaBoletim(que)` — funções ÚNICAS das três
+atividades, do pós-colheita e do painel (c4: nunca uma variante por atividade).
+
+| tela | antes | agora (expediente correndo) |
+| --- | --- | --- |
+| Casa do gerente | "Boletim de hoje pendente" · "Preencha até as 19h" | "Boletim de hoje" · "Preencha o boletim no fim do expediente, até as 19h" |
+| Casa do pós-colheita | "Registro de hoje pendente" | "Registro de hoje" · mesma frase, com a chave "registro" |
+| Painel — cartão do dia | farol âmbar · "Corte diário: 19h" | farol neutro · "Os boletins chegam no fim do expediente" (depois do fim, "Corte diário: 19h") |
+| Painel — chips e cartão da unidade | âmbar desde a meia-noite · "Ainda sem boletim hoje" | neutro · "O boletim do dia chega no fim do expediente" |
+| Monitor de chegada (v82) | "3 de 24 · 21 sem nada recebido" | "3 de 24 · o expediente ainda está correndo" |
+| Rascunho de outro dia | "Continuar rascunho" | "Continuar rascunho de 17/09" (o boletim vai com a data dele) |
+
+Depois das 17h nada disso muda em relação ao que era: o farol vira âmbar de
+espera e o texto volta a falar do corte das 19h. O contador ("3 de 24") nunca
+sai da tela — o que muda é o farol e a frase, nunca o número.
+
+**A ajuda passo a passo** trocou "todo fim de tarde" por "todo fim de
+expediente, antes de ir embora" + "o boletim é do dia que está terminando", e o
+último passo agora cita "o que ficou para terminar" e o plano de amanhã (os
+nomes da v75, que o texto ainda não tinha acompanhado).
+
+**O que NÃO mudou:** nenhum dado gravado, nenhuma tabela, nenhum campo, nenhuma
+chamada nova ao Supabase; o boletim continua sendo o do dia em que é preenchido
+(`hojeBRT`); a régua de 7 dias (v73), a folha "📋 Amanhã" (v75), o cinto de
+segurança do envio (v70) e o indicador de envio (v82) ficam idênticos; quem
+preferir preencher durante o dia continua podendo.
+
+**Provas (v101).**
+- `node scripts/checar-poluicao.cjs`: **803 ✅ · 42 ❌**, checklist item a item
+  IDÊNTICO ao do `origin/main` medido na mesma máquina, no mesmo dia e na mesma
+  janela do expediente — nenhum ❌ novo (detalhe na seção "Telas × padrões de
+  tela").
+- `scripts/regressao_render.cjs` `origin/main` × v101 (as duas com o expediente
+  aberto, 11h45 de Brasília): os ÚNICOS textos que mudam são os da tabela acima,
+  mais o rodapé "v100 → v101". O boletim em si — as três atividades, todas as
+  seções, o cinto de segurança, a folha "📋 Amanhã", o resumo do WhatsApp e a
+  fila de sincronização — sai byte a byte igual.
+- Sintaxe: `node --check` no JavaScript extraído do index.html.
+
+**Para o Nilo (pergunta aberta).** Com a rotina da manhã, quem esquecia era
+pego no mesmo dia; com a rotina do fim do expediente, o esquecimento só aparece
+na manhã seguinte — e hoje o app só oferece "Preencher boletim de **hoje**".
+O gerente que perder a noite ou lança o dia anterior dentro do boletim de hoje
+(data errada, e o plano/insumo/executado contam no dia errado) ou não lança. Só
+o rascunho salvo atravessa a virada, e agora dizendo de que dia é. Abrir
+"registrar o boletim de ontem" pela régua de 7 dias é tarefa própria — fica
+aguardando decisão.
+
 ## Relatórios da Diretoria em três níveis (v99) — menu › abas por atividade › folha
 Regra permanente em CLAUDE.md, item c22; checagem em
 docs/definicao-de-pronto.md, item 28; comportamento da tela em
@@ -2935,6 +3006,14 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v101, 18/09/2026: **803 ✅ · 42 ❌** — checklist IDÊNTICO ao do `origin/main`
+medido na mesma máquina e no mesmo dia (mesmos ✅ e mesmos ❌, item a item):
+nenhum ❌ novo. O ❌ a mais em relação ao registrado na v100 não vem da v101 e
+sim do calendário: 18/09/2026 é sexta-feira, e na sexta a pastilha do ritual da
+semana (v77) aparece por desenho, derrubando a checagem "nenhuma pastilha
+aparece sem pendência" do grupo 14 também no main. Como o farol do dia passou a
+depender da hora (c23), as duas versões têm de ser medidas na mesma janela —
+estas foram, com o expediente aberto (11h45 de Brasília). Medição anterior,
 v100, 17/09/2026: **804 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v99, nenhum
 novo. A v100 acrescentou 1 checagem ao grupo "18. Relato de aplicação" (talhão
 em chips removíveis) e manteve a tela "Colar do WhatsApp › Conferir a aplicação"
@@ -3687,9 +3766,11 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   mais (com o banco de 07/09/2026, quase nada ainda). Sem o SQL rodado o
   app segue igual (a leitura falha em silêncio e nada aparece).
 - **Estados vazios (v61) — para o Nilo:** revisar as frases (lista no
-  PR da v61 e em docs/qualidade-log.md) e decidir sobre "Boletim de
-  hoje pendente" / "Registro de hoje pendente" nas casas do gerente e
-  do pós-colheita (rótulo de situação; trocar toca o café).
+  PR da v61 e em docs/qualidade-log.md). A parte dos títulos "Boletim de
+  hoje pendente" / "Registro de hoje pendente" foi resolvida na v101
+  (viraram "Boletim de hoje" / "Registro de hoje", com a frase da espera
+  pela função única `fraseEsperaBoletim`), nas três atividades e no
+  pós-colheita.
 - **Janela e farol (v60):** `sql/042-janela-farol.sql` RODADO pelo Nilo em
   07/09/2026 e conferido pela REST (10 janelas propostas ativas; 582
   combinações; Capoeira Grande × monitoramento amarelo "sem registro desde

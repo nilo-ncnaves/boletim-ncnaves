@@ -3547,13 +3547,38 @@ function indicadores(dias){
   });
   return {qtd:bs.length, sacas:Math.round(sacas), chuva, horasMaq, ativ, fitoAltos, ocorrAltas};
 }
+/* ---------- Janela do dia (v101): o boletim fecha o expediente ----------
+   Decisão do Nilo em 18/09/2026: os gerentes passaram a enviar o boletim AO FINAL DO
+   EXPEDIENTE, e não mais no começo da manhã. O app já era desenhado assim (a ajuda sempre
+   disse "todo fim de expediente"), mas as telas de acompanhamento contavam o dia desde a
+   meia-noite: às 7h da manhã o painel já mostrava "0 de 24 unidades enviaram hoje" com
+   farol âmbar, e a casa do gerente dizia "Boletim de hoje pendente" — cobrança de um dia
+   que ainda nem aconteceu, e "pendente" é palavra proibida (c2).
+   Regra que fica: enquanto a janela do dia está aberta, a ausência do boletim é o estado
+   NORMAL — farol neutro e nenhuma palavra de cobrança; a espera começa só depois que o
+   expediente fecha (mesma regra 4 do plano de safra: vermelho só depois de a janela
+   fechar). Uma fonte só para as três atividades, o pós-colheita e o painel: EXPEDIENTE
+   (horas em Brasília, como "hoje"), expedienteAberto(), farolDoDia(tem) e
+   fraseEsperaBoletim(que). */
+const EXPEDIENTE={fim:17, corte:19};
+const horaBRT=()=>{ try{ const s=new Date().toLocaleTimeString("sv-SE",{timeZone:FUSO_BRT});
+  const h=parseInt(String(s).slice(0,2),10); return isNaN(h)?new Date().getHours():h;
+}catch(e){ return new Date().getHours(); } };
+const expedienteAberto=()=>horaBRT()<EXPEDIENTE.fim;
+/* farol do dia corrente: verde com registro; com o expediente correndo, neutro — nunca âmbar */
+const farolDoDia=tem=>tem?"ok":(expedienteAberto()?"vazio":"espera");
+/* frase da espera, sem cobrar: "que" é chave de quem chama ("boletim" / "registro"), nunca atividade */
+const fraseEsperaBoletim=que=>expedienteAberto()
+  ? "Preencha o "+(que||"boletim")+" no fim do expediente, até as "+EXPEDIENTE.corte+"h."
+  : "Hora de preencher o "+(que||"boletim")+" — até as "+EXPEDIENTE.corte+"h.";
+
 function statusDoDia(fz){
   const b = boletimDoDia(hojeISO(), fz);
   if(b){
     const critico = (b.ocorrencias||[]).some(o=>o.grav==="Alta") || (b.fito||[]).some(f=>f.nivel==="Alto");
     return critico ? "critico" : "ok";
   }
-  return (new Date().getHours()>=17) ? "espera" : "vazio";
+  return farolDoDia(null);
 }
 
 /* ---------- Rascunho novo ---------- */
@@ -3748,8 +3773,8 @@ function vCasaGerente(){
       <div class="linha-flex">
         <span class="farol ${st}"></span>
         <div class="cresce">
-          <h2>${b?(naFila("b",b.id)?"Boletim de hoje guardado no aparelho":"Boletim de hoje enviado"):"Boletim de hoje pendente"}</h2>
-          <p class="mut">${b?(naFila("b",b.id)?"Sobe sozinho quando o sinal voltar":("Enviado às "+esc(horaEnvio(b))+(b.editadoEm?" · editado":""))):"Preencha até as 19h"}</p>
+          <h2>${b?(naFila("b",b.id)?"Boletim de hoje guardado no aparelho":"Boletim de hoje enviado"):"Boletim de hoje"}</h2>
+          <p class="mut">${b?(naFila("b",b.id)?"Sobe sozinho quando o sinal voltar":("Enviado às "+esc(horaEnvio(b))+(b.editadoEm?" · editado":""))):fraseEsperaBoletim("boletim")}</p>
         </div>
       </div>
     </div>`:cartaoDiaRegua({dia, reg:bDia, que:"boletim registrado", unidade:fz, rotulo:"Boletim", attr:"data-ver", farol:bDia&&critico(bDia)?"critico":"ok",
@@ -3759,7 +3784,7 @@ function vCasaGerente(){
     ${cartaoRelatoriosGerente(fz)}
     ${syncFila.length?`<div class="aviso">${syncStatus()}</div>`:""}
     ${temRasc?`<div class="aviso">📝 Você tem um rascunho de ${fmtData(rascunho.data)} guardado neste aparelho. Ele não se perde sem internet.</div>`:""}
-    <button class="btn" id="bt-preencher">${b?"Ver / corrigir boletim de hoje":temRasc?"Continuar rascunho":"Preencher boletim de hoje"}</button>
+    <button class="btn" id="bt-preencher">${b?"Ver / corrigir boletim de hoje":temRasc?("Continuar rascunho"+(rascunho.data!==hoje?" de "+fmtDataCurta(rascunho.data):"")):"Preencher boletim de hoje"}</button>
     ${ontem && (ontem.pendencias || (ontem.atividades||[]).some(a=>a.status==="continua"))?`
     <div class="cartao mt"><h3>O que ficou de ${fmtData(ontem.data)}</h3>
       ${(ontem.atividades||[]).filter(a=>a.status==="continua").map(a=>`
@@ -9070,7 +9095,7 @@ function cartaoChegadaBoletins(){
         : (semAparelho?"":"nenhum aparelho sincronizou nesta unidade");
       return `<div style="padding:5px 0;border-top:1px solid var(--linha)">
         <div class="linha-flex" style="gap:8px">
-          <span class="farol ${l.b?"ok":"espera"}"></span>
+          <span class="farol ${farolDoDia(l.b)}"></span>
           <span class="cresce" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.b?esc(l.f.nome):"<b>"+esc(l.f.nome)+"</b>"}</span>
           <span class="num mut" style="flex:none">${dir}</span></div>
         ${ap?`<p class="mut" style="margin:2px 0 0 22px;font-size:.72rem">${ap}</p>`:""}</div>`;
@@ -9078,7 +9103,8 @@ function cartaoChegadaBoletins(){
   /* nasce RECOLHIDO (P5): o resumo já dá a olhada — "3 de 24 · 21 sem nada recebido" — e a lista
      inteira não empurra o painel para baixo (o painel já passa de 2 telas; ver c5/P3). */
   return `<details class="secao"><summary><span class="ico">📡</span>Chegada dos boletins hoje
-    <span class="resumo">${n} de ${linhas.length}${n<linhas.length?" · "+(linhas.length-n)+" sem nada recebido":""}</span><span class="seta">›</span></summary>
+    <span class="resumo">${n} de ${linhas.length}${expedienteAberto()?" · o expediente ainda está correndo"
+      :(n<linhas.length?" · "+(linhas.length-n)+" sem nada recebido":"")}</span><span class="seta">›</span></summary>
     <div class="corpo">
       ${corpo||htmlEstado("vazio",{que:"unidade",onde:"neste filtro"})}
       ${soltos.length?`<div style="padding:6px 0;border-top:1px solid var(--linha);margin-top:6px">
@@ -9086,7 +9112,7 @@ function cartaoChegadaBoletins(){
         <p class="mut" style="margin:2px 0 0;font-size:.72rem">${soltos.slice(0,6).map(x=>esc(haQuanto(x.visto_em))+(x.versao?" · "+esc(x.versao):"")+(x.chave?" · código "+esc(rotuloDaChave(x.chave)):"")+(n0(x.na_fila)?" · "+n0(x.na_fila)+" na fila":"")).join("<br>")}${soltos.length>6?"<br>e mais "+(soltos.length-6):""}</p>
         <p class="mut" style="margin:4px 0 0;font-size:.72rem">O celular falou com o banco, mas parou antes de escolher a unidade. Com o código da própria fazenda o app abre direto no boletim dela.</p></div>`:""}
       ${semAparelho&&!soltos.length?`<p class="mut" style="font-size:.72rem;margin-top:8px">A coluna do aparelho aparece depois de rodar sql/052-aparelho-sync.sql no Supabase; até lá o cartão mostra só a hora de chegada do boletim.</p>`:""}
-      <p class="mut" style="font-size:.72rem;margin-top:8px">Hora em que o boletim entrou no banco. "Nada recebido" é ausência de REGISTRO, nunca afirmação de que não foi feito.</p>
+      <p class="mut" style="font-size:.72rem;margin-top:8px">Hora em que o boletim entrou no banco. Os boletins chegam no fim do expediente (corte ${EXPEDIENTE.corte}h). "Nada recebido" é ausência de REGISTRO, nunca afirmação de que não foi feito.</p>
     </div></details>`;
 }
 function cartaoFarolBoletins(){
@@ -9384,15 +9410,15 @@ const PAINEL_CARTOES={
 
 /* ---------- Tela: painel do proprietário ---------- */
 function vPainel(){
-  const hoje=hojeISO(), tarde=new Date().getHours()>=17;
+  const hoje=hojeISO();
   const unidadesAtv = D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
   const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
   const i7 = indicadores(7), i30 = indicadores(30);
   return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
     ${chipsAtividade("atv-filtro", filtroPainel.atv||"", {todas:"Todas"})}
-    <div class="cartao"><div class="linha-flex"><span class="farol ${enviadasHoje?"ok":"espera"}"></span>
+    <div class="cartao"><div class="linha-flex"><span class="farol ${farolDoDia(enviadasHoje)}"></span>
       <div class="cresce"><h2>${enviadasHoje} de ${unidadesAtv.length} unidades enviaram hoje</h2>
-      <p class="mut">Corte diário: 19h · toque numa fazenda para filtrar</p>
+      <p class="mut">${expedienteAberto()?"Os boletins chegam no fim do expediente":"Corte diário: "+EXPEDIENTE.corte+"h"} · toque numa fazenda para filtrar</p>
       ${syncAtivo()?`<p class="mut" style="font-size:.75rem">${syncStatus()} <button class="btn suave mini" id="bt-sync" style="display:inline-flex;padding:2px 8px">🔄 Atualizar</button></p>`:""}</div></div></div>
     ${(()=>{ const nt=relCache.filter(l=>l.texto).length, nn=relCache.filter(l=>!l.texto&&l.unidade_id).length;
       return `<button class="btn mb no-print" id="bt-relatorios-tela">📊 Relatórios${relCache.length?` <span style="font-weight:400;font-size:.85rem;opacity:.85">· ${nt?nt+" texto"+(nt>1?"s":"")+" para revisar":""}${nt&&nn?" · ":""}${nn?"números prontos":""}</span>`:""}</button>`; })()}
@@ -9475,7 +9501,7 @@ function vPainel(){
       <button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${!filtroPainel.fazenda?"border-color:var(--verde)":""}" data-fz="">
         <span class="linha-flex" style="gap:7px"><b style="font-size:.8rem;white-space:nowrap">Todas</b></span></button>
       ${unidadesAtv.map(f=>{const b=boletimDoDia(hoje,f.id);
-        const st=b?(((b.ocorrencias||[]).some(o=>o.grav==="Alta")||(b.fito||[]).some(x=>x.nivel==="Alto")||(b.irr&&(["Baixo","Crítica"].includes(b.irr.agua)||b.irr.status==="Não rodou")))?"critico":"ok"):(tarde?"espera":"vazio");
+        const st=b?(((b.ocorrencias||[]).some(o=>o.grav==="Alta")||(b.fito||[]).some(x=>x.nivel==="Alto")||(b.irr&&(["Baixo","Crítica"].includes(b.irr.agua)||b.irr.status==="Não rodou")))?"critico":"ok"):farolDoDia(null);
         const cults=[...new Set(talhoesAnuais(f.id).map(t=>cicloAtivo(t.id)).filter(Boolean).map(c=>rotuloCultura(c.cultura)))];
         return `<button class="cartao" style="margin:0;flex:0 0 auto;padding:9px 12px;${filtroPainel.fazenda===f.id?"border-color:var(--verde)":""}" data-fz="${f.id}">
         <span class="linha-flex" style="gap:7px"><span class="farol ${st}"></span>
@@ -9485,9 +9511,9 @@ function vPainel(){
       const bh=boletimDoDia(hoje,f.id);
       const ult=boletinsOrdenados().filter(x=>x.fazendaId===f.id).slice(0,7);
       return `<div class="cartao" style="border-color:var(--verde)">
-        <div class="linha-flex"><span class="farol ${bh?"ok":(tarde?"espera":"vazio")}"></span>
+        <div class="linha-flex"><span class="farol ${farolDoDia(bh)}"></span>
           <div class="cresce"><h2>${esc(f.nome)}</h2>
-          <p class="mut">${bh?("Boletim de hoje enviado às "+esc((bh.enviadoEm||"").split(" ")[1]||"")):"Ainda sem boletim hoje"}</p></div>
+          <p class="mut">${bh?("Boletim de hoje enviado às "+esc((bh.enviadoEm||"").split(" ")[1]||"")):(expedienteAberto()?"O boletim do dia chega no fim do expediente":"Ainda sem boletim hoje")}</p></div>
           <button class="btn suave mini" data-fz="${f.id}">✕ fechar</button></div>
         ${ult.length?`<ul class="lista-limpa mt">${ult.map(x=>`
           <li><button class="linha-flex" style="width:100%;text-align:left" data-ver="${x.id}">
@@ -9809,7 +9835,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v100";
+const APP_VERSAO="v101";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -11488,12 +11514,12 @@ function planAtaGravar(){
 function vAjuda(){
   return topo("Como preencher","Passo a passo",true)+`
   <div class="cartao"><ol style="padding-left:18px;display:grid;gap:10px">
-    <li><b>Todo fim de tarde</b>, abra o app e toque no botão verde <b>Preencher boletim de hoje</b>.</li>
+    <li><b>Todo fim de expediente</b>, antes de ir embora, abra o app e toque no botão verde <b>Preencher boletim de hoje</b>. O boletim é do dia que está terminando.</li>
     <li>Vá abrindo <b>só as seções do que aconteceu</b>. Dia de chuva sem serviço? Marque "Chuva forte", escreva "sem atividades" e envie — leva 30 segundos e vale.</li>
     <li>Prefira <b>tocar nos botões</b> em vez de digitar. Os números têm ＋ e −.</li>
     <li><b>Sem internet, sem problema:</b> tudo fica guardado no celular sozinho, campo a campo. Pode até fechar o app e voltar depois.</li>
     <li>Aconteceu algo sério (acidente, quebra, geada)? Registre em <b>Ocorrências</b>, marque a gravidade e <b>tire uma foto</b> — o escritório vê na hora.</li>
-    <li>No fim, confira as <b>pendências de amanhã</b> e toque em <b>Enviar boletim</b>. Errou algo? Dá para corrigir em até 48 horas.</li>
+    <li>No fim, confira <b>o que ficou para terminar</b>, responda o <b>plano de amanhã</b> (ou toque em "Pular") e toque em <b>Enviar boletim</b>. Errou algo? Dá para corrigir em até 48 horas.</li>
   </ol></div>`;
 }
 
@@ -12203,9 +12229,9 @@ function vCasaPos(){
     ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>${naFila("p",rec)?"📝 Registro guardado":"✅ Registro enviado!"}</h2>
       <p class="mut">${naFila("p",rec)?"Está no aparelho e sobe sozinho quando o sinal voltar. ":""}Um toque e o resumo vai pro grupo.</p>
       <button class="btn mt" data-zappos="${rec}">📲 Mandar resumo no WhatsApp</button></div>`:""}
-    ${dia===hoje?`<div class="cartao"><div class="linha-flex"><span class="farol ${p?"ok":(new Date().getHours()>=17?"espera":"vazio")}"></span>
-      <div class="cresce"><h2>${p?(naFila("p",p.id)?"Registro de hoje guardado no aparelho":"Registro de hoje enviado"):"Registro de hoje pendente"}</h2>
-      <p class="mut">Terreiro, secador e benefício — preencha só o que teve.</p></div></div></div>`
+    ${dia===hoje?`<div class="cartao"><div class="linha-flex"><span class="farol ${farolDoDia(p)}"></span>
+      <div class="cresce"><h2>${p?(naFila("p",p.id)?"Registro de hoje guardado no aparelho":"Registro de hoje enviado"):"Registro de hoje"}</h2>
+      <p class="mut">${p?"Terreiro, secador e benefício — preencha só o que teve.":fraseEsperaBoletim("registro")}</p></div></div></div>`
     :cartaoDiaRegua({dia, reg:pDia, que:"registro de pós-colheita", unidade:fz, rotulo:"Registro", attr:"data-verpos", sub:pDia?esc(pDia.responsavel||""):""})}
     ${(()=>{ const ontem=[...(D.posColheitas||[])].filter(x=>x.fazendaId===fz&&x.data<hojeISO()).sort((a,b)=>a.data<b.data?1:-1)[0];
       const rodando=ontem?secsDe(ontem).filter(s=>estadoSec(s)==="continua"&&s.lote):[];

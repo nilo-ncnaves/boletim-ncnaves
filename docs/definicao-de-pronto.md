@@ -1168,3 +1168,50 @@ passou a medir o cartão colapsado na tela do relatório narrativo.
 `scripts/regressao_render.cjs` contra `origin/main`: gerente das três
 atividades, pós-colheita, apontamento e painel da Diretoria idênticos; só
 `vRelatorios` e as duas telas novas mudam.
+
+## 29. Janela do dia: com o expediente correndo, a ausência é o estado normal (desde a v101)
+
+Origem: 18/09/2026, decisão do Nilo — os gerentes passaram a enviar o boletim
+ao final do expediente, e não mais no começo da manhã. O app já era desenhado
+assim (a ajuda sempre disse "todo fim de expediente"), mas as telas de
+acompanhamento contavam o dia desde a meia-noite: às 7h o painel mostrava
+"0 de 24 unidades enviaram hoje" com farol âmbar e a casa do gerente dizia
+"Boletim de hoje pendente" — cobrança de um dia que ainda nem aconteceu, e
+"pendente" é palavra que o item 6 (estados de lista) já proibia.
+
+Regras que ficam:
+
+1. **Uma fonte só.** O catálogo `EXPEDIENTE` ({fim: 17, corte: 19}, horas de
+   Brasília, como "hoje") e as funções `horaBRT()`, `expedienteAberto()`,
+   `farolDoDia(tem)` e `fraseEsperaBoletim(que)` do index.html. Nenhuma tela
+   decide o farol do dia por conta própria com `new Date().getHours()`, e
+   nenhuma variante por atividade, por perfil ou por tela.
+2. **Farol do dia corrente:** verde com registro; neutro (`vazio`) enquanto o
+   expediente corre; âmbar (`espera`) só depois do fim do expediente. Nunca
+   vermelho — a cor só muda depois de a janela fechar (regra 4 do plano de
+   safra). Vale na casa do gerente, na casa do pós-colheita, no painel da
+   Diretoria (cartão do dia, chips por unidade, cartão da unidade escolhida) e
+   no monitor de chegada (item 19).
+3. **O número é fato; o julgamento é que não existe.** "3 de 24 unidades
+   enviaram hoje" continua na tela com o expediente correndo — muda a frase de
+   apoio ("Os boletins chegam no fim do expediente") e o farol. Proibidos, como
+   sempre: "não fez", "pendente", "atrasado", "faltou", "esqueceu".
+4. **A espera não cobra, e cabe em duas linhas no iPhone.** A casa do gerente
+   lê "Boletim de hoje" + "Preencha o boletim no fim do expediente, até as 19h";
+   passado o fim do expediente, "Hora de preencher o boletim — até as 19h". O
+   pós-colheita usa a MESMA função, com a chave "registro" — o substantivo vem
+   de quem chama, nunca de `if(atividade==="…")`.
+5. **Rascunho de outro dia diz de que dia é** ("Continuar rascunho de 17/09").
+   O boletim continua sendo gravado com a data do rascunho, nunca com a de
+   hoje — mudar a data de um registro seria reescrever o passado (item 17).
+6. **Nada de novo por baixo:** sem tabela, sem campo, sem chamada ao Supabase,
+   sem bloqueio. Quem preferir preencher durante o dia continua podendo, e a
+   régua de 7 dias (item 14), a folha "📋 Amanhã" (item 16) e o cinto de
+   segurança do envio (item 11) ficam idênticos.
+
+Checagem: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
+`scripts/regressao_render.cjs` contra `origin/main` — só a casa do gerente, a
+casa do pós-colheita e o painel da Diretoria mudam, e só em texto e farol.
+Como o farol do dia depende da hora, a comparação das duas versões tem de ser
+feita na mesma janela (as duas com o expediente aberto, ou as duas depois do
+fim dele).

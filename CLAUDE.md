@@ -1272,6 +1272,42 @@ aparecem na mesma lista.**
   (o grupo 8 da v68 passou a medir o cartão colapsado na tela do relatório
   narrativo); detalhe em docs/definicao-de-pronto.md, item 28.
 
+### c23) Janela do dia: com o expediente correndo, a ausência é o estado normal (desde a v101)
+Decisão do Nilo em 18/09/2026: os gerentes passaram a enviar o boletim **ao
+final do expediente**, e não mais no começo da manhã. O app já era desenhado
+assim (a ajuda sempre disse "todo fim de expediente"), mas as telas de
+acompanhamento contavam o dia desde a meia-noite: às 7h o painel já mostrava
+"0 de 24 unidades enviaram hoje" com farol âmbar e a casa do gerente dizia
+"Boletim de hoje pendente" — cobrança de um dia que ainda nem aconteceu, e
+"pendente" é palavra proibida (c2).
+- **Fonte única:** o catálogo `EXPEDIENTE` ({fim, corte}, em horas de
+  Brasília como "hoje", por `horaBRT()`) e as funções `expedienteAberto()`,
+  `farolDoDia(tem)` e `fraseEsperaBoletim(que)` do index.html — nunca uma
+  variante por atividade, por perfil ou por tela. Nenhuma tela decide o farol
+  do dia com `new Date().getHours()` por conta própria.
+- **Farol do dia corrente:** verde com registro; **neutro enquanto o
+  expediente corre** (nunca âmbar); âmbar de espera só depois que o expediente
+  fecha. Mesma regra 4 do plano de safra — a cor só muda depois de a janela
+  fechar, e a janela do dia é o próprio expediente.
+- **Palavra:** "pendente" saiu das telas do dia corrente. A casa do gerente diz
+  "Boletim de hoje" e "Preencha o boletim no fim do expediente, até as 19h"
+  (passado o fim, "Hora de preencher o boletim — até as 19h"); o painel, "Os
+  boletins chegam no fim do expediente" e, passado o fim, "Corte diário: 19h". O contador ("3 de 24") é
+  fato e continua aparecendo: o que muda é o farol e a frase, nunca o número.
+- **Três atividades e pós-colheita pela mesma função**, mais o monitor de
+  chegada (c16), que com o expediente correndo lê "o expediente ainda está
+  correndo" no lugar de "N sem nada recebido".
+- **Rascunho de outro dia diz de que dia é** ("Continuar rascunho de 17/09"):
+  ao enviar, o boletim fica com a data dele, nunca com a de hoje.
+- **O que não muda:** o boletim continua sendo o do dia em que é preenchido
+  (`hojeBRT`), a régua de 7 dias (c11), a folha "📋 Amanhã" (c13), o cinto de
+  segurança do envio (c8) e nenhum dado gravado. Nada impede quem preferir
+  preencher durante o dia.
+- Conferência: `scripts/checar-poluicao.cjs` (nenhum ❌ novo) e
+  `scripts/regressao_render.cjs` contra origin/main — só a casa do gerente, a
+  casa do pós-colheita e o painel mudam de texto/farol; detalhe em
+  docs/definicao-de-pronto.md, item 29.
+
 ### d) DEFINIÇÃO DE PRONTO (obrigatória antes de abrir qualquer PR)
 Versão detalhada em docs/definicao-de-pronto.md.
 1. Rodar `node scripts/checar-poluicao.cjs` (instruções no cabeçalho
