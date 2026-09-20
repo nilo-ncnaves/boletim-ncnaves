@@ -222,7 +222,7 @@ de 3 linhas que venha a entrar numa lista) usa o componente único
 ## 11. Seção eventual oferece resposta explícita de ausência (desde a v69)
 Toda seção do boletim classificada como **eventual** em
 docs/catalogos-por-atividade.md ("Seções do boletim: eventual ×
-esperada") — hoje pragas/doenças, ocorrências, movimentação e sanidade
+esperada") — hoje pragas/doenças, movimentação e sanidade (ocorrências saíram na v101)
 do rebanho — mostra, quando não há registro, o par de chips
 **"Nada a registrar hoje" · "Registrar…"** pelo componente único
 (`chipsRespostaSecao` / `resumoSecaoHtml` / `pintarSecoesResposta`,

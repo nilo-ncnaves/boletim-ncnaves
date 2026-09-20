@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v100** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v101** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -81,13 +81,18 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
 Desde a v69 cada seção tem uma classificação **eventual × esperada**
 (docs/catalogos-por-atividade.md, "Seções do boletim: eventual ×
 esperada"; catálogo `SECOES_BOLETIM`; confirmada pelo Nilo em
-08/09/2026): as eventuais — café: Pragas, doenças e daninhas e
-Ocorrências gerais; grãos: Pragas, doenças e ocorrências (uma resposta
-por cartão); pecuária: Movimentação do rebanho, Sanidade e Ocorrências
-e sanidade — oferecem o par de chips "Nada a registrar hoje" ·
-"Registrar…" quando não há registro (seção própria abaixo).
+08/09/2026): as eventuais — café: Pragas, doenças e daninhas; grãos:
+Pragas, doenças e daninhas (id GRAOS-FITO_OCOR mantido); pecuária:
+Movimentação do rebanho e Sanidade — oferecem o par de chips "Nada a
+registrar hoje" · "Registrar…" quando não há registro (seção própria
+abaixo). **Desde a v101 não existe mais a seção "Ocorrências"** (café:
+Ocorrências gerais; grãos: a metade "ocorrências" do cartão de pragas;
+pecuária: Ocorrências e sanidade) — decisão do Nilo em 20/09/2026: o
+app não oferece registro de acidente de trabalho nem de ocorrência.
+Boletins antigos com `ocorrencias` continuam legíveis; espelho no banco
+pelo sql/058 (CAFE-OCOR e PEC-OCOR com ativo = false).
 - ☕ Café: clima, mão de obra por função, talhões/atividades,
-  irrigação (gotejo), colheita, pós-colheita, fito, ocorrências.
+  irrigação (gotejo), colheita, pós-colheita, fito.
   Desde a v76 a seção **Atividades por talhão** é cascata de 3 passos —
   talhão → atividade → detalhes — e usa a nomenclatura da lavoura (seção
   "Nomenclatura do café na palavra da lavoura"). Desde a **v87** o passo
@@ -2022,6 +2027,49 @@ código um caminho que ninguém aqui consegue usar, então ficou só a colagem
 manual. Se um dia o grupo passar a usar Android, é uma entrada no manifesto
 mais o tratamento do parâmetro na abertura do app.
 
+## Boletim sem "Ocorrências" (v101) — o app não registra acidente nem ocorrência
+Decisão do Nilo em 20/09/2026: registro de acidente de trabalho dentro do
+app pode virar prova contra a empresa se um funcionário agir de má fé. A
+seção "Ocorrências" saiu INTEIRA do boletim, nas três atividades — a lista
+geral (Acidente de trabalho · Quebra de equipamento · Dano climático ·
+Visita técnica · Recebimento de insumos · Outra), a de grãos (Quebra de
+máquina · Falta de insumo · Chuva impediu aplicação · Atraso de operação)
+e a de pecuária (Morte de animal · Fuga de animais · Cerca rompida · Falta
+de água · Animal doente), com gravidade, texto e foto.
+- **O que saiu do index.html:** os cartões "Ocorrências gerais" (café) e
+  "Ocorrências e sanidade" (pecuária); a metade "Ocorrências gerais" do
+  cartão dos grãos, que agora se chama "Pragas, doenças e daninhas" (o id
+  `GRAOS-FITO_OCOR` é chave substituta, gravada em `payload.secoes`, e NÃO
+  muda); `cardOcorr`, `LISTA_OCORR*`, `listaOcorrDa`, os tratadores de
+  "＋ ocorrência", gravidade, texto e foto; as três linhas "Ocorrências" de
+  Cadastros › Catálogos; a linha do LEIA-ME que mandava registrar acidente
+  em Ocorrências; a ocorrência do boletim de exemplo (`b2`).
+- **O que fica (regra da v76: o passado não se reescreve):** `b.ocorrencias`
+  dos boletins já gravados continua legível — boletim enviado, resumo
+  WhatsApp, CSV, farol "crítico" e KPI "Alertas graves — 30 d" somam o que
+  já existe; rascunho e fixtures continuam com `ocorrencias: []`. A causa de
+  morte "Acidente" da pecuária (`PEC_CAUSAS_MORTE`) fica: é morte de ANIMAL,
+  não acidente de trabalho. "Registrar ocorrência" continua sendo o rótulo do
+  chip de pragas e doenças (ocorrência fitossanitária).
+- **Envio:** com uma seção eventual a menos, o cinto do envio (v70) exige
+  resposta só em pragas/doenças (café e grãos) e em movimentação e sanidade
+  (pecuária).
+- **Banco:** `sql/058-sem-ocorrencias.sql` — CAFE-OCOR e PEC-OCOR com
+  `ativo = false` e GRAOS-FITO_OCOR com o nome e os campos novos. Nada se
+  apaga; a visão `vw_completude_boletim` e o gatilho só olham seção ativa.
+- **Print de tela — NÃO É POSSÍVEL num app de navegador (PWA).** O Nilo
+  pediu, na mesma data, que o app impedisse captura de tela. Nem o Safari
+  do iPhone nem o Chrome do Android dão a uma página qualquer meio de
+  bloquear ou detectar o print: isso só existe em app nativo instalado pela
+  loja (no Android, `FLAG_SECURE`; no iPhone nem app nativo bloqueia — só
+  detecta o print depois de tirado). Nenhum "bloqueio" foi colocado no
+  código para não dar falsa segurança. Alternativa real, se o Nilo quiser:
+  publicar o app como nativo (Android) — decisão fora desta tarefa.
+- Provas: `checar-poluicao.cjs` (nenhum ❌ novo; os dois ❌ herdados do "＋"
+  de Ocorrências saíram junto com a seção), regressão contra o main (os
+  passos de ocorrência saíram do `regressao_render.cjs`; café, grãos e
+  pecuária mudam só na ausência do cartão) e os quatro `teste_*.cjs`.
+
 ## Relatórios da Diretoria em três níveis (v99) — menu › abas por atividade › folha
 Regra permanente em CLAUDE.md, item c22; checagem em
 docs/definicao-de-pronto.md, item 28; comportamento da tela em
@@ -3142,8 +3190,8 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
     "Nada a registrar hoje" · "Registrar ocorrência" + lista + ＋) · "＋"
     ❌ (tipo em chips ✓, mas talhão em seletor e tudo junto; ordem O QUÊ
     → ONDE).
-  - Ocorrências gerais: fechada ✅ · ao abrir ✅ (v69: idem) · "＋" ❌
-    (tipo em seletor + gravidade + texto + foto de uma vez).
+  - Ocorrências gerais: seção REMOVIDA na v101 (o ❌ herdado do "＋"
+    saiu junto).
 - 🌾 Grãos (f33) — casa e boletim ✅ (1 tela, tudo fechado); termos de
   café/pecuária ✅ zero.
   - Mão de obra: idem café ❌ ❌.
@@ -3174,8 +3222,8 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
       campos).
     - Outros manejos: ao abrir ✅ · "＋ manejo" ❌ (2 seletores + 3
       campos).
-  - Ocorrências e sanidade: ao abrir ✅ (v69: par de chips) · "＋" ❌
-    (idem café).
+  - Ocorrências e sanidade: seção REMOVIDA na v101 (o ❌ herdado do "＋"
+    saiu junto).
 - 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
   Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
   "Enviar registro do dia" não é fixo no rodapé ❌; termos de

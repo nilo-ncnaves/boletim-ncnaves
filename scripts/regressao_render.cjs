@@ -86,7 +86,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
   const browser = await pw.chromium.launch();
   const ger = (fz, atv) => ({ userId: 'u1', papel: 'gerente', nome: 'Gerente', atividade: atv, fazendaId: fz });
 
-  /* ☕ café — boletim completo: clima, mão de obra, irrigação + fertirrigação, atividades, colheita, fito, ocorrência, envio, WhatsApp, detalhe */
+  /* ☕ café — boletim completo: clima, mão de obra, irrigação + fertirrigação, atividades, colheita, fito, envio, WhatsApp, detalhe (v101: sem ocorrência) */
   await cenario(browser, 'cafe-f23', { codigo: CODIGOS.f23, chave: 'f23' }, ger('f23', 'CAFE'), [
     /* v75: plano de HOJE semeado (feito ontem) — exercita a faixa "O plano de ontem para hoje", o status
        automático e, no envio, a pergunta do motivo. Só no café: em grãos e pecuária a ausência do plano
@@ -108,8 +108,6 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['62-enviar-sem-resposta', async p => { await clique(p, '#bt-enviar'); }],   /* v70: seção eventual sem resposta → aviso âmbar, não envia */
     ['65-nada-fito', async p => { await clique(p, '[data-resp-nada="CAFE-FITO"]'); }],   /* v69: "Nada a registrar hoje" — cai sozinho no 70-fito */
     ['70-fito', async p => { await clique(p, '#bt-add-fito'); await clique(p, '[data-ftipo="Praga"]'); await clique(p, '[data-fnome="Broca-do-café"]'); const t = await primeiraOpcao(p, 'select[data-f="talhaoId"]'); await escolhe(p, 'select[data-f="talhaoId"]', t); await clique(p, '[data-fniv="Médio"]'); await preenche(p, 'input[data-f="obs"]', 'amostragem 3%'); }],
-    ['75-nada-ocor-desfaz', async p => { await clique(p, '[data-resp-nada="CAFE-OCOR"]'); await clique(p, '[data-resp-nada="CAFE-OCOR"]'); }],   /* v69: grava e desfaz no 2º toque */
-    ['80-ocorrencia', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de equipamento'); await clique(p, '[data-ograv="Média"]'); await preenche(p, 'textarea[data-o="texto"]', 'mangueira estourou'); }],
     ['85-obs', async p => { await preenche(p, 'textarea[data-t="obsGeral"]', 'dia normal'); await preenche(p, 'textarea[data-t="pendencias"]', 'terminar setor 3'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
     ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } const pl = await p.$('#bt-plano-pular');   /* v75: folha "Amanhã" — pulada, para o resto do roteiro seguir igual */ if (pl) { await pl.click(); await pausa(p, 300); } }],
@@ -117,7 +115,7 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['97-whats-enviado', async p => { const txt = await p.evaluate(() => resumoWhats(D.boletins[D.boletins.length - 1])); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
   ]);
 
-  /* 🌾 grãos — operações, irrigação por pivô, fito/ocorrências */
+  /* 🌾 grãos — operações, irrigação por pivô, fito (v101: sem ocorrências) */
   await cenario(browser, 'graos-f33', { codigo: CODIGOS.f33, chave: 'f33' }, ger('f33', 'GRAOS'), [
     ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],   /* v73 */
     ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
@@ -128,7 +126,6 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['42-enviar-sem-resposta', async p => { await clique(p, '#bt-enviar'); }],   /* v70 */
     ['45-nada', async p => { await clique(p, '[data-resp-nada="GRAOS-FITO_OCOR"]'); }],   /* v69: cai sozinho no 50-fito */
     ['50-fito', async p => { await clique(p, '#bt-add-fito'); await clique(p, '[data-ftipo="Praga"]'); const t = await primeiraOpcao(p, 'select[data-f="talhaoId"]'); await escolhe(p, 'select[data-f="talhaoId"]', t); await clique(p, '[data-fniv="Baixo"]'); }],
-    ['60-ocorr', async p => { await clique(p, '#bt-add-oc'); await escolhe(p, 'select[data-o="tipo"]', 'Quebra de máquina'); await clique(p, '[data-ograv="Baixa"]'); await preenche(p, 'textarea[data-o="texto"]', 'pneu'); }],
     ['90-whats-rascunho', async p => { const txt = await p.evaluate(() => resumoWhats(rascunho)); await p.evaluate(t => { document.querySelector('#app').setAttribute('data-whats', t); }, txt); }],
     ['95-enviado', async p => { await clique(p, '#bt-enviar'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim');   /* v72: diálogo único */ if (cx) { await cx.click(); await pausa(p, 300); } const pl = await p.$('#bt-plano-pular');   /* v75: folha "Amanhã" — pulada, para o resto do roteiro seguir igual */ if (pl) { await pl.click(); await pausa(p, 300); } }],
     ['96-detalhe', async p => { await p.click('[data-ver] >> nth=0'); }],   /* v67: boletim enviado (badge de categoria) */
