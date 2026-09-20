@@ -128,13 +128,20 @@ informado × medido por pivô.
 As áreas de milho semente são arrendadas a sementeiras (ex.:
 Pioneer). Talhões tipo ARRENDADO aparecem na lista com a etiqueta
 "Arrendado — sementeira", SEM operações, SEM irrigação, SEM colheita;
-apenas ocorrência livre opcional. Ciclos não se aplicam a eles.
+apenas observação livre opcional. Ciclos não se aplicam a eles.
 Não existem operações de campo de semente (despendoamento, roguing,
 isolamento, vistorias) em nenhum catálogo.
 
-### Ocorrências (grãos)
-Quebra de máquina · Falta de insumo · Chuva impediu aplicação ·
-Atraso de operação · + lista geral do app.
+### Ocorrências — REMOVIDAS na v101
+Por decisão do Nilo (20/09/2026), o boletim não oferece mais o registro
+de "Ocorrências" em nenhuma atividade (a lista geral — acidente de
+trabalho, quebra de equipamento, dano climático, visita técnica,
+recebimento de insumos, outra — e as listas próprias de grãos e de
+pecuária). Nenhuma constante `LISTA_OCORR*` existe mais no index.html.
+Boletins já gravados com `payload.ocorrencias` continuam legíveis
+(boletim enviado, WhatsApp, CSV, alertas graves); só não se cria
+registro novo. Quebra de máquina, falta de insumo e chuva entram em
+"Observações e pendências" (texto livre). Espelho no banco: sql/058.
 
 ### Sugestões fitossanitárias (grãos)
 - Pragas: percevejo-marrom (soja), lagarta Spodoptera/Helicoverpa,
@@ -643,13 +650,12 @@ atividade na tela.
 | CAFE-ATIV | ☕ Café | Atividades por talhão | esperada | — | — |
 | CAFE-COLHEITA | ☕ Café | Colheita | esperada (sazonal: fora da safra não há o que responder) | — | — |
 | **CAFE-FITO** | ☕ Café | Pragas, doenças e daninhas | **eventual** | fito | Registrar ocorrência |
-| **CAFE-OCOR** | ☕ Café | Ocorrências gerais | **eventual** | ocorrencias | Registrar ocorrência |
 | CAFE-OBS | ☕ Café | Observações e pendências | esperada (texto livre) | — | — |
 | GRAOS-CLIMA | 🌾 Grãos | Clima do dia | esperada | — | — |
 | GRAOS-MO | 🌾 Grãos | Mão de obra | esperada | — | — |
 | GRAOS-OPER | 🌾 Grãos | Operações do dia | esperada | — | — |
 | GRAOS-IRG | 🌾 Grãos | Irrigação (pivôs) | esperada (já tem "Não rodou" por pivô) | — | — |
-| **GRAOS-FITO_OCOR** | 🌾 Grãos | Pragas, doenças e ocorrências (um cartão, duas listas; UMA resposta por cartão — decisão do Nilo) | **eventual** | fito + ocorrencias | Registrar ocorrência (aciona "＋ ocorrência") |
+| **GRAOS-FITO_OCOR** | 🌾 Grãos | Pragas, doenças e daninhas (id mantido — chave substituta; até a v100 o cartão também tinha as ocorrências) | **eventual** | fito | Registrar ocorrência (aciona "＋ praga / doença / daninha") |
 | GRAOS-OBS | 🌾 Grãos | Observações e pendências | esperada | — | — |
 | PEC-CLIMA | 🐂 Pecuária | Clima do dia | esperada | — | — |
 | PEC-MO | 🐂 Pecuária | Mão de obra | esperada | — | — |
@@ -661,7 +667,6 @@ atividade na tela.
 | PEC-PASTO | 🐂 Pecuária | Pecuária › Pasto e estrutura | esperada (formulário de estado) | — | — |
 | PEC-MANEJO | 🐂 Pecuária | Pecuária › Outros manejos | esperada (pelo farol de leitura; opção "Outros manejos eventual" não escolhida) | — | — |
 | PEC-OBSPEC | 🐂 Pecuária | Pecuária › Observações de pecuária | esperada (texto livre) | — | — |
-| **PEC-OCOR** | 🐂 Pecuária | Ocorrências e sanidade | **eventual** | ocorrencias | Registrar ocorrência |
 | PEC-OBS | 🐂 Pecuária | Observações e pendências | esperada | — | — |
 
 Estados do cabeçalho do cartão eventual (componente único

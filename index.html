@@ -1084,7 +1084,7 @@ function dadosSemente(){
         colheita:[{id:"c2", talhaoId:"t064", modo:"Mecânica", latas:"", carretas:16, sacas:37, passada:"1ª passada", destino:"Terreiro", cereja:58, verde:24, seco:18}],
         pos:{terreiro:"Lotes 07 e 08 no terreiro", secLote:"Lote 06", secTemp:38, secHoras:12, sacasBenef:28},
         fito:[{id:"ft1", tipo:"Praga", nome:"Broca-do-café", talhaoId:"t066", nivel:"Médio", obs:"Amostragem 3,8% — monitorar"}],
-        ocorrencias:[{id:"oc1", tipo:"Quebra de equipamento", grav:"Média", texto:"Mangueira hidráulica da colhedora estourou às 14h; substituída em 1h30.", foto:null}],
+        ocorrencias:[],
         obsGeral:"", pendencias:"Comprar 2 mangueiras reserva."
       },
       { id:"b3", exemplo:true, data:dm(1), fazendaId:"f22c", responsavel:"Gerente Vereda", enviadoEm:dm(1)+" 18:20",
@@ -1789,11 +1789,11 @@ function funcoesDa(fz){
   /* v94: ordem alfabética em pt-BR (pedido dos gerentes do café; a mesma lista nas três atividades) */
   return lista.sort((a,b)=>a.localeCompare(b,"pt-BR"));
 }
-/* OCORRÊNCIAS por atividade (a lista geral vale para todos; pecuária e grãos ganham as próprias) */
-const LISTA_OCORR_PECUARIA=["Morte de animal","Fuga de animais","Cerca rompida","Falta de água","Animal doente"];
-const LISTA_OCORR_GRAOS=["Quebra de máquina","Falta de insumo","Chuva impediu aplicação","Atraso de operação"];
-const listaOcorrDa = fz => atividadeDe(fz)==="PECUARIA" ? [...LISTA_OCORR_PECUARIA, ...LISTA_OCORR]
-  : atividadeDe(fz)==="GRAOS" ? [...LISTA_OCORR_GRAOS, ...LISTA_OCORR] : LISTA_OCORR;
+/* v101: a seção "Ocorrências" (acidente de trabalho, quebra, dano climático…) saiu do boletim por decisão
+   do Nilo (20/09/2026) — o app não oferece mais o registro de acidente nem de ocorrência. As listas
+   LISTA_OCORR / LISTA_OCORR_GRAOS / LISTA_OCORR_PECUARIA e a função listaOcorrDa foram removidas.
+   Boletins já gravados com b.ocorrencias continuam legíveis (boletim enviado, WhatsApp, CSV, alertas):
+   nenhum registro do passado perde sentido — só não se cria registro novo. */
 /* ---- Resposta explícita de ausência por seção (v69) ----
    Catálogo das seções do boletim por atividade — espelho de boletim_secao (sql/047); fonte:
    docs/catalogos-por-atividade.md, "Seções do boletim: eventual × esperada". id = chave
@@ -1814,13 +1814,14 @@ const SECOES_BOLETIM=[
   {id:"CAFE-ATIV",atividade:"CAFE",nome:"Atividades por talhão",tipo:"esperada"},
   {id:"CAFE-COLHEITA",atividade:"CAFE",nome:"Colheita",tipo:"esperada"},
   {id:"CAFE-FITO",atividade:"CAFE",nome:"Pragas, doenças e daninhas",tipo:"eventual",campos:["fito"],resumo:"res-fito",botao:"bt-add-fito",acao:"Registrar ocorrência"},
-  {id:"CAFE-OCOR",atividade:"CAFE",nome:"Ocorrências gerais",tipo:"eventual",campos:["ocorrencias"],resumo:"res-oc",botao:"bt-add-oc",acao:"Registrar ocorrência"},
   {id:"CAFE-OBS",atividade:"CAFE",nome:"Observações e pendências",tipo:"esperada"},
   {id:"GRAOS-CLIMA",atividade:"GRAOS",nome:"Clima do dia",tipo:"esperada"},
   {id:"GRAOS-MO",atividade:"GRAOS",nome:"Mão de obra",tipo:"esperada"},
   {id:"GRAOS-OPER",atividade:"GRAOS",nome:"Operações do dia",tipo:"esperada"},
   {id:"GRAOS-IRG",atividade:"GRAOS",nome:"Irrigação (pivôs)",tipo:"esperada"},
-  {id:"GRAOS-FITO_OCOR",atividade:"GRAOS",nome:"Pragas, doenças e ocorrências",tipo:"eventual",campos:["fito","ocorrencias"],resumo:"res-fito",botao:"bt-add-oc",acao:"Registrar ocorrência"},
+  /* v101: o id GRAOS-FITO_OCOR é chave substituta (boletim_secao e payload.secoes já gravados) e não muda;
+     o cartão passou a ser só pragas, doenças e daninhas — as ocorrências saíram (sql/058). */
+  {id:"GRAOS-FITO_OCOR",atividade:"GRAOS",nome:"Pragas, doenças e daninhas",tipo:"eventual",campos:["fito"],resumo:"res-fito",botao:"bt-add-fito",acao:"Registrar ocorrência"},
   {id:"GRAOS-OBS",atividade:"GRAOS",nome:"Observações e pendências",tipo:"esperada"},
   {id:"PEC-CLIMA",atividade:"PECUARIA",nome:"Clima do dia",tipo:"esperada"},
   {id:"PEC-MO",atividade:"PECUARIA",nome:"Mão de obra",tipo:"esperada"},
@@ -1832,7 +1833,6 @@ const SECOES_BOLETIM=[
   {id:"PEC-PASTO",atividade:"PECUARIA",nome:"Pasto e estrutura",tipo:"esperada"},
   {id:"PEC-MANEJO",atividade:"PECUARIA",nome:"Outros manejos",tipo:"esperada"},
   {id:"PEC-OBSPEC",atividade:"PECUARIA",nome:"Observações de pecuária",tipo:"esperada"},
-  {id:"PEC-OCOR",atividade:"PECUARIA",nome:"Ocorrências e sanidade",tipo:"eventual",campos:["ocorrencias"],resumo:"res-oc",botao:"bt-add-oc",acao:"Registrar ocorrência"},
   {id:"PEC-OBS",atividade:"PECUARIA",nome:"Observações e pendências",tipo:"esperada"}
 ];
 const secoesEventuaisDa = atv => SECOES_BOLETIM.filter(s=>s.atividade===atv && s.tipo==="eventual");
@@ -3500,7 +3500,6 @@ const LISTA_FITO_TIPO = ["Praga","Doença","Planta daninha"];
 const SUGESTAO_FITO = {"Praga":["Broca-do-café","Bicho-mineiro","Cigarra","Ácaro-vermelho","Cochonilha","Lagarta"],
   "Doença":["Ferrugem","Cercosporiose","Phoma","Mancha-aureolada","Antracnose"],
   "Planta daninha":["Braquiária","Trapoeraba","Picão-preto","Corda-de-viola","Capim-amargoso","Tiririca"]};
-const LISTA_OCORR = ["Acidente de trabalho","Quebra de equipamento","Dano climático","Visita técnica","Recebimento de insumos","Outra"];
 const LISTA_DESTINO = ["Terreiro","Direto ao secador","Outra fazenda 🚚","Outro"];
 /* v94 (pedido dos gerentes do café, 15/09/2026): medidas padronizadas da colheita.
    1 carreta = 4.500 L de café da roça = 10 sacas beneficiadas (logo 450 L por saca). O bag não tem
@@ -8276,7 +8275,7 @@ function secaoOperacoes(r){
       <p class="mut mt" style="font-size:.78rem">Toque em ＋, escolha o talhão e a operação — os campos certos aparecem sozinhos.</p>
       <div id="lista-ativ">${r.atividades.map(cardAtivHtml).join("")}</div>
       <button class="btn suave mt" id="bt-add-ativ">＋ operação</button>
-      ${(arr=>arr.length?`<p class="mut mt" style="font-size:.78rem">${arr.map(t=>`<b>${esc(t.nome)}</b> <span class="tag amarelo">Arrendado — sementeira</span>`).join(" · ")}<br>Área conduzida pela sementeira — sem operações no boletim. Se precisar registrar algo, use as ocorrências.</p>`:"")(talhoesArrendados(r.fazendaId))}
+      ${(arr=>arr.length?`<p class="mut mt" style="font-size:.78rem">${arr.map(t=>`<b>${esc(t.nome)}</b> <span class="tag amarelo">Arrendado — sementeira</span>`).join(" · ")}<br>Área conduzida pela sementeira — sem operações no boletim. Se precisar registrar algo, use as observações.</p>`:"")(talhoesArrendados(r.fazendaId))}
     </div></details>`;
 }
 /* ===== GRÃOS — Irrigação por pivô (informado pelo gerente × medido pela iCrop) =====
@@ -8412,17 +8411,14 @@ function secaoIrrigacaoGraos(r){
       ${cartaoIcropDia(r)}
     </div></details>`;
 }
-/* ===== GRÃOS — Pragas, doenças e ocorrências numa seção só ===== */
+/* ===== GRÃOS — Pragas, doenças e daninhas (v101: as ocorrências gerais saíram do cartão) ===== */
 function secaoFitoOcorrGraos(r){
-  return `<details class="secao"><summary><span class="ico">🐛</span>Pragas, doenças e ocorrências
+  return `<details class="secao"><summary><span class="ico">🐛</span>Pragas, doenças e daninhas
     ${resumoSecaoHtml(r,"res-fito")}<span class="seta">›</span></summary>
     <div class="corpo">${chipsRespostaSecao(r,"res-fito")}
       <label class="mt">Pragas, doenças e daninhas <span class="mut">(lista da cultura do talhão)</span></label>
       <div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mini mt" id="bt-add-fito">＋ praga / doença / daninha</button>
-      <label class="mt">Ocorrências gerais <span class="mut">(quebra, falta de insumo, chuva…)</span></label>
-      <div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
-      <button class="btn suave mini mt" id="bt-add-oc">＋ ocorrência</button>
     </div></details>`;
 }
 function cardLotePec(l,i,fz){
@@ -8792,11 +8788,6 @@ function vForm(){
     <div class="corpo">${chipsRespostaSecao(r,"res-fito")}<div id="lista-fito">${r.fito.map(cardFito).join("")}</div>
       <button class="btn suave mt" id="bt-add-fito">＋ Registrar ocorrência fitossanitária</button></div></details>`}
 
-  ${soGraos?"":`<details class="secao" ${r.ocorrencias.length?"open":""}><summary><span class="ico">⚠️</span>${temPec?"Ocorrências e sanidade":"Ocorrências gerais"}
-    ${resumoSecaoHtml(r,"res-oc")}<span class="seta">›</span></summary>
-    <div class="corpo">${chipsRespostaSecao(r,"res-oc")}<div id="lista-oc">${r.ocorrencias.map(cardOcorr).join("")}</div>
-      <button class="btn suave mt" id="bt-add-oc">＋ Adicionar ocorrência</button></div></details>`}
-
   ${secaoInsumos(r)}
 
   <details class="secao"><summary><span class="ico">📝</span>Observações e pendências<span class="seta">›</span></summary>
@@ -8996,23 +8987,6 @@ function cardFito(f){
     <label>Nível de infestação</label>
     <div class="chips">${["Baixo","Médio","Alto"].map(nv=>`<button class="chip ${f.nivel===nv?"on":""}" data-fniv="${nv}">${nv}</button>`).join("")}</div>
     <label>Observação</label><input data-f="obs" value="${esc(f.obs)}" placeholder="Ex.: amostragem, ruas afetadas">
-  </div>`;
-}
-function cardOcorr(o){
-  return `<div class="subcartao" data-oc="${o.id}">
-    <button class="fechar-sub" data-rm-oc="${o.id}">remover</button>
-    <label>Tipo</label>
-    <select data-o="tipo">${["<option value=''>Selecione…</option>",...listaOcorrDa(rascunho?rascunho.fazendaId:"").map(t=>`<option ${o.tipo===t?"selected":""}>${t}</option>`),(o.tipo&&!listaOcorrDa(rascunho?rascunho.fazendaId:"").includes(o.tipo)?`<option selected>${esc(o.tipo)}</option>`:"")].join("")}</select>
-    <label>Gravidade</label>
-    <div class="chips">${["Baixa","Média","Alta"].map(g=>`<button class="chip ${o.grav===g?"on":""}" data-ograv="${g}" data-ograv-id="${o.id}">${g}</button>`).join("")}</div>
-    <label>O que aconteceu</label><textarea data-o="texto" placeholder="Conte em poucas linhas">${esc(o.texto)}</textarea>
-    <label>Foto (opcional)</label>
-    <div class="linha-flex">
-      ${o.foto?`<img class="foto-mini" src="${o.foto}" alt="Foto da ocorrência">`:""}
-      <button class="btn suave mini" data-foto="${o.id}">${o.foto?"Trocar foto":"📷 Tirar / anexar foto"}</button>
-      ${o.foto?`<button class="btn suave mini" data-rm-foto="${o.id}">remover</button>`:""}
-    </div>
-    <input type="file" accept="image/*" capture="environment" hidden data-foto-input="${o.id}">
   </div>`;
 }
 /* comprime a foto para caber no armazenamento (máx. ~800 px, JPEG) */
@@ -9809,7 +9783,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v100";
+const APP_VERSAO="v101";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -9888,7 +9862,6 @@ function cadCatalogosDe(atv){
     ["fito:CAFE:Praga","Pragas",SUGESTAO_FITO["Praga"],true],
     ["fito:CAFE:Doença","Doenças",SUGESTAO_FITO["Doença"],true],
     ["fito:CAFE:Planta daninha","Plantas daninhas",SUGESTAO_FITO["Planta daninha"],true],
-    ["ocorr:GERAL","Ocorrências",LISTA_OCORR,false],
     ["clima","Condições de clima",LISTA_CLIMA,false],
     ["destino","Destinos da colheita",LISTA_DESTINO,false]];
   if(atv==="GRAOS") return [
@@ -9898,8 +9871,7 @@ function cadCatalogosDe(atv){
     ["fito:GRAOS:Praga","Pragas",SUGESTAO_FITO_GRAOS["Praga"],true],
     ["fito:GRAOS:Doença","Doenças",SUGESTAO_FITO_GRAOS["Doença"],true],
     ["fito:GRAOS:Planta daninha","Plantas daninhas",SUGESTAO_FITO_GRAOS["Planta daninha"],true],
-    ["cult","Culturas anuais",CULTURAS_ANUAIS.map(c=>c[1]),false],
-    ["ocorr:GRAOS","Ocorrências",[...LISTA_OCORR_GRAOS,...LISTA_OCORR],false]];
+    ["cult","Culturas anuais",CULTURAS_ANUAIS.map(c=>c[1]),false]];
   return [
     ["funcoes:PECUARIA","Funções (mão de obra)",LISTA_FUNCOES_PECUARIA,true],
     ...OPS_PECUARIA_FASES.map(([fase,ops])=>["opsp:"+fase,"Outros manejos — "+fase,ops,false]),
@@ -9909,8 +9881,7 @@ function cadCatalogosDe(atv){
     ["pecsan","Problemas de sanidade",PEC_PROBLEMAS_SAN,false],
     ["pecacao","Ações de sanidade",PEC_ACOES_SAN,false],
     ["pecpasto","Condição do pasto",PEC_CONDICAO_PASTO,false],
-    ["pastos","Pastos por fazenda (PASTOS_POR_FAZENDA)",Object.keys(PASTOS_POR_FAZENDA).flatMap(k=>PASTOS_POR_FAZENDA[k].map(p=>k+" · "+p)),false],
-    ["ocorr:PECUARIA","Ocorrências",[...LISTA_OCORR_PECUARIA,...LISTA_OCORR],false]];
+    ["pastos","Pastos por fazenda (PASTOS_POR_FAZENDA)",Object.keys(PASTOS_POR_FAZENDA).flatMap(k=>PASTOS_POR_FAZENDA[k].map(p=>k+" · "+p)),false]];
 }
 /* v86: os produtos saíram de Catálogos e viraram item próprio do menu (Insumos e remessas) — a conta segue o menu */
 const cadCatTotal=()=>["CAFE","GRAOS","PECUARIA"].reduce((s,a)=>s+cadCatalogosDe(a).reduce((x,[k,,lista])=>x+lista.length+catExtra(k).length,0),0)+D.maquinas.length;
@@ -10231,7 +10202,7 @@ function cadVCatalogos(){
   const n=a=>cadCatalogosDe(a).reduce((s,[k,,l])=>s+l.length+catExtra(k).length,0);
   return cadTopo("Catálogos","Vocabulário do boletim")+`
     <p class="mut" style="font-size:.78rem">Termos padrão vêm do código (fonte oficial: docs/catalogos-por-atividade.md). O escritório pode acrescentar termos, que entram nas listas do gerente da atividade.</p>
-    ${cadItem("catalogo","CAFE","☕ Café","funções, operações, pragas, doenças, daninhas, ocorrências",n("CAFE"))}
+    ${cadItem("catalogo","CAFE","☕ Café","funções, operações, pragas, doenças, daninhas",n("CAFE"))}
     ${cadItem("catalogo","GRAOS","🌾 Grãos","funções, operações por fase, pragas, doenças, daninhas, culturas",n("GRAOS"))}
     ${cadItem("catalogo","PECUARIA","🐂 Pecuária","funções, manejos, categorias animais, sanidade, pastos",n("PECUARIA"))}
     ${cadItem("maquinas","","Máquinas e equipamentos","nome, categoria e fazendas que atende",D.maquinas.length)}`;
@@ -11492,7 +11463,6 @@ function vAjuda(){
     <li>Vá abrindo <b>só as seções do que aconteceu</b>. Dia de chuva sem serviço? Marque "Chuva forte", escreva "sem atividades" e envie — leva 30 segundos e vale.</li>
     <li>Prefira <b>tocar nos botões</b> em vez de digitar. Os números têm ＋ e −.</li>
     <li><b>Sem internet, sem problema:</b> tudo fica guardado no celular sozinho, campo a campo. Pode até fechar o app e voltar depois.</li>
-    <li>Aconteceu algo sério (acidente, quebra, geada)? Registre em <b>Ocorrências</b>, marque a gravidade e <b>tire uma foto</b> — o escritório vê na hora.</li>
     <li>No fim, confira as <b>pendências de amanhã</b> e toque em <b>Enviar boletim</b>. Errou algo? Dá para corrigir em até 48 horas.</li>
   </ol></div>`;
 }
@@ -13167,16 +13137,6 @@ function ligarEventos(tela){
     if(d.fniv){ const card=t.closest("[data-fito]"); const f=r.fito.find(x=>x.id===card.dataset.fito);
       f.nivel=d.fniv; marcarChips(card,"fniv",f.nivel); salvarRascunho(); return; }
 
-    if(t.id==="bt-add-oc"){ const o={id:uid(),tipo:"",grav:"",texto:"",foto:null};
-      r.ocorrencias.push(o); $("#lista-oc").insertAdjacentHTML("beforeend",cardOcorr(o));
-      pintarSecoesResposta(r); salvarRascunho(); return; }
-    if(d.rmOc){ r.ocorrencias=r.ocorrencias.filter(o=>o.id!==d.rmOc);
-      t.closest("[data-oc]").remove(); pintarSecoesResposta(r); salvarRascunho(); return; }
-    if(d.ograv){ const card=t.closest("[data-oc]"); const o=r.ocorrencias.find(x=>x.id===card.dataset.oc);
-      o.grav=d.ograv; marcarChips(card,"ograv",o.grav); salvarRascunho(); return; }
-    if(d.foto){ app.querySelector(`input[data-foto-input="${d.foto}"]`).click(); return; }
-    if(d.rmFoto){ const card=t.closest("[data-oc]"); const o=r.ocorrencias.find(x=>x.id===d.rmFoto);
-      o.foto=null; card.outerHTML=cardOcorr(o); salvarRascunho(); return; }
     cadastroClique(d,t);
   };
 
@@ -13249,7 +13209,6 @@ function ligarEventos(tela){
         if(["sacas","carretas","bags","bagLitros"].includes(d.cc)){ const s=$("#res-col"); if(s) s.textContent=sacasTexto(r.colheita);
           const k=card.querySelector("[data-colcalc]"); if(k) k.textContent=colheitaCalcTexto(c); } }
       else if(d.f!==undefined){ const c=el.closest("[data-fito]"); r.fito.find(x=>x.id===c.dataset.fito)[d.f]=el.value; }
-      else if(d.o!==undefined){ const c=el.closest("[data-oc]"); r.ocorrencias.find(x=>x.id===c.dataset.oc)[d.o]=el.value; }
       else if(d.pec!==undefined){ r.pecuaria=r.pecuaria||pecVazia(); r.pecuaria[d.pec]=el.value; }
       else if(d.pastosel!==undefined){ /* v51: select de pasto do cadastro — "Outro…" abre o campo livre ao lado */
         const tx=el.nextElementSibling;
@@ -13296,13 +13255,6 @@ function ligarEventos(tela){
     if(d.insFotoInput && el.files && el.files[0]){
       const durl=await comprimirFoto(el.files[0]);
       if(durl){ insCompletarRecebimento(d.insFotoInput,{foto:durl}); ir(telaAtual,null,true); }
-      return;
-    }
-    if(d.fotoInput && el.files && el.files[0] && rascunho){
-      const durl=await comprimirFoto(el.files[0]);
-      if(durl){ const o=rascunho.ocorrencias.find(x=>x.id===d.fotoInput);
-        o.foto=durl; const card=app.querySelector(`[data-oc="${d.fotoInput}"]`);
-        if(card) card.outerHTML=cardOcorr(o); salvarRascunho(); }
       return;
     }
     if(d.m==="nome" && rascunho){ const c=el.closest("[data-ativ]");
