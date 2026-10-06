@@ -109,7 +109,7 @@
       tela e tem só duas linhas de menu (Textos para revisar · Números) com o
       estado na própria linha, sem prévia e sem cartão; "Textos para revisar"
       abre com as abas 🏢 Grupo · ☕ Café · 🌾 Grãos · 🐂 Pecuária (contadores
-      1 · 10 · 5 · 9) numa fileira que quebra em linhas e nunca passa de 390 px;
+      1 · 10 · 5 · 9 e, desde a v102, 🐃 Confinamento 1) numa fileira que quebra em linhas e nunca passa de 390 px;
       a aba ☕ Café cabe em 2 telas com 10 unidades, uma linha por unidade na
       ordem da tela inicial (nome + estado, sem prévia), atividade decidida
       pelo catálogo por id; o toque abre a folha com o texto integral daquela
@@ -117,6 +117,16 @@
       texto lê "sem texto neste período" sem ação; "Números" é o conteúdo de
       antes em tela própria (filtro, lista, relatório com anterior/próximo,
       Compartilhar e PDF) e o voltar devolve um degrau por vez.
+  21. Confinamento (v102): a casa do gerente de confinamento (código VF-6318, unidade
+      f22f) é medida como casa de gerente (régua de 7 dias, altura, visual); sem lote,
+      "Preencher diário" nasce inativo dizendo a próxima ação; a entrada de lote revela
+      curral → grupo genético → detalhes um passo por vez (zero campo antes do toque
+      anterior, data em chips, nunca input type=date), com "Criar lote" inativo até o que
+      falta; a tela do lote mostra números calculados e "sem pesagem desde a entrada" sem
+      farol vermelho; o diário (uma linha por lote) é medido como boletim — zero termos de
+      café, grãos e pecuária; "Enviar diário" inativo nomeia o lote e o campo que faltam,
+      ativa no lugar depois de sobra + curral e fica no rodapé visível sem rolar. As telas
+      de café, grãos e pecuária passam a ser varridas também pelos termos do confinamento.
   15. Insumos (v86): a porta única "Colar do WhatsApp" tem uma tela e um campo,
       com o botão de avanço inativo dizendo a próxima ação (sem nativo e sem sair
       da tela); a mensagem do grupo é classificada sozinha e o tipo pode ser
@@ -163,12 +173,12 @@ function lerTermos() {
   for (let i = ini + 1; i < md.length; i++) {
     const l = md[i];
     if (/^## /.test(l)) break;
-    const h = /^### (Caf[ée]|Gr[ãa]os|Pecu[áa]ria)/i.exec(l);
-    if (h) { atual = norm(h[1]).startsWith('caf') ? 'CAFE' : norm(h[1]).startsWith('gra') ? 'GRAOS' : 'PECUARIA'; termos[atual] = termos[atual] || []; continue; }
+    const h = /^### (Caf[ée]|Gr[ãa]os|Pecu[áa]ria|Confinamento)/i.exec(l);
+    if (h) { const k = norm(h[1]); atual = k.startsWith('caf') ? 'CAFE' : k.startsWith('gra') ? 'GRAOS' : k.startsWith('pecu') ? 'PECUARIA' : 'CONFINAMENTO'; termos[atual] = termos[atual] || []; continue; }
     if (!atual || !l.trim() || l.trim().startsWith('>') || l.trim().startsWith('<!--')) continue;
     l.split(/[,;·]/).map(t => t.trim()).filter(Boolean).forEach(t => termos[atual].push(t));
   }
-  ['CAFE', 'GRAOS', 'PECUARIA'].forEach(a => { if (!termos[a] || !termos[a].length) throw new Error('lista de termos vazia para ' + a); });
+  ['CAFE', 'GRAOS', 'PECUARIA', 'CONFINAMENTO'].forEach(a => { if (!termos[a] || !termos[a].length) throw new Error('lista de termos vazia para ' + a); });
   return termos;
 }
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -638,7 +648,7 @@ async function medirPlano(browser, base, R, rot, fz, atv, chuva, termos) {
   /* regra c: nenhum termo de outra atividade na faixa nem na folha do plano */
   {
     const txt = [P.faixa.texto || '', P.folha.texto || ''].join(' ');
-    const outras = { CAFE: ['GRAOS', 'PECUARIA'], GRAOS: ['CAFE', 'PECUARIA'], PECUARIA: ['CAFE', 'GRAOS'] }[atv];
+    const outras = { CAFE: ['GRAOS', 'PECUARIA', 'CONFINAMENTO'], GRAOS: ['CAFE', 'PECUARIA', 'CONFINAMENTO'], PECUARIA: ['CAFE', 'GRAOS', 'CONFINAMENTO'] }[atv];
     P.termosAlheios = {}; outras.forEach(o => { P.termosAlheios[o] = acharTermos(txt, termos[o]); });
     P.termosProprios = acharTermos(txt, termos[atv]).length;
   }
@@ -1043,7 +1053,7 @@ async function cenarioBoletim(browser, base, R, rot, fz, atv, termos) {
   }
   /* pecuária: as pastagens têm select "Outro…"; grãos: escolher um talhão para ver o 2º passo */
   form.texto = await page.evaluate(NA_PAGINA.textoTudo);
-  const outras = { CAFE: ['GRAOS', 'PECUARIA'], GRAOS: ['CAFE', 'PECUARIA'], PECUARIA: ['CAFE', 'GRAOS'] }[atv];
+  const outras = { CAFE: ['GRAOS', 'PECUARIA', 'CONFINAMENTO'], GRAOS: ['CAFE', 'PECUARIA', 'CONFINAMENTO'], PECUARIA: ['CAFE', 'GRAOS', 'CONFINAMENTO'] }[atv];   /* v102 */
   form.termosAlheios = {};
   outras.forEach(o => { form.termosAlheios[o] = acharTermos(form.texto, termos[o]); });
   form.termosProprios = acharTermos(form.texto, termos[atv]).length;
@@ -1096,10 +1106,73 @@ async function cenarioPos(browser, base, R, termos) {
   form.secoes = await page.evaluate(NA_PAGINA.secoes);
   form.cartoes = [];
   form.texto = await page.evaluate(NA_PAGINA.textoTudo);
-  form.termosAlheios = { GRAOS: acharTermos(form.texto, termos.GRAOS), PECUARIA: acharTermos(form.texto, termos.PECUARIA) };
+  form.termosAlheios = { GRAOS: acharTermos(form.texto, termos.GRAOS), PECUARIA: acharTermos(form.texto, termos.PECUARIA), CONFINAMENTO: acharTermos(form.texto, termos.CONFINAMENTO) };
   form.erros = erros.slice();
   form.decisao = await medirDecisao(page, '#bt-enviar-pos', 'input[data-pt="entradaLatas"]', null);
   R.telas.push(form);
+  await ctx.close();
+}
+
+/* ---------- 21. Confinamento (v102) ----------
+   Casa, entrada de lote em 3 passos, tela do lote e diário do gerente de confinamento (código VF-6318, unidade
+   f22f). Casa e lote são medidos como casa de gerente; a entrada de lote como Cadastros (cabeçalho fixo, ação
+   principal no rodapé); o diário como boletim (altura, termos de outra atividade, ação principal visível). */
+async function cenarioConf(browser, base, R, termos) {
+  const sess = { userId: 'u5', papel: 'conf', nome: 'Gerente de Confinamento', atividade: 'CONFINAMENTO', fazendaId: 'f22f' };
+  const { page, ctx, erros } = await novaPagina(browser, base, { codigo: 'VF-6318', chave: 'f22f' }, sess);
+  const C = {};
+  const vis = sel => page.evaluate(s => [...document.querySelectorAll('#app ' + s)].filter(el => el.getClientRects().length).length, sel);
+  const casa0 = await medirTela(page, 'Confinamento (f22f Vereda) — casa sem lote', 'gerente');
+  casa0.regua = await medirRegua(page);
+  casa0.erros = erros.slice();
+  R.telas.push(casa0);
+  C.semLote = await page.evaluate(() => { const b = document.querySelector('#bt-preencher-cf');
+    return { inativo: !!b && b.classList.contains('acao-off'), falta: b ? b.getAttribute('data-falta') || '' : '', texto: document.querySelector('#app').innerText.replace(/\s+/g, ' ') }; });
+  /* entrada de lote: 3 passos */
+  await page.click('#bt-cf-novo'); await page.waitForTimeout(300);
+  R.telas.push(await medirTela(page, 'Confinamento › Entrada de lote (ao abrir)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
+  C.passo1 = { inputs: await vis('input, select, textarea'), chips: await vis('[data-cfncur]'), gen: await vis('[data-cfngen]') };
+  await page.click('[data-cfncur="tcf01"]'); await page.waitForTimeout(200);
+  C.passo2 = { inputs: await vis('input, select, textarea'), gen: await vis('[data-cfngen]') };
+  await page.click('[data-cfngen="NELORE"]'); await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Confinamento › Entrada de lote (detalhes)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
+  C.passo3 = await page.evaluate(() => { const b = document.querySelector('#bt-cf-criar');
+    return { inputs: document.querySelectorAll('#app input').length, inativo: !!b && b.classList.contains('acao-off'), falta: b ? b.getAttribute('data-falta') || '' : '', dataDate: document.querySelectorAll('#app input[type=date]').length }; });
+  await page.evaluate(() => { cfNovo.cabecas = '120'; cfNovo.peso = '380'; cfNovo.origem = 'RECRIA'; cfCriarLote(); }); await page.waitForTimeout(300);
+  const lote = await medirTela(page, 'Confinamento › Lote (CF-VER-<ano>-01)', 'gerente');
+  lote.erros = erros.slice();
+  R.telas.push(lote);
+  C.lote = await page.evaluate(() => ({ tela: telaAtual, texto: document.querySelector('#app').innerText.replace(/\s+/g, ' '), vermelho: document.querySelectorAll('#app .farol.critico').length }));
+  await page.evaluate(() => ir('casa')); await page.waitForTimeout(200);
+  R.telas.push(await medirTela(page, 'Confinamento (f22f Vereda) — casa com lote', 'gerente'));
+  await page.click('#bt-preencher-cf'); await page.waitForTimeout(300);
+  const form = await medirTela(page, 'Confinamento (f22f Vereda) — diário (ao abrir)', 'boletim', { atividade: 'CONFINAMENTO' });
+  form.secoes = []; form.cartoes = [];
+  form.texto = await page.evaluate(NA_PAGINA.textoTudo);
+  form.termosAlheios = {}; ['CAFE', 'GRAOS', 'PECUARIA'].forEach(o => { form.termosAlheios[o] = acharTermos(form.texto, termos[o]); });
+  form.termosProprios = acharTermos(form.texto, termos.CONFINAMENTO || []).length;
+  form.erros = erros.slice();
+  form.acoesOffForm = await page.evaluate(() => document.querySelectorAll('#app .acao-off[data-papel]').length);
+  R.telas.push(form);
+  /* decisão (c10): o botão inativo explica ao toque; sobra + curral ativam no lugar, sem redesenhar */
+  C.decisao = await page.evaluate(() => {
+    const b = document.querySelector('#bt-enviar-cf'); if (!b) return { existe: false };
+    const telaAntes = telaAtual, nat = window.__nativos;
+    b.click();
+    const conteudo = getComputedStyle(b, '::after').content || ''; const nota = /^"/.test(conteudo) ? conteudo.slice(1, -1) : '';
+    const cs = getComputedStyle(b);
+    const r = { existe: true, inativo: b.classList.contains('acao-off') && b.getAttribute('aria-disabled') === 'true', estilo: cs.borderTopStyle,
+      vermelho: /181, 67, 46/.test([cs.color, cs.backgroundColor, cs.borderTopColor].join(' ')), nota, mostrou: b.classList.contains('mostra') && nota.length > 0,
+      proibido: /obrigat|erro de valida|esqueceu|você|faltou|pendente/i.test(nota), nativos: window.__nativos - nat, mesmaTela: telaAtual === telaAntes };
+    b.click(); b.setAttribute('data-marca-teste', '1');
+    document.querySelector('[data-cfsobra="0:2"]').click(); document.querySelector('[data-cfcur="0:SECO"]').click();
+    const b2 = document.querySelector('#bt-enviar-cf');
+    r.depois = { ativo: !b2.classList.contains('acao-off') && !b2.getAttribute('data-falta'), noLugar: b2.getAttribute('data-marca-teste') === '1' };
+    const x = b2.getBoundingClientRect(); r.rodape = x.top >= 0 && x.bottom <= innerHeight;
+    return r; });
+  C.nativos = await page.evaluate(() => window.__nativos);
+  C.erros = erros.slice();
+  R.conf = C;
   await ctx.close();
 }
 
@@ -1786,7 +1859,7 @@ function avaliar(R) {
   boletins.forEach(t => {
     const propria = t.termosProprios ? ` (detector ativo: ${t.termosProprios} termos da própria atividade na tela)` : '';
     Object.entries(t.termosAlheios || {}).forEach(([atv, achados]) => {
-      const rot = { CAFE: 'café', GRAOS: 'grãos', PECUARIA: 'pecuária' }[atv];
+      const rot = { CAFE: 'café', GRAOS: 'grãos', PECUARIA: 'pecuária', CONFINAMENTO: 'confinamento' }[atv];
       add('5. Zero termos de outra atividade', `${t.nome.split(' — ')[0]} — termos de ${rot}`, !achados.length, achados.length ? achados.join(', ') : 'nenhum' + propria);
     });
   });
@@ -2164,17 +2237,17 @@ function avaliar(R) {
   if (R.relatorios) {
     const G = '20. Relatórios em três níveis: menu, abas por atividade, uma linha por unidade, folha';
     const V = R.relatorios, M = V.menu, T = V.tx, C = V.cafe, L = C.lista, N = V.num;
-    add(G, 'Nível 1 — a tela Relatórios cabe em 1 tela de iPhone com 24 textos + 1 de grupo baixados (era 8,05 telas na v98)', V.menuTelas <= 1, `${V.menuTelas} telas`);
+    add(G, 'Nível 1 — a tela Relatórios cabe em 1 tela de iPhone com 24 textos + 1 de grupo baixados (25 desde a v102; era 8,05 telas na v98)', V.menuTelas <= 1, `${V.menuTelas} telas`);
     add(G, 'Nível 1 — só duas linhas de menu (Textos para revisar · Números): nenhuma prévia, nenhum cartão, nenhum parágrafo',
       M.linhas.length === 2 && M.previas === 0 && M.cartoes === 0 && M.paragrafos === 0 && /Textos para revisar/.test(M.linhas[0].titulo) && /Números/.test(M.linhas[1].titulo),
       `${M.linhas.length} linhas; ${M.previas} prévia(s); ${M.cartoes} cartão(ões); ${M.paragrafos} parágrafo(s)`);
     add(G, 'Nível 1 — estado na própria linha (P7): "Devolutiva semanal · dd a dd/mm · N textos" e "último: … · N para conferir" (âmbar só no número)',
-      /^\d+ relatórios · 25 textos$|^Devolutiva semanal · \d\d a \d\d\/\d\d · \d+ textos$/.test(M.linhas[0].estado) && /^último: .+ · 1 para conferir$/.test(M.linhas[1].estado) && M.ambar,
+      /^\d+ relatórios · 2[56] textos$|^Devolutiva semanal · \d\d a \d\d\/\d\d · \d+ textos$/.test(M.linhas[0].estado) && /^último: .+ · 1 para conferir$/.test(M.linhas[1].estado) && M.ambar,
       `"${M.linhas[0].estado}" · "${M.linhas[1].estado}"`);
     add(G, `Nível 1 — as duas linhas são botões com seta "›", alvo ≥ ${TOQUE_MIN} px, mesma classe das linhas de unidade da v88`,
       M.linhas.every(l => l.botao && l.seta && !l.off && l.alt >= TOQUE_MIN), M.linhas.map(l => Math.round(l.alt) + ' px').join(' · '));
-    add(G, 'Textos para revisar — abas na ordem fixa 🏢 Grupo · ☕ Café · 🌾 Grãos · 🐂 Pecuária, com contadores 1 · 10 · 5 · 9',
-      !!T && T.rotulos.join(' | ') === '🏢 Grupo (1) | ☕ Café (10) | 🌾 Grãos (5) | 🐂 Pecuária (9)', T ? T.rotulos.join(' | ') : 'sem abas');
+    add(G, 'Textos para revisar — abas na ordem fixa 🏢 Grupo · ☕ Café · 🌾 Grãos · 🐂 Pecuária · 🐃 Confinamento, com contadores 1 · 10 · 5 · 9 · 1 (v102: a unidade de confinamento entrou no cadastro)',
+      !!T && T.rotulos.join(' | ') === '🏢 Grupo (1) | ☕ Café (10) | 🌾 Grãos (5) | 🐂 Pecuária (9) | 🐃 Confinamento (1)', T ? T.rotulos.join(' | ') : 'sem abas');
     add(G, `Textos para revisar — a fileira de abas quebra em linhas, nunca passa de ${VP.width} px nem rola de lado; chips ≥ ${TOQUE_MIN} px, sem pílula`,
       !!T && T.wrap === 'wrap' && T.largura <= T.cliente + 1 && T.scrollW <= VP.width && T.minH >= TOQUE_MIN && T.raio === 0,
       T ? `${T.largura} px em ${T.cliente} px; página ${T.scrollW} px; chip ${T.minH} px; raio ${T.raio}` : '');
@@ -2237,6 +2310,19 @@ function avaliar(R) {
     add(G, 'Nenhum erro de JavaScript na navegação de volta', !V.erros.length, V.erros[0] || 'sem erro');
   }
 
+  /* 21. Confinamento (v102) */
+  if (R.conf) {
+    const g = '21. Confinamento: perfil próprio, entrada de lote em 3 passos, diário de 2 minutos', C = R.conf, d = C.decisao || {};
+    add(g, 'Casa sem lote — "Preencher diário" inativo diz a próxima ação ("Registre a entrada do primeiro lote"), sem termo de cobrança', C.semLote.inativo && /Registre a entrada do primeiro lote/.test(C.semLote.falta) && !PLANO_PROIBIDO.test(C.semLote.texto), `"${C.semLote.falta}"`);
+    add(g, 'Entrada de lote ao abrir — só os chips de curral (ONDE): zero campo, zero seletor, nada do passo 2', C.passo1.inputs === 0 && C.passo1.chips > 0 && C.passo1.gen === 0, `${C.passo1.chips} chips · ${C.passo1.inputs} campos`);
+    add(g, 'Escolhido o curral — só o grupo genético (O QUÊ), ainda sem campo', C.passo2.inputs === 0 && C.passo2.gen === 2, `${C.passo2.gen} chips · ${C.passo2.inputs} campos`);
+    add(g, 'Escolhido o grupo — detalhes com "Criar lote" inativo dizendo o que falta; data em chips, nunca input type=date', C.passo3.inputs > 0 && C.passo3.inativo && /Informe/.test(C.passo3.falta) && C.passo3.dataDate === 0, `"${C.passo3.falta}"`);
+    add(g, 'Tela do lote — números calculados (dias de cocho, cabeças vivas) e "sem pesagem desde a entrada"; sem projeção, nenhum farol vermelho', C.lote.tela === 'cflote' && /dias de cocho/.test(C.lote.texto) && /sem pesagem desde a entrada/.test(C.lote.texto) && C.lote.vermelho === 0 && !PLANO_PROIBIDO.test(C.lote.texto), '');
+    add(g, 'Diário — "Enviar diário" nasce inativo com o visual do botão de perfil e o toque nomeia o lote e o campo que faltam', d.existe && d.inativo && d.estilo === 'dashed' && !d.vermelho && d.mostrou && /Marque a sobra de cocho do lote/.test(d.nota) && !d.proibido && d.mesmaTela && d.nativos === 0, `"${d.nota || ''}"`);
+    add(g, 'Diário — sobra e curral marcados, o botão ativa no lugar (mesmo elemento) e fica no rodapé, visível sem rolar', !!d.depois && d.depois.ativo && d.depois.noLugar && d.rodape, d.depois ? `${d.depois.ativo ? 'ativo' : 'inativo'}${d.depois.noLugar ? ', mesmo elemento' : ', redesenhado'}` : '');
+    add(g, 'Nenhum confirm()/alert() nativo e nenhum erro de página no cenário', C.nativos === 0 && !C.erros.length, C.erros[0] || '');
+  }
+
   return itens.map((i, n) => Object.assign(i, { n })).sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.n - b.n);
 }
 
@@ -2264,6 +2350,7 @@ function relatorio(itens, R) {
     await cenarioBoletim(browser, base, R, 'Grãos (f33 Floramill)', 'f33', 'GRAOS', termos);
     await cenarioBoletim(browser, base, R, 'Pecuária (f26 Água Santa)', 'f26', 'PECUARIA', termos);
     await cenarioPos(browser, base, R, termos);
+    await cenarioConf(browser, base, R, termos);   /* v102 */
     await cenarioDiretoria(browser, base, R);
     await cenarioCadastros(browser, base, R);
     /* v75: plano do dia nas três atividades + a variante do dia impedido pelo clima (café) */

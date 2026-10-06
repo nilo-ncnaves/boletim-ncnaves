@@ -7,7 +7,8 @@
  quando qualquer prova falha.
 
  O que prova, na ordem da tarefa (item 4):
-   a. 24 textos por unidade + 1 de grupo → 4 abas, contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9,
+   a. 25 textos por unidade + 1 de grupo → 5 abas, contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9 · 🐃 1
+      (desde a v102 o cadastro tem a unidade de confinamento),
       na ordem fixa; nível 1 com duas linhas de menu e o estado na linha.
    b. Código de escopo só de pecuária → sem abas, 9 linhas (hoje nenhum código com painel é
       de uma atividade só, e o texto do redator só desce para escopo total — a prova simula
@@ -86,7 +87,7 @@ const LINHAS = () => [...document.querySelectorAll('#app .cad-item')].map(b => (
   const { srv, base } = await servir(RAIZ);
   const browser = await pw.chromium.launch();
   try {
-    /* ---- a, c, d, e, f, g: Diretoria com 24 textos + 1 de grupo ---- */
+    /* ---- a, c, d, e, f, g: Diretoria com 25 textos (um por unidade; 24 até a v101) + 1 de grupo ---- */
     {
       const { page, ctx, erros } = await novaPagina(browser, base, DIRETORIA, SESSAO);
       await page.evaluate(SEMENTE);
@@ -94,13 +95,13 @@ const LINHAS = () => [...document.querySelectorAll('#app .cad-item')].map(b => (
       const nivel1 = await page.evaluate(LINHAS_STR => { const LINHAS = eval(LINHAS_STR); return { tela: telaAtual, telas: +(document.documentElement.scrollHeight / 844).toFixed(2), linhas: LINHAS(), previas: document.querySelectorAll('#app .txt-previa, #app .txt-cartao').length, cartoes: document.querySelectorAll('#app .cartao').length }; }, LINHAS.toString());
       ok('a. Nível 1 — duas linhas de menu, sem prévia e sem cartão, em 1 tela', nivel1.linhas.length === 2 && nivel1.previas === 0 && nivel1.cartoes === 0 && nivel1.telas <= 1,
         `${nivel1.linhas.length} linhas · ${nivel1.previas} prévia(s) · ${nivel1.cartoes} cartão(ões) · ${nivel1.telas} telas`);
-      ok('a. Nível 1 — estado na linha: "2 relatórios · 25 textos" e "último: … · 1 para conferir"',
-        nivel1.linhas[0].estado === '2 relatórios · 25 textos' && /^último: \d\d a \d\d\/\d\d · 1 para conferir$/.test(nivel1.linhas[1].estado),
+      ok('a. Nível 1 — estado na linha: "2 relatórios · 26 textos" e "último: … · 1 para conferir"',
+        nivel1.linhas[0].estado === '2 relatórios · 26 textos' && /^último: \d\d a \d\d\/\d\d · 1 para conferir$/.test(nivel1.linhas[1].estado),
         `"${nivel1.linhas[0].estado}" · "${nivel1.linhas[1].estado}"`);
       await page.click('#bt-rel-textos'); await page.waitForTimeout(300);
       const abas = await page.evaluate(ABAS_STR => eval(ABAS_STR)(), ABAS.toString());
-      ok('a. 24 textos por unidade + 1 de grupo → 4 abas, contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9, na ordem fixa, Grupo aberta primeiro',
-        abas.join(' | ') === '🏢 Grupo (1) * | ☕ Café (10) | 🌾 Grãos (5) | 🐂 Pecuária (9)', abas.join(' | '));
+      ok('a. 25 textos por unidade + 1 de grupo → 5 abas, contadores 🏢 1 · ☕ 10 · 🌾 5 · 🐂 9 · 🐃 1, na ordem fixa do catálogo, Grupo aberta primeiro',
+        abas.join(' | ') === '🏢 Grupo (1) * | ☕ Café (10) | 🌾 Grãos (5) | 🐂 Pecuária (9) | 🐃 Confinamento (1)', abas.join(' | '));
       const fila = await page.evaluate(() => { const f = document.querySelector('#app .rel-abas'); return { largura: f.scrollWidth, cliente: f.clientWidth, pagina: document.documentElement.scrollWidth, wrap: getComputedStyle(f).flexWrap }; });
       ok('a. A fileira de abas quebra em linhas e nunca passa de 390 px', fila.wrap === 'wrap' && fila.largura <= fila.cliente + 1 && fila.pagina <= 390, `${fila.largura} px em ${fila.cliente}; página ${fila.pagina} px`);
       /* g. nome enganoso: uma unidade de pecuária rebatizada "Café do Sul" continua em 🐂 */

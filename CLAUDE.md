@@ -111,6 +111,12 @@ em "Anexar".
 Desde a v99: NENHUMA tabela nova, nenhum campo novo e nenhuma chamada nova
 ao Supabase. A tela 📊 Relatórios da Diretoria só rearranja o que
 baixarRelatorios já guarda em relCache (menu › abas por atividade › folha).
+Desde a v102: cf_lotes, cf_diario, cf_eventos, cf_pesagens, cf_sanidade,
+cf_saidas e as visões vw_cf_diario_lote e vw_cf_lote_resumo (sql/059; o
+módulo Confinamento — o app lê E escreve, na mesma fila offline dos
+boletins; na v102 escreve lotes, diário e eventos de morte; pesagens,
+sanidade e saídas entram nas próximas versões). Nenhuma tabela existente
+foi alterada. Plano e decisões em docs/CONFINAMENTO.md.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -157,7 +163,13 @@ Fazenda > Talhão (menor unidade de custo). Fazendas irrigadas com
 iCrop: Cachoeira do Rio Preto—Lagamar (f03), Vereda (f22),
 Floramill (f33), Capoeira Grande (f27). O de-para nome-iCrop → id
 do app está na constante DEPARA_ICROP do index.html.
-Perfis de uso: gerente (preenche) e diretoria (painel).
+Perfis de uso: gerente (preenche) e diretoria (painel). Desde a v102 há
+a quarta atividade CONFINAMENTO (🐃; unidade Vereda — Confinamento, f22f,
+fazenda-mãe Vereda) com perfil próprio "Gerente de Confinamento"
+(papel "conf", molde do pós-colheita): a unidade mínima de custo é o LOTE
+(CF-VER-2026-01), nunca o curral; o FarmTell Beef cuida do trato e o app
+registra o que ele não captura. Catálogo em docs/catalogos-por-atividade.md,
+seção CONFINAMENTO.
 
 ## Plano de safra (regras permanentes desde a v52)
 O plano do agrônomo (Salvino) entra no app SÓ como referência e

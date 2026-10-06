@@ -1,7 +1,9 @@
 # Confinamento — plano de implementação (rascunho para o Nilo, 01/10/2026)
 
-Situação: PROPOSTA. Nada aqui está codado. As perguntas do item 3 precisam
-de resposta antes da etapa 1.
+Situação: EM IMPLEMENTAÇÃO. Perguntas respondidas pelo Nilo em 06/10/2026
+(item 3, com a resposta ao lado de cada uma). v102 entregou a etapa 1 + o
+diário (item 4). O que já existe no app está no ESTADO.md, seção
+"Confinamento (v102)".
 
 ## 0. O que já existe no app e pesa na decisão
 
@@ -170,72 +172,99 @@ dos CSV que o app já gera.
 
 Identidade e acesso
 1. Qual é a fazenda: Vereda (f22, Romaria/MG, onde já existe o talhão
+   → **Vereda (f22).** Unidade f22f "Vereda — Confinamento" (v102).
    "Curral Confinamento") ou Vereda Romaria (f23)? Proposta: unidade nova
    "Vereda — Confinamento" (id f22f), fazenda-mãe Vereda.
 2. Sigla de 3 letras no código do lote (CF-VER-2026-01)? Numeração
+   → **Sim** (VER; reinicia por ano; dois dígitos).
    reinicia a cada ano? Dois dígitos bastam?
 3. O Gerente de Confinamento é outra pessoa, ou o gerente de café/grãos
+   → **Outra pessoa.** Código próprio VF-6318 (unidade) e CONF-4725 (atividade).
    da Vereda? Muda se o código é só da unidade (VF-NNNN) ou combinado.
 4. Currais: quantos e como se chamam? Proposta: cadastrados como talhões
+   → **Provisório:** Curral 1 a 6 como talhões tipo CURRAL; o Nilo ajusta em Cadastros.
    da unidade com tipo CURRAL, em Cadastros › Talhões.
 
 Diário
 5. Quais campos do diário são obrigatórios para enviar? Proposta: CMS,
+   → Decidido: sobra e curral obrigatórios; CMS opcional; enfermaria vazio = 0; clima opcional.
    sobra e curral por lote; enfermaria aceita 0; clima opcional.
 6. CMS do dia pode faltar (FarmTell atrasou)? Se sim, a linha envia sem CMS
+   → **Sim**: a linha envia sem CMS e lê "sem CMS".
    e o escritório vê "sem CMS"?
 7. Escala da sobra de cocho: confirmar rótulos 0 a 4 (0 = cocho limpo …
+   → Pesquisado: escala 0–4 do padrão de leitura de cocho (0 cocho limpo · 1 restos espalhados · 2 camada fina · 3 sobra 25–50 % · 4 sobra > 50 %).
    4 = sobra alta) — vêm do padrão do FarmTell?
 
 Lote e eventos
 8. O lote pode sair em mais de um embarque? Se sim, fecha quando cabeças
+   → **Sim.** Fecha com zero vivas e todos os romaneios lançados.
    vivas = 0 E todos os romaneios lançados.
 9. Carência: um animal (brinco) em carência trava o lote inteiro?
+   → v1: um animal em carência trava o lote inteiro.
    Proposta v1: trava tudo; "sair deixando os brincos X" fica para depois.
 10. Pesagem por amostra (cabeças pesadas < vivas) vale para o GMD do lote?
+   → Vale: o GMD usa o peso médio da amostra.
 
 Projeção e farol
 11. Cortes do farol: proposta verde ≥ 95 % do GMD-alvo, amarelo 85–95 %,
     vermelho < 85 %; cinza sem pesagem. Pode ser?
+   → Mantidos: 95 % / 85 %; cinza sem pesagem.
 12. O gerente vê o farol e o GMD-alvo (exceção à regra "farol é da
     Diretoria" do plano de safra). Custo/@ e preço-teto ficam só para
     escritório e Diretoria — confirma?
+   → **Todo mundo vê tudo. Sem trava.**
 13. Preço de compra: o gerente lança na entrada; depois disso, só o
     escritório vê — confirma?
+   → Na maioria é recria: avaliação na entrada e preço ESTIMADO. Campo "Preço de referência (estimado na avaliação de entrada)", opcional, R$/@ ou R$/kg.
 14. Quais campos da ficha de entrada entram na projeção do app (lista do
     item 1) e quem digita a primeira versão: escritório, antes da entrada?
+   → Decidido: gmdAlvo, diasPrevistos, pesoSaidaKg, cmsPrevisto, rendimentoPct, custoArroba, precoTeto, gmdEquilibrio; o escritório digita a primeira versão (v104).
 
 Escritório e saída
 15. Grau de acabamento: escala do frigorífico (1 a 5) ou texto? Bônus em
     R$ total ou R$/@?
+   → Escala 1 a 5 do frigorífico; bônus em R$/@.
 16. "Registrar saída" ganha UMA confirmação (a única nova: lote, cabeças,
     peso, frigorífico)? Hoje o app tem 20 pontos de confirmação (c10).
+   → Sim, uma só (v103).
 
 Catálogos (listas curtas a confirmar)
 17. Causas de morte: timpanismo · acidose · pneumonia · trauma/acidente ·
     clostridiose · desconhecida · outra.
+   → **OK.**
 18. Motivos da leitura semanal: clima · sanidade · consumo/dieta · lote
     desuniforme · instalação/cocho · outro.
+   → Mantidos (v104).
 19. Frigoríficos: lista fixa (quais?) ou texto com memória do último.
+   → Texto com memória do último.
 20. Ícone e rótulo da atividade na entrada e no painel: "🐂 Confinamento"
     repete o boi da pecuária; alternativa "🐃". Qual?
+   → **🐃** (alternativa).
 
 Saídas
 21. CSV: quem baixa (gerente e escritório, ou só escritório)? O escritório
     tem um export do FarmTell de exemplo para alinhar nomes de colunas?
+   → Qualquer pessoa, sem trava.
 22. WhatsApp: "desvio" = farol amarelo/vermelho + mortes do dia + sobra 0
     ou 4 — confirma?
+   → **OK.**
 
 ## 4. Etapas de código (uma versão por PR)
 
-1. v102 — Fundação: atividade CONFINAMENTO, unidade, currais, códigos
+Reorganizadas em 06/10/2026: as etapas 1 e 2 saíram juntas na v102, para o
+gerente poder começar a usar o diário no primeiro dia.
+
+1. v102 — ENTREGUE. Fundação + diário: atividade CONFINAMENTO, unidade, currais, códigos
    CONF/VF, papel "conf", fila e `sql/059`, Casa, Entrada de lote, lista e
    tela do lote (sem eventos), Cadastros › Confinamento (currais, lotes),
    `scripts/teste_confinamento.cjs` e grupo novo no `checar-poluicao`.
-2. v103 — Diário de 2 minutos, faixa de envio, régua, WhatsApp.
-3. v104 — Eventos: pesagem, transferência, morte, sanidade com carência,
-   saída com trava; cálculos e farol; CSV por lote.
-4. v105 — Escritório (romaneio, fechar lote, projeção versionada),
-   cartão da Diretoria, leitura semanal.
-5. Depois — importação do CSV do FarmTell pela porta única (como o PDF do
+   diário de 2 minutos com morte (evento) e desfazer, faixa de envio, régua,
+   WhatsApp, CSV por lote, tela do lote com números calculados.
+2. v103 — Eventos restantes: pesagem, transferência, sanidade com carência
+   (trava a saída), saída para abate com a única confirmação nova; farol
+   com GMD real.
+3. v104 — Escritório (romaneio, fechar lote, projeção versionada), cartão
+   da Diretoria pelo `PAINEL_CARTOES`, leitura semanal de sexta.
+4. Depois — importação do CSV do FarmTell pela porta única (como o PDF do
    Agro1), sem bloquear nada acima.
