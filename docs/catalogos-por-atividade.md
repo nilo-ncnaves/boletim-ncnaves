@@ -426,10 +426,13 @@ fazenda-mãe Vereda, f22). Código de acesso VF-NNNN (unidade) e CONF-NNNN
   curral; lote misto de Nelore e cruzado Angus vira dois lotes.
 - O FarmTell Beef cuida do trato; o app registra o que ele não captura.
   O CMS médio do dia é a única ponte: um número por lote, opcional.
-- Diário em 2 minutos: formulário (como o Clima), uma linha por lote ativo,
-  "Enviar diário" fixo no rodapé e inativo enquanto faltar sobra ou curral
-  de algum lote (c10). Mortes nunca são digitadas soltas: "＋ morte" abre o
-  evento e o número vem dele.
+- Diário em 2 minutos: formulário (como o Clima). Desde a v103, **um cartão
+  por curral ocupado** (o cocho é do curral: CMS, sobra, condição, bebedouro
+  e ofegação uma vez) com **uma sublinha por lote** (enfermaria, "Algo fora do
+  normal?", mortes); "Enviar diário" fixo no rodapé e inativo enquanto faltar
+  sobra, condição ou bebedouro de algum curral, ou houver valor fora da faixa
+  (c10). Mortes nunca são digitadas soltas: "＋ morte" abre o evento e o
+  número vem dele.
 - Entrada de lote em 3 passos: curral (chips) → grupo genético (chips) →
   detalhes (data em chips dos últimos 7 dias, cabeças, peso de balança,
   origem, fornecedor/fazenda de origem, preço de referência, GTA).
@@ -444,33 +447,59 @@ fazenda-mãe Vereda, f22). Código de acesso VF-NNNN (unidade) e CONF-NNNN
 | Origem (`CF_ORIGEM`) | Recria do grupo · Compra |
 | Unidade do preço (`CF_PRECO_UN`) | R$/@ · R$/kg |
 | Sobra de cocho (`CF_SOBRA`) | 0 cocho limpo · 1 restos espalhados · 2 camada fina · 3 sobra de 25 a 50 % · 4 sobra acima de 50 % |
-| Condição do curral (`CF_CURRAL_COND`) | Seco · Úmido · Lama |
+| Condição do curral (`CF_CURRAL_COND`) | Seco · Poeira · Úmido · Lama (Poeira desde a v103) |
+| Bebedouro do curral (`CF_BEBEDOURO`, v103) | ok · sujo · falha |
+| Escore de ofegação do curral (`CF_OFEGACAO`, v103) | 0 normal · 1 respiração rápida · 2 ofegante, boca fechada · 3 boca aberta · 4 boca aberta, língua de fora |
+| Algo fora do normal? — lote (`CF_FORA_NORMAL`, v103) | monta · briga · animal mancando · animal caído · cocho com problema · outro |
+| Motivo de quem entrou na enfermaria (`CF_MOTIVO_ENFERMARIA`, v103) | respiratório · digestivo · casco / locomoção · trauma · outro |
+| Necropsia — morte (`CF_NECROPSIA`, v103) | feita · não feita |
+| Condição da pesagem (`CF_JEJUM`, v103) | com jejum · sem jejum (desconto `CF_DESCONTO_JEJUM` = 4 %, provisório — a confirmar com a AXYS) |
+| Travas de faixa (`CF_FAIXAS`, v103) | CMS 4–16 kg MS · peso de entrada 150–650 kg · peso estimado da morte 100–800 kg · chuva 0–200 mm |
+| Indicadores (v103) | `CF_QUEDA_CMS` 10 % · `CF_JANELA_CMS` 3 diários · `CF_DIAS_ADAPTACAO` 21 dias · `CF_CA_MIN_COBERTURA` 70 % |
 | Causas de morte (`CF_CAUSAS_MORTE`) | Timpanismo · Acidose · Pneumonia · Trauma / acidente · Clostridiose · Desconhecida · Outra |
 | Farol contra a projeção (`CF_FAROL`) | verde ≥ 95 % do GMD-alvo · amarelo 85–95 % · vermelho < 85 % · cinza sem pesagem |
 | Status do lote (`CF_STATUS`) | ativo · em saída · aguardando romaneio · fechado · cancelado |
 | Sigla do código (`CF_SIGLA_FAZENDA`) | f22 → VER (por id da fazenda-mãe, nunca por pedaço de nome) |
 
-### Diário (`cf_diario`, uma linha por lote em `payload.lotes[]`)
-Clima do dia: chuva (mm) e estresse térmico (Sim/Não). Por lote: CMS
-(kg MS/cab, opcional — "sem CMS" quando o FarmTell atrasou), sobra de
-cocho (0–4, obrigatório), animais na enfermaria (nº, vazio = 0), condição
-do curral (obrigatório), observação. Mortes do dia: eventos MORTE (causa
-em chips, cabeças, peso estimado opcional — o único peso estimado do app),
-com "desfazer" no lugar (o evento fica cancelado, nunca apagado).
+### Diário (`cf_diario`; desde a v103 `payload.currais[]` + `payload.lotes[]`)
+Dia: chuva (mm). **Por curral** (`currais[]`): CMS (kg MS/cab, opcional —
+"sem CMS" quando o FarmTell atrasou; faixa 4–16), sobra de cocho (0–4,
+leitura da manhã, obrigatório), condição do curral (obrigatório), bebedouro
+(obrigatório), escore de ofegação (opcional). **Por lote** (`lotes[]`, com o
+`curralId` do dia): entraram hoje na enfermaria (nº, vazio = 0; com > 0, o
+motivo em chips), estão na enfermaria (nº, vazio = 0), "Algo fora do
+normal?" (chips, seleção múltipla). Mortes do dia: eventos MORTE (causa em
+chips, cabeças, peso estimado opcional — o único peso estimado do app —,
+necropsia opcional), com "desfazer" no lugar (o evento fica cancelado, nunca
+apagado). Diário da v102 (tudo por lote: CMS, sobra, enfermaria, condição,
+observação; estresse térmico Sim/Não no dia) continua legível pela leitura
+única `cfDiarioNorm`; "entraram hoje" lê "não informado".
 
 ### Resumo WhatsApp — bloco 🐃 CONFINAMENTO <FAZENDA>
-Cabeçalho com a fazenda-mãe e a data; "Por:"; clima; uma linha 🐂 por lote
-(cabeças vivas · dia de cocho · CMS ou "sem CMS" · sobra · enfermaria ·
-curral); "⚠️ Morte <lote>: n (causa)"; "🔎 Fora do esperado:" com sobra 0
-ou 4 e GMD abaixo do alvo; observação.
+Cabeçalho com a fazenda-mãe e a data; "Por:"; clima; desde a v103 uma linha
+🏠 por curral (CMS ou "sem CMS" · sobra · condição · bebedouro · ofegação) e,
+abaixo, uma 🐂 por lote (cabeças vivas · dia de cocho · casos novos e motivo ·
+na enfermaria · fora do normal); "⚠️ Morte <lote>: n (causa) · necropsia
+feita"; "🔎 Fora do esperado:" com sobra 0 em 2+ diários seguidos ou 3–4,
+poeira/lama, bebedouro sujo/falha, ofegação ≥ 3, queda de consumo ("lote
+consumo −14 %"), CMS × previsto e GMD abaixo do alvo; observação. Diário da
+v102 sai no formato de antes (uma linha 🐂 por lote com tudo).
+
+### CSV do lote
+Colunas da v102 primeiro (`lote; unidade; tipo; data; cabecas; peso_kg;
+cms_kg_ms; sobra_escore; enfermaria; curral; causa; responsavel; obs`) e,
+desde a v103, as novas NO FIM: `fora_normal; pesagem_jejum; curral_do_dia;
+enf_entraram; enf_motivos; bebedouro; ofegacao; necropsia`.
 
 ### Sincronização
 `cf_lotes` (t:"cfl"), `cf_diario` (t:"cfd", id = unidade_data) e
 `cf_eventos` (t:"cfe") na mesma fila offline; leitura por
 `baixarConfinamento` só para quem tem unidade de confinamento no escopo
-ou painel (sql/059). Próximas versões: pesagens, sanidade com carência
-(trava a saída), saída e romaneio, projeção versionada, leitura semanal,
-cartão da Diretoria, importação do CSV do FarmTell.
+ou painel (sql/059). Desde a v103 a visão `vw_cf_diario_lote` lê os dois
+formatos do diário (sql/060). Próximas versões: v104 pesagens, sanidade com
+carência (trava a saída), transferência e saída; v105 romaneio, projeção
+versionada, leitura semanal e cartão da Diretoria; importação do CSV do
+FarmTell assim que houver o export de exemplo.
 
 ---
 
@@ -1085,7 +1114,12 @@ aguadas, porteira, capataz, prenhes, gestação, carrapato
 ### Confinamento
 CMS, GMD, timpanismo, acidose, clostridiose, nelore, angus, FarmTell,
 sobra de cocho, dias de cocho, grupo genético, lotes no cocho,
-cabeças vivas
+cabeças vivas, ofegação, necropsia, poeira, morbidade
+
+> v103: "ofegação", "necropsia", "poeira" (condição do curral) e
+> "morbidade" entraram na lista. "Bebedouro" e "monta" NÃO entram, pelo
+> mesmo motivo de "curral": a pecuária já usa os dois ("Manutenção de cerca
+> / cocho / bebedouro", "Problema bomba / bebedouro", "Estação de monta").
 
 ## Operação do Agro1 → operações do app (v96) — `ERP_OPERACOES`
 Catálogo por chave, usado SÓ para dois fins: o escopo do 🔸 "só no app"

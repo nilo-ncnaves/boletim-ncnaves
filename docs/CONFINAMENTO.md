@@ -2,8 +2,9 @@
 
 Situação: EM IMPLEMENTAÇÃO. Perguntas respondidas pelo Nilo em 06/10/2026
 (item 3, com a resposta ao lado de cada uma). v102 entregou a etapa 1 + o
-diário (item 4). O que já existe no app está no ESTADO.md, seção
-"Confinamento (v102)".
+diário (item 4); v103 foi a revisão de especialista (item 5: o cocho é do
+curral, travas de faixa, registros leves e indicadores). O que já existe no
+app está no ESTADO.md, seções "Confinamento (v103)" e "Confinamento (v102)".
 
 ## 0. O que já existe no app e pesa na decisão
 
@@ -213,7 +214,8 @@ Projeção e farol
 12. O gerente vê o farol e o GMD-alvo (exceção à regra "farol é da
     Diretoria" do plano de safra). Custo/@ e preço-teto ficam só para
     escritório e Diretoria — confirma?
-   → **Todo mundo vê tudo. Sem trava.**
+   → **Todo mundo vê tudo. Sem trava.** (v103: registrado no CLAUDE.md, junto
+   da regra 4 do plano de safra, para ninguém "corrigir".)
 13. Preço de compra: o gerente lança na entrada; depois disso, só o
     escritório vê — confirma?
    → Na maioria é recria: avaliação na entrada e preço ESTIMADO. Campo "Preço de referência (estimado na avaliação de entrada)", opcional, R$/@ ou R$/kg.
@@ -248,7 +250,13 @@ Saídas
    → Qualquer pessoa, sem trava.
 22. WhatsApp: "desvio" = farol amarelo/vermelho + mortes do dia + sobra 0
     ou 4 — confirma?
-   → **OK.**
+   → **OK.** **Trocada na v103 (07/10/2026), na revisão de especialista:** a
+   sobra deixou de ser desvio por um dia só de 0 ou 4. Agora é desvio: sobra 0
+   em 2 ou mais diários seguidos (cocho limpo um dia é leitura normal; dois
+   seguidos indica trato curto) ou sobra 3 ou 4 em qualquer dia (sobra alta já
+   no primeiro dia é sinal de queda de consumo). Também entram no "Fora do
+   esperado": poeira ou lama no curral, bebedouro sujo ou com falha, ofegação
+   3 ou mais, queda de consumo e farol de consumo amarelo/vermelho.
 
 ## 4. Etapas de código (uma versão por PR)
 
@@ -261,10 +269,57 @@ gerente poder começar a usar o diário no primeiro dia.
    `scripts/teste_confinamento.cjs` e grupo novo no `checar-poluicao`.
    diário de 2 minutos com morte (evento) e desfazer, faixa de envio, régua,
    WhatsApp, CSV por lote, tela do lote com números calculados.
-2. v103 — Eventos restantes: pesagem, transferência, sanidade com carência
-   (trava a saída), saída para abate com a única confirmação nova; farol
-   com GMD real.
-3. v104 — Escritório (romaneio, fechar lote, projeção versionada), cartão
-   da Diretoria pelo `PAINEL_CARTOES`, leitura semanal de sexta.
-4. Depois — importação do CSV do FarmTell pela porta única (como o PDF do
-   Agro1), sem bloquear nada acima.
+2. v103 — ENTREGUE. Revisão de especialista (item 5): diário por curral,
+   travas de faixa, poeira, jejum na pesagem, "Algo fora do normal?",
+   enfermaria em dois números, bebedouro, ofegação, necropsia e os
+   indicadores calculados (queda de consumo, farol de consumo, adaptação,
+   sobra em sequência, peso estimado, saída prevista, conversão, morbidade).
+   A Parte D (importação do CSV do FarmTell) ficou pendente do export de
+   exemplo (docs/exemplos/farmtell/LEIA-ME.md).
+3. v104 — Eventos restantes (era a v103): pesagem (chip obrigatório "com
+   jejum · sem jejum", campo `jejum` já no modelo; "amostra de N de M
+   cabeças" ao lado do GMD), transferência (usa o `curralId` do dia gravado
+   no diário), sanidade com carência (trava a saída; produto e dose são
+   REGISTRO do que foi feito, nunca sugestão, padrão ou lista recomendada),
+   saída para abate com a única confirmação nova (com a projeção de peso e
+   data ao lado do real); farol com GMD real.
+4. v105 — Escritório (era a v104): romaneio, fechar lote, projeção
+   versionada, cartão da Diretoria pelo `PAINEL_CARTOES`, leitura semanal de
+   sexta.
+5. Importação do CSV do FarmTell pela porta única (como o PDF do Agro1) —
+   Parte D da v103, assim que houver o export real; não bloqueia nada acima.
+
+## 5. Revisão de especialista (v103, 07/10/2026) — decisões
+
+Avaliação do módulo da v102 do ponto de vista de gestão de confinamento de
+gado de corte. O que mudou e por quê:
+
+| | Antes (v102) | Depois (v103) | Por quê |
+|---|---|---|---|
+| D1 | Sobra, condição do curral e CMS marcados POR LOTE | Marcados UMA vez por CURRAL; o lote fica com enfermaria, "Algo fora do normal?" e mortes | Lote misto vira dois lotes no mesmo curral, que comem no mesmo cocho; o CMS do FarmTell também é por curral |
+| D2 | Qualquer número passava | Travas de faixa `CF_FAIXAS` (CMS 4–16 · peso de entrada 150–650 · peso da morte 100–800 · chuva 0–200) e nada acima das cabeças vivas | Um "98" no lugar de "9,8" estragava GMD, conversão e mortalidade do giro |
+| D3 | Seco · Úmido · Lama | Seco · Poeira · Úmido · Lama | O giro é na seca; de agosto a outubro o problema do curral no Cerrado é poeira (doença respiratória) |
+| D4 | Peso sem condição | Chip obrigatório "com jejum · sem jejum" na entrada; desconto de 4 % no GMD quando as condições diferem (**provisório — a confirmar com a AXYS**) | O enchimento (3 a 5 % do peso) virava ganho ou perda falsa |
+| D5 | "Sobra de cocho" | "Sobra de cocho (leitura da manhã)" | A leitura é de manhã, antes do primeiro trato; o diário é preenchido no fim do dia |
+| D6 | Regra 4 × "todo mundo vê tudo" sem registro; observação livre por lote × regra 2 | CLAUDE.md registra a exceção; observação do lote virou chips "Algo fora do normal?" (monta · briga · animal mancando · animal caído · cocho com problema · outro) | Machos inteiros: monta e briga são causa real de trauma e de perda de GMD |
+
+Registros leves novos (chips ou números, nenhum texto livre): enfermaria em
+dois números ("entraram hoje", com motivo; "estão na enfermaria") — a
+morbidade (caso novo) é o que importa, não o estoque; bebedouro do curral
+(obrigatório); escore de ofegação 0–4 do curral (opcional, no lugar do
+"estresse térmico" do dia); necropsia na morte (opcional).
+
+Indicadores (todos calculados, nenhum gravado; sem dado, "—" ou cinza com o
+motivo, nunca vermelho): queda de consumo (CMS do dia > 10 % abaixo da média
+dos 3 diários anteriores com CMS — primeiro sinal de acidose, doença
+respiratória ou calor); farol diário de consumo × CMS previsto (na casa a
+bolinha é o pior entre consumo e ganho); CMS em % do peso vivo estimado; selo
+"adaptação · dia N" até 21 dias, com mortalidade e morbidade dos primeiros 21
+dias à parte; sobra em sequência (pergunta 22, trocada); peso estimado hoje
+(pelo alvo ou pelo GMD real) e saída prevista; conversão alimentar (só com
+CMS em ≥ 70 % dos dias do período); morbidade.
+
+Contagem do diário com 5 lotes em 4 currais (cada campo uma vez, como na
+v102): 22 → 31 campos (+41 %); só os obrigatórios, 10 → 12 (+20 %). O teto
+do pedido era +30 %: a decisão sobre quais campos ficam recolhidos é do
+Nilo, antes do PR (proposta no ESTADO.md, PENDÊNCIAS).

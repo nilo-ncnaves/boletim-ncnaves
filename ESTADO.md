@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v102** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v103** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -82,6 +82,101 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   de DIRETORIA (LG-9351) e ADMIN (AD-4786) foram substituídos pelo
   formato novo — esses aparelhos pedem o código novo uma vez.
 
+## Confinamento (v103) — revisão de especialista: o cocho é do curral, travas, registros leves e indicadores
+Avaliação do módulo da v102 feita em 07/10/2026 do ponto de vista de gestão de
+confinamento de gado de corte, entregue numa versão só, a pedido do Nilo. Nada de
+café, grãos, pecuária, pós-colheita ou Diretoria muda (regressão byte a byte).
+- **O cocho é do curral (D1).** Dois lotes no mesmo curral (lote misto = duas
+  entradas) comem no mesmo cocho; até a v102 o gerente marcava a mesma sobra duas
+  vezes, podendo marcar valores diferentes. O diário virou **um cartão por curral
+  ocupado** (ordem do cadastro de currais) com CMS, sobra de cocho, condição do
+  curral, bebedouro e ofegação UMA vez, e dentro dele **uma sublinha por lote**
+  (identidade, enfermaria, "Algo fora do normal?", mortes com "＋ morte"). Curral
+  com um lote só fica como antes (a identidade do lote no topo do cartão). A trava
+  fala de curral ("Marque a sobra de cocho do Curral 3"). Dado:
+  `payload.currais[] = {curralId, cms, sobra, cond, bebedouro, ofegacao}` e
+  `payload.lotes[] = {loteId, curralId (o do dia), enfEntraram, enfMotivos[],
+  enfEstao, foraNormal[]}`; no diário de hoje o curral do lote acompanha o cadastro
+  (lote transferido na v104 cai sozinho no cartão certo).
+- **Diário da v102 continua legível — nada é reescrito.** Toda leitura passa pela
+  função única `cfDiarioNorm(d)` + `cfLinhaDia(dn, loteId)` (detalhe, WhatsApp,
+  tela do lote, CSV e indicadores): o diário antigo conserva o que foi marcado em
+  CADA lote (sobra, CMS, condição, observação), `enfermaria` vira "estão na
+  enfermaria" e "entraram hoje" fica **não informado** (nunca 0); o "estresse
+  térmico" antigo continua aparecendo.
+- **Travas de faixa (D2)** pelo catálogo `CF_FAIXAS` (CMS 4–16 kg MS, peso de
+  entrada 150–650 kg, peso estimado da morte 100–800 kg, chuva 0–200 mm) e
+  enfermaria ("entraram" ou "estão") ou morte acima das cabeças vivas: o botão de
+  avanço fica inativo com o motivo ("CMS do Curral 2 fora de 4 a 16 kg MS —
+  confira"); vírgula decimal aceita; nenhum diálogo, nenhum `alert()`.
+- **Poeira (D3):** condição do curral Seco · Poeira · Úmido · Lama (`POEIRA`);
+  poeira e lama vão ao "🔎 Fora do esperado".
+- **Jejum (D4):** a entrada de lote pede o chip obrigatório "Pesagem: com jejum ·
+  sem jejum" (`pesoEntradaJejum` SIM/NAO; lotes da v102 leem "não informado"); o
+  modelo da pesagem ganha `jejum` (tela na v104). O GMD desconta
+  `CF_DESCONTO_JEJUM = 0,04` do peso SEM jejum quando as duas pontas têm condições
+  diferentes — **valor provisório, a confirmar com a consultoria AXYS**; com
+  condição não informada, sem desconto e com a nota "condição de pesagem não
+  informada".
+- **Sobra "leitura da manhã" (D5)** no rótulo; legenda 0–4 igual.
+- **Regras registradas (D6):** (a) CLAUDE.md, junto da regra 4 do plano de safra:
+  no confinamento todo perfil vê todos os números do lote, inclusive preço, custo e
+  farol (pergunta 12); (b) a observação livre por lote virou chips de seleção
+  múltipla **"Algo fora do normal?"** (`CF_FORA_NORMAL`: monta · briga · animal
+  mancando · animal caído · cocho com problema · outro — o lote é de machos
+  inteiros), com os chips removíveis da c12; a observação do dia continua; (c) com
+  nome lembrado, "Quem está preenchendo: Fulano · trocar" — o campo só abre no
+  "trocar".
+- **Registros leves (Parte B), todos chips ou números:** enfermaria em dois
+  números — "Entraram hoje na enfermaria" (caso novo; com > 0 aparecem, no lugar,
+  os motivos `CF_MOTIVO_ENFERMARIA`: respiratório · digestivo · casco / locomoção ·
+  trauma · outro — registro, nunca sugestão) e "Estão na enfermaria"; vazio = 0;
+  **bebedouro** do curral (ok · sujo · falha, obrigatório; sujo/falha no Fora do
+  esperado); **escore de ofegação** do curral (0 normal · 1 respiração rápida · 2
+  ofegante, boca fechada · 3 boca aberta · 4 boca aberta, língua de fora;
+  opcional; substitui o chip "Estresse térmico" do topo; ≥ 3 no Fora do esperado);
+  **necropsia** (feita · não feita, opcional) no evento de morte, no detalhe, no
+  WhatsApp ("· necropsia feita") e no CSV.
+- **Indicadores (Parte C), todos CALCULADOS em `cfResumoLote`, nunca gravados:**
+  | Indicador | Fórmula | Quando aparece | Sem dado |
+  |---|---|---|---|
+  | Queda de consumo | CMS do dia < média dos 3 diários anteriores COM CMS × 0,90 (`CF_QUEDA_CMS`, `CF_JANELA_CMS`) | casa ("↓ consumo"), tela do lote, Fora do esperado ("lote consumo −14 %") | menos de 3 diários com CMS: sem alerta |
+  | Farol de consumo | CMS do dia ÷ CMS previsto, cortes 95/85 | tela do lote (Consumo e Ganho lado a lado); na casa a bolinha é o PIOR dos dois | sem projeção ou sem CMS: cinza com o motivo |
+  | CMS % do peso vivo | CMS do dia ÷ peso estimado | tela do lote (número, sem farol) | sem peso estimado: não mostra |
+  | Adaptação | dias de cocho ≤ 21 (`CF_DIAS_ADAPTACAO`) | selo "adaptação · dia N" na casa e na tela do lote; mortalidade e morbidade dos 21 primeiros dias à parte | — |
+  | Sobra em sequência | sobra 0 em 2+ diários seguidos, ou 3–4 em qualquer dia | Fora do esperado (uma vez por curral) | — |
+  | Peso estimado hoje | última pesagem (ou entrada) + GMD × dias; GMD real com pesagem ("pelo GMD real"), senão o alvo ("pelo alvo") | tela do lote | sem pesagem e sem projeção: "—" |
+  | Saída prevista | entrada + dias previstos | tela do lote ("faltam N dias") | sem projeção: não mostra |
+  | Conversão alimentar | média do CMS entre as duas últimas pesagens ÷ GMD do período (kg MS/kg) | tela do lote | sem pesagem, ou CMS em < 70 % dos dias (`CF_CA_MIN_COBERTURA`): "dados de consumo insuficientes" |
+  | Morbidade | casos novos acumulados ÷ cabeças de entrada | tela do lote (e nos 21 primeiros dias) | diário só da v102: "casos novos não informados"; sem diário: "sem diário" |
+  Nenhum indicador fica vermelho por falta de dado; nenhum texto manda fazer
+  (dieta, trato, tratamento).
+- **Saídas:** WhatsApp com uma linha 🏠 por curral (CMS · sobra · condição ·
+  bebedouro · ofegação) e uma 🐂 por lote (cabeças · dia · enfermaria · fora do
+  normal); o diário da v102 sai como saía. CSV com 8 colunas novas NO FIM
+  (`fora_normal; pesagem_jejum; curral_do_dia; enf_entraram; enf_motivos;
+  bebedouro; ofegacao; necropsia`) — planilha de quem já usa não quebra.
+- **SQL:** `sql/060-confinamento-v103.sql` recria `vw_cf_diario_lote` (uma linha
+  por lote-dia, juntando o lote ao curral do dia, lendo os dois formatos; colunas
+  de antes na mesma ordem e 8 novas no fim; nenhuma removida) e cria a função de
+  leitura `cf_num` (número digitado que não é número vira nulo — a visão nunca
+  falha por uma linha). Nenhuma tabela nova. Rodável de novo. A visão
+  `vw_cf_lote_resumo` (sql/059) continua SEM o desconto de jejum.
+- **Contagem do diário (5 lotes em 4 currais), medida nas duas versões:** v102 =
+  11 números + 11 grupos de chips = 22 campos (10 obrigatórios); v103 = 15 + 16 =
+  31 campos (12 obrigatórios). Pela conta da v102 ("cada campo uma vez") são +41 %,
+  acima do teto de 30 % do pedido — **decisão do Nilo pendente antes do PR**
+  (ver PENDÊNCIAS). Só o obrigatório: +20 %.
+- **Plano renumerado (docs/CONFINAMENTO.md, item 4):** v104 = pesagem,
+  transferência, sanidade com carência e saída; v105 = escritório, Diretoria e
+  leitura semanal; importação do FarmTell = Parte D desta revisão, pendente do
+  export de exemplo (`docs/exemplos/farmtell/LEIA-ME.md`).
+- **Provas:** `node scripts/teste_confinamento.cjs` → **68 ✅ · 0 ❌** (as 39 da
+  v102 no modelo novo + 29 da v103, (a)–(r)); `scripts/checar-poluicao.cjs` →
+  848 ✅ · 42 ❌ (os 42 herdados; zero novo; grupo 21 com 3 itens novos);
+  `scripts/regressao_render.cjs` main × branch: café, grãos, pecuária,
+  pós-colheita, Diretoria e Administrador idênticos (só hora e versão mudam).
+
 ## Confinamento (v102) — perfil próprio, lote como unidade de custo
 Pedido do Nilo em 01/10/2026, respostas às 22 perguntas do plano em
 06/10/2026 (docs/CONFINAMENTO.md). Etapa 1 + diário, numa versão só, para
@@ -126,11 +221,12 @@ pós-colheita: registro diário próprio fora de `boletins`), código VF-6318
   entrada; acabamento 1–5, bônus R$/@; uma confirmação nova só na saída;
   causas de morte e motivos conforme proposta; frigorífico em texto com
   memória; ícone 🐃; CSV para qualquer pessoa.
-- **O que ficou para as próximas versões (uma por PR):** v103 pesagem,
-  transferência, sanidade com carência (trava a saída) e saída com nota;
-  v104 escritório (romaneio, fechar lote, projeção versionada), cartão da
-  Diretoria pelo `PAINEL_CARTOES`, leitura semanal de sexta; depois,
-  importação do CSV do FarmTell pela porta única. No painel, a unidade de
+- **O que ficou para as próximas versões (uma por PR; renumerado na v103,
+  que virou a revisão de especialista):** v104 pesagem, transferência,
+  sanidade com carência (trava a saída) e saída com nota; v105 escritório
+  (romaneio, fechar lote, projeção versionada), cartão da Diretoria pelo
+  `PAINEL_CARTOES`, leitura semanal de sexta; a importação do CSV do FarmTell
+  pela porta única é a Parte D da v103, pendente do export de exemplo. No painel, a unidade de
   confinamento já conta em "N de M unidades enviaram hoje" pelo diário
   (`registroDoDia`), e a aba 🐃 aparece pelo catálogo `ATIVIDADES`.
 - **Termos exclusivos:** "cabeça(s)", "cocho", "boi", "gado", "brinco",
@@ -3054,6 +3150,15 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v103, 07/10/2026: **848 ✅ · 42 ❌** — os mesmos 42 ❌ herdados (o `origin/main`
+da v102 mede 845 ✅ · 42 ❌ com o mesmo script, no mesmo dia), nenhum novo. A v103
+acrescentou 3 checagens ao grupo "21. Confinamento" (diário por curral; "Algo fora
+do normal?" em chips com os chips removíveis da c12; tela do lote sem vermelho por
+falta de dado e, com tudo aceso, em 1,64 tela) e o cenário passou a marcar o chip
+de jejum e o bebedouro. Alturas a 390 × 844: diário (ao abrir, 1 lote) 1,49 → 2,01
+telas; diário com 5 lotes em 4 currais 3,75 → 5,52 telas (formulário, sem seção);
+tela do lote 1,08 → 1,39 tela (com tudo aceso, 1,35 → 1,80); entrada de lote
+(detalhes) 1,5 → 1,6 tela. Medição anterior,
 v102, 06/10/2026: **844 ✅ · 43 ❌** — os mesmos 43 ❌ herdados (o `origin/main`
 da v101 mede 797 ✅ · 43 ❌ com o mesmo script, no mesmo dia), nenhum novo. A
 v102 acrescentou o grupo "21. Confinamento" (8 ✅) e as telas "Confinamento
@@ -3315,6 +3420,15 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
   faltam, ativa no lugar depois de sobra + curral); termos de
   café/grãos/pecuária ✅ zero. Chips de sobra/curral/causa usam a classe
   global `.chip` (pílula — o mesmo ❌ herdado de P10 de todas as telas).
+  **v103:** diário por curral ✅ (um cartão por curral ocupado, uma sobra,
+  sublinhas por lote; inativo nomeando o CURRAL e o campo; ativa no lugar
+  depois de sobra + condição + bebedouro); "Algo fora do normal?" e motivo da
+  enfermaria em chips com os chips removíveis da c12 ✅ (zero texto livre
+  novo); travas de faixa pelo botão de avanço ✅ (zero diálogo); tela do lote
+  ✅ (8 números, faróis Consumo × Ganho lado a lado, nada vermelho por falta de
+  dado, 1,80 tela com tudo aceso); nenhuma fileira passa de 390 px ✅. Selo de
+  adaptação com classe nova `.cf-selo` sem raio nem sombra; os chips continuam
+  na classe global (P10 herdado).
 - 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
   Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
   "Enviar registro do dia" não é fixo no rodapé ❌; termos de
@@ -3452,6 +3566,26 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Confinamento (v103) — decisão do Nilo sobre a contagem do diário, ANTES do
+  PR.** Com 5 lotes em 4 currais o diário passa de 22 para 31 campos (+41 %,
+  contando cada campo uma vez, como a v102 contou); o teto do pedido era +30 %.
+  Proposta: ofegação vira "＋ ofegação" recolhido por curral (só abre em dia de
+  calor) → 27 campos (+23 %). Alternativa: aceitar os 31 (só o obrigatório sobe
+  de 10 para 12, +20 %).
+- **Confinamento (v103) — rodar `sql/060-confinamento-v103.sql` no Supabase**
+  depois do 059 (recria a visão `vw_cf_diario_lote`; nenhuma tabela nova; pode
+  rodar de novo). Enquanto não rodar, o app funciona igual — só a visão do
+  escritório não mostra as colunas novas.
+- **Confinamento (v103) — `CF_DESCONTO_JEJUM = 0,04` é provisório:** confirmar
+  com a consultoria AXYS. Quando confirmado, a visão `vw_cf_lote_resumo`
+  (sql/059) pode ganhar o mesmo desconto (hoje o banco calcula o GMD sem ele).
+- **Confinamento — Parte D (importação do CSV do FarmTell) pendente:** falta
+  um export real em `docs/exemplos/farmtell/` (3+ dias, 2+ currais, leitura
+  de cocho). Passo a passo para o Nilo em `docs/exemplos/farmtell/LEIA-ME.md`.
+  Antes de codar: tabela coluna do FarmTell → campo do app → unidade (MS × MN
+  e fonte do teor de MS; de-para curral do FarmTell → curral do cadastro em
+  Cadastros › Confinamento; escala da leitura de cocho — se não for 0–4, parar
+  para o Nilo decidir).
 - **Confinamento (v102) — rodar `sql/059-confinamento.sql` no Supabase**
   (seis tabelas + duas visões, uma vez só; pode rodar de novo sem
   duplicar). Enquanto não rodar, o diário do gerente fica "Aguardando
@@ -3460,9 +3594,10 @@ classes `cad-*` e não acrescenta raio/sombra/pílula novos.
   Nelore/Angus → cabeças, peso, origem) → tela do lote → casa → "Preencher
   diário de hoje" (sobra e curral por lote, "＋ morte") → Enviar → WhatsApp.
   Currais "Curral 1" a "Curral 6" são provisórios (Cadastros › Talhões da
-  unidade Vereda — Confinamento). Próximas versões: v103 pesagem,
-  transferência, sanidade com carência e saída; v104 romaneio, fechamento,
-  projeção, cartão da Diretoria e leitura semanal.
+  unidade Vereda — Confinamento). Próximas versões (renumeradas na v103):
+  v104 pesagem, transferência, sanidade com carência e saída; v105 romaneio,
+  fechamento, projeção, cartão da Diretoria e leitura semanal. Desde a v103 o
+  diário marca sobra, condição e bebedouro POR CURRAL (não mais por lote).
 - **Relatórios em três níveis (v99) — para o Nilo testar no iPhone:**
   Diretoria › 📊 Relatórios abre com duas linhas ("📝 Textos para revisar"
   com "Devolutiva semanal · dd a dd/mm · N textos" e "📊 Números" com

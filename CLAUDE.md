@@ -117,6 +117,11 @@ módulo Confinamento — o app lê E escreve, na mesma fila offline dos
 boletins; na v102 escreve lotes, diário e eventos de morte; pesagens,
 sanidade e saídas entram nas próximas versões). Nenhuma tabela existente
 foi alterada. Plano e decisões em docs/CONFINAMENTO.md.
+Desde a v103: NENHUMA tabela nova. O diário do confinamento passou a gravar
+por CURRAL (cf_diario.payload.currais[]) e por lote (payload.lotes[], com o
+curral do dia); o sql/060 só recria a visão vw_cf_diario_lote (lê os dois
+formatos, colunas novas no fim, nenhuma removida) e cria a função de leitura
+cf_num. Nenhum diário gravado é reescrito.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
