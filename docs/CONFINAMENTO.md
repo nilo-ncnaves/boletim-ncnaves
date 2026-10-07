@@ -321,5 +321,5 @@ CMS em ≥ 70 % dos dias do período); morbidade.
 
 Contagem do diário com 5 lotes em 4 currais (cada campo uma vez, como na
 v102): 22 → 31 campos (+41 %); só os obrigatórios, 10 → 12 (+20 %). O teto
-do pedido era +30 %: a decisão sobre quais campos ficam recolhidos é do
-Nilo, antes do PR (proposta no ESTADO.md, PENDÊNCIAS).
+do pedido era +30 %: o Nilo aceitou a contagem como está em 07/10/2026 (se o
+diário pesar no campo, a saída estudada é recolher a ofegação, 27 campos).

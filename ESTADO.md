@@ -165,8 +165,8 @@ café, grãos, pecuária, pós-colheita ou Diretoria muda (regressão byte a byt
 - **Contagem do diário (5 lotes em 4 currais), medida nas duas versões:** v102 =
   11 números + 11 grupos de chips = 22 campos (10 obrigatórios); v103 = 15 + 16 =
   31 campos (12 obrigatórios). Pela conta da v102 ("cada campo uma vez") são +41 %,
-  acima do teto de 30 % do pedido — **decisão do Nilo pendente antes do PR**
-  (ver PENDÊNCIAS). Só o obrigatório: +20 %.
+  acima do teto de 30 % do pedido. **Decisão do Nilo (07/10/2026): aceito como
+  está** — mandou fazer o merge com os 31 campos. Só o obrigatório: +20 %.
 - **Plano renumerado (docs/CONFINAMENTO.md, item 4):** v104 = pesagem,
   transferência, sanidade com carência e saída; v105 = escritório, Diretoria e
   leitura semanal; importação do FarmTell = Parte D desta revisão, pendente do
@@ -3566,12 +3566,10 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
-- **Confinamento (v103) — decisão do Nilo sobre a contagem do diário, ANTES do
-  PR.** Com 5 lotes em 4 currais o diário passa de 22 para 31 campos (+41 %,
-  contando cada campo uma vez, como a v102 contou); o teto do pedido era +30 %.
-  Proposta: ofegação vira "＋ ofegação" recolhido por curral (só abre em dia de
-  calor) → 27 campos (+23 %). Alternativa: aceitar os 31 (só o obrigatório sobe
-  de 10 para 12, +20 %).
+- **Confinamento (v103) — contagem do diário: aceita pelo Nilo em 07/10/2026**
+  (31 campos com 5 lotes em 4 currais, +41 % sobre a v102; obrigatórios +20 %).
+  Se o gerente reclamar do tamanho do diário, a saída já estudada é recolher a
+  ofegação num "＋ ofegação" por curral (27 campos, +23 %).
 - **Confinamento (v103) — rodar `sql/060-confinamento-v103.sql` no Supabase**
   depois do 059 (recria a visão `vw_cf_diario_lote`; nenhuma tabela nova; pode
   rodar de novo). Enquanto não rodar, o app funciona igual — só a visão do
