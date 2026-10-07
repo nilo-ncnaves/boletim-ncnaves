@@ -31,7 +31,7 @@ const mocks = process.argv[4] ? JSON.parse(fs.readFileSync(process.argv[4], 'utf
 if (!base || !out) { console.error('uso: node regressao_render.cjs <url base> <pasta de saída> [mocks.json]'); process.exit(1); }
 fs.mkdirSync(out, { recursive: true });
 
-const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', f01: 'AL-4172', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
+const CODIGOS = { f23: 'VR-7061', f33: 'FM-9028', f26: 'AS-6754', f01: 'AL-4172', f22f: 'VF-6318', DIRETORIA: 'DIRETORIA-8034', ADMIN: 'ADMIN-9561' };
 const html = p => p.evaluate(() => document.querySelector('#app').innerHTML);
 const abrirDetails = p => p.evaluate(() => document.querySelectorAll('details').forEach(d => { d.open = true; }));
 const pausa = (p, ms) => p.waitForTimeout(ms || 200);
@@ -157,6 +157,24 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['20-terreiro', async p => { await preenche(p, 'input[data-pt="entradaLatas"]', '300'); }],
     /* v82: envio do registro e volta para a casa — prova do indicador de envio no pós-colheita */
     ['30-enviado', async p => { await clique(p, '#bt-enviar-pos'); const cx = await p.$('#bt-aviso-confirmar, #bt-dialogo-sim'); if (cx) { await cx.click(); await pausa(p, 300); } }],
+  ]);
+
+  /* 🐃 confinamento (v102) — casa, entrada de lote em 3 passos, tela do lote, diário e envio */
+  if (await (async () => { const c = await browser.newContext(); const p = await c.newPage(); await p.goto(base + '/index.html'); const tem = await p.evaluate(() => typeof vCasaConf === 'function'); await c.close(); return tem; })())
+  await cenario(browser, 'conf-f22f', { codigo: CODIGOS.f22f, chave: 'f22f' }, { userId: 'u5', papel: 'conf', nome: 'Gerente de Confinamento', atividade: 'CONFINAMENTO', fazendaId: 'f22f' }, [
+    ['05-regua-ontem', async p => { await clique(p, '.regua-dia >> nth=1'); }],
+    ['06-regua-hoje', async p => { await clique(p, '.regua-dia >> nth=0'); }],
+    ['10-novo-lote', async p => { await clique(p, '#bt-cf-novo'); }],
+    ['11-curral', async p => { await clique(p, '[data-cfncur="tcf03"]'); }],
+    ['12-genetica', async p => { await clique(p, '[data-cfngen="NELORE"]'); }],
+    ['13-detalhes', async p => { await preenche(p, 'input[data-cfn="cabecas"]', '120'); await preenche(p, 'input[data-cfn="peso"]', '380'); await clique(p, '[data-cfnorig="RECRIA"]'); }],
+    ['14-lote', async p => { await clique(p, '#bt-cf-criar'); }],
+    ['15-casa', async p => { await clique(p, '[data-voltar]'); }],
+    ['20-diario', async p => { await clique(p, '#bt-preencher-cf'); }],
+    ['21-linha', async p => { await preenche(p, '[data-cfl="0"] input[data-cfd="cms"]', '9,8'); await clique(p, '[data-cfsobra="0:2"]'); await clique(p, '[data-cfcur="0:SECO"]'); }],
+    ['22-morte', async p => { await clique(p, '[data-cfmorte="0"]'); await clique(p, '[data-cfcausa="0:Timpanismo"]'); await clique(p, '#bt-cf-morte-ok'); }],
+    ['30-enviado', async p => { await clique(p, '#bt-enviar-cf'); await pausa(p, 400); }],
+    ['31-detalhe', async p => { await clique(p, '#bt-preencher-cf'); }],
   ]);
 
   /* 📋 diretoria — painel, filtro por fazenda, relatório */

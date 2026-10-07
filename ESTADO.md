@@ -4,7 +4,7 @@ Fotografia atual do Boletim NCNaves. TODA tarefa que mudar
 comportamento, catálogo, chave ou versão DEVE atualizar este arquivo
 no mesmo pull request (regra no CLAUDE.md).
 
-**Versão atual: v101** (rodapé da tela inicial + cache do sw.js).
+**Versão atual: v102** (rodapé da tela inicial + cache do sw.js).
 
 ## Unidades operacionais (fazenda física + atividade)
 - ☕ Café: Água Limpa (f01), Rio Preto-Lagamar — Café (f03c),
@@ -17,6 +17,9 @@ no mesmo pull request (regra no CLAUDE.md).
 - 🐂 Pecuária: Mata Preta — Pecuária (f13p), Monte Carmelo —
   Pecuária (f14p), Água Santa (f26), Chapada (f28), Chapadão (f29),
   Confins (f30), Cra Cra (f31), Ferragem (f32), Gameleira (f34).
+- 🐃 Confinamento (v102): Vereda — Confinamento (f22f, fazenda-mãe
+  Vereda; currais Curral 1 a 6 como talhões tipo CURRAL, nomes
+  provisórios a ajustar em Cadastros › Talhões).
 
 Unidades desmembradas compartilham a fazenda-mãe (fazendaMae) no
 painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
@@ -31,8 +34,10 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   permissões (painel, cadastros). Tipos:
   - **Por unidade** (XX-NNNN, chave = id da fazenda): abre só ela e
     vai direto ao boletim.
-  - **Por atividade** (CAFE-NNNN, GRAOS-NNNN, PECU-NNNN; chaves
-    ATV:CAFE etc.): todas as unidades da atividade. Unidade criada
+  - **Por atividade** (CAFE-NNNN, GRAOS-NNNN, PECU-NNNN e, desde a
+    v102, CONF-NNNN; chaves ATV:CAFE etc.): todas as unidades da
+    atividade. O código da unidade de confinamento é VF-NNNN e abre
+    direto a casa do Gerente de Confinamento (papel "conf"). Unidade criada
     no futuro entra sozinha no escopo (calculado na hora pelo perfil
     da fazenda).
   - **Combinados de atividades** (CAFEGRAOS-NNNN, CAFEPECU-NNNN,
@@ -76,6 +81,72 @@ painel; talhões tipo ESTRUTURA aparecem em todas as unidades irmãs.
   dentro (migração automática do acesso gravado); os códigos antigos
   de DIRETORIA (LG-9351) e ADMIN (AD-4786) foram substituídos pelo
   formato novo — esses aparelhos pedem o código novo uma vez.
+
+## Confinamento (v102) — perfil próprio, lote como unidade de custo
+Pedido do Nilo em 01/10/2026, respostas às 22 perguntas do plano em
+06/10/2026 (docs/CONFINAMENTO.md). Etapa 1 + diário, numa versão só, para
+o gerente poder começar a usar: quarta atividade `CONFINAMENTO` (🐃),
+unidade Vereda — Confinamento (f22f), papel `conf` (molde do
+pós-colheita: registro diário próprio fora de `boletins`), código VF-6318
+(unidade) e CONF-4725 (atividade). Nada de café, grãos ou pecuária muda.
+- **O que o gerente faz hoje:** casa com régua de 7 dias, indicador de
+  envio e os lotes no cocho (uma linha por lote: código · genética ·
+  cabeças vivas · dia de cocho · GMD quando houver); **entrada de lote em
+  3 passos** (curral → grupo genético → detalhes; lote misto = duas
+  entradas; código CF-VER-<ano>-<nº> gerado na hora, numeração por
+  unidade e ano); **diário de 2 minutos** (clima do dia + uma linha por
+  lote: CMS do FarmTell opcional, sobra de cocho 0–4, animais na
+  enfermaria, condição do curral; "Enviar diário" fixo no rodapé, inativo
+  enquanto faltar sobra ou curral de algum lote); **morte** por "＋ morte"
+  dentro da linha do lote (causa em chips, cabeças, peso estimado — o
+  único do app), com "desfazer" no lugar (o evento fica cancelado, nunca
+  apagado); **tela do lote** com dias de cocho, cabeças vivas, mortes e
+  mortalidade, GMD (ou "sem pesagem desde a entrada", cinza) e, quando
+  houver projeção, o farol contra ela (verde ≥ 95 % do GMD-alvo, amarelo
+  85–95 %, vermelho abaixo); **diário enviado** com "Corrigir" (48 h, pelo
+  catálogo c9); **resumo WhatsApp** (🐃 CONFINAMENTO VEREDA, uma linha por
+  lote, mortes do dia, "🔎 Fora do esperado"); **CSV do lote** (uma linha
+  por evento, ";" + BOM, como os outros CSV).
+- **Onde mora o dado:** `D.cfLotes` (cf_lotes, t:"cfl"), `D.cfDiarios`
+  (cf_diario, t:"cfd", id = unidade_data, um por dia), `D.cfEventos`
+  (cf_eventos, t:"cfe"); leitura por `baixarConfinamento` só para quem tem
+  unidade de confinamento no escopo ou painel. Rascunhos em `bdf:rasccf`
+  e `bdf:cfnovo`. Os números do lote são SEMPRE calculados
+  (`cfResumoLote`), nunca gravados. A unidade, os currais e o usuário
+  "conf" chegam aos aparelhos que já tinham dados por migração leve (uma
+  vez, sem migração geral).
+- **Decisões registradas (Nilo, 06/10/2026):** fazenda = Vereda (f22);
+  sigla VER, numeração reinicia por ano, dois dígitos; gerente é outra
+  pessoa (código próprio); currais provisórios; CMS opcional, sobra e
+  curral obrigatórios; escala de sobra 0–4 do padrão de leitura de cocho;
+  saída em mais de um embarque (lote fecha com zero vivas e romaneios
+  lançados); carência de um animal trava o lote inteiro (v1); pesagem por
+  amostra vale; cortes do farol 95/85; todo mundo vê tudo (sem trava de
+  custo); origem na maioria é recria com preço estimado na avaliação de
+  entrada; acabamento 1–5, bônus R$/@; uma confirmação nova só na saída;
+  causas de morte e motivos conforme proposta; frigorífico em texto com
+  memória; ícone 🐃; CSV para qualquer pessoa.
+- **O que ficou para as próximas versões (uma por PR):** v103 pesagem,
+  transferência, sanidade com carência (trava a saída) e saída com nota;
+  v104 escritório (romaneio, fechar lote, projeção versionada), cartão da
+  Diretoria pelo `PAINEL_CARTOES`, leitura semanal de sexta; depois,
+  importação do CSV do FarmTell pela porta única. No painel, a unidade de
+  confinamento já conta em "N de M unidades enviaram hoje" pelo diário
+  (`registroDoDia`), e a aba 🐃 aparece pelo catálogo `ATIVIDADES`.
+- **Termos exclusivos:** "cabeça(s)", "cocho", "boi", "gado", "brinco",
+  "pesagem" e "embarque" deixaram de ser exclusivos da pecuária (uso
+  legítimo no confinamento); a lista do confinamento (CMS, GMD, nelore,
+  angus, FarmTell, sobra/dias de cocho…) passou a ser varrida nas telas de
+  café, grãos e pecuária.
+- **Provas:** `node scripts/teste_confinamento.cjs` → **39 ✅ · 0 ❌**
+  (a–i da tarefa, sem rede, 390 px); `scripts/checar-poluicao.cjs` ganhou
+  o grupo "21. Confinamento" e as telas do módulo (ver "Telas × padrões");
+  `scripts/regressao_render.cjs` contra o `origin/main` da v101: café,
+  grãos, pecuária, pós-colheita e Diretoria byte a byte iguais; só a
+  entrada do Administrador ganha o botão "🐃 Confinamento" e o cenário
+  novo `conf-f22f` existe só na v102. SQL: `sql/059-confinamento.sql`
+  (seis tabelas + duas visões; rodar uma vez — enquanto não rodar, o
+  módulo funciona inteiro no aparelho e o diário espera na fila).
 
 ## Seções do boletim por atividade
 Desde a v69 cada seção tem uma classificação **eventual × esperada**
@@ -2983,6 +3054,14 @@ Os PADRÕES DE TELA viraram lei da casa no CLAUDE.md (a: boletim em 3
 passos; b: P1–P10 dos cadastros; c: nada de uma atividade na tela de
 outra; d: DEFINIÇÃO DE PRONTO). A medição é de
 `scripts/checar-poluicao.cjs` (sem rede, 390 × 844 px). Medição vigente,
+v102, 06/10/2026: **844 ✅ · 43 ❌** — os mesmos 43 ❌ herdados (o `origin/main`
+da v101 mede 797 ✅ · 43 ❌ com o mesmo script, no mesmo dia), nenhum novo. A
+v102 acrescentou o grupo "21. Confinamento" (8 ✅) e as telas "Confinamento
+(f22f Vereda) — casa sem lote / com lote", "Entrada de lote (ao abrir /
+detalhes)", "Lote" e "diário (ao abrir)"; as telas de café, grãos e pecuária
+passaram a ser varridas também pelos termos do confinamento (zero achados);
+as checagens de Relatórios passaram a esperar 25 textos por unidade e a aba
+🐃 Confinamento (1), porque a unidade nova entrou no cadastro. Medição anterior,
 v100, 17/09/2026: **804 ✅ · 41 ❌** — os mesmos 41 ❌ herdados da v99, nenhum
 novo. A v100 acrescentou 1 checagem ao grupo "18. Relato de aplicação" (talhão
 em chips removíveis) e manteve a tela "Colar do WhatsApp › Conferir a aplicação"
@@ -3224,6 +3303,18 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
       campos).
   - Ocorrências e sanidade: seção REMOVIDA na v101 (o ❌ herdado do "＋"
     saiu junto).
+- 🐃 Confinamento (f22f, v102) — casa sem lote e com lote ✅ (≤ 2 telas;
+  régua de 7 dias ✅; "Preencher diário" inativo sem lote, com a próxima
+  ação ✅); Entrada de lote: ao abrir só os chips de curral ✅ · curral →
+  só genética ✅ · genética → detalhes com "Criar lote" inativo dizendo o
+  que falta, data em chips (zero input type=date) ✅ · cabeçalho fixo com
+  voltar e ação no rodapé ✅; tela do lote ✅ (números calculados, "sem
+  pesagem desde a entrada", nenhum farol vermelho sem projeção); diário
+  (ao abrir) ✅ (formulário sem seção, uma linha por lote, "Enviar diário"
+  fixo no rodapé visível sem rolar, inativo nomeando o lote e o campo que
+  faltam, ativa no lugar depois de sobra + curral); termos de
+  café/grãos/pecuária ✅ zero. Chips de sobra/curral/causa usam a classe
+  global `.chip` (pílula — o mesmo ❌ herdado de P10 de todas as telas).
 - 🏭 Pós-colheita (f23): **4 seções abertas por padrão ❌**; Secador,
   Tulha e Benefício mostram um cartão com campos ao abrir ❌ ❌ ❌;
   "Enviar registro do dia" não é fixo no rodapé ❌; termos de
@@ -3234,7 +3325,7 @@ Colunas: fechada por padrão · ao abrir só lista + ＋ · 3 passos após ＋
 ### Diretoria e Escritório (padrões b e c)
 - Painel da Diretoria: renderiza ✅ · 3,2 telas de altura com a busca
   de boletins ✅ (referência; v71: 4 botões em duas linhas, 390 px sem
-  rolar de lado ✅) · Relatórios (menu, v99, com 24 textos + 1 de grupo)
+  rolar de lado ✅) · Relatórios (menu, v99, com 24 textos + 1 de grupo; 25 desde a v102)
   1 tela ✅ · Resumo do período 1,2 telas ✅.
 - Decisão e confirmação (v72, grupo 10): boletim de café, grãos e
   pecuária e registro do pós-colheita — Enviar inativo ao abrir (cinza,
@@ -3361,6 +3452,17 @@ CSS-base) e precisa de decisão do Nilo** — até lá, tela nova usa as
 classes `cad-*` e não acrescenta raio/sombra/pílula novos.
 
 ## PENDÊNCIAS
+- **Confinamento (v102) — rodar `sql/059-confinamento.sql` no Supabase**
+  (seis tabelas + duas visões, uma vez só; pode rodar de novo sem
+  duplicar). Enquanto não rodar, o diário do gerente fica "Aguardando
+  internet (1 diário na fila)" e sobe sozinho depois. Para o Nilo conferir
+  no iPhone com o código VF-6318: casa → "＋ Entrada de lote" (curral →
+  Nelore/Angus → cabeças, peso, origem) → tela do lote → casa → "Preencher
+  diário de hoje" (sobra e curral por lote, "＋ morte") → Enviar → WhatsApp.
+  Currais "Curral 1" a "Curral 6" são provisórios (Cadastros › Talhões da
+  unidade Vereda — Confinamento). Próximas versões: v103 pesagem,
+  transferência, sanidade com carência e saída; v104 romaneio, fechamento,
+  projeção, cartão da Diretoria e leitura semanal.
 - **Relatórios em três níveis (v99) — para o Nilo testar no iPhone:**
   Diretoria › 📊 Relatórios abre com duas linhas ("📝 Textos para revisar"
   com "Devolutiva semanal · dd a dd/mm · N textos" e "📊 Números" com

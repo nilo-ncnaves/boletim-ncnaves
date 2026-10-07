@@ -412,6 +412,68 @@ AgroGestão.
 
 ---
 
+## CONFINAMENTO (perfil próprio — v102)
+
+Unidade de negócio própria (ao lado de grãos, café e pecuária de pasto),
+com perfil "Gerente de Confinamento" (`papel:"conf"`, molde do
+pós-colheita) e atividade `CONFINAMENTO` no catálogo `ATIVIDADES`
+(🐃, escolhido pelo Nilo). Unidade inicial: Vereda — Confinamento (f22f,
+fazenda-mãe Vereda, f22). Código de acesso VF-NNNN (unidade) e CONF-NNNN
+(atividade). Plano completo e decisões: docs/CONFINAMENTO.md.
+
+### Princípios de tela
+- A unidade mínima de custo é o LOTE (`CF-<sigla>-<ano>-<nº>`), nunca o
+  curral; lote misto de Nelore e cruzado Angus vira dois lotes.
+- O FarmTell Beef cuida do trato; o app registra o que ele não captura.
+  O CMS médio do dia é a única ponte: um número por lote, opcional.
+- Diário em 2 minutos: formulário (como o Clima), uma linha por lote ativo,
+  "Enviar diário" fixo no rodapé e inativo enquanto faltar sobra ou curral
+  de algum lote (c10). Mortes nunca são digitadas soltas: "＋ morte" abre o
+  evento e o número vem dele.
+- Entrada de lote em 3 passos: curral (chips) → grupo genético (chips) →
+  detalhes (data em chips dos últimos 7 dias, cabeças, peso de balança,
+  origem, fornecedor/fazenda de origem, preço de referência, GTA).
+- A tela do lote mostra só números CALCULADOS (dias de cocho, cabeças
+  vivas, mortes e mortalidade, GMD) e, com projeção, o farol contra ela.
+  Sem pesagem lê "sem pesagem desde a entrada", em cinza.
+
+### Catálogos (`CF_*` do index.html)
+| Catálogo | Valores |
+|---|---|
+| Grupo genético (`CF_GENETICA`) | Nelore · Cruzado Angus |
+| Origem (`CF_ORIGEM`) | Recria do grupo · Compra |
+| Unidade do preço (`CF_PRECO_UN`) | R$/@ · R$/kg |
+| Sobra de cocho (`CF_SOBRA`) | 0 cocho limpo · 1 restos espalhados · 2 camada fina · 3 sobra de 25 a 50 % · 4 sobra acima de 50 % |
+| Condição do curral (`CF_CURRAL_COND`) | Seco · Úmido · Lama |
+| Causas de morte (`CF_CAUSAS_MORTE`) | Timpanismo · Acidose · Pneumonia · Trauma / acidente · Clostridiose · Desconhecida · Outra |
+| Farol contra a projeção (`CF_FAROL`) | verde ≥ 95 % do GMD-alvo · amarelo 85–95 % · vermelho < 85 % · cinza sem pesagem |
+| Status do lote (`CF_STATUS`) | ativo · em saída · aguardando romaneio · fechado · cancelado |
+| Sigla do código (`CF_SIGLA_FAZENDA`) | f22 → VER (por id da fazenda-mãe, nunca por pedaço de nome) |
+
+### Diário (`cf_diario`, uma linha por lote em `payload.lotes[]`)
+Clima do dia: chuva (mm) e estresse térmico (Sim/Não). Por lote: CMS
+(kg MS/cab, opcional — "sem CMS" quando o FarmTell atrasou), sobra de
+cocho (0–4, obrigatório), animais na enfermaria (nº, vazio = 0), condição
+do curral (obrigatório), observação. Mortes do dia: eventos MORTE (causa
+em chips, cabeças, peso estimado opcional — o único peso estimado do app),
+com "desfazer" no lugar (o evento fica cancelado, nunca apagado).
+
+### Resumo WhatsApp — bloco 🐃 CONFINAMENTO <FAZENDA>
+Cabeçalho com a fazenda-mãe e a data; "Por:"; clima; uma linha 🐂 por lote
+(cabeças vivas · dia de cocho · CMS ou "sem CMS" · sobra · enfermaria ·
+curral); "⚠️ Morte <lote>: n (causa)"; "🔎 Fora do esperado:" com sobra 0
+ou 4 e GMD abaixo do alvo; observação.
+
+### Sincronização
+`cf_lotes` (t:"cfl"), `cf_diario` (t:"cfd", id = unidade_data) e
+`cf_eventos` (t:"cfe") na mesma fila offline; leitura por
+`baixarConfinamento` só para quem tem unidade de confinamento no escopo
+ou painel (sql/059). Próximas versões: pesagens, sanidade com carência
+(trava a saída), saída e romaneio, projeção versionada, leitura semanal,
+cartão da Diretoria, importação do CSV do FarmTell.
+
+---
+
 ## Cabeçalho contextual — unidade operacional e ciclo por atividade (v66)
 
 Vocabulário que o componente único `cabecalhoContexto` do index.html
@@ -1006,11 +1068,24 @@ arrendado, quimigação, buva, capim-amargoso, ferrugem-asiática,
 percevejo, cigarrinha, lagarta, mosca-branca, silo, grãos ardidos
 
 ### Pecuária
-cabeça, cabeças, cocho, bezerro, bezerra, garrote, novilha, touro,
-touros, vaca, vacas, boi, rebanho, pasto, pastos, retiro, retiros,
-IATF, bicheira, berro, desmama, brinco, sal mineral, proteinado,
-vermifugação, everminou, apartação, castração, pesagem, embarque,
-gado, aguadas, porteira, capataz, prenhes, gestação, carrapato
+bezerro, bezerra, garrote, novilha, touro,
+touros, vaca, vacas, rebanho, pasto, pastos, retiro, retiros,
+IATF, bicheira, berro, desmama, sal mineral, proteinado,
+vermifugação, everminou, apartação, castração,
+aguadas, porteira, capataz, prenhes, gestação, carrapato
+
+> v102: "cabeça", "cabeças", "cocho", "boi", "gado", "brinco", "pesagem"
+> e "embarque" saíram desta lista porque têm uso legítimo no
+> confinamento (regra do cabeçalho: só entra palavra sem uso fora da
+> própria atividade). "Curral", "enfermaria", "frigorífico" e
+> "romaneio" NÃO entram na lista do confinamento pelo mesmo motivo
+> (função "Auxiliar de curral" e "apartou p/ enfermaria" na pecuária;
+> frigorífico e romaneio na saída de gado e nas remessas).
+
+### Confinamento
+CMS, GMD, timpanismo, acidose, clostridiose, nelore, angus, FarmTell,
+sobra de cocho, dias de cocho, grupo genético, lotes no cocho,
+cabeças vivas
 
 ## Operação do Agro1 → operações do app (v96) — `ERP_OPERACOES`
 Catálogo por chave, usado SÓ para dois fins: o escopo do 🔸 "só no app"

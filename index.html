@@ -148,6 +148,11 @@ h3{font-size:.95rem;font-weight:700}
 .secao>summary .resumo.neutro,.subsec>summary .resumo.neutro{color:var(--tinta-2);font-weight:600}
 .resp-secao{margin:6px 0 10px}.resp-secao:empty{display:none}
 .subcartao{background:var(--papel);border:1px dashed var(--linha);border-radius:10px;padding:12px;margin-top:10px;position:relative}
+/* v102: números do lote do confinamento — quatro casas, rótulo embaixo, sem raio e sem sombra */
+.cf-grade{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.cf-grade>div{border:1px solid var(--linha);padding:8px 10px;min-width:0}
+.cf-grade .v{font-size:1.3rem;font-weight:700;line-height:1.2;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.cf-grade .r{font-size:.74rem;color:var(--tinta-2);margin-top:2px}
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
 .rodape{position:fixed;left:0;right:0;bottom:0;background:var(--cartao);border-top:1px solid var(--linha);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:30}
@@ -475,7 +480,8 @@ function dadosSemente(){
       {id:"u1", nome:"Gerente", papel:"gerente"},
       {id:"u2", nome:"Diretoria", papel:"proprietario"},
       {id:"u3", nome:"Escritório", papel:"admin"},
-      {id:"u4", nome:"Pós-colheita", papel:"pos"}
+      {id:"u4", nome:"Pós-colheita", papel:"pos"},
+      {id:"u5", nome:"Gerente de Confinamento", papel:"conf"}
     ],
     fazendas:[
       /* perfil decide o que o boletim mostra: CAFE, GRAOS e/ou PECUARIA.
@@ -493,6 +499,7 @@ function dadosSemente(){
       {id:"f21", nome:"São Félix — Arrendamento", municipio:"", perfil:["CAFE"]},
       {id:"f22c", nome:"Vereda — Café", municipio:"Romaria/MG", perfil:["CAFE"], fazendaMae:{id:"f22", nome:"Vereda"}},
       {id:"f22g", nome:"Vereda — Grãos", municipio:"Romaria/MG", perfil:["GRAOS"], fazendaMae:{id:"f22", nome:"Vereda"}},
+      {id:"f22f", nome:"Vereda — Confinamento", municipio:"Romaria/MG", perfil:["CONFINAMENTO"], fazendaMae:{id:"f22", nome:"Vereda"}},   /* v102 */
       {id:"f23", nome:"Vereda Romaria", municipio:"Romaria/MG", perfil:["CAFE"]},
       {id:"f24", nome:"Vereda Café 5º e 6º", municipio:"Romaria/MG", perfil:["CAFE"]},
       {id:"f20", nome:"Lagamar Café (Rodrigo)", municipio:"Coromandel/MG", perfil:["CAFE"]},
@@ -563,6 +570,10 @@ function dadosSemente(){
       {id:"t083", fazendaId:"f20", nome:"Arrendo João Xavier", area:25.0},
       {id:"t084", fazendaId:"f21", nome:"Arrendamento", area:30.0},
       {id:"t085", fazendaId:"f22c", nome:"Curral Confinamento", area:3.0},
+      /* v102: currais do confinamento (nomes provisórios — o escritório ajusta em Cadastros › Talhões) */
+      {id:"tcf01", fazendaId:"f22f", nome:"Curral 1", tipo:"CURRAL"}, {id:"tcf02", fazendaId:"f22f", nome:"Curral 2", tipo:"CURRAL"},
+      {id:"tcf03", fazendaId:"f22f", nome:"Curral 3", tipo:"CURRAL"}, {id:"tcf04", fazendaId:"f22f", nome:"Curral 4", tipo:"CURRAL"},
+      {id:"tcf05", fazendaId:"f22f", nome:"Curral 5", tipo:"CURRAL"}, {id:"tcf06", fazendaId:"f22f", nome:"Curral 6", tipo:"CURRAL"},
       {id:"t086", fazendaId:"f22c", nome:"Setor 01", area:16},
       {id:"t087", fazendaId:"f22c", nome:"Setor 02", area:23},
       {id:"t088", fazendaId:"f22c", nome:"Setor 03", area:20},
@@ -1212,6 +1223,12 @@ async function carregarTudo(){
      uma vez só, sem migração geral. Removidas em Cadastros, não voltam (D.talhoesRemovidos). */
   ["t057","t058"].forEach(id=>{ const semente=dadosSemente().talhoes.find(t=>t.id===id);
     if(semente && !(D.talhoes||[]).some(t=>t.id===id) && !((D.talhoesRemovidos||[]).includes(id))) D.talhoes.push({...semente}); });
+  /* v102: a unidade Vereda — Confinamento, os currais e o papel "conf" chegam nos aparelhos que já
+     tinham dados, uma vez só, sem migração geral (mesma regra dos talhões t057/t058 da v77). */
+  { const sem=dadosSemente();
+    sem.fazendas.filter(f=>atividadeDe0(f)==="CONFINAMENTO").forEach(f=>{ if(!(D.fazendas||[]).some(x=>x.id===f.id)) D.fazendas.push({...f}); });
+    sem.talhoes.filter(t=>t.tipo==="CURRAL").forEach(t=>{ if(!(D.talhoes||[]).some(x=>x.id===t.id) && !((D.talhoesRemovidos||[]).includes(t.id))) D.talhoes.push({...t}); });
+    sem.usuarios.forEach(u=>{ if(!(D.usuarios||[]).some(x=>x.papel===u.papel)) D.usuarios.push({...u}); }); }
   /* v86: nomes novos do de-para da ata (a remessa de insumo usa a MESMA tabela) chegam nos
      aparelhos que já guardaram a própria cópia — acrescenta só o que falta, sem mexer no que
      a pessoa ligou. A tela de Cadastros não apaga linha, então nada volta contra a vontade dela. */
@@ -1240,6 +1257,8 @@ async function carregarTudo(){
       delete rascunhoPos.secador; delete rascunhoPos.beneficio; }
     if(rascunhoPos && !rascunhoPos.tulhas) rascunhoPos.tulhas=[{lote:'',mov:'',obs:''}]; } }catch(e){}
   D.posColheitas = D.posColheitas||[];
+  try{ const rc=await Persist.get("bdf:rasccf"); if(rc) rascunhoConf=JSON.parse(rc); }catch(e){}   /* v102 */
+  try{ const cn=await Persist.get("bdf:cfnovo"); if(cn) cfNovo=JSON.parse(cn); }catch(e){}
   /* plano de safra vigente guardado no aparelho (v52) — sem cache o app é igual à v51 */
   try{ const pc=await Persist.get("bdf:plano"); planoCache=pc?(JSON.parse(pc)||{}):{}; }catch(e){ planoCache={}; }
   /* relatórios automáticos já baixados (v55) — sem rede vale o último; sem cache, nada aparece */
@@ -1268,8 +1287,8 @@ async function carregarTudo(){
   else if(sessao){
     if(sessao.papel==="admin" && !podeCadastros()) sessao=null;
     else if(sessao.papel==="proprietario" && !podePainel()) sessao=null;
-    else if((sessao.papel==="gerente"||sessao.papel==="pos") && sessao.fazendaId && !podeVer(sessao.fazendaId)) sessao=null;
-    else if(sessao.papel==="gerente" && sessao.atividade && !unidadesPermitidas().some(f=>atividadeDe(f.id)===sessao.atividade)) sessao=null;
+    else if((sessao.papel==="gerente"||sessao.papel==="pos"||sessao.papel==="conf") && sessao.fazendaId && !podeVer(sessao.fazendaId)) sessao=null;
+    else if((sessao.papel==="gerente"||sessao.papel==="conf") && sessao.atividade && !unidadesPermitidas().some(f=>atividadeDe(f.id)===sessao.atividade)) sessao=null;
   }
 }
 async function salvarDados(){ await Persist.set("bdf:dados", JSON.stringify(D)); }
@@ -1291,12 +1310,12 @@ const talhoesDa = fz => {
 const maquinasDa = fz => D.maquinas.filter(m=>(m.fazendas||[]).includes(fz));
 /* ---- Multicultura: tipo do talhão, ciclos de cultura anual e catálogos ---- */
 const TIPOS_TALHAO=[["CAFE_PERENE","Café"],["GRAO_ANUAL","Grão (anual)"],["ARRENDADO","Arrendado — sementeira"],
-  ["PASTO_PECUARIA","Pasto / pecuária"],["ESTRUTURA","Estrutura"],["INDEFINIDO","Indefinido"]];
+  ["PASTO_PECUARIA","Pasto / pecuária"],["CURRAL","Curral (confinamento)"],["ESTRUTURA","Estrutura"],["INDEFINIDO","Indefinido"]];
 const rotuloTipo = tp => { const h=TIPOS_TALHAO.find(([k])=>k===tp); return h?h[1]:"Indefinido"; };
 /* O que o boletim mostra é decidido pelo PERFIL da fazenda (CAFE, GRAOS, PECUARIA),
    nunca pelo nome do chão. O perfil vem gravado no cadastro de fazendas. */
 const PERFIS_PADRAO={ f01:["CAFE"], f03c:["CAFE"], f03g:["GRAOS"], f13c:["CAFE"], f13p:["PECUARIA"],
-  f14c:["CAFE"], f14p:["PECUARIA"], f20:["CAFE"], f21:["CAFE"], f22c:["CAFE"], f22g:["GRAOS"],
+  f14c:["CAFE"], f14p:["PECUARIA"], f20:["CAFE"], f21:["CAFE"], f22c:["CAFE"], f22g:["GRAOS"], f22f:["CONFINAMENTO"],
   f23:["CAFE"], f24:["CAFE"], f25:["CAFE"], f26:["PECUARIA"], f27:["GRAOS"], f28:["PECUARIA"],
   f29:["PECUARIA"], f30:["PECUARIA"], f31:["PECUARIA"], f32:["PECUARIA"], f33:["GRAOS"],
   f34:["PECUARIA"], f35:["GRAOS"] };
@@ -1309,11 +1328,13 @@ const maeDe = f => f.fazendaMae || {id:f.id, nome:f.nome};
 const maeIdDe = fz => { const f=fazenda(fz); return (f.fazendaMae&&f.fazendaMae.id)||f.id||fz; };
 const unidadesDaMae = maeId => D.fazendas.filter(f=>maeDe(f).id===maeId);
 const atividadeDe = fz => (perfilDe(fz)[0])||"CAFE";
-const ATIVIDADES=[["CAFE","☕","Café","var(--cereja)"],["GRAOS","🌾","Grãos","var(--amarelo)"],["PECUARIA","🐂","Pecuária","var(--terra)"]];
+const ATIVIDADES=[["CAFE","☕","Café","var(--cereja)"],["GRAOS","🌾","Grãos","var(--amarelo)"],["PECUARIA","🐂","Pecuária","var(--terra)"],["CONFINAMENTO","🐃","Confinamento","var(--terra)"]];   /* v102: 🐃 escolhido pelo Nilo */
 const rotuloAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[2]:""; };
 const emojiAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[1]:""; };
 const corAtividade = a => { const h=ATIVIDADES.find(([k])=>k===a); return h?h[3]:"var(--verde)"; };
-const ROTULO_CULT={CAFE:"Café", GRAOS:"Grãos", PECUARIA:"Pecuária"};
+const ROTULO_CULT={CAFE:"Café", GRAOS:"Grãos", PECUARIA:"Pecuária", CONFINAMENTO:"Confinamento"};
+/* atividade de uma fazenda da SEMENTE (antes de D existir) — só a migração leve usa */
+const atividadeDe0 = f => (Array.isArray(f.perfil)&&f.perfil[0])||"CAFE";
 const perfilDe = fz => { const f=fazenda(fz); return (Array.isArray(f.perfil)&&f.perfil.length)?f.perfil:(PERFIS_PADRAO[fz]||["CAFE"]); };
 const temCultura = (fz,c) => perfilDe(fz).includes(c);
 
@@ -1337,14 +1358,14 @@ const CODIGOS_PADRAO={
   f14c:"CC-6081", f14p:"CP-1739", f20:"LR-8447", f21:"SF-9426", f22c:"VC-5883",
   f22g:"VG-2496", f23:"VR-7061", f24:"VQ-3215", f25:"NC-1690",
   f26:"AS-6754", f27:"CG-5372", f28:"CH-2381", f29:"CD-8196", f30:"CF-3907",
-  f31:"CR-5240", f32:"FE-7623", f33:"FM-9028", f34:"GA-1058", f35:"PB-4519",
-  "ATV:CAFE":"CAFE-2740", "ATV:GRAOS":"GRAOS-3815", "ATV:PECUARIA":"PECU-5926",
+  f31:"CR-5240", f32:"FE-7623", f33:"FM-9028", f34:"GA-1058", f35:"PB-4519", f22f:"VF-6318",
+  "ATV:CAFE":"CAFE-2740", "ATV:GRAOS":"GRAOS-3815", "ATV:PECUARIA":"PECU-5926", "ATV:CONFINAMENTO":"CONF-4725",
   "ATV:CAFE+GRAOS":"CAFEGRAOS-4157", "ATV:CAFE+PECUARIA":"CAFEPECU-6283",
   "ATV:GRAOS+PECUARIA":"GRAOSPECU-7492",
   DIRETORIA:"DIRETORIA-8034", ADMIN:"ADMIN-9561"
 };
-const CHAVES_ATV=["ATV:CAFE","ATV:GRAOS","ATV:PECUARIA","ATV:CAFE+GRAOS","ATV:CAFE+PECUARIA","ATV:GRAOS+PECUARIA"];
-const ABREV_ATV={CAFE:"CAFE", GRAOS:"GRAOS", PECUARIA:"PECU"};
+const CHAVES_ATV=["ATV:CAFE","ATV:GRAOS","ATV:PECUARIA","ATV:CONFINAMENTO","ATV:CAFE+GRAOS","ATV:CAFE+PECUARIA","ATV:GRAOS+PECUARIA"];
+const ABREV_ATV={CAFE:"CAFE", GRAOS:"GRAOS", PECUARIA:"PECU", CONFINAMENTO:"CONF"};
 const codigoDe = chave => (((D&&D.codigosAcesso)||{})[chave] || CODIGOS_PADRAO[chave] || "");
 /* chave → escopo {ativs, unidades, tudo?, painel?, cadastros?, soLe?} (null = chave inválida) */
 function escopoDaChave(chave){
@@ -1398,7 +1419,7 @@ const ACOES_PERFIL={
   colar_whatsapp:       {pode:()=>podePainel(), visivel:()=>false},
   escritorio:           {pode:()=>podeCadastros(), visivel:()=>false},
   cadastros_painel:     {pode:()=>!!sessao && sessao.papel==="admin", visivel:()=>!!sessao && sessao.papel==="proprietario", papel:"Ação do escritório (administrador)"},
-  corrigir_boletim:     {pode:c=>!!sessao && sessao.papel==="gerente" && !!c.prazo, visivel:()=>!!sessao && sessao.papel!=="gerente", papel:"Ação do gerente (até 48 h após o envio)"},
+  corrigir_boletim:     {pode:c=>!!sessao && (sessao.papel==="gerente"||sessao.papel==="conf") && !!c.prazo, visivel:()=>!!sessao && sessao.papel!=="gerente" && sessao.papel!=="conf", papel:"Ação do gerente (até 48 h após o envio)"},
   marcar_visto:         {pode:()=>!!sessao && sessao.papel!=="gerente", visivel:()=>!!sessao && sessao.papel==="gerente", papel:"Ação da diretoria"}
 };
 function estadoAcao(id, ctx){
@@ -1457,13 +1478,13 @@ function entrarPeloAcesso(){
   if(e.soLe){ const u=D.usuarios.find(x=>x.papel==="proprietario");
     sessao={userId:u?u.id:"u2", papel:"proprietario", nome:u?u.nome:"Diretoria"};
     Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("painel"); return; }
-  const uni=unidadesPermitidas(), u=D.usuarios.find(x=>x.papel==="gerente");
-  if(uni.length===1){ const fz=uni[0].id;
-    sessao={userId:u?u.id:"u1", papel:"gerente", nome:"Gerente — "+fazenda(fz).nome, atividade:atividadeDe(fz), fazendaId:fz};
+  const uni=unidadesPermitidas();
+  if(uni.length===1){ const fz=uni[0].id, papel=papelDaAtividade(atividadeDe(fz)), u=D.usuarios.find(x=>x.papel===papel);   /* v102: o papel vem do catálogo da atividade */
+    sessao={userId:u?u.id:"u1", papel, nome:"Gerente — "+fazenda(fz).nome, atividade:atividadeDe(fz), fazendaId:fz};
     Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa"); return; }
   const ativs=[...new Set(uni.map(f=>atividadeDe(f.id)))];
-  if(ativs.length===1){
-    sessao={userId:u?u.id:"u1", papel:"gerente", nome:u?u.nome:"Gerente", atividade:ativs[0], fazendaId:null};
+  if(ativs.length===1){ const papel=papelDaAtividade(ativs[0]), u=D.usuarios.find(x=>x.papel===papel);
+    sessao={userId:u?u.id:"u1", papel, nome:u?u.nome:"Gerente", atividade:ativs[0], fazendaId:null};
     Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
   ir("entrada");
 }
@@ -1486,6 +1507,7 @@ function tipoPeloPerfil(nome, perfil){
   const n=String(nome||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   const so = (perfil&&perfil.length===1) ? perfil[0] : null;
   if(so==="PECUARIA") return /sede|represa|area geral|armazem/.test(n)?"ESTRUTURA":"PASTO_PECUARIA";
+  if(so==="CONFINAMENTO") return /sede|represa|area geral|armazem/.test(n)?"ESTRUTURA":"CURRAL";   /* v102 */
   if(so==="CAFE") return "CAFE_PERENE";
   if(so==="GRAOS") return "GRAO_ANUAL";
   if(/setor|cafe/.test(n)) return "CAFE_PERENE";
@@ -2383,7 +2405,7 @@ function farolPorUnidade(){
 const farolRodape=comRitmo=>`<p class="mut" style="font-size:.72rem;margin-top:12px">Calculado no Supabase (janelas em operacao_janela, sql/042); o app só mostra. ${farolBaixadoEm?"Baixado em "+new Date(farolBaixadoEm).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""} Vermelho só depois de a janela fechar. "Sem registro" não quer dizer que não foi feito — quer dizer que não está no boletim.${comRitmo?" Ritmo = mediana dos dias entre um registro e o anterior da mesma operação (vw_ritmo_operacoes, sql/043); só aparece com dois registros ou mais.":""}</p>`;
 function vFarois(){
   const uns=farolPorUnidade();
-  const grupos=[["GRAOS","🌾 Grãos"],["PECUARIA","🐂 Pecuária"],["CAFE","☕ Café"]].map(([k,r])=>[r,uns.filter(u=>u.atividade===k)]).filter(([,l])=>l.length);
+  const grupos=[["GRAOS","🌾 Grãos"],["PECUARIA","🐂 Pecuária"],["CONFINAMENTO","🐃 Confinamento"],["CAFE","☕ Café"]].map(([k,r])=>[r,uns.filter(u=>u.atividade===k)]).filter(([,l])=>l.length);
   const rot={vermelho:"janela fechada",amarelo:"janela aberta",verde:"em dia",cinza:"sem histórico"};
   const item=u=>`<button class="cad-item" data-farolun="${u.id}" data-nome="${esc(u.nome)}">
       <span class="farol reto ${relFarolCor(u.pior)}"></span>
@@ -3593,11 +3615,15 @@ function ir(tela, arg, manterScroll){
   telaAtual = tela;
   if(!manterScroll) window.scrollTo(0,0);
   const app = $("#app");
-  app.className = (tela!=="codigo" && sessao && sessao.papel!=="gerente" && sessao.papel!=="pos") ? "largo" : "";
+  app.className = (tela!=="codigo" && sessao && sessao.papel!=="gerente" && sessao.papel!=="pos" && sessao.papel!=="conf") ? "largo" : "";
   if(tela==="codigo") app.innerHTML = vCodigo();
   else if(tela==="entrada") app.innerHTML = vEntrada();
   else if(tela==="fazendas") app.innerHTML = vEscolheFazenda();
-  else if(tela==="casa") app.innerHTML = (sessao.papel==="gerente") ? vCasaGerente() : (sessao.papel==="pos") ? vCasaPos() : vPainel();
+  else if(tela==="casa") app.innerHTML = (sessao.papel==="gerente") ? vCasaGerente() : (sessao.papel==="pos") ? vCasaPos() : (sessao.papel==="conf") ? vCasaConf() : vPainel();
+  else if(tela==="cfform") app.innerHTML = vFormConf();          /* v102: diário do confinamento */
+  else if(tela==="cfnovo") app.innerHTML = vNovoLoteConf();      /* v102: entrada de lote (3 passos) */
+  else if(tela==="cflote") app.innerHTML = vLoteConf(arg);       /* v102: tela do lote */
+  else if(tela==="cfdetalhe") app.innerHTML = vDetalheConf(arg); /* v102: diário enviado */
   else if(tela==="formpos") app.innerHTML = vFormPos();
   else if(tela==="detalhepos") app.innerHTML = vDetalhePos(arg);
   else if(tela==="painel") app.innerHTML = vPainel();
@@ -3693,6 +3719,8 @@ function vEntrada(){
       <span><b>Grãos</b><span class="mut">Boletim dos pivôs e lavouras anuais</span></span></button>`:""}
     ${temAtv("PECUARIA")?`<button class="perfil-btn" data-atividade="PECUARIA" style="border-left:4px solid var(--terra)"><span class="ava">🐂</span>
       <span><b>Pecuária</b><span class="mut">Boletim do gado e dos pastos</span></span></button>`:""}
+    ${temAtv("CONFINAMENTO")?`<button class="perfil-btn" data-atividade="CONFINAMENTO" style="border-left:4px solid var(--terra)"><span class="ava">🐃</span>
+      <span><b>Confinamento</b><span class="mut">Diário dos lotes no cocho</span></span></button>`:""}
     ${temPos?`<button class="perfil-btn" data-perfil="pos"><span class="ava">🏭</span>
       <span><b>Terreiro / Secador / Benefício</b><span class="mut">Registro diário do pós-colheita</span></span></button>`:""}
     ${acaoOk("painel_diretoria")?`<button class="perfil-btn" data-perfil="proprietario"><span class="ava">📋</span>
@@ -3710,7 +3738,7 @@ function vEntrada(){
   </div>`;
 }
 function vEscolheFazenda(){
-  const atv=(sessao&&sessao.papel==="gerente")?(sessao.atividade||""):"";
+  const atv=(sessao&&(sessao.papel==="gerente"||sessao.papel==="conf"))?(sessao.atividade||""):"";
   const lista=unidadesPermitidas().filter(f=>!atv || atividadeDe(f.id)===atv);
   return topo(atv?emojiAtividade(atv)+" "+rotuloAtividade(atv):"Qual fazenda?", atv?"Toque na sua unidade":"Toque na sua fazenda", true)+
     (lista.map(f=>`<button class="perfil-btn" data-fazenda="${f.id}">
@@ -3809,7 +3837,8 @@ const CTX_ATIVIDADE={
      safra operacional; pecuária: sem safra). Vocabulário em docs/catalogos-por-atividade.md. */
   CAFE:{ciclo:null},
   GRAOS:{ciclo:fz=>{ const cs=[...new Set(talhoesAnuais(fz).map(t=>cicloAtivo(t.id)).filter(Boolean).map(c=>rotuloCultura(c.cultura)))]; return cs.length?"ciclo: "+cs.join(", "):""; }},
-  PECUARIA:{ciclo:null}
+  PECUARIA:{ciclo:null},
+  CONFINAMENTO:{ciclo:null}   /* v102: lote por lote na tela, nunca safra */
 };
 /* Área operacional da unidade = soma dos talhões cadastrados nela (D.talhoes por fazendaId), sem
    ESTRUTURA (sede, represa, área geral — duplicariam) e sem ARRENDADO (sementeira). 0 = sem área. */
@@ -9360,7 +9389,7 @@ const PAINEL_CARTOES={
 function vPainel(){
   const hoje=hojeISO(), tarde=new Date().getHours()>=17;
   const unidadesAtv = D.fazendas.filter(f=>!filtroPainel.atv || atividadeDe(f.id)===filtroPainel.atv);
-  const enviadasHoje = unidadesAtv.filter(f=>boletimDoDia(hoje,f.id)).length;
+  const enviadasHoje = unidadesAtv.filter(f=>registroDoDia(hoje,f.id)).length;   /* v102: boletim ou diário do confinamento */
   const i7 = indicadores(7), i30 = indicadores(30);
   return topo("Grupo LGS — Fazendas", sessao.papel==="admin"?"Administrador":"Diretoria")+`
     ${chipsAtividade("atv-filtro", filtroPainel.atv||"", {todas:"Todas"})}
@@ -9783,7 +9812,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v101";
+const APP_VERSAO="v102";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -9955,7 +9984,7 @@ function cadVFazendas(){
 function cadVFazenda(id){
   const f=D.fazendas.find(x=>x.id===id); if(!f) return cadTopo("Unidade")+`<p class="mut">Unidade não encontrada.</p>`;
   const atual=perfilDe(f.id).join(",");
-  const ops=[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"],["CAFE,GRAOS","Café + Grãos"],["CAFE,PECUARIA","Café + Pecuária"],["GRAOS,PECUARIA","Grãos + Pecuária"],["CAFE,GRAOS,PECUARIA","Café + Grãos + Pecuária"]];
+  const ops=[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"],["CONFINAMENTO","Confinamento"],["CAFE,GRAOS","Café + Grãos"],["CAFE,PECUARIA","Café + Pecuária"],["GRAOS,PECUARIA","Grãos + Pecuária"],["CAFE,GRAOS,PECUARIA","Café + Grãos + Pecuária"]];
   if(!ops.some(([k])=>k===atual)) ops.push([atual, perfilDe(f.id).map(c=>ROTULO_CULT[c]||c).join(" + ")]);
   const irmas=D.fazendas.filter(x=>x.id!==f.id && maeDe(x).id===maeDe(f).id);
   const nt=D.talhoes.filter(t=>t.fazendaId===f.id).length;
@@ -9977,7 +10006,7 @@ function cadVFazenda(id){
     ${cadMais(`<p class="mut" style="font-size:.78rem">Id interno: <b class="num">${esc(f.id)}</b>${f.fazendaMae?" · fazenda-mãe "+esc(f.fazendaMae.id):""}. Ids antigos (FZ_LEGADO) continuam aceitos na leitura dos boletins.</p>`)}
     ${cadZona(`
       <p><b>Desmembrar</b> — cria uma unidade irmã desta fazenda física, para outra atividade (cada turma preenche o seu boletim).</p>
-      ${cadSelect("Atividade da nova unidade","novaAtv",[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"]],"")}
+      ${cadSelect("Atividade da nova unidade","novaAtv",[["CAFE","Café"],["GRAOS","Grãos"],["PECUARIA","Pecuária"],["CONFINAMENTO","Confinamento"]],"")}
       <div class="mt">${cadConfirmar("desmembrar:"+f.id,"Criar unidade irmã","Criar a unidade irmã com a atividade escolhida acima?")}</div>
       ${irmas.length?`<p class="mt"><b>Unificar</b> — passa os talhões desta unidade para uma irmã e deixa esta inativa. Os boletins antigos continuam abrindo.</p>
       ${cadSelect("Unificar com","alvoUnif",irmas.map(x=>[x.id,x.nome]),irmas[0].id)}
@@ -10389,7 +10418,7 @@ function cadOk(chave){
   if(tipo==="enc-ciclo"){ const c=(D.ciclos||[]).find(x=>x.id===resto); if(c){ c.encerradoEm=hojeISO(); salvarDados(); } cadSalvo("ciclo:"+(c?c.talhaoId:""),"Colheita encerrada"); cadVoltar(); return; }
   if(tipo==="novo-cod"){ const novo=gerarNovoCodigo(resto); cadUI.form={novoCodigo:novo}; cadUI.zona=false; cadSalvo("","Novo código gerado"); cadRender(); return; }
   if(tipo==="desmembrar"){ const f=D.fazendas.find(x=>x.id===resto), atv=cadVal("novaAtv"); if(!f||!atv){ cadUI.msg="Escolha a atividade da nova unidade."; cadUI.zona=true; cadRender(); return; }
-    const mae=maeDe(f); const base=(mae.id||f.id).replace(/[cgp]$/,""); let novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p"}[atv]); let n=2; while(D.fazendas.some(x=>x.id===novoId)) novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p"}[atv])+(n++);
+    const mae=maeDe(f); const base=(mae.id||f.id).replace(/[cgp]$/,""); let novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p",CONFINAMENTO:"f"}[atv]); let n=2; while(D.fazendas.some(x=>x.id===novoId)) novoId=base+({CAFE:"c",GRAOS:"g",PECUARIA:"p",CONFINAMENTO:"f"}[atv])+(n++);
     const nova={id:novoId, nome:mae.nome+" — "+ROTULO_CULT[atv], municipio:f.municipio||"", perfil:[atv], fazendaMae:{id:mae.id, nome:mae.nome}, entidade:f.entidade||""};
     if(!f.fazendaMae) f.fazendaMae={id:mae.id, nome:mae.nome};
     D.fazendas.push(nova); salvarDados(); cadSalvo("fazenda:"+novoId,"Unidade irmã criada"); cadNav.pop(); cadNav.push({v:"fazenda",id:novoId}); ir("cadastros"); return; }
@@ -11879,6 +11908,25 @@ async function syncEnviar(){
       if(!reg) continue;
       corpo={ id:reg.id, ini:reg.ini, payload:reg };
       conflito="id";
+    }else if(item.t==="cfl"){
+      /* v102: lote do confinamento (sql/059). Colunas soltas para consulta; o lote inteiro em payload. */
+      col="cf_lotes"; reg=cfLotes().find(x=>x.id===item.id); if(!reg) continue;
+      corpo={ id:reg.id, unidade_id:reg.unidadeId, ano:n0(reg.ano), seq:n0(reg.seq), curral_id:reg.curralId||null, grupo_genetico:reg.genetica||null,
+        entrada_data:reg.entradaData, cabecas_entrada:n0(reg.cabecasEntrada), peso_entrada_kg:n0(reg.pesoEntradaKg), origem:reg.origem||null,
+        status:reg.status||"ATIVO", payload:reg };
+      conflito="id";
+    }else if(item.t==="cfd"){
+      /* v102: diário do confinamento — um por unidade e dia (id = unidade_data) */
+      col="cf_diario"; reg=cfDiarios().find(x=>x.id===item.id); if(!reg) continue;
+      corpo={ id:reg.id, unidade_id:reg.unidadeId, data:reg.data, responsavel:reg.responsavel||"",
+        chuva_mm:(reg.chuvaMm===""||reg.chuvaMm==null)?null:n0(reg.chuvaMm), estresse_termico:reg.estresse==="Sim"?true:reg.estresse==="Não"?false:null, payload:reg };
+      conflito="id";
+    }else if(item.t==="cfe"){
+      /* v102: evento do lote (hoje só MORTE; transferência e leitura semanal entram nas próximas versões) */
+      col="cf_eventos"; reg=cfEventos().find(x=>x.id===item.id); if(!reg) continue;
+      corpo={ id:reg.id, unidade_id:reg.unidadeId, lote_id:reg.loteId, data:reg.data, tipo:reg.tipo, cabecas:n0(reg.cabecas)||null, causa:reg.causa||null,
+        peso_estimado_kg:(reg.pesoEstimadoKg===""||reg.pesoEstimadoKg==null)?null:n0(reg.pesoEstimadoKg), cancelado:!!reg.cancelado, payload:reg };
+      conflito="id";
     }else if(item.t==="pec"){
       /* espelho da pecuária do boletim em tabela própria (ERP/consultas);
          o payload completo do boletim continua indo para "boletins" */
@@ -11899,7 +11947,7 @@ async function syncEnviar(){
         body:JSON.stringify([corpo])});
       /* v82: o recibo do banco fica gravado no proprio registro. Antes, "enviado" era so
          "gravado no aparelho" — e um erro de rede passava batido (ver diagnostico de 11/09). */
-      if(r.ok){ if(reg && (item.t==="b"||item.t==="p")){ reg.sincEm=new Date().toISOString(); mudou=true; } }
+      if(r.ok){ if(reg && (item.t==="b"||item.t==="p"||item.t==="cfd")){ reg.sincEm=new Date().toISOString(); mudou=true; } }
       else { item.http=r.status; item.tent=(item.tent||0)+1; resto.push(item); }
     }catch(e){ item.http=0; item.tent=(item.tent||0)+1; resto.push(item); }
   }
@@ -11915,6 +11963,7 @@ async function syncBaixar(){
   const idsFz = soFz ? soFz.concat(Object.keys(FZ_LEGADO).filter(k=>soFz.includes(FZ_LEGADO[k]))) : null;
   await baixarPlanejamento();
   await baixarInsumos();
+  await baixarConfinamento();   /* v102 */
   for(const [col,alvo] of [["boletins","boletins"],["pos_colheitas","posColheitas"],["remessas","remessas"],["telemetria","telemetria"]]){
     try{
       /* v82: `atualizado` = hora em que a linha entrou no banco. É o "recebido HH:MM" do monitor de
@@ -12018,6 +12067,32 @@ async function baixarInsumos(){
   if(ok) await salvarDados();
   return ok;
 }
+/* v102: confinamento (sql/059). Lê só quem tem unidade de confinamento no escopo ou painel; aparelho de
+   escopo limitado recebe só as linhas das próprias unidades. Edição local ainda na fila vence. */
+async function baixarConfinamento(){
+  if(!syncAtivo()) return false;
+  const e=escopoAtual(); if(!e) return false;
+  const uns=unidadesPermitidas().filter(f=>atividadeDe(f.id)==="CONFINAMENTO").map(f=>f.id);
+  if(!e.tudo && !uns.length) return false;
+  let ok=false;
+  for(const [col,alvo] of [["cf_lotes","cfLotes"],["cf_diario","cfDiarios"],["cf_eventos","cfEventos"],["cf_pesagens","cfPesagens"],["cf_sanidade","cfSanidade"],["cf_saidas","cfSaidas"]]){
+    try{
+      let url=syncCfg.url+"/rest/v1/"+col+"?select=payload,atualizado&limit=3000";
+      if(!e.tudo) url+="&unidade_id=in.("+uns.join(",")+")";
+      const r=await fetch(url,{ headers:{ "apikey":syncCfg.chave, "Authorization":"Bearer "+syncCfg.chave } });
+      if(!r.ok) continue;
+      const linhas=await r.json(); if(!Array.isArray(linhas)) continue;
+      ok=true;
+      const lista=D[alvo]=D[alvo]||[];
+      linhas.forEach(l=>{ const o=l.payload; if(!o||!o.id) return;
+        if(l.atualizado) o.recebidoEm=l.atualizado;
+        if(syncFila.some(x=>x.id===o.id)) return;
+        const i=lista.findIndex(x=>x.id===o.id); if(i>=0) lista[i]=o; else lista.push(o); });
+    }catch(e2){}
+  }
+  if(ok) await salvarDados();
+  return ok;
+}
 /* Códigos de acesso atuais (tabela codigos_acesso). Sem internet vale o que o
    aparelho já tem (CODIGOS_PADRAO + últimos baixados). */
 async function baixarCodigos(){
@@ -12043,7 +12118,7 @@ async function syncTudo(){
   insFotoRemessas();                     /* v86: foto do aplicado dentro da remessa, para o relatório mensal (sql/056) */
   /* v82: a fila esvaziou (ou emperrou) enquanto o gerente olhava a casa? o indicador de envio troca
      sozinho, no lugar — o formulário nunca é redesenhado, para não tirar o foco de quem digita. */
-  if(filaAntes!==syncFila.length && sessao && (sessao.papel==="gerente"||sessao.papel==="pos") && telaAtual==="casa")
+  if(filaAntes!==syncFila.length && sessao && (sessao.papel==="gerente"||sessao.papel==="pos"||sessao.papel==="conf") && telaAtual==="casa")
     ir("casa", null, true);
   /* v91: com a ação rápida "⋯" de uma tarefa aberta, a tela de Planejamento NÃO é redesenhada pela sincronização —
      era isto que fazia a tarefa "sumir" um segundo depois de "Concluí" (a lista inteira voltava reordenada pelo
@@ -12086,8 +12161,8 @@ function faixaEnvio(fz, o){
   /* `t` é chave substituta, não condicional por atividade: "b" = boletim, "p" = pós-colheita.
      O vocabulário ("boletim" / "registro") vem de quem chama, como na régua de 7 dias (c11). */
   const t = (o&&o.t)||"b", rot = (o&&o.rotulo)||"boletim";
-  const b = t==="p" ? posDoDia(hojeBRT(), fz) : boletimDoDia(hojeBRT(), fz);
-  const fila = syncFila.filter(x=>x.t==="b" || x.t==="p");
+  const b = t==="p" ? posDoDia(hojeBRT(), fz) : t==="cfd" ? cfDiarioDoDia(hojeBRT(), fz) : boletimDoDia(hojeBRT(), fz);   /* v102: "cfd" = diário do confinamento */
+  const fila = syncFila.filter(x=>x.t==="b" || x.t==="p" || x.t==="cfd");
   const meu = b ? naFila(t, b.id) : null;
   if(!b && !fila.length) return "";
   const nb = fila.filter(x=>x.t===t).length;
@@ -12299,6 +12374,433 @@ function abrirWhatsPos(id){
   const a=document.createElement("a"); a.href="https://wa.me/?text="+encodeURIComponent(txt);
   a.target="_blank"; a.rel="noopener"; a.click();
 }
+/* ======================================================================
+   CONFINAMENTO (v102) — perfil próprio "Gerente de Confinamento"
+   ----------------------------------------------------------------------
+   Quarta atividade do app (ATIVIDADES: CONFINAMENTO), unidade de negócio
+   própria na controladoria, ao lado de Grãos, Café e Pecuária de pasto.
+   A unidade mínima de custo é o LOTE (CF-<sigla>-<ano>-<nº>), não o
+   curral: lote misto de Nelore e cruzado Angus vira dois lotes.
+   O molde do perfil é o pós-colheita (papel "pos"): registro diário
+   PRÓPRIO fora da tabela boletins (cf_diario), casa própria, rascunho
+   próprio, item próprio na fila offline — e os MESMOS componentes das
+   outras telas (cabecalhoContexto, reguaDias, faixaEnvio, htmlEstado,
+   botaoAvanco, avisoInline). Nada de uma atividade aparece na tela de
+   outra (regra c): o gerente de café, grãos e pecuária não vê nada disto.
+   O FarmTell Beef cuida do trato (dieta, leitura de cocho, kg MS por
+   curral); o app registra o que ele não captura: eventos do lote,
+   pesagens, sanidade, condições do dia e a leitura do gerente. O CMS
+   médio do dia é a única ponte: um número por lote, copiado do FarmTell.
+   Onde mora o dado: D.cfLotes (cf_lotes, t:"cfl"), D.cfDiarios
+   (cf_diario, t:"cfd"), D.cfEventos (cf_eventos, t:"cfe"); desde a v104,
+   D.cfPesagens, D.cfSanidade e D.cfSaidas. Tudo com id gerado no
+   aparelho, upsert por id, nada apagado (cancelar é status/flag).
+   Vocabulário: a tela relata REGISTRO — "sem pesagem desde a entrada",
+   "sem CMS" — nunca "não fez", "pendente", "atrasado".
+   Plano completo e decisões do Nilo: docs/CONFINAMENTO.md.
+   ====================================================================== */
+const CF_SIGLA_FAZENDA={f22:"VER"};   /* sigla no código do lote, por id da fazenda-mãe (nunca por pedaço de nome) */
+const CF_GENETICA=[["NELORE","Nelore"],["CRUZADO_ANGUS","Cruzado Angus"]];
+const CF_ORIGEM=[["RECRIA","Recria do grupo"],["COMPRA","Compra"]];
+const CF_PRECO_UN=[["ARROBA","R$/@"],["KG","R$/kg"]];
+/* escore de sobra de cocho 0–4 (padrão de leitura de cocho usado em confinamento: 0 = cocho limpo … 4 = mais da
+   metade do trato sobrou). O número é o que o gerente marca; o rótulo é só legenda. */
+const CF_SOBRA=[["0","cocho limpo"],["1","restos espalhados"],["2","camada fina"],["3","sobra de 25 a 50 %"],["4","sobra acima de 50 %"]];
+const CF_CURRAL_COND=[["SECO","Seco"],["UMIDO","Úmido"],["LAMA","Lama"]];
+const CF_CAUSAS_MORTE=["Timpanismo","Acidose","Pneumonia","Trauma / acidente","Clostridiose","Desconhecida","Outra"];
+/* farol contra a projeção: verde a partir de 95 % do GMD-alvo, amarelo de 85 a 95 %, vermelho abaixo; cinza sem pesagem */
+const CF_FAROL={verde:0.95, amarelo:0.85};
+const CF_FAROL_CSS={verde:"ok", amarelo:"espera", vermelho:"critico", cinza:"vazio"};
+const CF_STATUS={ATIVO:"ativo", EM_SAIDA:"em saída", AGUARDANDO_ROMANEIO:"aguardando romaneio", FECHADO:"fechado", CANCELADO:"cancelado"};
+let rascunhoConf=null, cfNovo=null, envioRecenteConf=null, cfUI={morte:null, ultimaMorte:null, flash:""};
+const cfLotes=()=>(D.cfLotes=D.cfLotes||[]);
+const cfDiarios=()=>(D.cfDiarios=D.cfDiarios||[]);
+const cfEventos=()=>(D.cfEventos=D.cfEventos||[]);
+const cfPesagens=()=>(D.cfPesagens=D.cfPesagens||[]);
+const cfLote=id=>cfLotes().find(l=>l.id===id);
+const cfLotesDa=fz=>cfLotes().filter(l=>l.unidadeId===fz && l.status!=="CANCELADO").sort((a,b)=>a.id<b.id?-1:1);
+const cfLotesAtivos=fz=>cfLotesDa(fz).filter(l=>l.status!=="FECHADO");
+const cfDiarioDoDia=(data,fz)=>cfDiarios().find(d=>d.data===data && d.unidadeId===fz);
+const cfCurrais=fz=>talhoesDa(fz).filter(t=>t.tipo==="CURRAL" && t.fazendaId===fz);
+const cfCurralNome=id=>{ const t=(D.talhoes||[]).find(x=>x.id===id); return t?t.nome:(id||""); };
+const cfRot=(lista,k)=>{ const h=lista.find(([a])=>a===k); return h?h[1]:(k||""); };
+const cfMortesDia=(loteId,data)=>cfEventos().filter(e=>e.tipo==="MORTE" && e.loteId===loteId && e.data===data && !e.cancelado);
+const diasEntreISO=(a,b)=>Math.round((new Date(String(b).slice(0,10)+"T12:00:00")-new Date(String(a).slice(0,10)+"T12:00:00"))/864e5);
+const fmtKg=v=>n0(v).toLocaleString("pt-BR",{maximumFractionDigits:1});   /* aceita "9,8" digitado */
+const fmtGmd=v=>Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct=v=>Number(v).toLocaleString("pt-BR",{maximumFractionDigits:1});
+/* o papel do gerente é decidido pelo catálogo da atividade, nunca por `if` na tela */
+const PAPEL_ATIVIDADE={CONFINAMENTO:"conf"};
+const papelDaAtividade=a=>PAPEL_ATIVIDADE[a]||"gerente";
+/* registro do dia de uma unidade, seja boletim ou diário do confinamento (o painel conta os dois) */
+const registroDoDia=(data,fz)=>boletimDoDia(data,fz)||cfDiarioDoDia(data,fz);
+
+/* ---- números do lote, SEMPRE calculados, nunca gravados ---- */
+function cfResumoLote(l, dia){
+  dia=dia||hojeBRT();
+  const evs=cfEventos().filter(e=>e.loteId===l.id && !e.cancelado && e.data<=dia);
+  const mortes=evs.filter(e=>e.tipo==="MORTE").reduce((s,e)=>s+(n0(e.cabecas)||1),0);
+  const saidas=((D.cfSaidas||[]).filter(s=>s.loteId===l.id && !s.cancelado && s.data<=dia)).reduce((s,x)=>s+n0(x.cabecas),0);
+  const vivas=Math.max(0, n0(l.cabecasEntrada)-mortes-saidas);
+  const dias=Math.max(0, diasEntreISO(l.entradaData, dia));
+  const mort=n0(l.cabecasEntrada)?mortes/n0(l.cabecasEntrada)*100:0;
+  const pes=cfPesagens().filter(p=>p.loteId===l.id && !p.cancelado && p.data<=dia).sort((a,b)=>a.data<b.data?-1:1);
+  const ult=pes.length?pes[pes.length-1]:null, ant=pes.length>1?pes[pes.length-2]:null;
+  const gmdDe=(p0,d0,p1,d1)=>{ const n=diasEntreISO(d0,d1); return n>0?(n0(p1)-n0(p0))/n:null; };
+  const gmd=ult?gmdDe(l.pesoEntradaKg,l.entradaData,ult.pesoMedioKg,ult.data):null;
+  const gmdUlt=ult?(ant?gmdDe(ant.pesoMedioKg,ant.data,ult.pesoMedioKg,ult.data):gmd):null;
+  const proj=l.projecao||null;
+  let farol="cinza";
+  if(gmd!=null && proj && n0(proj.gmdAlvo)>0){ const r=gmd/n0(proj.gmdAlvo); farol=r>=CF_FAROL.verde?"verde":r>=CF_FAROL.amarelo?"amarelo":"vermelho"; }
+  return {mortes, saidas, vivas, dias, mort, gmd, gmdUlt, ultPesagem:ult, proj, farol};
+}
+/* código do lote: CF-<sigla da fazenda-mãe>-<ano>-<nº>, numeração por unidade e ano */
+function cfProximoCodigo(fz, ano){
+  const mae=maeDe(fazenda(fz)); const sigla=CF_SIGLA_FAZENDA[mae.id]||String(mae.id||fz).toUpperCase();
+  const seq=cfLotes().filter(l=>l.unidadeId===fz && n0(l.ano)===n0(ano)).reduce((m,l)=>Math.max(m,n0(l.seq)),0)+1;
+  return {id:"CF-"+sigla+"-"+ano+"-"+String(seq).padStart(2,"0"), sigla, seq};
+}
+const cfLinhaLote=l=>{ const r=cfResumoLote(l);
+  return `<li><button class="linha-flex" style="width:100%;text-align:left" data-cflote="${esc(l.id)}">
+    <span class="farol reto ${CF_FAROL_CSS[r.farol]}"></span>
+    <span class="cresce"><b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${r.vivas}</span> cab · dia <span class="num">${r.dias}</span>${r.gmd!=null?` · GMD <span class="num">${fmtGmd(r.gmd)}</span>`:""}</span></span>
+    <span class="mut">›</span></button></li>`; };
+const cfResumo1linha=d=>{ const n=(d.lotes||[]).length, m=(d.lotes||[]).reduce((s,x)=>s+cfMortesDia(x.loteId,d.data).reduce((a,e)=>a+(n0(e.cabecas)||1),0),0);
+  return n+" lote"+(n===1?"":"s")+(m?" · "+m+" morte"+(m>1?"s":""):""); };
+
+/* ---------- Tela: casa do gerente de confinamento ---------- */
+function vCasaConf(){
+  const fz=sessao.fazendaId, hoje=hojeBRT(), dia=diaRegua(fz), d=cfDiarioDoDia(hoje,fz);
+  const dDia = dia===hoje ? d : cfDiarioDoDia(dia,fz);
+  const rec = envioRecenteConf && d && d.id===envioRecenteConf ? d.id : null;
+  const lotes=cfLotesAtivos(fz);
+  const temRasc = rascunhoConf && !rascunhoConf.id && rascunhoConf.unidadeId===fz && rascunhoConf.data===hoje;
+  const ult=cfDiarios().filter(x=>x.unidadeId===fz).sort((a,b)=>a.data<b.data?1:-1).slice(0,5);
+  return cabecalhoContexto(fz,{sub:"Gerente de confinamento"})
+    +`<div style="height:3px;background:${corAtividade("CONFINAMENTO")};margin:-14px -14px 14px"></div>`
+    +reguaDias(fz, dia)
+    +faixaEnvio(fz,{t:"cfd", rotulo:"diário"})
+    +`
+    ${rec?`<div class="cartao" style="border-color:var(--verde)"><h2>${naFila("cfd",rec)?"📝 Diário guardado":"✅ Diário enviado!"}</h2>
+      <p class="mut">${naFila("cfd",rec)?"Está no aparelho e sobe sozinho quando o sinal voltar. ":""}Um toque e o resumo vai pro grupo.</p>
+      <button class="btn mt" data-zapcf="${esc(rec)}">📲 Mandar resumo no WhatsApp</button></div>`:""}
+    ${dia===hoje?`<div class="cartao"><div class="linha-flex"><span class="farol ${d?"ok":(new Date().getHours()>=17?"espera":"vazio")}"></span>
+      <div class="cresce"><h2>${d?(naFila("cfd",d.id)?"Diário de hoje guardado no aparelho":"Diário de hoje enviado"):"Diário de hoje por enviar"}</h2>
+      <p class="mut">${d?(naFila("cfd",d.id)?"Sobe sozinho quando o sinal voltar":"Enviado às "+esc(horaEnvio(d))+(d.editadoEm?" · corrigido":"")):"Uma linha por lote — dois minutos no fim do dia"}</p></div></div></div>`
+    :cartaoDiaRegua({dia, reg:dDia, que:"diário registrado", unidade:fz, rotulo:"Diário", attr:"data-vercf", sub:dDia?esc([dDia.responsavel||"",cfResumo1linha(dDia)].filter(Boolean).join(" · ")):""})}
+    ${botaoAvanco("bt-preencher-cf",{rotulo: d?"Ver / corrigir diário de hoje":(temRasc?"Continuar diário de hoje":"Preencher diário de hoje"),
+        falta:(!d && !lotes.length)?"Registre a entrada do primeiro lote":""})}
+    ${temRasc?`<div class="aviso mt">📝 Diário de hoje guardado como rascunho neste aparelho. Ele não se perde sem internet.</div>`:""}
+    <div class="cartao mt"><h3>Lotes no cocho</h3>
+      <ul class="lista-limpa">${lotes.map(cfLinhaLote).join("")||htmlEstado("vazio",{que:"lote ativo",unidade:fz,dica:"Registre a entrada do primeiro lote."},{tag:"li"})}</ul>
+      <button class="btn suave mini mt" id="bt-cf-novo">＋ Entrada de lote</button></div>
+    <div class="cartao mt"><h3>Últimos diários</h3>
+      <ul class="lista-limpa">${ult.map(x=>`<li><button class="linha-flex" style="width:100%;text-align:left" data-vercf="${esc(x.id)}">
+        <span class="farol ok"></span><span class="cresce"><b>${fmtData(x.data)}</b> <span class="mut">· ${esc(cfResumo1linha(x))}</span></span>
+        <span class="mut">›</span></button></li>`).join("")||htmlEstado("vazio",{que:"diário registrado",unidade:fz,dica:"Os diários aparecem aqui depois do primeiro envio."},{tag:"li"})}</ul></div>
+    <button class="btn sec mt" id="bt-trocar-faz">Trocar de fazenda</button>
+    <button class="btn sec mt" id="bt-sair">Sair</button>`;
+}
+
+/* ---------- Diário de 2 minutos: uma linha por lote ---------- */
+function novoRascunhoConf(fz){
+  return { id:null, data:hojeBRT(), unidadeId:fz,
+    responsavel:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)?nomeRespLembrado:"",
+    chuvaMm:"", estresse:"", obs:"", lotes:[] };
+}
+/* uma linha por lote ATIVO: lote novo entra, lote fechado sai, o que já foi marcado fica */
+function cfSincronizarLinhas(r){
+  const ativos=cfLotesAtivos(r.unidadeId);
+  const antigas=r.lotes||[];
+  r.lotes=ativos.map(l=>antigas.find(x=>x.loteId===l.id)||{loteId:l.id, cms:"", sobra:"", enfermaria:"", curral:"", obs:""});
+  return r;
+}
+function salvarRascConf(){ if(rascunhoConf) Persist.set("bdf:rasccf", JSON.stringify(rascunhoConf)); else Persist.del("bdf:rasccf");
+  if(rascunhoConf) atualizarAvanco("bt-enviar-cf", faltaEnvioConf(rascunhoConf)); }
+/* pré-condição VISÍVEL do envio (c10): sobra e curral marcados em todo lote; CMS é opcional (o FarmTell pode atrasar) */
+function faltaEnvioConf(r){
+  if(!r) return "";
+  if(!(r.lotes||[]).length) return "Registre a entrada do primeiro lote";
+  for(const x of r.lotes){
+    if(x.sobra==="") return "Marque a sobra de cocho do lote "+x.loteId;
+    if(x.curral==="") return "Marque o curral do lote "+x.loteId;
+  }
+  return "";
+}
+const cfOntemLinha=(fz,data,loteId)=>{ const ant=cfDiarios().filter(d=>d.unidadeId===fz && d.data<data).sort((a,b)=>a.data<b.data?1:-1)[0];
+  return ant?(ant.lotes||[]).find(x=>x.loteId===loteId):null; };
+function vFormConf(){
+  const r=rascunhoConf, fz=r.unidadeId;
+  const chip=(attr,v,rot,on)=>`<button class="chip ${on?"on":""}" data-${attr}="${esc(v)}">${rot}</button>`;
+  return topo(maeDe(fazenda(fz)).nome+" — "+fmtData(r.data),"Diário do confinamento · salvo automaticamente",true)+`
+  <p class="mut mb" style="font-size:.8rem">⏱️ Dois minutos: uma linha por lote. O CMS vem do FarmTell — se ainda não saiu, deixe em branco.</p>
+  <div class="cartao" style="padding:10px 14px"><label>Quem está preenchendo</label>
+    <input data-cfr="responsavel" value="${esc(r.responsavel||"")}" placeholder="Seu nome"></div>
+  <div class="cartao"><h3>🌤️ Dia</h3>
+    <div class="grade2"><div><label>Chuva (mm)</label><input inputmode="decimal" data-cfr="chuvaMm" value="${esc(r.chuvaMm)}" placeholder="0"></div>
+      <div><label>Estresse térmico</label><div class="chips" data-cfgrupo="estresse">${chip("cfest","Sim","Sim",r.estresse==="Sim")}${chip("cfest","Não","Não",r.estresse==="Não")}</div></div></div></div>
+  <p class="mut" style="font-size:.76rem">Sobra de cocho: ${CF_SOBRA.map(([k,rot])=>k+" "+rot).join(" · ")}.</p>
+  ${r.lotes.map((x,i)=>{ const l=cfLote(x.loteId); if(!l) return ""; const res=cfResumoLote(l,r.data), ont=cfOntemLinha(fz,r.data,l.id), mortes=cfMortesDia(l.id,r.data), m=cfUI.morte&&cfUI.morte.i===i?cfUI.morte:null;
+    return `<div class="subcartao" data-cfl="${i}">
+      <b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${res.vivas}</span> cab · dia <span class="num">${res.dias}</span> · ${esc(cfCurralNome(l.curralId))}</span>
+      <div class="grade2 mt">
+        <div><label>CMS (kg MS/cab)</label><input inputmode="decimal" data-cfd="cms" value="${esc(x.cms)}" placeholder="${ont&&ont.cms!==""?"ontem "+esc(fmtKg(ont.cms)):"do FarmTell"}"></div>
+        <div><label>Na enfermaria (nº)</label><input inputmode="numeric" data-cfd="enfermaria" value="${esc(x.enfermaria)}" placeholder="0"></div>
+      </div>
+      <label class="mt">Sobra de cocho</label>
+      <div class="chips" data-cfgrupo="sobra">${CF_SOBRA.map(([k,rot])=>`<button class="chip ${x.sobra===k?"on":""}" data-cfsobra="${i}:${k}" title="${esc(rot)}" aria-label="${k} — ${esc(rot)}">${k}</button>`).join("")}</div>
+      <label class="mt">Curral</label>
+      <div class="chips" data-cfgrupo="curral">${CF_CURRAL_COND.map(([k,rot])=>`<button class="chip ${x.curral===k?"on":""}" data-cfcur="${i}:${k}">${rot}</button>`).join("")}</div>
+      ${mortes.map(e=>`<p class="mt" style="margin-bottom:0">⚠️ Morte · ${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${cfUI.ultimaMorte===e.id?` <button class="btn suave mini" data-cfdesfazer="${esc(e.id)}" style="display:inline-flex;min-height:32px;padding:0 10px">desfazer</button>`:""}</p>`).join("")}
+      ${m?`<div class="subcartao" id="cf-morte-box"><label>Causa provável</label>
+        <div class="chips">${CF_CAUSAS_MORTE.map(c=>`<button class="chip ${m.causa===c?"on":""}" data-cfcausa="${i}:${esc(c)}">${esc(c)}</button>`).join("")}</div>
+        <div class="grade2 mt"><div><label>Cabeças</label><input inputmode="numeric" data-cfm="cabecas" value="${esc(m.cabecas)}"></div>
+          <div><label>Peso estimado (kg)</label><input inputmode="decimal" data-cfm="peso" value="${esc(m.peso)}" placeholder="opcional"></div></div>
+        <div class="linha-flex mt"><button class="btn sec mini" id="bt-cf-morte-cancelar">Cancelar</button>${botaoAvanco("bt-cf-morte-ok",{rotulo:"Registrar morte", classe:"btn mini", falta:m.causa?"":"Escolha a causa provável"})}</div></div>`
+      :`<div class="linha-flex mt"><span class="cresce mut">${mortes.length?"":"Sem morte registrada hoje"}</span><button class="btn suave mini" data-cfmorte="${i}">＋ morte</button></div>`}
+      <label class="mt">Observação do lote</label><input data-cfd="obs" value="${esc(x.obs||"")}" placeholder="Opcional">
+    </div>`; }).join("")||htmlEstado("vazio",{que:"lote ativo",unidade:fz,dica:"Registre a entrada do primeiro lote."},{classe:"mut"})}
+  <div class="cartao mt"><label>Observação do dia</label><textarea data-cfr="obs" rows="2" placeholder="Opcional">${esc(r.obs||"")}</textarea></div>
+  ${cadRodape(botaoAvanco("bt-enviar-cf",{rotulo:"Enviar diário", falta:faltaEnvioConf(r)}))}`;
+}
+function validarEnviarConf(){
+  const r=rascunhoConf; if(!r) return;
+  const falta=faltaEnvioConf(r); if(falta){ atualizarAvanco("bt-enviar-cf", falta); return; }
+  const lista=cfDiarios();
+  const dup=lista.find(d=>d.data===r.data && d.unidadeId===r.unidadeId && d.id!==r.id);
+  if(dup){ avisoInline("#bt-enviar-cf", "Já existe diário de "+fmtData(r.data)+" nesta unidade. Abra-o na casa para corrigir."); return; }
+  const agora=hojeISO()+" "+new Date().toTimeString().slice(0,5);
+  if(!r.id){ r.id=r.unidadeId+"_"+r.data; r.enviadoEm=agora; lista.push(r); }
+  else { r.editadoEm=agora; delete r.sincEm; const i=lista.findIndex(d=>d.id===r.id); if(i>=0) lista[i]=r; else lista.push(r); }
+  if(r.responsavel){ Persist.set("bdf:nomeResp", r.responsavel); nomeRespLembrado=r.responsavel; }
+  envioRecenteConf=r.id;
+  syncEnfileirar("cfd", r.id);
+  salvarDados(); rascunhoConf=null; Persist.del("bdf:rasccf");
+  ir("casa");
+}
+function vDetalheConf(id){
+  const d=cfDiarios().find(x=>x.id===id);
+  if(!d) return topo("Diário","não encontrado",true);
+  const prazo=(()=>{ const t=new Date((d.enviadoEm||"").replace(" ","T")); return isNaN(t)?true:(Date.now()-t.getTime())<=48*36e5; })();
+  return cabecalhoContexto(d.unidadeId,{sub:[fmtData(d.data),"Diário do confinamento",d.responsavel].filter(Boolean).join(" · "), voltar:true})+`
+    ${(d.chuvaMm!==""||d.estresse)?`<div class="cartao"><h3>🌤️ Dia</h3><p class="mt">${[d.chuvaMm!==""?"chuva "+n0(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":d.estresse==="Não"?"sem estresse térmico":""].filter(Boolean).join(" · ")}</p></div>`:""}
+    ${(d.lotes||[]).map(x=>{ const l=cfLote(x.loteId), mortes=cfMortesDia(x.loteId,d.data);
+      return `<div class="cartao"><h3 class="num">${esc(x.loteId)}</h3>${l?`<p class="mut">${esc(cfRot(CF_GENETICA,l.genetica))} · ${esc(cfCurralNome(l.curralId))}</p>`:""}<dl class="dl mt">
+        <dt>CMS</dt><dd>${x.cms!==""?fmtKg(x.cms)+" kg MS/cab":"sem CMS"}</dd>
+        <dt>Sobra de cocho</dt><dd>${x.sobra!==""?esc(x.sobra+" · "+cfRot(CF_SOBRA,x.sobra)):"—"}</dd>
+        <dt>Enfermaria</dt><dd>${n0(x.enfermaria)}</dd>
+        <dt>Curral</dt><dd>${esc(cfRot(CF_CURRAL_COND,x.curral))||"—"}</dd>
+        ${mortes.map(e=>`<dt>Morte</dt><dd>${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}</dd>`).join("")}
+        ${x.obs?`<dt>Obs.</dt><dd>${esc(x.obs)}</dd>`:""}</dl></div>`; }).join("")}
+    ${d.obs?`<div class="cartao"><h3>📝 Observação do dia</h3><p class="mt" style="white-space:pre-wrap">${esc(d.obs)}</p></div>`:""}
+    <button class="btn mt" data-zapcf="${esc(d.id)}">📲 Mandar resumo no WhatsApp</button>
+    ${botaoAcao("corrigir_boletim",{prazo},{rotulo:"✏️ Corrigir", aria:"Corrigir", classe:"btn sec mt", attrs:`data-cfcorrigir="${esc(d.id)}"`})}
+    <button class="btn sec mt" data-voltar="1">‹ Voltar</button>`;
+}
+
+/* ---------- Entrada de lote (3 passos: curral → grupo genético → detalhes) ---------- */
+function novoCfNovo(){ return {curral:"", genetica:"", data:hojeBRT(), cabecas:"", peso:"", origem:"", fornecedor:"", preco:"", precoUn:"ARROBA", gta:"", obs:""}; }
+function salvarCfNovo(){ if(cfNovo) Persist.set("bdf:cfnovo", JSON.stringify(cfNovo)); else Persist.del("bdf:cfnovo");
+  if(cfNovo) atualizarAvanco("bt-cf-criar", faltaNovoLote(cfNovo)); }
+function faltaNovoLote(n){
+  if(!n.curral) return "Escolha o curral";
+  if(!n.genetica) return "Escolha o grupo genético";
+  if(!(n0(n.cabecas)>0)) return "Informe as cabeças que entraram";
+  if(!(n0(n.peso)>0)) return "Informe o peso médio de balança";
+  if(!n.origem) return "Escolha a origem do lote";
+  return "";
+}
+function vNovoLoteConf(){
+  const n=cfNovo||(cfNovo=novoCfNovo()), fz=sessao.fazendaId, currais=cfCurrais(fz);
+  const escolhido=(rot,attr)=>`<p class="linha-flex" style="margin:0"><span class="cresce"><b>${esc(rot)}</b></span><button class="btn suave mini" data-cfntrocar="${attr}">trocar</button></p>`;
+  const cod=cfProximoCodigo(fz, +String(n.data).slice(0,4)).id;
+  const rotDia=iso=>{ const h=hojeBRT(); return iso===h?"hoje":iso===diaISO(h,-1)?"ontem":DIAS_SEMANA[new Date(iso+"T12:00:00").getDay()]+" "+fmtDataCurta(iso); };
+  return topo("Entrada de lote", maeDe(fazenda(fz)).nome+" › Confinamento", true)+`
+  <div class="cartao"><h3>1 · Em qual curral?</h3>
+    ${n.curral?escolhido(cfCurralNome(n.curral),"curral")
+      :(currais.length?`<div class="chips mt">${currais.map(c=>`<button class="chip" data-cfncur="${esc(c.id)}">${esc(c.nome)}</button>`).join("")}</div>`
+      :htmlEstado("vazio",{que:"curral cadastrado",unidade:fz,dica:"O escritório cadastra os currais em Cadastros › Talhões."},{classe:"mut"}))}</div>
+  ${n.curral?`<div class="cartao"><h3>2 · Qual grupo genético?</h3>
+    ${n.genetica?escolhido(cfRot(CF_GENETICA,n.genetica),"genetica")
+      :`<div class="chips mt">${CF_GENETICA.map(([k,rot])=>`<button class="chip" data-cfngen="${k}">${rot}</button>`).join("")}</div>
+       <p class="mut" style="font-size:.76rem;margin-top:8px">Lote misto? Registre uma entrada por grupo genético — cada uma vira um lote, mesmo no mesmo curral.</p>`}</div>`:""}
+  ${n.curral&&n.genetica?`<div class="cartao"><h3>3 · Detalhes da entrada</h3>
+    <p class="mut">Código do lote: <b class="num">${esc(cod)}</b></p>
+    <label class="mt">Data da entrada</label>
+    <div class="chips">${diasRegua().map(iso=>`<button class="chip ${n.data===iso?"on":""}" data-cfndata="${iso}">${esc(rotDia(iso))}</button>`).join("")}</div>
+    <div class="grade2 mt">
+      <div><label>Cabeças</label><input inputmode="numeric" data-cfn="cabecas" value="${esc(n.cabecas)}"></div>
+      <div><label>Peso médio de balança (kg)</label><input inputmode="decimal" data-cfn="peso" value="${esc(n.peso)}"></div>
+    </div>
+    <label class="mt">Origem</label>
+    <div class="chips">${CF_ORIGEM.map(([k,rot])=>`<button class="chip ${n.origem===k?"on":""}" data-cfnorig="${k}">${rot}</button>`).join("")}</div>
+    <label class="mt">${n.origem==="COMPRA"?"Fornecedor":"Fazenda de origem"}</label><input data-cfn="fornecedor" value="${esc(n.fornecedor)}" placeholder="Opcional">
+    <label class="mt">Preço de referência${n.origem==="RECRIA"?" (estimado na avaliação de entrada)":""}</label>
+    <div class="grade2"><div><input inputmode="decimal" data-cfn="preco" value="${esc(n.preco)}" placeholder="Opcional"></div>
+      <div class="chips">${CF_PRECO_UN.map(([k,rot])=>`<button class="chip ${n.precoUn===k?"on":""}" data-cfnpun="${k}">${rot}</button>`).join("")}</div></div>
+    <label class="mt">Nº da GTA</label><input data-cfn="gta" value="${esc(n.gta)}" placeholder="Opcional">
+    <label class="mt">Observação</label><input data-cfn="obs" value="${esc(n.obs)}" placeholder="Opcional">
+  </div>
+  ${cadRodape(botaoAvanco("bt-cf-criar",{rotulo:"Criar lote", falta:faltaNovoLote(n)}))}`:""}`;
+}
+function cfCriarLote(){
+  const n=cfNovo, fz=sessao.fazendaId; if(!n) return;
+  const falta=faltaNovoLote(n); if(falta){ atualizarAvanco("bt-cf-criar", falta); return; }
+  const ano=+String(n.data).slice(0,4), cod=cfProximoCodigo(fz, ano), agora=new Date().toISOString();
+  const l={ id:cod.id, unidadeId:fz, sigla:cod.sigla, ano, seq:cod.seq, curralId:n.curral, genetica:n.genetica,
+    entradaData:n.data, cabecasEntrada:n0(n.cabecas), pesoEntradaKg:n0(n.peso), origem:n.origem, fornecedor:n.fornecedor||"",
+    precoValor:n.preco===""?"":n0(n.preco), precoUn:n.precoUn||"ARROBA", gta:n.gta||"", obs:n.obs||"",
+    status:"ATIVO", projecao:null, criadoEm:agora, criadoPor:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)||"",
+    historico:[{em:agora, acao:"entrada", por:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)||""}] };
+  cfLotes().push(l);
+  syncEnfileirar("cfl", l.id);
+  if(rascunhoConf && rascunhoConf.unidadeId===fz) cfSincronizarLinhas(rascunhoConf);
+  salvarDados(); salvarRascConf(); cfNovo=null; Persist.del("bdf:cfnovo");
+  cfUI.flash="Lote "+l.id+" criado";
+  ir("cflote", l.id);
+}
+
+/* ---------- Tela do lote: números calculados × projeção ---------- */
+function vLoteConf(id){
+  const l=cfLote(id); if(!l) return topo("Lote","não encontrado",true);
+  const r=cfResumoLote(l), fl=cfUI.flash; cfUI.flash="";
+  const diarios=cfDiarios().filter(d=>d.unidadeId===l.unidadeId && (d.lotes||[]).some(x=>x.loteId===l.id)).sort((a,b)=>a.data<b.data?1:-1).slice(0,7);
+  const mortes=cfEventos().filter(e=>e.tipo==="MORTE" && e.loteId===l.id && !e.cancelado).sort((a,b)=>a.data<b.data?1:-1);
+  const tile=(v,rot)=>`<div><div class="v num">${v}</div><div class="r">${rot}</div></div>`;
+  return cabecalhoContexto(l.unidadeId,{sub:"Lote "+l.id, voltar:true})+`
+    ${fl?`<div class="aviso verde">✔ ${esc(fl)}</div>`:""}
+    <div class="cartao"><h3><span class="num">${esc(l.id)}</span> <span class="tag terra">${esc(CF_STATUS[l.status]||l.status)}</span></h3>
+      <p class="mut">${esc(cfRot(CF_GENETICA,l.genetica))} · ${esc(cfCurralNome(l.curralId))} · entrou em ${fmtData(l.entradaData)}</p>
+      <div class="cf-grade">
+        ${tile(r.dias,"dias de cocho")}
+        ${tile(r.vivas+`<span class="mut" style="font-size:.78rem;font-weight:500"> de ${n0(l.cabecasEntrada)}</span>`,"cabeças vivas")}
+        ${tile(r.mortes+(r.mortes?`<span class="mut" style="font-size:.78rem;font-weight:500"> · ${fmtPct(r.mort)} %</span>`:""),"mortes · mortalidade")}
+        ${tile(r.gmd!=null?fmtGmd(r.gmd):"—", r.gmd!=null?"GMD kg/dia desde a entrada":"sem pesagem desde a entrada")}
+      </div>
+      ${r.gmdUlt!=null&&r.ultPesagem?`<p class="mut mt" style="font-size:.8rem">Última pesagem ${fmtDataCurta(r.ultPesagem.data)}: ${fmtKg(r.ultPesagem.pesoMedioKg)} kg · GMD desde ela <span class="num">${fmtGmd(r.gmdUlt)}</span></p>`:""}
+      ${r.proj?`<p class="mt linha-flex"><span class="farol reto ${CF_FAROL_CSS[r.farol]}"></span><span class="cresce">${r.gmd!=null?`GMD <span class="num">${fmtGmd(r.gmd)}</span> × alvo <span class="num">${fmtGmd(r.proj.gmdAlvo)}</span> kg/dia`:"sem pesagem desde a entrada"}${n0(r.proj.diasPrevistos)?` · previstos <span class="num">${n0(r.proj.diasPrevistos)}</span> dias`:""}</span></p>`
+        :`<p class="mut mt" style="font-size:.8rem">Sem projeção lançada para este lote.</p>`}
+    </div>
+    <div class="cartao"><h3>Entrada</h3><dl class="dl mt">
+      <dt>Cabeças</dt><dd class="num">${n0(l.cabecasEntrada)}</dd>
+      <dt>Peso médio</dt><dd class="num">${fmtKg(l.pesoEntradaKg)} kg</dd>
+      <dt>Origem</dt><dd>${esc(cfRot(CF_ORIGEM,l.origem))}${l.fornecedor?" · "+esc(l.fornecedor):""}</dd>
+      ${l.precoValor!==""&&l.precoValor!=null?`<dt>Preço ref.</dt><dd class="num">${esc(Number(l.precoValor).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}))} ${esc(cfRot(CF_PRECO_UN,l.precoUn))}</dd>`:""}
+      ${l.gta?`<dt>GTA</dt><dd>${esc(l.gta)}</dd>`:""}
+      ${l.obs?`<dt>Obs.</dt><dd>${esc(l.obs)}</dd>`:""}</dl></div>
+    ${mortes.length?`<div class="cartao"><h3>Mortes</h3><ul class="lista-limpa">${mortes.map(e=>`<li class="mt">${fmtDataCurta(e.data)} · ${esc(e.causa)}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}</li>`).join("")}</ul></div>`:""}
+    <div class="cartao"><h3>Últimos diários deste lote</h3>
+      <ul class="lista-limpa">${diarios.map(d=>{ const x=d.lotes.find(y=>y.loteId===l.id);
+        return `<li><button class="linha-flex" style="width:100%;text-align:left" data-vercf="${esc(d.id)}"><span class="cresce"><b>${fmtDataCurta(d.data)}</b> <span class="mut">· ${x.cms!==""?"CMS "+fmtKg(x.cms):"sem CMS"} · sobra ${esc(x.sobra||"—")} · enf. ${n0(x.enfermaria)} · ${esc(cfRot(CF_CURRAL_COND,x.curral)).toLowerCase()||"—"}</span></span><span class="mut">›</span></button></li>`; }).join("")
+        ||htmlEstado("vazio",{que:"diário registrado",operacao:"lote "+l.id,unidade:l.unidadeId},{tag:"li"})}</ul></div>
+    <button class="btn sec mt" data-cfcsv="${esc(l.id)}">⬇ CSV do lote</button>
+    <button class="btn sec mt" data-voltar="1">‹ Voltar</button>`;
+}
+
+/* ---------- Resumo WhatsApp do diário ---------- */
+function resumoWhatsConf(d){
+  const mae=maeDe(fazenda(d.unidadeId));
+  const L=["🐃 *CONFINAMENTO "+mae.nome.toUpperCase()+"* — "+fmtData(d.data), "Por: "+(d.responsavel||"—")];
+  const cl=[(d.chuvaMm!==""&&d.chuvaMm!=null)?"chuva "+n0(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":""].filter(Boolean);
+  if(cl.length) L.push("🌤️ "+cl.join(" · "));
+  const desvios=[];
+  (d.lotes||[]).forEach(x=>{ const l=cfLote(x.loteId); if(!l) return; const r=cfResumoLote(l,d.data), mortes=cfMortesDia(l.id,d.data);
+    L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(x.cms!==""?" · CMS "+fmtKg(x.cms)+" kg MS":" · sem CMS")+(x.sobra!==""?" · sobra "+x.sobra:"")
+      +(n0(x.enfermaria)?" · "+n0(x.enfermaria)+" na enfermaria":"")+(x.curral?" · curral "+cfRot(CF_CURRAL_COND,x.curral).toLowerCase():"")+(x.obs?" — "+x.obs:""));
+    mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")); });
+    if(x.sobra==="0"||x.sobra==="4") desvios.push(l.id+" sobra "+x.sobra);
+    if(r.farol==="amarelo"||r.farol==="vermelho") desvios.push(l.id+" GMD "+fmtGmd(r.gmd)+" × alvo "+fmtGmd(r.proj.gmdAlvo));
+  });
+  if(desvios.length) L.push("🔎 Fora do esperado: "+desvios.join(" · "));
+  if(d.obs) L.push("📝 "+d.obs);
+  return L.join("\n");
+}
+function abrirWhatsConf(id){
+  const d=cfDiarios().find(x=>x.id===id); if(!d) return;
+  const txt=resumoWhatsConf(d);
+  if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); return; }
+  const a=document.createElement("a"); a.href="https://wa.me/?text="+encodeURIComponent(txt);
+  a.target="_blank"; a.rel="noopener"; a.click();
+}
+
+/* ---------- CSV por lote: uma linha por evento, no formato que o escritório cruza com a ficha e o FarmTell ---------- */
+function cfCsvTexto(id){
+  const l=cfLote(id); if(!l) return "";
+  const cab=["lote","unidade","tipo","data","cabecas","peso_kg","cms_kg_ms","sobra_escore","enfermaria","curral","causa","responsavel","obs"];
+  const c=v=>{ const s=String(v==null?"":v).replace(/"/g,'""'); return /[;"\n]/.test(s)?'"'+s+'"':s; };
+  const num=v=>(v===""||v==null)?"":String(v).replace(".",",");
+  const linhas=[];
+  linhas.push({data:l.entradaData, ord:0, c:[l.id, fazenda(l.unidadeId).nome, "ENTRADA", l.entradaData, n0(l.cabecasEntrada), num(l.pesoEntradaKg), "", "", "", cfCurralNome(l.curralId), "", l.criadoPor||"",
+    [cfRot(CF_GENETICA,l.genetica), cfRot(CF_ORIGEM,l.origem), l.fornecedor, (l.precoValor!==""&&l.precoValor!=null)?"preço "+num(l.precoValor)+" "+cfRot(CF_PRECO_UN,l.precoUn):"", l.gta?"GTA "+l.gta:"", l.obs].filter(Boolean).join(" · ")]});
+  cfDiarios().filter(d=>d.unidadeId===l.unidadeId).forEach(d=>{ const x=(d.lotes||[]).find(y=>y.loteId===l.id); if(!x) return;
+    linhas.push({data:d.data, ord:1, c:[l.id, fazenda(l.unidadeId).nome, "DIARIO", d.data, "", "", num(x.cms), x.sobra, x.enfermaria===""?"0":n0(x.enfermaria), cfRot(CF_CURRAL_COND,x.curral), "", d.responsavel||"",
+      [d.chuvaMm!==""&&d.chuvaMm!=null?"chuva "+num(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":"", x.obs].filter(Boolean).join(" · ")]}); });
+  cfEventos().filter(e=>e.loteId===l.id && !e.cancelado).forEach(e=>{
+    linhas.push({data:e.data, ord:2, c:[l.id, fazenda(l.unidadeId).nome, e.tipo, e.data, n0(e.cabecas)||(e.tipo==="MORTE"?1:""), num(e.pesoEstimadoKg), "", "", "", e.curralPara?cfCurralNome(e.curralPara):"", e.causa||"", e.responsavel||"", e.obs||""]}); });
+  cfPesagens().filter(p=>p.loteId===l.id && !p.cancelado).forEach(p=>{
+    linhas.push({data:p.data, ord:3, c:[l.id, fazenda(l.unidadeId).nome, "PESAGEM", p.data, n0(p.cabecasPesadas), num(p.pesoMedioKg), "", "", "", "", "", p.responsavel||"", p.obs||""]}); });
+  linhas.sort((a,b)=>(a.data<b.data?-1:a.data>b.data?1:a.ord-b.ord));
+  return [cab.join(";")].concat(linhas.map(x=>x.c.map(c).join(";"))).join("\r\n");
+}
+function cfCsvLote(id){
+  const txt=cfCsvTexto(id); if(!txt) return;
+  const blob=new Blob(["﻿"+txt],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="lote_"+id+".csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------- toques e digitação do módulo (chamados pelos tratadores únicos de app.onclick / app.oninput) ---------- */
+const cfMarcarChip=t=>{ const pai=t.parentElement; if(pai) [...pai.querySelectorAll(".chip")].forEach(c=>c.classList.toggle("on",c===t)); };
+function cfClique(t,d){
+  if(!sessao) return false;
+  if(t.id==="bt-cf-novo"){ if(!cfNovo) cfNovo=novoCfNovo(); salvarCfNovo(); ir("cfnovo"); return true; }
+  if(d.cflote){ ir("cflote", d.cflote); return true; }
+  if(d.vercf){ ir("cfdetalhe", d.vercf); return true; }
+  if(d.zapcf){ abrirWhatsConf(d.zapcf); envioRecenteConf=null; return true; }
+  if(d.cfcsv){ cfCsvLote(d.cfcsv); return true; }
+  if(t.id==="bt-preencher-cf"){
+    const fz=sessao.fazendaId, dHoje=cfDiarioDoDia(hojeBRT(), fz);
+    if(dHoje){ ir("cfdetalhe", dHoje.id); return true; }
+    if(!rascunhoConf || rascunhoConf.unidadeId!==fz || rascunhoConf.data!==hojeBRT()) rascunhoConf=novoRascunhoConf(fz);
+    cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
+  if(d.cfcorrigir){ const x=cfDiarios().find(y=>y.id===d.cfcorrigir); if(!x) return true;
+    rascunhoConf=JSON.parse(JSON.stringify(x)); cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
+  if(t.id==="bt-enviar-cf"){ validarEnviarConf(); return true; }
+  if(d.cfest!==undefined && rascunhoConf){ rascunhoConf.estresse = rascunhoConf.estresse===d.cfest ? "" : d.cfest;
+    if(rascunhoConf.estresse) cfMarcarChip(t); else t.classList.remove("on"); salvarRascConf(); return true; }
+  if(d.cfsobra && rascunhoConf){ const [i,v]=d.cfsobra.split(":"); const x=rascunhoConf.lotes[+i]; if(x){ x.sobra=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  if(d.cfcur && rascunhoConf){ const [i,v]=d.cfcur.split(":"); const x=rascunhoConf.lotes[+i]; if(x){ x.curral=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  if(d.cfmorte!==undefined && rascunhoConf){ cfUI.morte={i:+d.cfmorte, causa:"", cabecas:"1", peso:""}; ir("cfform",null,true); return true; }
+  if(d.cfcausa && cfUI.morte){ const k=d.cfcausa.indexOf(":"); cfUI.morte.causa=d.cfcausa.slice(k+1); cfMarcarChip(t); atualizarAvanco("bt-cf-morte-ok",""); return true; }
+  if(t.id==="bt-cf-morte-cancelar"){ cfUI.morte=null; ir("cfform",null,true); return true; }
+  if(t.id==="bt-cf-morte-ok" && cfUI.morte && rascunhoConf){
+    const m=cfUI.morte, x=rascunhoConf.lotes[m.i]; if(!x) return true;
+    if(!m.causa){ atualizarAvanco("bt-cf-morte-ok","Escolha a causa provável"); return true; }
+    const e={ id:uid(), unidadeId:rascunhoConf.unidadeId, loteId:x.loteId, tipo:"MORTE", data:rascunhoConf.data, cabecas:n0(m.cabecas)||1, causa:m.causa,
+      pesoEstimadoKg:m.peso===""?"":n0(m.peso), responsavel:rascunhoConf.responsavel||"", criadoEm:new Date().toISOString(), cancelado:false };
+    cfEventos().push(e); syncEnfileirar("cfe", e.id); salvarDados();
+    cfUI.morte=null; cfUI.ultimaMorte=e.id; ir("cfform",null,true); return true; }
+  if(d.cfdesfazer){ const e=cfEventos().find(y=>y.id===d.cfdesfazer); if(e){ e.cancelado=true; e.canceladoEm=new Date().toISOString(); syncEnfileirar("cfe", e.id); salvarDados(); }
+    cfUI.ultimaMorte=null; ir(telaAtual,null,true); return true; }
+  /* entrada de lote */
+  if(d.cfncur){ if(!cfNovo) cfNovo=novoCfNovo(); cfNovo.curral=d.cfncur; salvarCfNovo(); ir("cfnovo",null,true); return true; }
+  if(d.cfngen && cfNovo){ cfNovo.genetica=d.cfngen; salvarCfNovo(); ir("cfnovo",null,true); return true; }
+  if(d.cfntrocar && cfNovo){ cfNovo[d.cfntrocar]=""; if(d.cfntrocar==="curral") cfNovo.genetica=""; salvarCfNovo(); ir("cfnovo",null,true); return true; }
+  if(d.cfndata && cfNovo){ cfNovo.data=d.cfndata; salvarCfNovo(); ir("cfnovo",null,true); return true; }   /* redesenha: o código previsto segue o ano da data */
+  if(d.cfnorig && cfNovo){ cfNovo.origem=d.cfnorig; salvarCfNovo(); ir("cfnovo",null,true); return true; }
+  if(d.cfnpun && cfNovo){ cfNovo.precoUn=d.cfnpun; cfMarcarChip(t); salvarCfNovo(); return true; }
+  if(t.id==="bt-cf-criar"){ cfCriarLote(); return true; }
+  return false;
+}
+function cfInput(el){
+  const d=el.dataset;
+  if(d.cfr!==undefined && rascunhoConf){ rascunhoConf[d.cfr]=el.value; salvarRascConf(); return true; }
+  if(d.cfd!==undefined && rascunhoConf){ const c=el.closest("[data-cfl]"); const i=c?parseInt(c.dataset.cfl):-1; const x=rascunhoConf.lotes[i]; if(x){ x[d.cfd]=el.value; salvarRascConf(); } return true; }
+  if(d.cfm!==undefined && cfUI.morte){ cfUI.morte[d.cfm]=el.value; return true; }
+  if(d.cfn!==undefined && cfNovo){ cfNovo[d.cfn]=el.value; salvarCfNovo(); return true; }
+  return false;
+}
+
 function vDetalhePos(id){
   const p=(D.posColheitas||[]).find(x=>x.id===id);
   if(!p) return topo("Registro","não encontrado",true);
@@ -12570,6 +13072,8 @@ function ligarEventos(tela){
     if(planClique(t,d)) return;
     /* v86: módulo de insumos — cartão de chegada, saldo, painel e a porta única "Colar do WhatsApp" */
     if(insClique(t,d)) return;
+    /* v102: módulo de confinamento — casa, diário, entrada de lote, tela do lote */
+    if(cfClique(t,d)) return;
     if(t.id==="bt-planejamento"||t.id==="bt-planejamento2"){ if(!podePainel()) return; abrirModulo("planejamento",()=>{ planNav=[{v:"menu"}]; }); return; }
     /* código de acesso */
     if(t.id==="bt-cod-entrar"){
@@ -12600,10 +13104,10 @@ function ligarEventos(tela){
     if(t.id==="bt-relatorios"){ if(!podeCadastros()) return; window.open("relatorios.html","_blank"); return; }
     if(d.up!==undefined){ if(!podeCadastros()) return; upClique(d,t); return; }
     /* entrada e fazenda */
-    if(d.atividade){ const u=D.usuarios.find(x=>x.papel==="gerente"); if(!u) return;
+    if(d.atividade){ const papel=papelDaAtividade(d.atividade), u=D.usuarios.find(x=>x.papel===papel); if(!u) return;   /* v102: papel pelo catálogo */
       if(soLeitura()) return; /* diretoria só lê */
       if(!unidadesPermitidas().some(f=>atividadeDe(f.id)===d.atividade)) return;
-      sessao={userId:u.id, papel:"gerente", nome:u.nome, atividade:d.atividade, fazendaId:null};
+      sessao={userId:u.id, papel, nome:u.nome, atividade:d.atividade, fazendaId:null};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("fazendas"); return; }
     if(d.perfil==="planejamento"){ if(!podePainel()) return;
       const papel=podeCadastros()?"admin":"proprietario", u=D.usuarios.find(x=>x.papel===papel);
@@ -12629,7 +13133,7 @@ function ligarEventos(tela){
       sessao={...sessao, fazendaId:d.fazenda, nome:"Gerente — "+fazenda(d.fazenda).nome};
       Persist.set("bdf:sessao",JSON.stringify(sessao)); rascunho=null; ir("casa"); return; }
     if(t.id==="bt-trocar-faz"){ rascunho=null;
-      if(sessao && sessao.papel==="gerente"){
+      if(sessao && (sessao.papel==="gerente"||sessao.papel==="conf")){
         /* escopo com uma atividade só: pula a tela de atividades */
         const ativs=[...new Set(unidadesPermitidas().map(f=>atividadeDe(f.id)))];
         if(ativs.length===1){ sessao={...sessao, fazendaId:null, atividade:ativs[0]};
@@ -12765,7 +13269,7 @@ function ligarEventos(tela){
     /* v89: tela aberta por abrirModulo devolve para onde a pessoa estava; o destino fixo abaixo
        vale só para tela que não foi registrada (casa do gerente, escolha de unidade…) */
     if(d.voltar && telaDeOnde[telaAtual]){ voltarDoModulo(telaAtual); return; }
-    if(d.voltar){ ir(!sessao?"entrada":(sessao.papel==="gerente"?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
+    if(d.voltar){ ir(!sessao?"entrada":((sessao.papel==="gerente"||sessao.papel==="conf")?(sessao.fazendaId?"casa":"entrada"):"painel")); return; }
     if(t.id==="bt-ajuda"){ ir("ajuda"); return; }
     if(t.id==="bt-cad"){ abrirModulo("cadastros",()=>{ cadNav=[]; }); return; }
     if(d.ver){ painelVoltaDetalhe = telaAtual==="painelun"; ir("detalhe", d.ver); return; }
@@ -13146,6 +13650,7 @@ function ligarEventos(tela){
     if(telaAtual==="cadastros" && cadInput(el)) return;
     if(telaAtual==="planejamento" && planInput(el)) return;   /* v77 */
     if(insInput(el)) return;                                  /* v86: colagem, pré-visualização e busca das mensagens */
+    if(cfInput(el)) return;                                   /* v102: diário e entrada de lote do confinamento */
     if(el.id==="imp-cola"){ atualizarAvanco("imp-ler", faltaLerArquivo()); return; }   /* v72: colar a tabela ativa "1 · Ler" */
     if(d.r!==undefined && rascunho){ rascunho[d.r]=el.value; salvarRascunho(); return; }
     if(d.pr!==undefined && rascunhoPos){ rascunhoPos[d.pr]=el.value; salvarRascPos(); return; }
