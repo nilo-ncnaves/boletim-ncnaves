@@ -12935,10 +12935,10 @@ function resumoWhatsConf(d){
     if(!dn.legado){
       L.push("🏠 "+nome+(!vazio(c.cms)?" · CMS "+fmtKg(c.cms)+" kg MS":" · sem CMS")+(!vazio(c.sobra)?" · sobra "+c.sobra:"")+(c.cond?" · curral "+condTxt(c.cond):"")
         +(c.bebedouro?" · bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro):"")+(!vazio(c.ofegacao)?" · ofegação "+c.ofegacao:""));
-      if(c.bebedouro==="SUJO"||c.bebedouro==="FALHA") desvios.push(nome+" bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro));
-      if(!vazio(c.ofegacao)&&n0(c.ofegacao)>=3) desvios.push(nome+" ofegação "+c.ofegacao);
       { const l0=cfLote(ls[0].loteId), r0=l0&&cfResumoLote(l0,d.data); if(r0&&r0.desvioSobra) desvios.push(nome+" "+r0.desvioSobra); }   /* C.4: o cocho é do curral, uma vez */
       if(c.cond==="POEIRA"||c.cond==="LAMA") desvios.push(nome+" "+condTxt(c.cond));
+      if(c.bebedouro==="SUJO"||c.bebedouro==="FALHA") desvios.push(nome+" bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro));
+      if(!vazio(c.ofegacao)&&n0(c.ofegacao)>=3) desvios.push(nome+" ofegação "+c.ofegacao);
     }
     ls.forEach(v=>{ const l=cfLote(v.loteId), r=cfResumoLote(l,d.data), mortes=cfMortesDia(l.id,d.data), fora=cfForaTxt(v);
       if(dn.legado){
