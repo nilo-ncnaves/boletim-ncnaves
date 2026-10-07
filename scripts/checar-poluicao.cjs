@@ -1166,6 +1166,7 @@ async function cenarioConf(browser, base, R, termos) {
       proibido: /obrigat|erro de valida|esqueceu|você|faltou|pendente/i.test(nota), nativos: window.__nativos - nat, mesmaTela: telaAtual === telaAntes };
     b.click(); b.setAttribute('data-marca-teste', '1');
     document.querySelector('[data-cfsobra="0:2"]').click(); document.querySelector('[data-cfcur="0:SECO"]').click();
+    const beb = document.querySelector('[data-cfbeb="0:OK"]'); if (beb) beb.click();   /* v103: bebedouro do curral */
     const b2 = document.querySelector('#bt-enviar-cf');
     r.depois = { ativo: !b2.classList.contains('acao-off') && !b2.getAttribute('data-falta'), noLugar: b2.getAttribute('data-marca-teste') === '1' };
     const x = b2.getBoundingClientRect(); r.rodape = x.top >= 0 && x.bottom <= innerHeight;
@@ -2318,8 +2319,8 @@ function avaliar(R) {
     add(g, 'Escolhido o curral — só o grupo genético (O QUÊ), ainda sem campo', C.passo2.inputs === 0 && C.passo2.gen === 2, `${C.passo2.gen} chips · ${C.passo2.inputs} campos`);
     add(g, 'Escolhido o grupo — detalhes com "Criar lote" inativo dizendo o que falta; data em chips, nunca input type=date', C.passo3.inputs > 0 && C.passo3.inativo && /Informe/.test(C.passo3.falta) && C.passo3.dataDate === 0, `"${C.passo3.falta}"`);
     add(g, 'Tela do lote — números calculados (dias de cocho, cabeças vivas) e "sem pesagem desde a entrada"; sem projeção, nenhum farol vermelho', C.lote.tela === 'cflote' && /dias de cocho/.test(C.lote.texto) && /sem pesagem desde a entrada/.test(C.lote.texto) && C.lote.vermelho === 0 && !PLANO_PROIBIDO.test(C.lote.texto), '');
-    add(g, 'Diário — "Enviar diário" nasce inativo com o visual do botão de perfil e o toque nomeia o lote e o campo que faltam', d.existe && d.inativo && d.estilo === 'dashed' && !d.vermelho && d.mostrou && /Marque a sobra de cocho do lote/.test(d.nota) && !d.proibido && d.mesmaTela && d.nativos === 0, `"${d.nota || ''}"`);
-    add(g, 'Diário — sobra e curral marcados, o botão ativa no lugar (mesmo elemento) e fica no rodapé, visível sem rolar', !!d.depois && d.depois.ativo && d.depois.noLugar && d.rodape, d.depois ? `${d.depois.ativo ? 'ativo' : 'inativo'}${d.depois.noLugar ? ', mesmo elemento' : ', redesenhado'}` : '');
+    add(g, 'Diário — "Enviar diário" nasce inativo com o visual do botão de perfil e o toque nomeia o curral e o campo que faltam (v103: o cocho é do curral)', d.existe && d.inativo && d.estilo === 'dashed' && !d.vermelho && d.mostrou && /Marque a sobra de cocho do Curral/.test(d.nota) && !d.proibido && d.mesmaTela && d.nativos === 0, `"${d.nota || ''}"`);
+    add(g, 'Diário — sobra, condição (e, desde a v103, bebedouro) do curral marcados, o botão ativa no lugar (mesmo elemento) e fica no rodapé, visível sem rolar', !!d.depois && d.depois.ativo && d.depois.noLugar && d.rodape, d.depois ? `${d.depois.ativo ? 'ativo' : 'inativo'}${d.depois.noLugar ? ', mesmo elemento' : ', redesenhado'}` : '');
     add(g, 'Nenhum confirm()/alert() nativo e nenhum erro de página no cenário', C.nativos === 0 && !C.erros.length, C.erros[0] || '');
   }
 

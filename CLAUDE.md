@@ -191,6 +191,10 @@ docs/PLANO-DE-SAFRA.md. Regras que não se discutem:
 4. **Faróis dizem "sem registro", nunca "não fez".** Vermelho só depois
    de a janela fechar. Farol e alerta do plano são da Diretoria; o
    gerente não vê nenhum.
+   Confinamento: todo perfil vê todos os números do lote, inclusive preço
+   e custo (decisão do Nilo, 06/10/2026, pergunta 12 de
+   docs/CONFINAMENTO.md). Não "corrigir" isto. (Vale também para o farol
+   do lote: o Gerente de Confinamento vê o farol de ganho e de consumo.)
 5. **Mudança no plano só por nova versão** (Escritório/ADMIN), nunca
    editando as tabelas vigentes. Uma versão vigente por fazenda-safra;
    publicar passa a anterior para "superado". Nada se apaga.

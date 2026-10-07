@@ -153,6 +153,7 @@ h3{font-size:.95rem;font-weight:700}
 .cf-grade>div{border:1px solid var(--linha);padding:8px 10px;min-width:0}
 .cf-grade .v{font-size:1.3rem;font-weight:700;line-height:1.2;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cf-grade .r{font-size:.74rem;color:var(--tinta-2);margin-top:2px}
+.cf-sublote{border-top:1px dashed var(--linha);margin-top:12px;padding-top:10px}   /* v103: lote dentro do cartão do curral */
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
 .rodape{position:fixed;left:0;right:0;bottom:0;background:var(--cartao);border-top:1px solid var(--linha);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:30}
@@ -9812,7 +9813,7 @@ function impRodar(){
    ESTADO.md). Estado local: cadNav (pilha de telas, para o Voltar levar
    sempre ao nível anterior) e cadUI (busca, confirmação inline, "Salvo").
    ==================================================================== */
-const APP_VERSAO="v102";
+const APP_VERSAO="v103";
 let cadNav=[];
 let cadUI={ busca:"", filtro:"", confirma:"", flash:"", foco:"", form:null, novo:"", mais:false, zona:false, msg:"", saltos:false };
 const cadAtual=()=>cadNav[cadNav.length-1]||{v:"menu"};
@@ -12406,13 +12407,28 @@ const CF_PRECO_UN=[["ARROBA","R$/@"],["KG","R$/kg"]];
 /* escore de sobra de cocho 0–4 (padrão de leitura de cocho usado em confinamento: 0 = cocho limpo … 4 = mais da
    metade do trato sobrou). O número é o que o gerente marca; o rótulo é só legenda. */
 const CF_SOBRA=[["0","cocho limpo"],["1","restos espalhados"],["2","camada fina"],["3","sobra de 25 a 50 %"],["4","sobra acima de 50 %"]];
-const CF_CURRAL_COND=[["SECO","Seco"],["UMIDO","Úmido"],["LAMA","Lama"]];
+/* v103: "Poeira" entra entre Seco e Úmido — o giro é na seca e, no Cerrado, de agosto a outubro o problema do curral é a
+   poeira (doença respiratória), não a lama. Diário antigo continua lendo o que gravou. */
+const CF_CURRAL_COND=[["SECO","Seco"],["POEIRA","Poeira"],["UMIDO","Úmido"],["LAMA","Lama"]];
 const CF_CAUSAS_MORTE=["Timpanismo","Acidose","Pneumonia","Trauma / acidente","Clostridiose","Desconhecida","Outra"];
+/* v103: travas de faixa — valor fora da faixa deixa o botão de avanço inativo com o motivo (c10), sem diálogo e sem
+   alert. Um "98" no lugar de "9,8" no CMS, ou um peso de entrada de 4.200 kg, estragaria GMD, conversão e mortalidade. */
+const CF_FAIXAS={cms:[4,16], pesoEntrada:[150,650], pesoMorte:[100,800], chuva:[0,200]};
+/* v103: condição da balança. Peso com jejum × sem jejum difere pelo enchimento (3 a 5 % do peso); o GMD que compara os
+   dois desconta o peso sem jejum. A pesagem de entrada grava pesoEntradaJejum; a pesagem intermediária (cfPesagens,
+   tela na v104) grava jejum — SIM | NAO; vazio = "não informado" (lotes da v102). */
+const CF_JEJUM=[["SIM","com jejum"],["NAO","sem jejum"]];
+const CF_DESCONTO_JEJUM=0.04;   /* PROVISÓRIO — a confirmar com a consultoria AXYS */
+/* v103: "Algo fora do normal?" do lote (no lugar da observação livre por lote) — o lote é todo de machos inteiros:
+   monta e briga são causa real de trauma e de perda de GMD. Registro, nunca prescrição. */
+const CF_FORA_NORMAL=[["MONTA","monta"],["BRIGA","briga"],["MANCANDO","animal mancando"],["CAIDO","animal caído"],["COCHO","cocho com problema"],["OUTRO","outro"]];
+const cfFaixaTxt=k=>CF_FAIXAS[k][0]+" a "+CF_FAIXAS[k][1];
+const cfForaFaixa=(v,k)=>v!==""&&v!=null&&(n0(v)<CF_FAIXAS[k][0]||n0(v)>CF_FAIXAS[k][1]);
 /* farol contra a projeção: verde a partir de 95 % do GMD-alvo, amarelo de 85 a 95 %, vermelho abaixo; cinza sem pesagem */
 const CF_FAROL={verde:0.95, amarelo:0.85};
 const CF_FAROL_CSS={verde:"ok", amarelo:"espera", vermelho:"critico", cinza:"vazio"};
 const CF_STATUS={ATIVO:"ativo", EM_SAIDA:"em saída", AGUARDANDO_ROMANEIO:"aguardando romaneio", FECHADO:"fechado", CANCELADO:"cancelado"};
-let rascunhoConf=null, cfNovo=null, envioRecenteConf=null, cfUI={morte:null, ultimaMorte:null, flash:""};
+let rascunhoConf=null, cfNovo=null, envioRecenteConf=null, cfUI={morte:null, ultimaMorte:null, flash:"", trocarNome:false};
 const cfLotes=()=>(D.cfLotes=D.cfLotes||[]);
 const cfDiarios=()=>(D.cfDiarios=D.cfDiarios||[]);
 const cfEventos=()=>(D.cfEventos=D.cfEventos||[]);
@@ -12435,6 +12451,33 @@ const papelDaAtividade=a=>PAPEL_ATIVIDADE[a]||"gerente";
 /* registro do dia de uma unidade, seja boletim ou diário do confinamento (o painel conta os dois) */
 const registroDoDia=(data,fz)=>boletimDoDia(data,fz)||cfDiarioDoDia(data,fz);
 
+/* ---- v103: leitura ÚNICA do diário, nos dois formatos (vDetalheConf, resumoWhatsConf, vLoteConf, cfCsvTexto e os
+   indicadores passam por aqui) ----
+   O cocho é do CURRAL, não do lote: dois lotes do mesmo curral comem no mesmo cocho. Desde a v103 o diário grava
+   currais[] = {curralId, cms, sobra, cond, …} (uma vez por curral) e lotes[] = {loteId, curralId (o do dia — foto do
+   momento), enfEstao, foraNormal[], …}. O diário da v102 tinha tudo por lote ({loteId, cms, sobra, enfermaria, curral
+   (= condição), obs}) e continua legível: a conversão é SÓ na leitura (nada gravado é reescrito); enfermaria vira
+   enfEstao, enfEntraram fica null (= "não informado", nunca 0) e cada lote conserva o que foi marcado nele (v102:{…}),
+   porque dois lotes do mesmo curral podiam ter sobras diferentes. */
+function cfDiarioNorm(d){
+  if(!d) return null;
+  if(Array.isArray(d.currais)) return Object.assign({}, d, {legado:false, currais:d.currais, lotes:d.lotes||[]});
+  const currais=[], lotes=[], v=x=>x==null?"":x;
+  (d.lotes||[]).forEach(x=>{ const l=cfLote(x.loteId), cid=(l&&l.curralId)||"";
+    if(!currais.some(c=>c.curralId===cid)) currais.push({curralId:cid, cms:v(x.cms), sobra:v(x.sobra), cond:x.curral||""});
+    lotes.push({loteId:x.loteId, curralId:cid, enfEntraram:null, enfMotivos:[], enfEstao:v(x.enfermaria), foraNormal:[], obs:x.obs||"",
+      v102:{cms:v(x.cms), sobra:v(x.sobra), cond:x.curral||""}}); });
+  return Object.assign({}, d, {legado:true, currais, lotes});
+}
+/* o dia de UM lote: campos do curral dele + campos dele (no formato da v102 vale o que foi marcado no próprio lote) */
+function cfLinhaDia(dn, loteId){
+  const x=((dn&&dn.lotes)||[]).find(y=>y.loteId===loteId); if(!x) return null;
+  const c=(dn.currais||[]).find(y=>y.curralId===x.curralId)||{};
+  return Object.assign({cms:"", sobra:"", cond:""}, c, x.v102||{},
+    {loteId, curralId:x.curralId, enfEntraram:x.enfEntraram, enfMotivos:x.enfMotivos||[], enfEstao:x.enfEstao==null?"":x.enfEstao, foraNormal:x.foraNormal||[], obs:x.obs||""});
+}
+const cfJejumRot=v=>v?cfRot(CF_JEJUM,v):"não informado";
+
 /* ---- números do lote, SEMPRE calculados, nunca gravados ---- */
 function cfResumoLote(l, dia){
   dia=dia||hojeBRT();
@@ -12446,13 +12489,20 @@ function cfResumoLote(l, dia){
   const mort=n0(l.cabecasEntrada)?mortes/n0(l.cabecasEntrada)*100:0;
   const pes=cfPesagens().filter(p=>p.loteId===l.id && !p.cancelado && p.data<=dia).sort((a,b)=>a.data<b.data?-1:1);
   const ult=pes.length?pes[pes.length-1]:null, ant=pes.length>1?pes[pes.length-2]:null;
-  const gmdDe=(p0,d0,p1,d1)=>{ const n=diasEntreISO(d0,d1); return n>0?(n0(p1)-n0(p0))/n:null; };
-  const gmd=ult?gmdDe(l.pesoEntradaKg,l.entradaData,ult.pesoMedioKg,ult.data):null;
-  const gmdUlt=ult?(ant?gmdDe(ant.pesoMedioKg,ant.data,ult.pesoMedioKg,ult.data):gmd):null;
+  /* v103: jejum — pesos de condições diferentes (com × sem jejum) só se comparam depois de descontar CF_DESCONTO_JEJUM
+     do peso SEM jejum; condição "não informado" em qualquer ponta: sem desconto, com a nota no GMD */
+  let gmdNota="";
+  const gmdDe=(p0,j0,d0,p1,j1,d1)=>{ const n=diasEntreISO(d0,d1); if(!(n>0)) return null;
+    let a=n0(p0), b=n0(p1);
+    if(!j0||!j1) gmdNota="condição de pesagem não informada";
+    else if(j0!==j1){ if(j0==="NAO") a*=1-CF_DESCONTO_JEJUM; else b*=1-CF_DESCONTO_JEJUM; }
+    return (b-a)/n; };
+  const gmd=ult?gmdDe(l.pesoEntradaKg,l.pesoEntradaJejum,l.entradaData,ult.pesoMedioKg,ult.jejum,ult.data):null;
+  const gmdUlt=ult?(ant?gmdDe(ant.pesoMedioKg,ant.jejum,ant.data,ult.pesoMedioKg,ult.jejum,ult.data):gmd):null;
   const proj=l.projecao||null;
   let farol="cinza";
   if(gmd!=null && proj && n0(proj.gmdAlvo)>0){ const r=gmd/n0(proj.gmdAlvo); farol=r>=CF_FAROL.verde?"verde":r>=CF_FAROL.amarelo?"amarelo":"vermelho"; }
-  return {mortes, saidas, vivas, dias, mort, gmd, gmdUlt, ultPesagem:ult, proj, farol};
+  return {mortes, saidas, vivas, dias, mort, gmd, gmdUlt, gmdNota, ultPesagem:ult, proj, farol};
 }
 /* código do lote: CF-<sigla da fazenda-mãe>-<ano>-<nº>, numeração por unidade e ano */
 function cfProximoCodigo(fz, ano){
@@ -12502,63 +12552,110 @@ function vCasaConf(){
     <button class="btn sec mt" id="bt-sair">Sair</button>`;
 }
 
-/* ---------- Diário de 2 minutos: uma linha por lote ---------- */
+/* ---------- Diário de 2 minutos: um cartão por curral ocupado, uma sublinha por lote (v103) ---------- */
 function novoRascunhoConf(fz){
   return { id:null, data:hojeBRT(), unidadeId:fz,
     responsavel:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)?nomeRespLembrado:"",
-    chuvaMm:"", estresse:"", obs:"", lotes:[] };
+    chuvaMm:"", estresse:"", obs:"", currais:[], lotes:[] };
 }
-/* uma linha por lote ATIVO: lote novo entra, lote fechado sai, o que já foi marcado fica */
+/* duas listas sincronizadas com o cadastro: lotes ATIVOS (lote novo entra, lote fechado sai, o que já foi marcado fica)
+   e currais OCUPADOS (curral com pelo menos um lote ativo), na ordem do cadastro de currais. O curral de cada lote é o
+   do dia: no diário de hoje acompanha o cadastro (lote transferido cai sozinho no cartão certo); no diário de outro dia
+   (correção) fica a foto daquele dia. Rascunho no formato da v102 é convertido pela leitura única (cfDiarioNorm). */
 function cfSincronizarLinhas(r){
-  const ativos=cfLotesAtivos(r.unidadeId);
-  const antigas=r.lotes||[];
-  r.lotes=ativos.map(l=>antigas.find(x=>x.loteId===l.id)||{loteId:l.id, cms:"", sobra:"", enfermaria:"", curral:"", obs:""});
+  if(!Array.isArray(r.currais)){ const n=cfDiarioNorm(r);
+    r.currais=n.currais.map(c=>Object.assign({}, c));
+    r.lotes=n.lotes.map(x=>{ const o=Object.assign({}, x); delete o.v102; return o; }); }
+  const ativos=cfLotesAtivos(r.unidadeId), antL=r.lotes||[], antC=r.currais||[], hoje=r.data===hojeBRT();
+  r.lotes=ativos.map(l=>{ const x=antL.find(y=>y.loteId===l.id);
+    if(!x) return {loteId:l.id, curralId:l.curralId||"", enfEstao:"", foraNormal:[]};
+    if(hoje||!x.curralId) x.curralId=l.curralId||"";
+    return x; });
+  const ordem=cfCurrais(r.unidadeId).map(t=>t.id), ocupados=[...new Set(r.lotes.map(x=>x.curralId))];
+  ocupados.sort((a,b)=>{ const ia=ordem.indexOf(a), ib=ordem.indexOf(b); return (ia<0?1e9:ia)-(ib<0?1e9:ib); });
+  r.currais=ocupados.map(cid=>antC.find(c=>c.curralId===cid)||{curralId:cid, cms:"", sobra:"", cond:""});
+  r.lotes.sort((a,b)=>ocupados.indexOf(a.curralId)-ocupados.indexOf(b.curralId)||(a.loteId<b.loteId?-1:1));
   return r;
 }
 function salvarRascConf(){ if(rascunhoConf) Persist.set("bdf:rasccf", JSON.stringify(rascunhoConf)); else Persist.del("bdf:rasccf");
   if(rascunhoConf) atualizarAvanco("bt-enviar-cf", faltaEnvioConf(rascunhoConf)); }
-/* pré-condição VISÍVEL do envio (c10): sobra e curral marcados em todo lote; CMS é opcional (o FarmTell pode atrasar) */
+const cfNomeCurral=cid=>cfCurralNome(cid)||"curral sem cadastro";
+/* pré-condição VISÍVEL do envio (c10), curral por curral: sobra e condição marcadas; CMS é opcional (o FarmTell pode
+   atrasar), mas, se veio, dentro da faixa; enfermaria nunca acima das cabeças vivas do lote. Diz o que conferir —
+   nunca "campo obrigatório", nunca "erro". */
 function faltaEnvioConf(r){
   if(!r) return "";
   if(!(r.lotes||[]).length) return "Registre a entrada do primeiro lote";
-  for(const x of r.lotes){
-    if(x.sobra==="") return "Marque a sobra de cocho do lote "+x.loteId;
-    if(x.curral==="") return "Marque o curral do lote "+x.loteId;
+  if(cfForaFaixa(r.chuvaMm,"chuva")) return "Chuva fora de "+cfFaixaTxt("chuva")+" mm — confira";
+  for(const c of r.currais||[]){ const nome=cfNomeCurral(c.curralId);
+    if(c.sobra===""||c.sobra==null) return "Marque a sobra de cocho do "+nome;
+    if(!c.cond) return "Marque a condição do "+nome;
+    if(cfForaFaixa(c.cms,"cms")) return "CMS do "+nome+" fora de "+cfFaixaTxt("cms")+" kg MS — confira";
+    for(const x of r.lotes.filter(y=>y.curralId===c.curralId)){ const l=cfLote(x.loteId); if(!l) continue;
+      const vivas=cfResumoLote(l,r.data).vivas;
+      if(n0(x.enfEstao)>vivas) return "Enfermaria do lote "+x.loteId+" acima das "+vivas+" cabeças vivas — confira";
+    }
   }
   return "";
 }
-const cfOntemLinha=(fz,data,loteId)=>{ const ant=cfDiarios().filter(d=>d.unidadeId===fz && d.data<data).sort((a,b)=>a.data<b.data?1:-1)[0];
-  return ant?(ant.lotes||[]).find(x=>x.loteId===loteId):null; };
+/* referência em cinza: o CMS do mesmo curral no diário anterior */
+const cfOntemCurral=(fz,data,curralId)=>{ const ant=cfDiarios().filter(d=>d.unidadeId===fz && d.data<data).sort((a,b)=>a.data<b.data?1:-1)[0];
+  return ant?(cfDiarioNorm(ant).currais||[]).find(c=>c.curralId===curralId):null; };
+/* pré-condição do "Registrar morte": causa, cabeças até as vivas do lote, peso estimado (opcional) dentro da faixa */
+function faltaMorteConf(){
+  const m=cfUI.morte, r=rascunhoConf; if(!m||!r) return "";
+  if(!m.causa) return "Escolha a causa provável";
+  const x=r.lotes[m.i], l=x&&cfLote(x.loteId);
+  if(l){ const vivas=cfResumoLote(l,r.data).vivas; if((n0(m.cabecas)||1)>vivas) return "Morte de "+(n0(m.cabecas)||1)+" cabeças acima das "+vivas+" vivas do lote — confira"; }
+  if(cfForaFaixa(m.peso,"pesoMorte")) return "Peso estimado fora de "+cfFaixaTxt("pesoMorte")+" kg — confira";
+  return "";
+}
+/* a parte do LOTE dentro do cartão do curral: identidade (só quando o curral tem mais de um lote), enfermaria,
+   "Algo fora do normal?" e as mortes do dia */
+function cfFormLote(r,x,li,mostraId){
+  const l=cfLote(x.loteId); if(!l) return "";
+  const res=cfResumoLote(l,r.data), mortes=cfMortesDia(l.id,r.data), m=cfUI.morte&&cfUI.morte.i===li?cfUI.morte:null;
+  return `<div class="${mostraId?"cf-sublote":""}" data-cfl="${li}">
+      ${mostraId?`<b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${res.vivas}</span> cab · dia <span class="num">${res.dias}</span></span>`:""}
+      <label class="mt">Na enfermaria (nº)</label><input inputmode="numeric" data-cfd="enfEstao" value="${esc(x.enfEstao==null?"":x.enfEstao)}" placeholder="0">
+      <div><label class="mt">Algo fora do normal?</label>
+        <div class="chips">${CF_FORA_NORMAL.map(([k,rot])=>`<button class="chip ${(x.foraNormal||[]).includes(k)?"on":""}" data-cffora="${li}:${k}">${esc(rot)}</button>`).join("")}</div>
+        ${chipsSelecao("cffora",{um:"situação marcada",varios:"situações marcadas"})}</div>
+      ${mortes.map(e=>`<p class="mt" style="margin-bottom:0">⚠️ Morte · ${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${cfUI.ultimaMorte===e.id?` <button class="btn suave mini" data-cfdesfazer="${esc(e.id)}" style="display:inline-flex;min-height:32px;padding:0 10px">desfazer</button>`:""}</p>`).join("")}
+      ${m?`<div class="subcartao" id="cf-morte-box"><label>Causa provável</label>
+        <div class="chips">${CF_CAUSAS_MORTE.map(c=>`<button class="chip ${m.causa===c?"on":""}" data-cfcausa="${li}:${esc(c)}">${esc(c)}</button>`).join("")}</div>
+        <div class="grade2 mt"><div><label>Cabeças</label><input inputmode="numeric" data-cfm="cabecas" value="${esc(m.cabecas)}"></div>
+          <div><label>Peso estimado (kg)</label><input inputmode="decimal" data-cfm="peso" value="${esc(m.peso)}" placeholder="opcional"></div></div>
+        <div class="linha-flex mt"><button class="btn sec mini" id="bt-cf-morte-cancelar">Cancelar</button>${botaoAvanco("bt-cf-morte-ok",{rotulo:"Registrar morte", classe:"btn mini", falta:faltaMorteConf()})}</div></div>`
+      :`<div class="linha-flex mt"><span class="cresce mut">${mortes.length?"":"Sem morte registrada hoje"}</span><button class="btn suave mini" data-cfmorte="${li}">＋ morte</button></div>`}
+    </div>`;
+}
 function vFormConf(){
   const r=rascunhoConf, fz=r.unidadeId;
   const chip=(attr,v,rot,on)=>`<button class="chip ${on?"on":""}" data-${attr}="${esc(v)}">${rot}</button>`;
+  const nomeFixo=r.responsavel&&!cfUI.trocarNome;
   return topo(maeDe(fazenda(fz)).nome+" — "+fmtData(r.data),"Diário do confinamento · salvo automaticamente",true)+`
-  <p class="mut mb" style="font-size:.8rem">⏱️ Dois minutos: uma linha por lote. O CMS vem do FarmTell — se ainda não saiu, deixe em branco.</p>
-  <div class="cartao" style="padding:10px 14px"><label>Quem está preenchendo</label>
-    <input data-cfr="responsavel" value="${esc(r.responsavel||"")}" placeholder="Seu nome"></div>
+  <p class="mut mb" style="font-size:.8rem">⏱️ Dois minutos: um cartão por curral, uma linha por lote. O CMS vem do FarmTell — se ainda não saiu, deixe em branco.</p>
+  <div class="cartao" style="padding:10px 14px">${nomeFixo
+    ?`<p class="linha-flex" style="margin:0"><span class="cresce">Quem está preenchendo: <b>${esc(r.responsavel)}</b></span><button class="btn suave mini" id="bt-cf-nome-trocar">trocar</button></p>`
+    :`<label>Quem está preenchendo</label><input data-cfr="responsavel" value="${esc(r.responsavel||"")}" placeholder="Seu nome">`}</div>
   <div class="cartao"><h3>🌤️ Dia</h3>
     <div class="grade2"><div><label>Chuva (mm)</label><input inputmode="decimal" data-cfr="chuvaMm" value="${esc(r.chuvaMm)}" placeholder="0"></div>
       <div><label>Estresse térmico</label><div class="chips" data-cfgrupo="estresse">${chip("cfest","Sim","Sim",r.estresse==="Sim")}${chip("cfest","Não","Não",r.estresse==="Não")}</div></div></div></div>
-  <p class="mut" style="font-size:.76rem">Sobra de cocho: ${CF_SOBRA.map(([k,rot])=>k+" "+rot).join(" · ")}.</p>
-  ${r.lotes.map((x,i)=>{ const l=cfLote(x.loteId); if(!l) return ""; const res=cfResumoLote(l,r.data), ont=cfOntemLinha(fz,r.data,l.id), mortes=cfMortesDia(l.id,r.data), m=cfUI.morte&&cfUI.morte.i===i?cfUI.morte:null;
-    return `<div class="subcartao" data-cfl="${i}">
-      <b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${res.vivas}</span> cab · dia <span class="num">${res.dias}</span> · ${esc(cfCurralNome(l.curralId))}</span>
-      <div class="grade2 mt">
-        <div><label>CMS (kg MS/cab)</label><input inputmode="decimal" data-cfd="cms" value="${esc(x.cms)}" placeholder="${ont&&ont.cms!==""?"ontem "+esc(fmtKg(ont.cms)):"do FarmTell"}"></div>
-        <div><label>Na enfermaria (nº)</label><input inputmode="numeric" data-cfd="enfermaria" value="${esc(x.enfermaria)}" placeholder="0"></div>
-      </div>
-      <label class="mt">Sobra de cocho</label>
-      <div class="chips" data-cfgrupo="sobra">${CF_SOBRA.map(([k,rot])=>`<button class="chip ${x.sobra===k?"on":""}" data-cfsobra="${i}:${k}" title="${esc(rot)}" aria-label="${k} — ${esc(rot)}">${k}</button>`).join("")}</div>
-      <label class="mt">Curral</label>
-      <div class="chips" data-cfgrupo="curral">${CF_CURRAL_COND.map(([k,rot])=>`<button class="chip ${x.curral===k?"on":""}" data-cfcur="${i}:${k}">${rot}</button>`).join("")}</div>
-      ${mortes.map(e=>`<p class="mt" style="margin-bottom:0">⚠️ Morte · ${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${cfUI.ultimaMorte===e.id?` <button class="btn suave mini" data-cfdesfazer="${esc(e.id)}" style="display:inline-flex;min-height:32px;padding:0 10px">desfazer</button>`:""}</p>`).join("")}
-      ${m?`<div class="subcartao" id="cf-morte-box"><label>Causa provável</label>
-        <div class="chips">${CF_CAUSAS_MORTE.map(c=>`<button class="chip ${m.causa===c?"on":""}" data-cfcausa="${i}:${esc(c)}">${esc(c)}</button>`).join("")}</div>
-        <div class="grade2 mt"><div><label>Cabeças</label><input inputmode="numeric" data-cfm="cabecas" value="${esc(m.cabecas)}"></div>
-          <div><label>Peso estimado (kg)</label><input inputmode="decimal" data-cfm="peso" value="${esc(m.peso)}" placeholder="opcional"></div></div>
-        <div class="linha-flex mt"><button class="btn sec mini" id="bt-cf-morte-cancelar">Cancelar</button>${botaoAvanco("bt-cf-morte-ok",{rotulo:"Registrar morte", classe:"btn mini", falta:m.causa?"":"Escolha a causa provável"})}</div></div>`
-      :`<div class="linha-flex mt"><span class="cresce mut">${mortes.length?"":"Sem morte registrada hoje"}</span><button class="btn suave mini" data-cfmorte="${i}">＋ morte</button></div>`}
-      <label class="mt">Observação do lote</label><input data-cfd="obs" value="${esc(x.obs||"")}" placeholder="Opcional">
+  <p class="mut" style="font-size:.76rem">Sobra de cocho (leitura da manhã): ${CF_SOBRA.map(([k,rot])=>k+" "+rot).join(" · ")}.</p>
+  ${(r.currais||[]).map((c,ci)=>{ const ls=r.lotes.map((x,li)=>({x,li})).filter(o=>o.x.curralId===c.curralId); if(!ls.length) return "";
+    const um=ls.length===1, nome=cfNomeCurral(c.curralId), ont=cfOntemCurral(fz,r.data,c.curralId);
+    const l1=cfLote(ls[0].x.loteId), res1=l1?cfResumoLote(l1,r.data):null;
+    const vivas=ls.reduce((s,o)=>{ const l=cfLote(o.x.loteId); return s+(l?cfResumoLote(l,r.data).vivas:0); },0);
+    return `<div class="subcartao" data-cfc="${ci}">
+      ${um&&l1?`<b class="num">${esc(l1.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l1.genetica))} · <span class="num">${res1.vivas}</span> cab · dia <span class="num">${res1.dias}</span> · ${esc(nome)}</span>`
+        :`<b>${esc(nome)}</b> <span class="mut">· ${ls.length} lotes · <span class="num">${vivas}</span> cab</span>`}
+      <label class="mt">CMS (kg MS/cab)</label><input inputmode="decimal" data-cfcd="cms" value="${esc(c.cms)}" placeholder="${ont&&ont.cms!==""&&ont.cms!=null?"ontem "+esc(fmtKg(ont.cms)):"do FarmTell"}">
+      <label class="mt">Sobra de cocho (leitura da manhã)</label>
+      <div class="chips" data-cfgrupo="sobra">${CF_SOBRA.map(([k,rot])=>`<button class="chip ${c.sobra===k?"on":""}" data-cfsobra="${ci}:${k}" title="${esc(rot)}" aria-label="${k} — ${esc(rot)}">${k}</button>`).join("")}</div>
+      <label class="mt">Condição do curral</label>
+      <div class="chips" data-cfgrupo="curral">${CF_CURRAL_COND.map(([k,rot])=>`<button class="chip ${c.cond===k?"on":""}" data-cfcur="${ci}:${k}">${rot}</button>`).join("")}</div>
+      ${ls.map(o=>cfFormLote(r,o.x,o.li,!um)).join("")}
     </div>`; }).join("")||htmlEstado("vazio",{que:"lote ativo",unidade:fz,dica:"Registre a entrada do primeiro lote."},{classe:"mut"})}
   <div class="cartao mt"><label>Observação do dia</label><textarea data-cfr="obs" rows="2" placeholder="Opcional">${esc(r.obs||"")}</textarea></div>
   ${cadRodape(botaoAvanco("bt-enviar-cf",{rotulo:"Enviar diário", falta:faltaEnvioConf(r)}))}`;
@@ -12578,20 +12675,38 @@ function validarEnviarConf(){
   salvarDados(); rascunhoConf=null; Persist.del("bdf:rasccf");
   ir("casa");
 }
+/* campos do CURRAL em lista de leitura (dt/dd) — no formato da v102 eles moram no lote */
+function cfDlCurral(v){
+  return `<dt>CMS</dt><dd>${v.cms!==""&&v.cms!=null?fmtKg(v.cms)+" kg MS/cab":"sem CMS"}</dd>
+        <dt>Sobra de cocho</dt><dd>${v.sobra!==""&&v.sobra!=null?esc(v.sobra+" · "+cfRot(CF_SOBRA,v.sobra)):"—"}</dd>
+        <dt>Curral</dt><dd>${esc(cfRot(CF_CURRAL_COND,v.cond))||"—"}</dd>`;
+}
+const cfMorteTxt=e=>esc(e.causa)+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")+((n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":"");
+const cfForaTxt=v=>(v.foraNormal||[]).map(k=>cfRot(CF_FORA_NORMAL,k)).join(", ");
+/* campos do LOTE em lista de leitura (dt/dd) */
+function cfDlLote(v,data){
+  const mortes=cfMortesDia(v.loteId,data);
+  return `<dt>Enfermaria</dt><dd>${n0(v.enfEstao)}</dd>
+        ${(v.foraNormal||[]).length?`<dt>Fora do normal</dt><dd>${esc(cfForaTxt(v))}</dd>`:""}
+        ${mortes.map(e=>`<dt>Morte</dt><dd>${cfMorteTxt(e)}</dd>`).join("")}
+        ${v.obs?`<dt>Obs.</dt><dd>${esc(v.obs)}</dd>`:""}`;
+}
 function vDetalheConf(id){
   const d=cfDiarios().find(x=>x.id===id);
   if(!d) return topo("Diário","não encontrado",true);
+  const dn=cfDiarioNorm(d);
   const prazo=(()=>{ const t=new Date((d.enviadoEm||"").replace(" ","T")); return isNaN(t)?true:(Date.now()-t.getTime())<=48*36e5; })();
   return cabecalhoContexto(d.unidadeId,{sub:[fmtData(d.data),"Diário do confinamento",d.responsavel].filter(Boolean).join(" · "), voltar:true})+`
-    ${(d.chuvaMm!==""||d.estresse)?`<div class="cartao"><h3>🌤️ Dia</h3><p class="mt">${[d.chuvaMm!==""?"chuva "+n0(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":d.estresse==="Não"?"sem estresse térmico":""].filter(Boolean).join(" · ")}</p></div>`:""}
-    ${(d.lotes||[]).map(x=>{ const l=cfLote(x.loteId), mortes=cfMortesDia(x.loteId,d.data);
-      return `<div class="cartao"><h3 class="num">${esc(x.loteId)}</h3>${l?`<p class="mut">${esc(cfRot(CF_GENETICA,l.genetica))} · ${esc(cfCurralNome(l.curralId))}</p>`:""}<dl class="dl mt">
-        <dt>CMS</dt><dd>${x.cms!==""?fmtKg(x.cms)+" kg MS/cab":"sem CMS"}</dd>
-        <dt>Sobra de cocho</dt><dd>${x.sobra!==""?esc(x.sobra+" · "+cfRot(CF_SOBRA,x.sobra)):"—"}</dd>
-        <dt>Enfermaria</dt><dd>${n0(x.enfermaria)}</dd>
-        <dt>Curral</dt><dd>${esc(cfRot(CF_CURRAL_COND,x.curral))||"—"}</dd>
-        ${mortes.map(e=>`<dt>Morte</dt><dd>${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}</dd>`).join("")}
-        ${x.obs?`<dt>Obs.</dt><dd>${esc(x.obs)}</dd>`:""}</dl></div>`; }).join("")}
+    ${(d.chuvaMm!==""&&d.chuvaMm!=null||d.estresse)?`<div class="cartao"><h3>🌤️ Dia</h3><p class="mt">${[d.chuvaMm!==""&&d.chuvaMm!=null?"chuva "+n0(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":d.estresse==="Não"?"sem estresse térmico":""].filter(Boolean).join(" · ")}</p></div>`:""}
+    ${dn.currais.map(c=>{ const ls=dn.lotes.filter(x=>x.curralId===c.curralId).map(x=>cfLinhaDia(dn,x.loteId)); if(!ls.length) return "";
+      const um=ls.length===1;
+      /* v102: os campos do curral eram por lote — cada lote mostra os seus; v103: uma vez por curral */
+      const lote=v=>{ const l=cfLote(v.loteId);
+        return `${um?"":`<h3 class="num mt">${esc(v.loteId)}</h3>`}${l?`<p class="mut">${esc(cfRot(CF_GENETICA,l.genetica))}${um?" · "+esc(cfNomeCurral(c.curralId)):""}</p>`:""}
+          <dl class="dl mt">${dn.legado?cfDlCurral(v):""}${cfDlLote(v,d.data)}</dl>`; };
+      return `<div class="cartao">${um?`<h3 class="num">${esc(ls[0].loteId)}</h3>`:`<h3>${esc(cfNomeCurral(c.curralId))} <span class="mut">· ${ls.length} lotes</span></h3>`}
+        ${dn.legado?"":`<dl class="dl mt">${cfDlCurral(c)}</dl>`}
+        ${ls.map(v=>`<div class="${um?"":"cf-sublote"}">${lote(v)}</div>`).join("")}</div>`; }).join("")}
     ${d.obs?`<div class="cartao"><h3>📝 Observação do dia</h3><p class="mt" style="white-space:pre-wrap">${esc(d.obs)}</p></div>`:""}
     <button class="btn mt" data-zapcf="${esc(d.id)}">📲 Mandar resumo no WhatsApp</button>
     ${botaoAcao("corrigir_boletim",{prazo},{rotulo:"✏️ Corrigir", aria:"Corrigir", classe:"btn sec mt", attrs:`data-cfcorrigir="${esc(d.id)}"`})}
@@ -12599,7 +12714,7 @@ function vDetalheConf(id){
 }
 
 /* ---------- Entrada de lote (3 passos: curral → grupo genético → detalhes) ---------- */
-function novoCfNovo(){ return {curral:"", genetica:"", data:hojeBRT(), cabecas:"", peso:"", origem:"", fornecedor:"", preco:"", precoUn:"ARROBA", gta:"", obs:""}; }
+function novoCfNovo(){ return {curral:"", genetica:"", data:hojeBRT(), cabecas:"", peso:"", jejum:"", origem:"", fornecedor:"", preco:"", precoUn:"ARROBA", gta:"", obs:""}; }
 function salvarCfNovo(){ if(cfNovo) Persist.set("bdf:cfnovo", JSON.stringify(cfNovo)); else Persist.del("bdf:cfnovo");
   if(cfNovo) atualizarAvanco("bt-cf-criar", faltaNovoLote(cfNovo)); }
 function faltaNovoLote(n){
@@ -12607,6 +12722,8 @@ function faltaNovoLote(n){
   if(!n.genetica) return "Escolha o grupo genético";
   if(!(n0(n.cabecas)>0)) return "Informe as cabeças que entraram";
   if(!(n0(n.peso)>0)) return "Informe o peso médio de balança";
+  if(cfForaFaixa(n.peso,"pesoEntrada")) return "Peso médio fora de "+cfFaixaTxt("pesoEntrada")+" kg — confira";
+  if(!n.jejum) return "Marque se a pesagem foi com ou sem jejum";
   if(!n.origem) return "Escolha a origem do lote";
   return "";
 }
@@ -12632,6 +12749,8 @@ function vNovoLoteConf(){
       <div><label>Cabeças</label><input inputmode="numeric" data-cfn="cabecas" value="${esc(n.cabecas)}"></div>
       <div><label>Peso médio de balança (kg)</label><input inputmode="decimal" data-cfn="peso" value="${esc(n.peso)}"></div>
     </div>
+    <label class="mt">Pesagem</label>
+    <div class="chips">${CF_JEJUM.map(([k,rot])=>`<button class="chip ${n.jejum===k?"on":""}" data-cfnjej="${k}">${rot}</button>`).join("")}</div>
     <label class="mt">Origem</label>
     <div class="chips">${CF_ORIGEM.map(([k,rot])=>`<button class="chip ${n.origem===k?"on":""}" data-cfnorig="${k}">${rot}</button>`).join("")}</div>
     <label class="mt">${n.origem==="COMPRA"?"Fornecedor":"Fazenda de origem"}</label><input data-cfn="fornecedor" value="${esc(n.fornecedor)}" placeholder="Opcional">
@@ -12648,7 +12767,7 @@ function cfCriarLote(){
   const falta=faltaNovoLote(n); if(falta){ atualizarAvanco("bt-cf-criar", falta); return; }
   const ano=+String(n.data).slice(0,4), cod=cfProximoCodigo(fz, ano), agora=new Date().toISOString();
   const l={ id:cod.id, unidadeId:fz, sigla:cod.sigla, ano, seq:cod.seq, curralId:n.curral, genetica:n.genetica,
-    entradaData:n.data, cabecasEntrada:n0(n.cabecas), pesoEntradaKg:n0(n.peso), origem:n.origem, fornecedor:n.fornecedor||"",
+    entradaData:n.data, cabecasEntrada:n0(n.cabecas), pesoEntradaKg:n0(n.peso), pesoEntradaJejum:n.jejum, origem:n.origem, fornecedor:n.fornecedor||"",
     precoValor:n.preco===""?"":n0(n.preco), precoUn:n.precoUn||"ARROBA", gta:n.gta||"", obs:n.obs||"",
     status:"ATIVO", projecao:null, criadoEm:agora, criadoPor:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)||"",
     historico:[{em:agora, acao:"entrada", por:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)||""}] };
@@ -12677,6 +12796,7 @@ function vLoteConf(id){
         ${tile(r.mortes+(r.mortes?`<span class="mut" style="font-size:.78rem;font-weight:500"> · ${fmtPct(r.mort)} %</span>`:""),"mortes · mortalidade")}
         ${tile(r.gmd!=null?fmtGmd(r.gmd):"—", r.gmd!=null?"GMD kg/dia desde a entrada":"sem pesagem desde a entrada")}
       </div>
+      ${r.gmd!=null&&r.gmdNota?`<p class="mut mt" style="font-size:.8rem">GMD sem desconto de jejum: ${esc(r.gmdNota)}.</p>`:""}
       ${r.gmdUlt!=null&&r.ultPesagem?`<p class="mut mt" style="font-size:.8rem">Última pesagem ${fmtDataCurta(r.ultPesagem.data)}: ${fmtKg(r.ultPesagem.pesoMedioKg)} kg · GMD desde ela <span class="num">${fmtGmd(r.gmdUlt)}</span></p>`:""}
       ${r.proj?`<p class="mt linha-flex"><span class="farol reto ${CF_FAROL_CSS[r.farol]}"></span><span class="cresce">${r.gmd!=null?`GMD <span class="num">${fmtGmd(r.gmd)}</span> × alvo <span class="num">${fmtGmd(r.proj.gmdAlvo)}</span> kg/dia`:"sem pesagem desde a entrada"}${n0(r.proj.diasPrevistos)?` · previstos <span class="num">${n0(r.proj.diasPrevistos)}</span> dias`:""}</span></p>`
         :`<p class="mut mt" style="font-size:.8rem">Sem projeção lançada para este lote.</p>`}
@@ -12684,14 +12804,15 @@ function vLoteConf(id){
     <div class="cartao"><h3>Entrada</h3><dl class="dl mt">
       <dt>Cabeças</dt><dd class="num">${n0(l.cabecasEntrada)}</dd>
       <dt>Peso médio</dt><dd class="num">${fmtKg(l.pesoEntradaKg)} kg</dd>
+      <dt>Pesagem</dt><dd>${esc(cfJejumRot(l.pesoEntradaJejum))}</dd>
       <dt>Origem</dt><dd>${esc(cfRot(CF_ORIGEM,l.origem))}${l.fornecedor?" · "+esc(l.fornecedor):""}</dd>
       ${l.precoValor!==""&&l.precoValor!=null?`<dt>Preço ref.</dt><dd class="num">${esc(Number(l.precoValor).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}))} ${esc(cfRot(CF_PRECO_UN,l.precoUn))}</dd>`:""}
       ${l.gta?`<dt>GTA</dt><dd>${esc(l.gta)}</dd>`:""}
       ${l.obs?`<dt>Obs.</dt><dd>${esc(l.obs)}</dd>`:""}</dl></div>
     ${mortes.length?`<div class="cartao"><h3>Mortes</h3><ul class="lista-limpa">${mortes.map(e=>`<li class="mt">${fmtDataCurta(e.data)} · ${esc(e.causa)}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}</li>`).join("")}</ul></div>`:""}
     <div class="cartao"><h3>Últimos diários deste lote</h3>
-      <ul class="lista-limpa">${diarios.map(d=>{ const x=d.lotes.find(y=>y.loteId===l.id);
-        return `<li><button class="linha-flex" style="width:100%;text-align:left" data-vercf="${esc(d.id)}"><span class="cresce"><b>${fmtDataCurta(d.data)}</b> <span class="mut">· ${x.cms!==""?"CMS "+fmtKg(x.cms):"sem CMS"} · sobra ${esc(x.sobra||"—")} · enf. ${n0(x.enfermaria)} · ${esc(cfRot(CF_CURRAL_COND,x.curral)).toLowerCase()||"—"}</span></span><span class="mut">›</span></button></li>`; }).join("")
+      <ul class="lista-limpa">${diarios.map(d=>{ const x=cfLinhaDia(cfDiarioNorm(d),l.id);
+        return `<li><button class="linha-flex" style="width:100%;text-align:left" data-vercf="${esc(d.id)}"><span class="cresce"><b>${fmtDataCurta(d.data)}</b> <span class="mut">· ${x.cms!==""&&x.cms!=null?"CMS "+fmtKg(x.cms):"sem CMS"} · sobra ${esc(x.sobra===""||x.sobra==null?"—":x.sobra)} · enf. ${n0(x.enfEstao)} · ${esc(cfRot(CF_CURRAL_COND,x.cond)).toLowerCase()||"—"}</span></span><span class="mut">›</span></button></li>`; }).join("")
         ||htmlEstado("vazio",{que:"diário registrado",operacao:"lote "+l.id,unidade:l.unidadeId},{tag:"li"})}</ul></div>
     <button class="btn sec mt" data-cfcsv="${esc(l.id)}">⬇ CSV do lote</button>
     <button class="btn sec mt" data-voltar="1">‹ Voltar</button>`;
@@ -12699,17 +12820,31 @@ function vLoteConf(id){
 
 /* ---------- Resumo WhatsApp do diário ---------- */
 function resumoWhatsConf(d){
-  const mae=maeDe(fazenda(d.unidadeId));
+  const mae=maeDe(fazenda(d.unidadeId)), dn=cfDiarioNorm(d);
   const L=["🐃 *CONFINAMENTO "+mae.nome.toUpperCase()+"* — "+fmtData(d.data), "Por: "+(d.responsavel||"—")];
   const cl=[(d.chuvaMm!==""&&d.chuvaMm!=null)?"chuva "+n0(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":""].filter(Boolean);
   if(cl.length) L.push("🌤️ "+cl.join(" · "));
-  const desvios=[];
-  (d.lotes||[]).forEach(x=>{ const l=cfLote(x.loteId); if(!l) return; const r=cfResumoLote(l,d.data), mortes=cfMortesDia(l.id,d.data);
-    L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(x.cms!==""?" · CMS "+fmtKg(x.cms)+" kg MS":" · sem CMS")+(x.sobra!==""?" · sobra "+x.sobra:"")
-      +(n0(x.enfermaria)?" · "+n0(x.enfermaria)+" na enfermaria":"")+(x.curral?" · curral "+cfRot(CF_CURRAL_COND,x.curral).toLowerCase():"")+(x.obs?" — "+x.obs:""));
-    mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")); });
-    if(x.sobra==="0"||x.sobra==="4") desvios.push(l.id+" sobra "+x.sobra);
-    if(r.farol==="amarelo"||r.farol==="vermelho") desvios.push(l.id+" GMD "+fmtGmd(r.gmd)+" × alvo "+fmtGmd(r.proj.gmdAlvo));
+  const desvios=[], vazio=v=>v===""||v==null;
+  const condTxt=k=>cfRot(CF_CURRAL_COND,k).toLowerCase();
+  dn.currais.forEach(c=>{
+    const ls=dn.lotes.filter(x=>x.curralId===c.curralId).map(x=>cfLinhaDia(dn,x.loteId)).filter(v=>cfLote(v.loteId)); if(!ls.length) return;
+    const nome=cfNomeCurral(c.curralId);
+    /* v103: o curral numa linha só (o cocho é dele), os lotes embaixo; o diário da v102 sai como saía (tudo por lote) */
+    if(!dn.legado){
+      L.push("🏠 "+nome+(!vazio(c.cms)?" · CMS "+fmtKg(c.cms)+" kg MS":" · sem CMS")+(!vazio(c.sobra)?" · sobra "+c.sobra:"")+(c.cond?" · curral "+condTxt(c.cond):""));
+      if(c.sobra==="0"||c.sobra==="4") desvios.push(nome+" sobra "+c.sobra);
+      if(c.cond==="POEIRA"||c.cond==="LAMA") desvios.push(nome+" "+condTxt(c.cond));
+    }
+    ls.forEach(v=>{ const l=cfLote(v.loteId), r=cfResumoLote(l,d.data), mortes=cfMortesDia(l.id,d.data), fora=cfForaTxt(v);
+      if(dn.legado){
+        L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(!vazio(v.cms)?" · CMS "+fmtKg(v.cms)+" kg MS":" · sem CMS")+(!vazio(v.sobra)?" · sobra "+v.sobra:"")
+          +(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(v.cond?" · curral "+condTxt(v.cond):"")+(v.obs?" — "+v.obs:""));
+        if(v.sobra==="0"||v.sobra==="4") desvios.push(l.id+" sobra "+v.sobra);
+        if(v.cond==="LAMA") desvios.push(l.id+" curral lama");
+      } else L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(fora?" · fora do normal: "+fora:""));
+      mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")); });
+      if(r.farol==="amarelo"||r.farol==="vermelho") desvios.push(l.id+" GMD "+fmtGmd(r.gmd)+" × alvo "+fmtGmd(r.proj.gmdAlvo));
+    });
   });
   if(desvios.length) L.push("🔎 Fora do esperado: "+desvios.join(" · "));
   if(d.obs) L.push("📝 "+d.obs);
@@ -12726,19 +12861,24 @@ function abrirWhatsConf(id){
 /* ---------- CSV por lote: uma linha por evento, no formato que o escritório cruza com a ficha e o FarmTell ---------- */
 function cfCsvTexto(id){
   const l=cfLote(id); if(!l) return "";
-  const cab=["lote","unidade","tipo","data","cabecas","peso_kg","cms_kg_ms","sobra_escore","enfermaria","curral","causa","responsavel","obs"];
+  /* v103: colunas novas SEMPRE no fim, para não quebrar a planilha de quem já usa o CSV da v102 */
+  const cab=["lote","unidade","tipo","data","cabecas","peso_kg","cms_kg_ms","sobra_escore","enfermaria","curral","causa","responsavel","obs",
+    "fora_normal","pesagem_jejum","curral_do_dia"];
   const c=v=>{ const s=String(v==null?"":v).replace(/"/g,'""'); return /[;"\n]/.test(s)?'"'+s+'"':s; };
   const num=v=>(v===""||v==null)?"":String(v).replace(".",",");
-  const linhas=[];
-  linhas.push({data:l.entradaData, ord:0, c:[l.id, fazenda(l.unidadeId).nome, "ENTRADA", l.entradaData, n0(l.cabecasEntrada), num(l.pesoEntradaKg), "", "", "", cfCurralNome(l.curralId), "", l.criadoPor||"",
-    [cfRot(CF_GENETICA,l.genetica), cfRot(CF_ORIGEM,l.origem), l.fornecedor, (l.precoValor!==""&&l.precoValor!=null)?"preço "+num(l.precoValor)+" "+cfRot(CF_PRECO_UN,l.precoUn):"", l.gta?"GTA "+l.gta:"", l.obs].filter(Boolean).join(" · ")]});
-  cfDiarios().filter(d=>d.unidadeId===l.unidadeId).forEach(d=>{ const x=(d.lotes||[]).find(y=>y.loteId===l.id); if(!x) return;
-    linhas.push({data:d.data, ord:1, c:[l.id, fazenda(l.unidadeId).nome, "DIARIO", d.data, "", "", num(x.cms), x.sobra, x.enfermaria===""?"0":n0(x.enfermaria), cfRot(CF_CURRAL_COND,x.curral), "", d.responsavel||"",
-      [d.chuvaMm!==""&&d.chuvaMm!=null?"chuva "+num(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":"", x.obs].filter(Boolean).join(" · ")]}); });
+  const linha=o=>cab.map(k=>o[k]==null?"":o[k]);
+  const un=fazenda(l.unidadeId).nome, linhas=[];
+  linhas.push({data:l.entradaData, ord:0, c:linha({lote:l.id, unidade:un, tipo:"ENTRADA", data:l.entradaData, cabecas:n0(l.cabecasEntrada), peso_kg:num(l.pesoEntradaKg), curral:cfCurralNome(l.curralId), responsavel:l.criadoPor||"",
+    obs:[cfRot(CF_GENETICA,l.genetica), cfRot(CF_ORIGEM,l.origem), l.fornecedor, (l.precoValor!==""&&l.precoValor!=null)?"preço "+num(l.precoValor)+" "+cfRot(CF_PRECO_UN,l.precoUn):"", l.gta?"GTA "+l.gta:"", l.obs].filter(Boolean).join(" · "),
+    pesagem_jejum:l.pesoEntradaJejum?cfRot(CF_JEJUM,l.pesoEntradaJejum):"", curral_do_dia:cfCurralNome(l.curralId)})});
+  cfDiarios().filter(d=>d.unidadeId===l.unidadeId).forEach(d=>{ const x=cfLinhaDia(cfDiarioNorm(d),l.id); if(!x) return;
+    linhas.push({data:d.data, ord:1, c:linha({lote:l.id, unidade:un, tipo:"DIARIO", data:d.data, cms_kg_ms:num(x.cms), sobra_escore:x.sobra, enfermaria:x.enfEstao===""?"0":n0(x.enfEstao), curral:cfRot(CF_CURRAL_COND,x.cond), responsavel:d.responsavel||"",
+      obs:[d.chuvaMm!==""&&d.chuvaMm!=null?"chuva "+num(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":"", x.obs].filter(Boolean).join(" · "),
+      fora_normal:cfForaTxt(x), curral_do_dia:cfCurralNome(x.curralId)})}); });
   cfEventos().filter(e=>e.loteId===l.id && !e.cancelado).forEach(e=>{
-    linhas.push({data:e.data, ord:2, c:[l.id, fazenda(l.unidadeId).nome, e.tipo, e.data, n0(e.cabecas)||(e.tipo==="MORTE"?1:""), num(e.pesoEstimadoKg), "", "", "", e.curralPara?cfCurralNome(e.curralPara):"", e.causa||"", e.responsavel||"", e.obs||""]}); });
+    linhas.push({data:e.data, ord:2, c:linha({lote:l.id, unidade:un, tipo:e.tipo, data:e.data, cabecas:n0(e.cabecas)||(e.tipo==="MORTE"?1:""), peso_kg:num(e.pesoEstimadoKg), curral:e.curralPara?cfCurralNome(e.curralPara):"", causa:e.causa||"", responsavel:e.responsavel||"", obs:e.obs||""})}); });
   cfPesagens().filter(p=>p.loteId===l.id && !p.cancelado).forEach(p=>{
-    linhas.push({data:p.data, ord:3, c:[l.id, fazenda(l.unidadeId).nome, "PESAGEM", p.data, n0(p.cabecasPesadas), num(p.pesoMedioKg), "", "", "", "", "", p.responsavel||"", p.obs||""]}); });
+    linhas.push({data:p.data, ord:3, c:linha({lote:l.id, unidade:un, tipo:"PESAGEM", data:p.data, cabecas:n0(p.cabecasPesadas), peso_kg:num(p.pesoMedioKg), responsavel:p.responsavel||"", obs:p.obs||"", pesagem_jejum:p.jejum?cfRot(CF_JEJUM,p.jejum):""})}); });
   linhas.sort((a,b)=>(a.data<b.data?-1:a.data>b.data?1:a.ord-b.ord));
   return [cab.join(";")].concat(linhas.map(x=>x.c.map(c).join(";"))).join("\r\n");
 }
@@ -12762,20 +12902,28 @@ function cfClique(t,d){
     const fz=sessao.fazendaId, dHoje=cfDiarioDoDia(hojeBRT(), fz);
     if(dHoje){ ir("cfdetalhe", dHoje.id); return true; }
     if(!rascunhoConf || rascunhoConf.unidadeId!==fz || rascunhoConf.data!==hojeBRT()) rascunhoConf=novoRascunhoConf(fz);
-    cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
+    cfUI.trocarNome=false; cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
   if(d.cfcorrigir){ const x=cfDiarios().find(y=>y.id===d.cfcorrigir); if(!x) return true;
-    rascunhoConf=JSON.parse(JSON.stringify(x)); cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
+    rascunhoConf=JSON.parse(JSON.stringify(x)); cfUI.trocarNome=false; cfSincronizarLinhas(rascunhoConf); salvarRascConf(); ir("cfform"); return true; }
+  /* v103 (A.7c): nome lembrado aparece como texto; o campo só abre com "trocar" */
+  if(t.id==="bt-cf-nome-trocar" && rascunhoConf){ cfUI.trocarNome=true; ir("cfform",null,true);
+    const el=document.querySelector('input[data-cfr="responsavel"]'); if(el){ el.focus(); el.select(); } return true; }
   if(t.id==="bt-enviar-cf"){ validarEnviarConf(); return true; }
   if(d.cfest!==undefined && rascunhoConf){ rascunhoConf.estresse = rascunhoConf.estresse===d.cfest ? "" : d.cfest;
     if(rascunhoConf.estresse) cfMarcarChip(t); else t.classList.remove("on"); salvarRascConf(); return true; }
-  if(d.cfsobra && rascunhoConf){ const [i,v]=d.cfsobra.split(":"); const x=rascunhoConf.lotes[+i]; if(x){ x.sobra=v; cfMarcarChip(t); salvarRascConf(); } return true; }
-  if(d.cfcur && rascunhoConf){ const [i,v]=d.cfcur.split(":"); const x=rascunhoConf.lotes[+i]; if(x){ x.curral=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  /* v103: sobra e condição são do CURRAL (índice em rascunhoConf.currais) */
+  if(d.cfsobra && rascunhoConf){ const [i,v]=d.cfsobra.split(":"); const c=(rascunhoConf.currais||[])[+i]; if(c){ c.sobra=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  if(d.cfcur && rascunhoConf){ const [i,v]=d.cfcur.split(":"); const c=(rascunhoConf.currais||[])[+i]; if(c){ c.cond=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  /* v103: "Algo fora do normal?" — seleção múltipla do lote; tocar de novo desmarca */
+  if(d.cffora && rascunhoConf){ const k=d.cffora.indexOf(":"), x=rascunhoConf.lotes[+d.cffora.slice(0,k)], v=d.cffora.slice(k+1);
+    if(x){ const s0=new Set(x.foraNormal||[]); if(s0.has(v)) s0.delete(v); else s0.add(v); x.foraNormal=CF_FORA_NORMAL.map(([a])=>a).filter(a=>s0.has(a));
+      t.classList.toggle("on", s0.has(v)); salvarRascConf(); } return true; }
   if(d.cfmorte!==undefined && rascunhoConf){ cfUI.morte={i:+d.cfmorte, causa:"", cabecas:"1", peso:""}; ir("cfform",null,true); return true; }
-  if(d.cfcausa && cfUI.morte){ const k=d.cfcausa.indexOf(":"); cfUI.morte.causa=d.cfcausa.slice(k+1); cfMarcarChip(t); atualizarAvanco("bt-cf-morte-ok",""); return true; }
+  if(d.cfcausa && cfUI.morte){ const k=d.cfcausa.indexOf(":"); cfUI.morte.causa=d.cfcausa.slice(k+1); cfMarcarChip(t); atualizarAvanco("bt-cf-morte-ok",faltaMorteConf()); return true; }
   if(t.id==="bt-cf-morte-cancelar"){ cfUI.morte=null; ir("cfform",null,true); return true; }
   if(t.id==="bt-cf-morte-ok" && cfUI.morte && rascunhoConf){
     const m=cfUI.morte, x=rascunhoConf.lotes[m.i]; if(!x) return true;
-    if(!m.causa){ atualizarAvanco("bt-cf-morte-ok","Escolha a causa provável"); return true; }
+    const falta=faltaMorteConf(); if(falta){ atualizarAvanco("bt-cf-morte-ok",falta); return true; }
     const e={ id:uid(), unidadeId:rascunhoConf.unidadeId, loteId:x.loteId, tipo:"MORTE", data:rascunhoConf.data, cabecas:n0(m.cabecas)||1, causa:m.causa,
       pesoEstimadoKg:m.peso===""?"":n0(m.peso), responsavel:rascunhoConf.responsavel||"", criadoEm:new Date().toISOString(), cancelado:false };
     cfEventos().push(e); syncEnfileirar("cfe", e.id); salvarDados();
@@ -12788,6 +12936,7 @@ function cfClique(t,d){
   if(d.cfntrocar && cfNovo){ cfNovo[d.cfntrocar]=""; if(d.cfntrocar==="curral") cfNovo.genetica=""; salvarCfNovo(); ir("cfnovo",null,true); return true; }
   if(d.cfndata && cfNovo){ cfNovo.data=d.cfndata; salvarCfNovo(); ir("cfnovo",null,true); return true; }   /* redesenha: o código previsto segue o ano da data */
   if(d.cfnorig && cfNovo){ cfNovo.origem=d.cfnorig; salvarCfNovo(); ir("cfnovo",null,true); return true; }
+  if(d.cfnjej && cfNovo){ cfNovo.jejum=d.cfnjej; cfMarcarChip(t); salvarCfNovo(); return true; }
   if(d.cfnpun && cfNovo){ cfNovo.precoUn=d.cfnpun; cfMarcarChip(t); salvarCfNovo(); return true; }
   if(t.id==="bt-cf-criar"){ cfCriarLote(); return true; }
   return false;
@@ -12796,7 +12945,8 @@ function cfInput(el){
   const d=el.dataset;
   if(d.cfr!==undefined && rascunhoConf){ rascunhoConf[d.cfr]=el.value; salvarRascConf(); return true; }
   if(d.cfd!==undefined && rascunhoConf){ const c=el.closest("[data-cfl]"); const i=c?parseInt(c.dataset.cfl):-1; const x=rascunhoConf.lotes[i]; if(x){ x[d.cfd]=el.value; salvarRascConf(); } return true; }
-  if(d.cfm!==undefined && cfUI.morte){ cfUI.morte[d.cfm]=el.value; return true; }
+  if(d.cfcd!==undefined && rascunhoConf){ const c=el.closest("[data-cfc]"); const i=c?parseInt(c.dataset.cfc):-1; const x=(rascunhoConf.currais||[])[i]; if(x){ x[d.cfcd]=el.value; salvarRascConf(); } return true; }
+  if(d.cfm!==undefined && cfUI.morte){ cfUI.morte[d.cfm]=el.value; atualizarAvanco("bt-cf-morte-ok",faltaMorteConf()); return true; }
   if(d.cfn!==undefined && cfNovo){ cfNovo[d.cfn]=el.value; salvarCfNovo(); return true; }
   return false;
 }
