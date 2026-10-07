@@ -117,6 +117,11 @@ módulo Confinamento — o app lê E escreve, na mesma fila offline dos
 boletins; na v102 escreve lotes, diário e eventos de morte; pesagens,
 sanidade e saídas entram nas próximas versões). Nenhuma tabela existente
 foi alterada. Plano e decisões em docs/CONFINAMENTO.md.
+Desde a v103: NENHUMA tabela nova. O diário do confinamento passou a gravar
+por CURRAL (cf_diario.payload.currais[]) e por lote (payload.lotes[], com o
+curral do dia); o sql/060 só recria a visão vw_cf_diario_lote (lê os dois
+formatos, colunas novas no fim, nenhuma removida) e cria a função de leitura
+cf_num. Nenhum diário gravado é reescrito.
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
@@ -191,6 +196,10 @@ docs/PLANO-DE-SAFRA.md. Regras que não se discutem:
 4. **Faróis dizem "sem registro", nunca "não fez".** Vermelho só depois
    de a janela fechar. Farol e alerta do plano são da Diretoria; o
    gerente não vê nenhum.
+   Confinamento: todo perfil vê todos os números do lote, inclusive preço
+   e custo (decisão do Nilo, 06/10/2026, pergunta 12 de
+   docs/CONFINAMENTO.md). Não "corrigir" isto. (Vale também para o farol
+   do lote: o Gerente de Confinamento vê o farol de ganho e de consumo.)
 5. **Mudança no plano só por nova versão** (Escritório/ADMIN), nunca
    editando as tabelas vigentes. Uma versão vigente por fazenda-safra;
    publicar passa a anterior para "superado". Nada se apaga.

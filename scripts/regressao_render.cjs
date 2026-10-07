@@ -167,11 +167,15 @@ async function cenario(browser, nome, acesso, sessao, passos) {
     ['10-novo-lote', async p => { await clique(p, '#bt-cf-novo'); }],
     ['11-curral', async p => { await clique(p, '[data-cfncur="tcf03"]'); }],
     ['12-genetica', async p => { await clique(p, '[data-cfngen="NELORE"]'); }],
-    ['13-detalhes', async p => { await preenche(p, 'input[data-cfn="cabecas"]', '120'); await preenche(p, 'input[data-cfn="peso"]', '380'); await clique(p, '[data-cfnorig="RECRIA"]'); }],
+    ['13-detalhes', async p => { await preenche(p, 'input[data-cfn="cabecas"]', '120'); await preenche(p, 'input[data-cfn="peso"]', '380');
+      if (await p.$('[data-cfnjej="NAO"]')) await clique(p, '[data-cfnjej="NAO"]');   /* v103: condição da pesagem */
+      await clique(p, '[data-cfnorig="RECRIA"]'); }],
     ['14-lote', async p => { await clique(p, '#bt-cf-criar'); }],
     ['15-casa', async p => { await clique(p, '[data-voltar]'); }],
     ['20-diario', async p => { await clique(p, '#bt-preencher-cf'); }],
-    ['21-linha', async p => { await preenche(p, '[data-cfl="0"] input[data-cfd="cms"]', '9,8'); await clique(p, '[data-cfsobra="0:2"]'); await clique(p, '[data-cfcur="0:SECO"]'); }],
+    ['21-linha', async p => { const v103 = !!(await p.$('[data-cfc="0"]'));   /* v103: o cocho é do curral (data-cfc); na v102, do lote */
+      await preenche(p, v103 ? '[data-cfc="0"] input[data-cfcd="cms"]' : '[data-cfl="0"] input[data-cfd="cms"]', '9,8'); await clique(p, '[data-cfsobra="0:2"]'); await clique(p, '[data-cfcur="0:SECO"]');
+      if (await p.$('[data-cfbeb="0:OK"]')) await clique(p, '[data-cfbeb="0:OK"]'); }],
     ['22-morte', async p => { await clique(p, '[data-cfmorte="0"]'); await clique(p, '[data-cfcausa="0:Timpanismo"]'); await clique(p, '#bt-cf-morte-ok'); }],
     ['30-enviado', async p => { await clique(p, '#bt-enviar-cf'); await pausa(p, 400); }],
     ['31-detalhe', async p => { await clique(p, '#bt-preencher-cf'); }],
