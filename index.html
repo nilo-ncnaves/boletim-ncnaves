@@ -12422,6 +12422,14 @@ const CF_DESCONTO_JEJUM=0.04;   /* PROVISÓRIO — a confirmar com a consultoria
 /* v103: "Algo fora do normal?" do lote (no lugar da observação livre por lote) — o lote é todo de machos inteiros:
    monta e briga são causa real de trauma e de perda de GMD. Registro, nunca prescrição. */
 const CF_FORA_NORMAL=[["MONTA","monta"],["BRIGA","briga"],["MANCANDO","animal mancando"],["CAIDO","animal caído"],["COCHO","cocho com problema"],["OUTRO","outro"]];
+/* v103 (Parte B): registros leves que faltavam — todos chips ou números, nenhum texto livre (regra 2).
+   Morbidade (caso NOVO) é o que importa, não o estoque da enfermaria: "Entraram hoje" + motivo; "Estão na enfermaria".
+   Motivo é REGISTRO do que se viu, nunca sugestão de tratamento. */
+const CF_MOTIVO_ENFERMARIA=[["RESPIRATORIO","respiratório"],["DIGESTIVO","digestivo"],["LOCOMOCAO","casco / locomoção"],["TRAUMA","trauma"],["OUTRO","outro"]];
+const CF_BEBEDOURO=[["OK","ok"],["SUJO","sujo"],["FALHA","falha"]];   /* do curral; obrigatório */
+/* escore de ofegação do curral (opcional) — substitui o chip "Estresse térmico sim/não" do topo; ≥ 3 é "fora do esperado" */
+const CF_OFEGACAO=[["0","normal"],["1","respiração rápida"],["2","ofegante, boca fechada"],["3","boca aberta"],["4","boca aberta, língua de fora"]];
+const CF_NECROPSIA=[["FEITA","feita"],["NAO_FEITA","não feita"]];   /* no evento de morte; opcional */
 const cfFaixaTxt=k=>CF_FAIXAS[k][0]+" a "+CF_FAIXAS[k][1];
 const cfForaFaixa=(v,k)=>v!==""&&v!=null&&(n0(v)<CF_FAIXAS[k][0]||n0(v)>CF_FAIXAS[k][1]);
 /* farol contra a projeção: verde a partir de 95 % do GMD-alvo, amarelo de 85 a 95 %, vermelho abaixo; cinza sem pesagem */
@@ -12464,7 +12472,7 @@ function cfDiarioNorm(d){
   if(Array.isArray(d.currais)) return Object.assign({}, d, {legado:false, currais:d.currais, lotes:d.lotes||[]});
   const currais=[], lotes=[], v=x=>x==null?"":x;
   (d.lotes||[]).forEach(x=>{ const l=cfLote(x.loteId), cid=(l&&l.curralId)||"";
-    if(!currais.some(c=>c.curralId===cid)) currais.push({curralId:cid, cms:v(x.cms), sobra:v(x.sobra), cond:x.curral||""});
+    if(!currais.some(c=>c.curralId===cid)) currais.push({curralId:cid, cms:v(x.cms), sobra:v(x.sobra), cond:x.curral||"", bebedouro:"", ofegacao:""});
     lotes.push({loteId:x.loteId, curralId:cid, enfEntraram:null, enfMotivos:[], enfEstao:v(x.enfermaria), foraNormal:[], obs:x.obs||"",
       v102:{cms:v(x.cms), sobra:v(x.sobra), cond:x.curral||""}}); });
   return Object.assign({}, d, {legado:true, currais, lotes});
@@ -12473,7 +12481,7 @@ function cfDiarioNorm(d){
 function cfLinhaDia(dn, loteId){
   const x=((dn&&dn.lotes)||[]).find(y=>y.loteId===loteId); if(!x) return null;
   const c=(dn.currais||[]).find(y=>y.curralId===x.curralId)||{};
-  return Object.assign({cms:"", sobra:"", cond:""}, c, x.v102||{},
+  return Object.assign({cms:"", sobra:"", cond:"", bebedouro:"", ofegacao:""}, c, x.v102||{},
     {loteId, curralId:x.curralId, enfEntraram:x.enfEntraram, enfMotivos:x.enfMotivos||[], enfEstao:x.enfEstao==null?"":x.enfEstao, foraNormal:x.foraNormal||[], obs:x.obs||""});
 }
 const cfJejumRot=v=>v?cfRot(CF_JEJUM,v):"não informado";
@@ -12556,7 +12564,7 @@ function vCasaConf(){
 function novoRascunhoConf(fz){
   return { id:null, data:hojeBRT(), unidadeId:fz,
     responsavel:(typeof nomeRespLembrado!=="undefined"&&nomeRespLembrado)?nomeRespLembrado:"",
-    chuvaMm:"", estresse:"", obs:"", currais:[], lotes:[] };
+    chuvaMm:"", obs:"", currais:[], lotes:[] };
 }
 /* duas listas sincronizadas com o cadastro: lotes ATIVOS (lote novo entra, lote fechado sai, o que já foi marcado fica)
    e currais OCUPADOS (curral com pelo menos um lote ativo), na ordem do cadastro de currais. O curral de cada lote é o
@@ -12568,12 +12576,12 @@ function cfSincronizarLinhas(r){
     r.lotes=n.lotes.map(x=>{ const o=Object.assign({}, x); delete o.v102; return o; }); }
   const ativos=cfLotesAtivos(r.unidadeId), antL=r.lotes||[], antC=r.currais||[], hoje=r.data===hojeBRT();
   r.lotes=ativos.map(l=>{ const x=antL.find(y=>y.loteId===l.id);
-    if(!x) return {loteId:l.id, curralId:l.curralId||"", enfEstao:"", foraNormal:[]};
+    if(!x) return {loteId:l.id, curralId:l.curralId||"", enfEntraram:"", enfMotivos:[], enfEstao:"", foraNormal:[]};
     if(hoje||!x.curralId) x.curralId=l.curralId||"";
     return x; });
   const ordem=cfCurrais(r.unidadeId).map(t=>t.id), ocupados=[...new Set(r.lotes.map(x=>x.curralId))];
   ocupados.sort((a,b)=>{ const ia=ordem.indexOf(a), ib=ordem.indexOf(b); return (ia<0?1e9:ia)-(ib<0?1e9:ib); });
-  r.currais=ocupados.map(cid=>antC.find(c=>c.curralId===cid)||{curralId:cid, cms:"", sobra:"", cond:""});
+  r.currais=ocupados.map(cid=>antC.find(c=>c.curralId===cid)||{curralId:cid, cms:"", sobra:"", cond:"", bebedouro:"", ofegacao:""});
   r.lotes.sort((a,b)=>ocupados.indexOf(a.curralId)-ocupados.indexOf(b.curralId)||(a.loteId<b.loteId?-1:1));
   return r;
 }
@@ -12590,10 +12598,11 @@ function faltaEnvioConf(r){
   for(const c of r.currais||[]){ const nome=cfNomeCurral(c.curralId);
     if(c.sobra===""||c.sobra==null) return "Marque a sobra de cocho do "+nome;
     if(!c.cond) return "Marque a condição do "+nome;
+    if(!c.bebedouro) return "Marque o bebedouro do "+nome;
     if(cfForaFaixa(c.cms,"cms")) return "CMS do "+nome+" fora de "+cfFaixaTxt("cms")+" kg MS — confira";
     for(const x of r.lotes.filter(y=>y.curralId===c.curralId)){ const l=cfLote(x.loteId); if(!l) continue;
       const vivas=cfResumoLote(l,r.data).vivas;
-      if(n0(x.enfEstao)>vivas) return "Enfermaria do lote "+x.loteId+" acima das "+vivas+" cabeças vivas — confira";
+      if(n0(x.enfEntraram)>vivas||n0(x.enfEstao)>vivas) return "Enfermaria do lote "+x.loteId+" acima das "+vivas+" cabeças vivas — confira";
     }
   }
   return "";
@@ -12617,15 +12626,22 @@ function cfFormLote(r,x,li,mostraId){
   const res=cfResumoLote(l,r.data), mortes=cfMortesDia(l.id,r.data), m=cfUI.morte&&cfUI.morte.i===li?cfUI.morte:null;
   return `<div class="${mostraId?"cf-sublote":""}" data-cfl="${li}">
       ${mostraId?`<b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${res.vivas}</span> cab · dia <span class="num">${res.dias}</span></span>`:""}
-      <label class="mt">Na enfermaria (nº)</label><input inputmode="numeric" data-cfd="enfEstao" value="${esc(x.enfEstao==null?"":x.enfEstao)}" placeholder="0">
+      <div class="grade2 mt">
+        <div><label>Entraram hoje na enfermaria</label><input inputmode="numeric" data-cfd="enfEntraram" value="${esc(x.enfEntraram==null?"":x.enfEntraram)}" placeholder="0"></div>
+        <div><label>Estão na enfermaria</label><input inputmode="numeric" data-cfd="enfEstao" value="${esc(x.enfEstao==null?"":x.enfEstao)}" placeholder="0"></div></div>
+      <div data-cfmotbox="${li}"${n0(x.enfEntraram)>0?"":" hidden"}><label class="mt">Motivo de quem entrou</label>
+        <div class="chips">${CF_MOTIVO_ENFERMARIA.map(([k,rot])=>`<button class="chip ${(x.enfMotivos||[]).includes(k)?"on":""}" data-cfmot="${li}:${k}">${esc(rot)}</button>`).join("")}</div>
+        ${chipsSelecao("cfmot",{um:"motivo marcado",varios:"motivos marcados"})}</div>
       <div><label class="mt">Algo fora do normal?</label>
         <div class="chips">${CF_FORA_NORMAL.map(([k,rot])=>`<button class="chip ${(x.foraNormal||[]).includes(k)?"on":""}" data-cffora="${li}:${k}">${esc(rot)}</button>`).join("")}</div>
         ${chipsSelecao("cffora",{um:"situação marcada",varios:"situações marcadas"})}</div>
-      ${mortes.map(e=>`<p class="mt" style="margin-bottom:0">⚠️ Morte · ${esc(e.causa)}${(e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":""}${(n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":""}${cfUI.ultimaMorte===e.id?` <button class="btn suave mini" data-cfdesfazer="${esc(e.id)}" style="display:inline-flex;min-height:32px;padding:0 10px">desfazer</button>`:""}</p>`).join("")}
+      ${mortes.map(e=>`<p class="mt" style="margin-bottom:0">⚠️ Morte · ${cfMorteTxt(e)}${cfUI.ultimaMorte===e.id?` <button class="btn suave mini" data-cfdesfazer="${esc(e.id)}" style="display:inline-flex;min-height:32px;padding:0 10px">desfazer</button>`:""}</p>`).join("")}
       ${m?`<div class="subcartao" id="cf-morte-box"><label>Causa provável</label>
         <div class="chips">${CF_CAUSAS_MORTE.map(c=>`<button class="chip ${m.causa===c?"on":""}" data-cfcausa="${li}:${esc(c)}">${esc(c)}</button>`).join("")}</div>
         <div class="grade2 mt"><div><label>Cabeças</label><input inputmode="numeric" data-cfm="cabecas" value="${esc(m.cabecas)}"></div>
           <div><label>Peso estimado (kg)</label><input inputmode="decimal" data-cfm="peso" value="${esc(m.peso)}" placeholder="opcional"></div></div>
+        <label class="mt">Necropsia</label>
+        <div class="chips">${CF_NECROPSIA.map(([k,rot])=>`<button class="chip ${m.necropsia===k?"on":""}" data-cfnecro="${k}">${rot}</button>`).join("")}</div>
         <div class="linha-flex mt"><button class="btn sec mini" id="bt-cf-morte-cancelar">Cancelar</button>${botaoAvanco("bt-cf-morte-ok",{rotulo:"Registrar morte", classe:"btn mini", falta:faltaMorteConf()})}</div></div>`
       :`<div class="linha-flex mt"><span class="cresce mut">${mortes.length?"":"Sem morte registrada hoje"}</span><button class="btn suave mini" data-cfmorte="${li}">＋ morte</button></div>`}
     </div>`;
@@ -12640,9 +12656,9 @@ function vFormConf(){
     ?`<p class="linha-flex" style="margin:0"><span class="cresce">Quem está preenchendo: <b>${esc(r.responsavel)}</b></span><button class="btn suave mini" id="bt-cf-nome-trocar">trocar</button></p>`
     :`<label>Quem está preenchendo</label><input data-cfr="responsavel" value="${esc(r.responsavel||"")}" placeholder="Seu nome">`}</div>
   <div class="cartao"><h3>🌤️ Dia</h3>
-    <div class="grade2"><div><label>Chuva (mm)</label><input inputmode="decimal" data-cfr="chuvaMm" value="${esc(r.chuvaMm)}" placeholder="0"></div>
-      <div><label>Estresse térmico</label><div class="chips" data-cfgrupo="estresse">${chip("cfest","Sim","Sim",r.estresse==="Sim")}${chip("cfest","Não","Não",r.estresse==="Não")}</div></div></div></div>
-  <p class="mut" style="font-size:.76rem">Sobra de cocho (leitura da manhã): ${CF_SOBRA.map(([k,rot])=>k+" "+rot).join(" · ")}.</p>
+    <div class="grade2"><div><label>Chuva (mm)</label><input inputmode="decimal" data-cfr="chuvaMm" value="${esc(r.chuvaMm)}" placeholder="0"></div></div></div>
+  <p class="mut" style="font-size:.76rem">Sobra de cocho (leitura da manhã): ${CF_SOBRA.map(([k,rot])=>k+" "+rot).join(" · ")}.<br>
+    Ofegação: ${CF_OFEGACAO.map(([k,rot])=>k+" "+rot).join(" · ")}.</p>
   ${(r.currais||[]).map((c,ci)=>{ const ls=r.lotes.map((x,li)=>({x,li})).filter(o=>o.x.curralId===c.curralId); if(!ls.length) return "";
     const um=ls.length===1, nome=cfNomeCurral(c.curralId), ont=cfOntemCurral(fz,r.data,c.curralId);
     const l1=cfLote(ls[0].x.loteId), res1=l1?cfResumoLote(l1,r.data):null;
@@ -12655,6 +12671,10 @@ function vFormConf(){
       <div class="chips" data-cfgrupo="sobra">${CF_SOBRA.map(([k,rot])=>`<button class="chip ${c.sobra===k?"on":""}" data-cfsobra="${ci}:${k}" title="${esc(rot)}" aria-label="${k} — ${esc(rot)}">${k}</button>`).join("")}</div>
       <label class="mt">Condição do curral</label>
       <div class="chips" data-cfgrupo="curral">${CF_CURRAL_COND.map(([k,rot])=>`<button class="chip ${c.cond===k?"on":""}" data-cfcur="${ci}:${k}">${rot}</button>`).join("")}</div>
+      <label class="mt">Bebedouro</label>
+      <div class="chips" data-cfgrupo="bebedouro">${CF_BEBEDOURO.map(([k,rot])=>`<button class="chip ${c.bebedouro===k?"on":""}" data-cfbeb="${ci}:${k}">${rot}</button>`).join("")}</div>
+      <label class="mt">Ofegação (opcional)</label>
+      <div class="chips" data-cfgrupo="ofegacao">${CF_OFEGACAO.map(([k,rot])=>`<button class="chip ${c.ofegacao===k?"on":""}" data-cfofeg="${ci}:${k}" title="${esc(rot)}" aria-label="${k} — ${esc(rot)}">${k}</button>`).join("")}</div>
       ${ls.map(o=>cfFormLote(r,o.x,o.li,!um)).join("")}
     </div>`; }).join("")||htmlEstado("vazio",{que:"lote ativo",unidade:fz,dica:"Registre a entrada do primeiro lote."},{classe:"mut"})}
   <div class="cartao mt"><label>Observação do dia</label><textarea data-cfr="obs" rows="2" placeholder="Opcional">${esc(r.obs||"")}</textarea></div>
@@ -12667,6 +12687,7 @@ function validarEnviarConf(){
   const dup=lista.find(d=>d.data===r.data && d.unidadeId===r.unidadeId && d.id!==r.id);
   if(dup){ avisoInline("#bt-enviar-cf", "Já existe diário de "+fmtData(r.data)+" nesta unidade. Abra-o na casa para corrigir."); return; }
   const agora=hojeISO()+" "+new Date().toTimeString().slice(0,5);
+  (r.lotes||[]).forEach(x=>{ if(!(n0(x.enfEntraram)>0)) x.enfMotivos=[]; });   /* v103: motivo só existe com caso novo */
   if(!r.id){ r.id=r.unidadeId+"_"+r.data; r.enviadoEm=agora; lista.push(r); }
   else { r.editadoEm=agora; delete r.sincEm; const i=lista.findIndex(d=>d.id===r.id); if(i>=0) lista[i]=r; else lista.push(r); }
   if(r.responsavel){ Persist.set("bdf:nomeResp", r.responsavel); nomeRespLembrado=r.responsavel; }
@@ -12679,14 +12700,21 @@ function validarEnviarConf(){
 function cfDlCurral(v){
   return `<dt>CMS</dt><dd>${v.cms!==""&&v.cms!=null?fmtKg(v.cms)+" kg MS/cab":"sem CMS"}</dd>
         <dt>Sobra de cocho</dt><dd>${v.sobra!==""&&v.sobra!=null?esc(v.sobra+" · "+cfRot(CF_SOBRA,v.sobra)):"—"}</dd>
-        <dt>Curral</dt><dd>${esc(cfRot(CF_CURRAL_COND,v.cond))||"—"}</dd>`;
+        <dt>Curral</dt><dd>${esc(cfRot(CF_CURRAL_COND,v.cond))||"—"}</dd>
+        ${v.bebedouro?`<dt>Bebedouro</dt><dd>${esc(cfRot(CF_BEBEDOURO,v.bebedouro))}</dd>`:""}
+        ${v.ofegacao!==""&&v.ofegacao!=null?`<dt>Ofegação</dt><dd>${esc(v.ofegacao+" · "+cfRot(CF_OFEGACAO,v.ofegacao))}</dd>`:""}`;
 }
-const cfMorteTxt=e=>esc(e.causa)+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")+((n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":"");
+const cfMorteTxt=e=>esc(e.causa)+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")+((n0(e.cabecas)||1)>1?" · "+n0(e.cabecas)+" cabeças":"")
+  +(e.necropsia?" · necropsia "+cfRot(CF_NECROPSIA,e.necropsia):"");
+const cfMotivosTxt=v=>(v.enfMotivos||[]).map(k=>cfRot(CF_MOTIVO_ENFERMARIA,k)).join(", ");
+/* "entraram hoje": null = diário da v102 (não informado — nunca 0); vazio = 0 */
+const cfEntraramTxt=v=>v.enfEntraram==null?"não informado":n0(v.enfEntraram)+(n0(v.enfEntraram)&&(v.enfMotivos||[]).length?" ("+cfMotivosTxt(v)+")":"");
 const cfForaTxt=v=>(v.foraNormal||[]).map(k=>cfRot(CF_FORA_NORMAL,k)).join(", ");
 /* campos do LOTE em lista de leitura (dt/dd) */
 function cfDlLote(v,data){
   const mortes=cfMortesDia(v.loteId,data);
   return `<dt>Enfermaria</dt><dd>${n0(v.enfEstao)}</dd>
+        <dt>Entraram hoje</dt><dd>${esc(cfEntraramTxt(v))}</dd>
         ${(v.foraNormal||[]).length?`<dt>Fora do normal</dt><dd>${esc(cfForaTxt(v))}</dd>`:""}
         ${mortes.map(e=>`<dt>Morte</dt><dd>${cfMorteTxt(e)}</dd>`).join("")}
         ${v.obs?`<dt>Obs.</dt><dd>${esc(v.obs)}</dd>`:""}`;
@@ -12831,7 +12859,10 @@ function resumoWhatsConf(d){
     const nome=cfNomeCurral(c.curralId);
     /* v103: o curral numa linha só (o cocho é dele), os lotes embaixo; o diário da v102 sai como saía (tudo por lote) */
     if(!dn.legado){
-      L.push("🏠 "+nome+(!vazio(c.cms)?" · CMS "+fmtKg(c.cms)+" kg MS":" · sem CMS")+(!vazio(c.sobra)?" · sobra "+c.sobra:"")+(c.cond?" · curral "+condTxt(c.cond):""));
+      L.push("🏠 "+nome+(!vazio(c.cms)?" · CMS "+fmtKg(c.cms)+" kg MS":" · sem CMS")+(!vazio(c.sobra)?" · sobra "+c.sobra:"")+(c.cond?" · curral "+condTxt(c.cond):"")
+        +(c.bebedouro?" · bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro):"")+(!vazio(c.ofegacao)?" · ofegação "+c.ofegacao:""));
+      if(c.bebedouro==="SUJO"||c.bebedouro==="FALHA") desvios.push(nome+" bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro));
+      if(!vazio(c.ofegacao)&&n0(c.ofegacao)>=3) desvios.push(nome+" ofegação "+c.ofegacao);
       if(c.sobra==="0"||c.sobra==="4") desvios.push(nome+" sobra "+c.sobra);
       if(c.cond==="POEIRA"||c.cond==="LAMA") desvios.push(nome+" "+condTxt(c.cond));
     }
@@ -12841,8 +12872,9 @@ function resumoWhatsConf(d){
           +(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(v.cond?" · curral "+condTxt(v.cond):"")+(v.obs?" — "+v.obs:""));
         if(v.sobra==="0"||v.sobra==="4") desvios.push(l.id+" sobra "+v.sobra);
         if(v.cond==="LAMA") desvios.push(l.id+" curral lama");
-      } else L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(fora?" · fora do normal: "+fora:""));
-      mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")); });
+      } else L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(n0(v.enfEntraram)?" · "+n0(v.enfEntraram)+" entraram na enfermaria"+((v.enfMotivos||[]).length?" ("+cfMotivosTxt(v)+")":""):"")
+          +(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(fora?" · fora do normal: "+fora:""));
+      mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")+(e.necropsia?" · necropsia "+cfRot(CF_NECROPSIA,e.necropsia):"")); });
       if(r.farol==="amarelo"||r.farol==="vermelho") desvios.push(l.id+" GMD "+fmtGmd(r.gmd)+" × alvo "+fmtGmd(r.proj.gmdAlvo));
     });
   });
@@ -12863,7 +12895,7 @@ function cfCsvTexto(id){
   const l=cfLote(id); if(!l) return "";
   /* v103: colunas novas SEMPRE no fim, para não quebrar a planilha de quem já usa o CSV da v102 */
   const cab=["lote","unidade","tipo","data","cabecas","peso_kg","cms_kg_ms","sobra_escore","enfermaria","curral","causa","responsavel","obs",
-    "fora_normal","pesagem_jejum","curral_do_dia"];
+    "fora_normal","pesagem_jejum","curral_do_dia","enf_entraram","enf_motivos","bebedouro","ofegacao","necropsia"];
   const c=v=>{ const s=String(v==null?"":v).replace(/"/g,'""'); return /[;"\n]/.test(s)?'"'+s+'"':s; };
   const num=v=>(v===""||v==null)?"":String(v).replace(".",",");
   const linha=o=>cab.map(k=>o[k]==null?"":o[k]);
@@ -12874,9 +12906,10 @@ function cfCsvTexto(id){
   cfDiarios().filter(d=>d.unidadeId===l.unidadeId).forEach(d=>{ const x=cfLinhaDia(cfDiarioNorm(d),l.id); if(!x) return;
     linhas.push({data:d.data, ord:1, c:linha({lote:l.id, unidade:un, tipo:"DIARIO", data:d.data, cms_kg_ms:num(x.cms), sobra_escore:x.sobra, enfermaria:x.enfEstao===""?"0":n0(x.enfEstao), curral:cfRot(CF_CURRAL_COND,x.cond), responsavel:d.responsavel||"",
       obs:[d.chuvaMm!==""&&d.chuvaMm!=null?"chuva "+num(d.chuvaMm)+" mm":"", d.estresse==="Sim"?"estresse térmico":"", x.obs].filter(Boolean).join(" · "),
-      fora_normal:cfForaTxt(x), curral_do_dia:cfCurralNome(x.curralId)})}); });
+      fora_normal:cfForaTxt(x), curral_do_dia:cfCurralNome(x.curralId), enf_entraram:x.enfEntraram==null?"":n0(x.enfEntraram), enf_motivos:n0(x.enfEntraram)?cfMotivosTxt(x):"",
+      bebedouro:x.bebedouro?cfRot(CF_BEBEDOURO,x.bebedouro):"", ofegacao:x.ofegacao==null?"":x.ofegacao})}); });
   cfEventos().filter(e=>e.loteId===l.id && !e.cancelado).forEach(e=>{
-    linhas.push({data:e.data, ord:2, c:linha({lote:l.id, unidade:un, tipo:e.tipo, data:e.data, cabecas:n0(e.cabecas)||(e.tipo==="MORTE"?1:""), peso_kg:num(e.pesoEstimadoKg), curral:e.curralPara?cfCurralNome(e.curralPara):"", causa:e.causa||"", responsavel:e.responsavel||"", obs:e.obs||""})}); });
+    linhas.push({data:e.data, ord:2, c:linha({lote:l.id, unidade:un, tipo:e.tipo, data:e.data, cabecas:n0(e.cabecas)||(e.tipo==="MORTE"?1:""), peso_kg:num(e.pesoEstimadoKg), curral:e.curralPara?cfCurralNome(e.curralPara):"", causa:e.causa||"", responsavel:e.responsavel||"", obs:e.obs||"", necropsia:e.necropsia?cfRot(CF_NECROPSIA,e.necropsia):""})}); });
   cfPesagens().filter(p=>p.loteId===l.id && !p.cancelado).forEach(p=>{
     linhas.push({data:p.data, ord:3, c:linha({lote:l.id, unidade:un, tipo:"PESAGEM", data:p.data, cabecas:n0(p.cabecasPesadas), peso_kg:num(p.pesoMedioKg), responsavel:p.responsavel||"", obs:p.obs||"", pesagem_jejum:p.jejum?cfRot(CF_JEJUM,p.jejum):""})}); });
   linhas.sort((a,b)=>(a.data<b.data?-1:a.data>b.data?1:a.ord-b.ord));
@@ -12914,18 +12947,27 @@ function cfClique(t,d){
   /* v103: sobra e condição são do CURRAL (índice em rascunhoConf.currais) */
   if(d.cfsobra && rascunhoConf){ const [i,v]=d.cfsobra.split(":"); const c=(rascunhoConf.currais||[])[+i]; if(c){ c.sobra=v; cfMarcarChip(t); salvarRascConf(); } return true; }
   if(d.cfcur && rascunhoConf){ const [i,v]=d.cfcur.split(":"); const c=(rascunhoConf.currais||[])[+i]; if(c){ c.cond=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  if(d.cfbeb && rascunhoConf){ const [i,v]=d.cfbeb.split(":"); const c=(rascunhoConf.currais||[])[+i]; if(c){ c.bebedouro=v; cfMarcarChip(t); salvarRascConf(); } return true; }
+  /* ofegação é opcional: o segundo toque no escore aceso desmarca */
+  if(d.cfofeg && rascunhoConf){ const [i,v]=d.cfofeg.split(":"); const c=(rascunhoConf.currais||[])[+i];
+    if(c){ c.ofegacao = c.ofegacao===v ? "" : v; if(c.ofegacao) cfMarcarChip(t); else t.classList.remove("on"); salvarRascConf(); } return true; }
+  if(d.cfmot && rascunhoConf){ const k=d.cfmot.indexOf(":"), x=rascunhoConf.lotes[+d.cfmot.slice(0,k)], v=d.cfmot.slice(k+1);
+    if(x){ const s0=new Set(x.enfMotivos||[]); if(s0.has(v)) s0.delete(v); else s0.add(v); x.enfMotivos=CF_MOTIVO_ENFERMARIA.map(([a])=>a).filter(a=>s0.has(a));
+      t.classList.toggle("on", s0.has(v)); salvarRascConf(); } return true; }
+  if(d.cfnecro && cfUI.morte){ cfUI.morte.necropsia = cfUI.morte.necropsia===d.cfnecro ? "" : d.cfnecro;
+    if(cfUI.morte.necropsia) cfMarcarChip(t); else t.classList.remove("on"); return true; }
   /* v103: "Algo fora do normal?" — seleção múltipla do lote; tocar de novo desmarca */
   if(d.cffora && rascunhoConf){ const k=d.cffora.indexOf(":"), x=rascunhoConf.lotes[+d.cffora.slice(0,k)], v=d.cffora.slice(k+1);
     if(x){ const s0=new Set(x.foraNormal||[]); if(s0.has(v)) s0.delete(v); else s0.add(v); x.foraNormal=CF_FORA_NORMAL.map(([a])=>a).filter(a=>s0.has(a));
       t.classList.toggle("on", s0.has(v)); salvarRascConf(); } return true; }
-  if(d.cfmorte!==undefined && rascunhoConf){ cfUI.morte={i:+d.cfmorte, causa:"", cabecas:"1", peso:""}; ir("cfform",null,true); return true; }
+  if(d.cfmorte!==undefined && rascunhoConf){ cfUI.morte={i:+d.cfmorte, causa:"", cabecas:"1", peso:"", necropsia:""}; ir("cfform",null,true); return true; }
   if(d.cfcausa && cfUI.morte){ const k=d.cfcausa.indexOf(":"); cfUI.morte.causa=d.cfcausa.slice(k+1); cfMarcarChip(t); atualizarAvanco("bt-cf-morte-ok",faltaMorteConf()); return true; }
   if(t.id==="bt-cf-morte-cancelar"){ cfUI.morte=null; ir("cfform",null,true); return true; }
   if(t.id==="bt-cf-morte-ok" && cfUI.morte && rascunhoConf){
     const m=cfUI.morte, x=rascunhoConf.lotes[m.i]; if(!x) return true;
     const falta=faltaMorteConf(); if(falta){ atualizarAvanco("bt-cf-morte-ok",falta); return true; }
     const e={ id:uid(), unidadeId:rascunhoConf.unidadeId, loteId:x.loteId, tipo:"MORTE", data:rascunhoConf.data, cabecas:n0(m.cabecas)||1, causa:m.causa,
-      pesoEstimadoKg:m.peso===""?"":n0(m.peso), responsavel:rascunhoConf.responsavel||"", criadoEm:new Date().toISOString(), cancelado:false };
+      pesoEstimadoKg:m.peso===""?"":n0(m.peso), necropsia:m.necropsia||"", responsavel:rascunhoConf.responsavel||"", criadoEm:new Date().toISOString(), cancelado:false };
     cfEventos().push(e); syncEnfileirar("cfe", e.id); salvarDados();
     cfUI.morte=null; cfUI.ultimaMorte=e.id; ir("cfform",null,true); return true; }
   if(d.cfdesfazer){ const e=cfEventos().find(y=>y.id===d.cfdesfazer); if(e){ e.cancelado=true; e.canceladoEm=new Date().toISOString(); syncEnfileirar("cfe", e.id); salvarDados(); }
@@ -12944,7 +12986,10 @@ function cfClique(t,d){
 function cfInput(el){
   const d=el.dataset;
   if(d.cfr!==undefined && rascunhoConf){ rascunhoConf[d.cfr]=el.value; salvarRascConf(); return true; }
-  if(d.cfd!==undefined && rascunhoConf){ const c=el.closest("[data-cfl]"); const i=c?parseInt(c.dataset.cfl):-1; const x=rascunhoConf.lotes[i]; if(x){ x[d.cfd]=el.value; salvarRascConf(); } return true; }
+  if(d.cfd!==undefined && rascunhoConf){ const c=el.closest("[data-cfl]"); const i=c?parseInt(c.dataset.cfl):-1; const x=rascunhoConf.lotes[i]; if(x){ x[d.cfd]=el.value; salvarRascConf(); }
+    /* v103: o motivo aparece no lugar quando entrou alguém na enfermaria (sem redesenhar: o foco fica no campo) */
+    if(d.cfd==="enfEntraram" && c){ const box=c.querySelector("[data-cfmotbox]"); if(box) box.hidden=!(n0(el.value)>0); }
+    return true; }
   if(d.cfcd!==undefined && rascunhoConf){ const c=el.closest("[data-cfc]"); const i=c?parseInt(c.dataset.cfc):-1; const x=(rascunhoConf.currais||[])[i]; if(x){ x[d.cfcd]=el.value; salvarRascConf(); } return true; }
   if(d.cfm!==undefined && cfUI.morte){ cfUI.morte[d.cfm]=el.value; atualizarAvanco("bt-cf-morte-ok",faltaMorteConf()); return true; }
   if(d.cfn!==undefined && cfNovo){ cfNovo[d.cfn]=el.value; salvarCfNovo(); return true; }

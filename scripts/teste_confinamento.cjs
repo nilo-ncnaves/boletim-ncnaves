@@ -175,9 +175,13 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     const e1 = await botao(page, '#bt-enviar-cf');
     await page.click('[data-cfcur="0:POEIRA"]'); await page.waitForTimeout(100);
     const e2 = await botao(page, '#bt-enviar-cf');
-    ok('e. Sobra marcada → agora falta a condição do Curral 3; condição marcada → o botão ativa (um passo por vez, no lugar)', /condição do Curral 3/.test(e1.falta) && !e2.inativo, `"${e1.falta}" → ${e2.inativo ? '"' + e2.falta + '"' : 'ativo'}`);
+    ok('e. Sobra marcada → agora falta a condição do Curral 3; condição marcada → falta o bebedouro (um passo por vez, no lugar)', /condição do Curral 3/.test(e1.falta) && /Marque o bebedouro do Curral 3/.test(e2.falta), `"${e1.falta}" → "${e2.falta}"`);
+    ok('v103 B(j). Sem bebedouro marcado, "Enviar diário" fica inativo e diz "Marque o bebedouro do Curral 3"', e2.inativo && e2.falta === 'Marque o bebedouro do Curral 3', `"${e2.falta}"`);
+    await page.click('[data-cfbeb="0:FALHA"]'); await page.waitForTimeout(100);
+    await page.click('[data-cfofeg="0:3"]'); await page.waitForTimeout(100);
+    const e2b = await botao(page, '#bt-enviar-cf');
     const chipsOn = await page.evaluate(() => [...document.querySelectorAll('#app [data-cfc="0"] [data-cfgrupo] .chip.on')].map(c => c.textContent.trim()));
-    ok('e. Os chips escolhidos ficam acesos no lugar, sem redesenhar a tela', chipsOn.join() === '2,Poeira', chipsOn.join(' · '));
+    ok('e. Os chips escolhidos ficam acesos no lugar, sem redesenhar a tela; com o bebedouro o botão ativa', chipsOn.join() === '2,Poeira,falha,3' && !e2b.inativo, chipsOn.join(' · '));
     /* v103 A(c): CMS "98" no lugar de "9,8" */
     await digita(page, '[data-cfc="0"] input[data-cfcd="cms"]', '98');
     const eC = await botao(page, '#bt-enviar-cf');
@@ -189,7 +193,13 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     const eD = await botao(page, '#bt-enviar-cf');
     await digita(page, '[data-cfl="1"] input[data-cfd="enfEstao"]', '');
     ok('v103 A(d). Enfermaria maior que as cabeças vivas trava o envio ("Enfermaria do lote …-02 acima das 80 cabeças vivas — confira")', eD.inativo && /Enfermaria do lote CF-VER-\d{4}-02 acima das 80 cabeças vivas — confira/.test(eD.falta), `"${eD.falta}"`);
-    await digita(page, '[data-cfl="0"] input[data-cfd="enfEstao"]', '1');
+    await digita(page, '[data-cfl="0"] input[data-cfd="enfEstao"]', '3');
+    /* v103 B(h): caso novo na enfermaria abre o motivo no lugar */
+    const hAntes = await page.evaluate(() => document.querySelector('#app [data-cfmotbox="0"]').hidden);
+    await digita(page, '[data-cfl="0"] input[data-cfd="enfEntraram"]', '2');
+    const hDepois = await page.evaluate(() => document.querySelector('#app [data-cfmotbox="0"]').hidden);
+    await page.click('[data-cfmot="0:RESPIRATORIO"]'); await page.waitForTimeout(100);
+    ok('v103 B(h). Enfermaria em dois números: o motivo (chips) só aparece quando "Entraram hoje" > 0, no lugar', hAntes === true && hDepois === false && (await page.evaluate(() => rascunhoConf.lotes[0].enfMotivos.join())) === 'RESPIRATORIO', `${hAntes} → ${hDepois}`);
     /* morte do lote 01 */
     await page.click('[data-cfmorte="0"]'); await page.waitForTimeout(250);
     const m0 = { causas: await visiveis(page, '[data-cfcausa]'), bt: await botao(page, '#bt-cf-morte-ok') };
@@ -211,13 +221,14 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     ok('e. "desfazer" volta as 120 cabeças e NÃO apaga: o evento fica cancelado', /120 cab/.test(m2.txt) && !/Timpanismo/.test(m2.txt) && m2.ev.join() === 'true', `cancelado: ${m2.ev.join()}`);
     await page.click('[data-cfmorte="0"]'); await page.waitForTimeout(200);
     await page.click('[data-cfcausa="0:Acidose"]'); await page.waitForTimeout(100);
+    await page.click('[data-cfnecro="FEITA"]'); await page.waitForTimeout(100);   /* v103 B.4 */
     await page.click('#bt-cf-morte-ok'); await page.waitForTimeout(300);
     /* "Algo fora do normal?" do lote 02 (o registro da morte redesenhou o formulário; a prova do "no lugar" é deste ponto em diante) */
     await page.evaluate(() => document.querySelector('#bt-enviar-cf').setAttribute('data-marca-teste', '1'));
     await page.click('[data-cffora="1:MONTA"]'); await page.waitForTimeout(100);
     await page.click('[data-cffora="1:BRIGA"]'); await page.waitForTimeout(100);
     const e3 = await page.evaluate(() => { const b = document.querySelector('#bt-enviar-cf'); return { ativo: !b.classList.contains('acao-off') && !b.getAttribute('data-falta'), noLugar: b.getAttribute('data-marca-teste') === '1',
-      fora: rascunhoConf.lotes[1].foraNormal.join(), sel: ((document.querySelector('#app [data-cfl="1"] .sel-box') || {}).innerText || '').replace(/\s+/g, ' ') }; });
+      fora: rascunhoConf.lotes[1].foraNormal.join(), sel: ((document.querySelector('#app [data-cfl="1"] .sel-box[data-sel-de="cffora"]') || {}).innerText || '').replace(/\s+/g, ' ') }; });
     ok('e. Com o curral marcado, "Enviar diário" fica ativo no lugar (mesmo elemento, sem redesenhar); "Algo fora do normal?" marca dois itens em chips (sem texto livre) e mostra a seleção', e3.ativo && e3.noLugar && e3.fora === 'MONTA,BRIGA' && /2 situações marcadas/.test(e3.sel), `${e3.ativo ? 'ativo' : 'inativo'} · ${e3.noLugar ? 'mesmo elemento' : 'redesenhado'} · ${e3.fora} · "${e3.sel}"`);
     const formTxt = await texto(page);
     ok('e. Diário sem termo de cobrança e sem seletor nativo de data', !PROIBIDO.test(formTxt) && (await visiveis(page, 'input[type=date], select')) === 0, '');
@@ -227,18 +238,22 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     await page.evaluate(() => ir('casa', null, true));   /* a tentativa de envio (abortada, offline) já terminou: estado final do indicador */
     const f1 = await page.evaluate(() => { const d = (D.cfDiarios || [])[0]; return { tela: telaAtual, n: (D.cfDiarios || []).length, id: d && d.id, fila: syncFila.map(x => x.t),
       txt: document.querySelector('#app').innerText.replace(/\s+/g, ' '), faixa: (document.querySelector('#app .aviso') || {}).textContent || '', zap: d ? resumoWhatsConf(d) : '', rasc: localStorage.getItem('bdf:rasccf'), nativos: window.__nativos,
-      cond: d && d.currais && d.currais[0] && d.currais[0].cond }; });
+      cond: d && d.currais && d.currais[0] && d.currais[0].cond, l0: d && [d.lotes[0].enfEntraram, d.lotes[0].enfMotivos.join(), d.lotes[0].enfEstao].join('|') }; });
     ok('f. Enviar → casa; diário gravado com id unidade_data e na fila (cfd); rascunho limpo', f1.tela === 'casa' && f1.n === 1 && /^f22f_\d{4}-\d{2}-\d{2}$/.test(f1.id) && f1.fila.includes('cfd') && !f1.rasc, `${f1.id} · fila ${f1.fila.join(',')}`);
     ok('f. Indicador de envio (componente único) fala em "diário" e, offline, "Aguardando internet" — nunca "enviado" antes do banco', /Aguardando internet \(1 diário na fila\)/.test(f1.faixa) && /Diário de hoje guardado no aparelho/.test(f1.txt), f1.faixa.replace(/\s+/g, ' ').slice(0, 90));
-    ok('f. Resumo WhatsApp: cabeçalho 🐃 CONFINAMENTO VEREDA, o curral numa linha (sem CMS · sobra · condição), uma linha por lote (cabeças, dia, enfermaria, fora do normal) e a morte do dia',
-      /^🐃 \*CONFINAMENTO VEREDA\* — \d\d\/\d\d\/\d{4}/.test(f1.zap) && /🏠 Curral 3 · sem CMS · sobra 2 · curral poeira/.test(f1.zap) && /🐂 CF-VER-\d{4}-01 · 119 cab · dia 0 · 1 na enfermaria/.test(f1.zap)
-        && /🐂 CF-VER-\d{4}-02 · 80 cab · dia 0 · fora do normal: monta, briga/.test(f1.zap) && /⚠️ Morte CF-VER-\d{4}-01: 1 \(acidose\)/.test(f1.zap) && !PROIBIDO.test(f1.zap),
+    ok('f. Resumo WhatsApp: cabeçalho 🐃 CONFINAMENTO VEREDA, o curral numa linha (sem CMS · sobra · condição · bebedouro · ofegação), uma linha por lote (cabeças, dia, enfermaria, fora do normal) e a morte do dia com a necropsia',
+      /^🐃 \*CONFINAMENTO VEREDA\* — \d\d\/\d\d\/\d{4}/.test(f1.zap) && /🏠 Curral 3 · sem CMS · sobra 2 · curral poeira · bebedouro falha · ofegação 3/.test(f1.zap)
+        && /🐂 CF-VER-\d{4}-02 · 80 cab · dia 0 · fora do normal: monta, briga/.test(f1.zap) && /⚠️ Morte CF-VER-\d{4}-01: 1 \(acidose\) · necropsia feita/.test(f1.zap) && !PROIBIDO.test(f1.zap),
       f1.zap.split('\n').join(' | ').slice(0, 300));
+    ok('v103 B(h). "Entraram 2 / respiratório" gravado no lote e no WhatsApp ("2 entraram na enfermaria (respiratório) · 3 na enfermaria")',
+      /🐂 CF-VER-\d{4}-01 · 119 cab · dia 0 · 2 entraram na enfermaria \(respiratório\) · 3 na enfermaria/.test(f1.zap) && f1.l0 === '2|RESPIRATORIO|3', f1.l0);
+    ok('v103 B(i). Bebedouro "falha" e ofegação 3 no "🔎 Fora do esperado" (junto com a poeira)', /🔎 Fora do esperado: [^\n]*Curral 3 bebedouro falha · Curral 3 ofegação 3/.test(f1.zap), (f1.zap.match(/🔎[^\n]*/) || [''])[0]);
     ok('v103 A(e). "Poeira" gravada no curral (POEIRA) e no "🔎 Fora do esperado" do WhatsApp', f1.cond === 'POEIRA' && /🔎 Fora do esperado: [^\n]*Curral 3 poeira/.test(f1.zap), (f1.zap.match(/🔎[^\n]*/) || [''])[0]);
     /* diário enviado e correção */
     await page.click('#bt-preencher-cf'); await page.waitForTimeout(300);
     const det = await page.evaluate(() => ({ tela: telaAtual, txt: document.querySelector('#app').innerText.replace(/\s+/g, ' '), corrigir: !!document.querySelector('#app [data-cfcorrigir]'), off: document.querySelectorAll('#app .acao-off').length }));
-    ok('f. "Ver / corrigir diário de hoje" abre o diário enviado (sem CMS lê "sem CMS"; curral e lotes) com Corrigir permitido ao gerente de confinamento', det.tela === 'cfdetalhe' && /sem CMS/.test(det.txt) && /Poeira/.test(det.txt) && /monta, briga/.test(det.txt) && det.corrigir && det.off === 0, '');
+    ok('f. "Ver / corrigir diário de hoje" abre o diário enviado (sem CMS lê "sem CMS"; curral, bebedouro, ofegação, enfermaria, necropsia) com Corrigir permitido ao gerente de confinamento', det.tela === 'cfdetalhe' && /sem CMS/.test(det.txt) && /Poeira/.test(det.txt) && /Bebedouro falha/.test(det.txt) && /Ofegação 3 · boca aberta/.test(det.txt)
+      && /Entraram hoje 2 \(respiratório\)/.test(det.txt) && /necropsia feita/.test(det.txt) && /monta, briga/.test(det.txt) && det.corrigir && det.off === 0, '');
     await page.click('#app [data-cfcorrigir]'); await page.waitForTimeout(300);
     await digita(page, '[data-cfc="0"] input[data-cfcd="cms"]', '9,8');
     await page.click('#bt-enviar-cf'); await page.waitForTimeout(400);
@@ -250,7 +265,7 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     const linhas = csv.split('\r\n');
     ok('g. CSV do lote: cabeçalho fixo com ";" (colunas da v102 primeiro, as novas no fim) e uma linha por evento (ENTRADA, DIARIO, MORTE), sem a morte cancelada',
       linhas[0].startsWith('lote;unidade;tipo;data;cabecas;peso_kg;cms_kg_ms;sobra_escore;enfermaria;curral;causa;responsavel;obs;') && linhas.length === 4
-        && /;ENTRADA;\d{4}-\d\d-\d\d;120;380;/.test(csv) && /;DIARIO;[^;]+;;;9,8;2;1;Poeira;/.test(csv) && /;MORTE;[^;]+;1;;;;;;Acidose;/.test(csv) && !/Timpanismo/.test(csv),
+        && /;ENTRADA;\d{4}-\d\d-\d\d;120;380;/.test(csv) && /;DIARIO;[^;]+;;;9,8;2;3;Poeira;/.test(csv) && /;MORTE;[^;]+;1;;;;;;Acidose;/.test(csv) && !/Timpanismo/.test(csv),
       linhas.length + ' linhas');
     ok('i. Cenário do gerente de confinamento: zero diálogo nativo e zero erro de página', f1.nativos === 0 && !erros.length, erros[0] || 'sem erro');
     await ctx.close();
