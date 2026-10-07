@@ -117,7 +117,8 @@
       texto lê "sem texto neste período" sem ação; "Números" é o conteúdo de
       antes em tela própria (filtro, lista, relatório com anterior/próximo,
       Compartilhar e PDF) e o voltar devolve um degrau por vez.
-  21. Confinamento (v102): a casa do gerente de confinamento (código VF-6318, unidade
+  21. Confinamento (v102; v103: diário por curral, multi-seleção com chips removíveis, tela do lote
+      cheia em até 2 telas sem vermelho por falta de dado): a casa do gerente de confinamento (código VF-6318, unidade
       f22f) é medida como casa de gerente (régua de 7 dias, altura, visual); sem lote,
       "Preencher diário" nasce inativo dizendo a próxima ação; a entrada de lote revela
       curral → grupo genético → detalhes um passo por vez (zero campo antes do toque
@@ -1138,7 +1139,7 @@ async function cenarioConf(browser, base, R, termos) {
   R.telas.push(await medirTela(page, 'Confinamento › Entrada de lote (detalhes)', 'cadastros', { tipo: 'detalhe', niveis: 2 }));
   C.passo3 = await page.evaluate(() => { const b = document.querySelector('#bt-cf-criar');
     return { inputs: document.querySelectorAll('#app input').length, inativo: !!b && b.classList.contains('acao-off'), falta: b ? b.getAttribute('data-falta') || '' : '', dataDate: document.querySelectorAll('#app input[type=date]').length }; });
-  await page.evaluate(() => { cfNovo.cabecas = '120'; cfNovo.peso = '380'; cfNovo.origem = 'RECRIA'; cfCriarLote(); }); await page.waitForTimeout(300);
+  await page.evaluate(() => { cfNovo.cabecas = '120'; cfNovo.peso = '380'; cfNovo.jejum = 'NAO'; cfNovo.origem = 'RECRIA'; cfCriarLote(); }); await page.waitForTimeout(300);   /* v103: jejum obrigatório */
   const lote = await medirTela(page, 'Confinamento › Lote (CF-VER-<ano>-01)', 'gerente');
   lote.erros = erros.slice();
   R.telas.push(lote);
@@ -1170,6 +1171,27 @@ async function cenarioConf(browser, base, R, termos) {
     const b2 = document.querySelector('#bt-enviar-cf');
     r.depois = { ativo: !b2.classList.contains('acao-off') && !b2.getAttribute('data-falta'), noLugar: b2.getAttribute('data-marca-teste') === '1' };
     const x = b2.getBoundingClientRect(); r.rodape = x.top >= 0 && x.bottom <= innerHeight;
+    return r; });
+  /* v103: segundo lote no MESMO curral → um cartão de curral com duas sublinhas; "Algo fora do normal?" é multi-seleção
+     fora do apontamento → chips removíveis (c12); tela do lote com projeção, pesagem, morte e diários (tudo aceso) */
+  C.v103 = await page.evaluate(() => {
+    const l0 = D.cfLotes[0], hoje = hojeBRT();
+    D.cfLotes.push(Object.assign({}, l0, { id: l0.id.replace(/-01$/, '-02'), seq: 2, genetica: 'CRUZADO_ANGUS' }));
+    rascunhoConf = null; ir('casa'); document.querySelector('#bt-preencher-cf').click();
+    const r = { cartoes: document.querySelectorAll('#app [data-cfc]').length, sublinhas: document.querySelectorAll('#app [data-cfc] .cf-sublote').length, sobras: document.querySelectorAll('#app [data-cfgrupo="sobra"]').length };
+    document.querySelector('[data-cffora="0:MONTA"]').click(); document.querySelector('[data-cffora="0:BRIGA"]').click(); pintarSelecoes();
+    const box = document.querySelector('#app [data-cfl="0"] .sel-box[data-sel-de="cffora"]');
+    r.selecao = box ? box.innerText.replace(/\s+/g, ' ') : ''; r.removiveis = box ? box.querySelectorAll('[data-sel-rm]').length : 0;
+    r.textoLivre = document.querySelectorAll('#app [data-cfd="obs"]').length;
+    /* lote sem dado nenhum: nada vermelho; com tudo: até 2 telas */
+    ir('cflote', l0.id); r.semDado = { vermelho: document.querySelectorAll('#app .farol.critico, #app .farol.espera').length };
+    l0.projecao = { gmdAlvo: 1.5, cmsPrevisto: 9.5, diasPrevistos: 100 };
+    (D.cfPesagens = D.cfPesagens || []).push({ id: 'pz', loteId: l0.id, data: hoje, cabecasPesadas: 20, pesoMedioKg: 380, jejum: 'NAO' });
+    ['-3', '-2', '-1', '0'].forEach((o, i) => { const data = diaISO(hoje, +o);
+      D.cfDiarios.push({ id: 'cz' + i, unidadeId: l0.unidadeId, data, currais: [{ curralId: l0.curralId, cms: ['9,0', '9,2', '9,1', '7,9'][i], sobra: '1', cond: 'POEIRA', bebedouro: 'OK', ofegacao: '2' }],
+        lotes: [{ loteId: l0.id, curralId: l0.curralId, enfEntraram: '1', enfMotivos: ['RESPIRATORIO'], enfEstao: '1', foraNormal: [] }] }); });
+    ir('cflote', l0.id);
+    r.cheio = { telas: Math.round(document.documentElement.scrollHeight / innerHeight * 100) / 100, farois: document.querySelectorAll('#app .cf-farois .farol').length, txt: document.querySelector('#app').innerText.replace(/\s+/g, ' ') };
     return r; });
   C.nativos = await page.evaluate(() => window.__nativos);
   C.erros = erros.slice();
@@ -2321,6 +2343,10 @@ function avaliar(R) {
     add(g, 'Tela do lote — números calculados (dias de cocho, cabeças vivas) e "sem pesagem desde a entrada"; sem projeção, nenhum farol vermelho', C.lote.tela === 'cflote' && /dias de cocho/.test(C.lote.texto) && /sem pesagem desde a entrada/.test(C.lote.texto) && C.lote.vermelho === 0 && !PLANO_PROIBIDO.test(C.lote.texto), '');
     add(g, 'Diário — "Enviar diário" nasce inativo com o visual do botão de perfil e o toque nomeia o curral e o campo que faltam (v103: o cocho é do curral)', d.existe && d.inativo && d.estilo === 'dashed' && !d.vermelho && d.mostrou && /Marque a sobra de cocho do Curral/.test(d.nota) && !d.proibido && d.mesmaTela && d.nativos === 0, `"${d.nota || ''}"`);
     add(g, 'Diário — sobra, condição (e, desde a v103, bebedouro) do curral marcados, o botão ativa no lugar (mesmo elemento) e fica no rodapé, visível sem rolar', !!d.depois && d.depois.ativo && d.depois.noLugar && d.rodape, d.depois ? `${d.depois.ativo ? 'ativo' : 'inativo'}${d.depois.noLugar ? ', mesmo elemento' : ', redesenhado'}` : '');
+    const v = C.v103 || {};
+    add(g, 'v103 — o cocho é do curral: dois lotes no mesmo curral viram UM cartão, com UMA sobra de cocho e uma sublinha por lote', v.cartoes === 1 && v.sobras === 1 && v.sublinhas === 2, `${v.cartoes} cartão · ${v.sobras} sobra · ${v.sublinhas} sublinhas`);
+    add(g, 'v103 — "Algo fora do normal?" é chip (zero texto livre por lote) e a multi-seleção mostra os chips removíveis do componente único (c12)', v.textoLivre === 0 && v.removiveis === 2 && /2 situações marcadas/.test(v.selecao || ''), `"${v.selecao || ''}" · ${v.textoLivre} campo de texto`);
+    add(g, 'v103 — tela do lote: sem dado, nenhum farol vermelho/amarelo; com tudo aceso (dois faróis, 8 números, queda de consumo) cabe em até 2 telas, sem termo proibido', !!v.semDado && v.semDado.vermelho === 0 && v.cheio && v.cheio.farois === 2 && v.cheio.telas <= 2 && /↓ consumo/.test(v.cheio.txt) && !PLANO_PROIBIDO.test(v.cheio.txt), v.cheio ? `${v.cheio.telas} telas · ${v.cheio.farois} faróis` : '');
     add(g, 'Nenhum confirm()/alert() nativo e nenhum erro de página no cenário', C.nativos === 0 && !C.erros.length, C.erros[0] || '');
   }
 

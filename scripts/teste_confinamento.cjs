@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- teste_confinamento.cjs — prova do módulo CONFINAMENTO (v102) do Boletim NCNaves.
+ teste_confinamento.cjs — prova do módulo CONFINAMENTO (v102 + revisão de especialista da v103) do Boletim NCNaves.
 
  É a validação escrita na tarefa da v102 (perfil "Gerente de Confinamento", etapa 1 + diário) e roda
  SEM REDE, como um celular offline, a 390 px de largura. Serve de trava: sai com código 1 quando
@@ -27,6 +27,22 @@
    i. Zero diálogo nativo e zero erro de página em todos os cenários; a fila offline recebe os três
       tipos novos (cfl, cfd, cfe).
 
+ v103 — revisão de especialista (as 39 provas da v102 continuam, no modelo novo: o cocho é do curral,
+ então "Marque a sobra de cocho do Curral 3" no lugar de "do lote …", o chip de jejum na entrada, e
+ as colunas novas do CSV no fim). Provas novas, com números fechados:
+   Parte A — (a) dois lotes no mesmo curral = um cartão, uma sobra, duas sublinhas; (b) diário da
+      v102 no detalhe, no WhatsApp e no CSV sem perder campo (e sem ser reescrito); (c) CMS "98"
+      trava o envio com o motivo; (d) enfermaria/morte acima das vivas travam; (e) Poeira gravada e
+      no Fora do esperado; (f) entrada sem jejum não cria lote; (g) entrada sem jejum × pesagem com
+      jejum desconta 4 %; A.7(c) nome lembrado como texto com "trocar".
+   Parte B — (h) entraram 2 / respiratório grava e vai ao WhatsApp; (i) bebedouro "falha" e
+      ofegação 3 no Fora do esperado; (j) sem bebedouro, "Enviar diário" inativo.
+   Parte C — (k) 9,0 · 9,2 · 9,1 → 7,9 = −13 %; (l) só 2 diários com CMS, sem alerta; (m) selo no
+      dia 15, não no 22; (n) sobra 0,0 / 0,1 / 3; (o) peso estimado pelo alvo e pelo real; (p) CA
+      com 80 % de cobertura sim, com 50 % não; (q) lote sem nada, nenhum vermelho; faróis de
+      consumo × ganho e o pior dos dois; morbidade e adaptação; altura da tela do lote ≤ 2 telas.
+   Geral — (r) nenhuma fileira passa de 390 px; diário com 5 lotes em 4 currais (contagem de campos).
+
  Uso (na raiz do repositório):
    node scripts/teste_confinamento.cjs
    node scripts/teste_confinamento.cjs --json
@@ -44,6 +60,7 @@ const RAIZ = path.resolve(__dirname, '..');
 const VP = { width: 390, height: 844 };
 const CONF = { codigo: 'VF-6318', chave: 'f22f' };
 const provas = [];
+const R103 = {};   /* v103: medidas para o resumo do PR (altura da tela do lote, contagem do diário) */
 const ok = (nome, passou, detalhe) => provas.push({ nome, ok: !!passou, detalhe: detalhe == null ? '' : String(detalhe) });
 
 function servir(dir) {
@@ -158,7 +175,7 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
     await page.evaluate(() => ir('casa'));
     const casa1 = await page.evaluate(() => ({ lotes: document.querySelectorAll('#app [data-cflote]').length, txt: document.querySelector('#app').innerText.replace(/\s+/g, ' ') }));
     const bPre = await botao(page, '#bt-preencher-cf');
-    ok('d. Casa: uma linha por lote ativo (código · genética · cabeças · dia) e "Preencher diário" ativo', casa1.lotes === 2 && /CF-VER-\d{4}-01 · Nelore · 120 cab · dia 0/.test(casa1.txt) && bPre && !bPre.inativo, `${casa1.lotes} linhas`);
+    ok('d. Casa: uma linha por lote ativo (código · genética · cabeças · selo de adaptação e dia) e "Preencher diário" ativo', casa1.lotes === 2 && /CF-VER-\d{4}-01 · Nelore · 120 cab · adaptação · dia 0/.test(casa1.txt) && bPre && !bPre.inativo, `${casa1.lotes} linhas`);
 
     /* ---- e: diário (v103: um cartão por curral ocupado, uma sublinha por lote) ---- */
     await page.click('#bt-preencher-cf'); await page.waitForTimeout(300);
@@ -315,6 +332,110 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
         const el = document.querySelector('#app input[data-cfr="responsavel"]'); r.depois = el ? el.value : null; return r; });
       ok('v103 A.7(c). "Quem está preenchendo": com nome lembrado aparece como texto com "trocar" (zero campo); o campo só abre ao tocar em "trocar"',
         !nm.campo && /Quem está preenchendo: João trocar/.test(nm.txt) && nm.depois === 'João', `"${nm.txt}" → campo com "${nm.depois}"`);
+      /* ---- v103 Parte C: indicadores (tudo calculado, nada gravado) ---- */
+      const C = await P.evaluate(() => {
+        const hoje = hojeBRT(), dI = n => diaISO(hoje, n);
+        D.cfLotes = []; D.cfDiarios = []; D.cfEventos = []; D.cfPesagens = []; rascunhoConf = null;
+        const lote = (id, curral, ent, cab, peso, jj, proj) => { const l = { id, unidadeId: 'f22f', ano: 2026, seq: +id.slice(-2), curralId: curral, genetica: 'NELORE', entradaData: ent, cabecasEntrada: cab, pesoEntradaKg: peso, pesoEntradaJejum: jj, origem: 'RECRIA', status: 'ATIVO', projecao: proj || null }; D.cfLotes.push(l); return l; };
+        const cur = (curralId, cms, sobra) => ({ curralId, cms, sobra, cond: 'SECO', bebedouro: 'OK', ofegacao: '' });
+        const lin = (loteId, curralId, entr) => ({ loteId, curralId, enfEntraram: entr || '', enfMotivos: [], enfEstao: '', foraNormal: [] });
+        const diario = (data, currais, lotes) => D.cfDiarios.push({ id: 'f22f_' + data, unidadeId: 'f22f', data, responsavel: 'Zé', chuvaMm: '', obs: '', enviadoEm: data + ' 18:00', currais, lotes });
+        const K = lote('CF-VER-2026-31', 'tcf01', dI(-20), 100, 380, 'NAO', { gmdAlvo: 1.5, cmsPrevisto: 9.5, diasPrevistos: 100 });
+        const L = lote('CF-VER-2026-32', 'tcf02', dI(-30), 100, 380, 'NAO');
+        const N = lote('CF-VER-2026-33', 'tcf03', dI(-30), 100, 380, 'NAO');
+        D.cfPesagens.push({ id: 'pk', loteId: K.id, data: dI(-10), cabecasPesadas: 30, pesoMedioKg: 395, jejum: 'NAO' });
+        D.cfEventos.push({ id: 'mk', unidadeId: 'f22f', loteId: K.id, tipo: 'MORTE', data: dI(-15), cabecas: 1, causa: 'Pneumonia', necropsia: 'FEITA', cancelado: false });
+        /* (k)/(l)/(n): Curral 1 = 9,0 · 9,2 · 9,1 → 7,9; Curral 2 só 2 diários anteriores com CMS; Curral 3 sobra 0 em dois diários seguidos */
+        diario(dI(-3), [cur('tcf01', '9,0', '1'), cur('tcf02', '', '0'), cur('tcf03', '9', '1')], [lin(K.id, 'tcf01', '2'), lin(L.id, 'tcf02'), lin(N.id, 'tcf03')]);
+        diario(dI(-2), [cur('tcf01', '9,2', '1'), cur('tcf02', '9,0', '0'), cur('tcf03', '9', '1')], [lin(K.id, 'tcf01', '1'), lin(L.id, 'tcf02'), lin(N.id, 'tcf03')]);
+        diario(dI(-1), [cur('tcf01', '9,1', '2'), cur('tcf02', '9,2', '1'), cur('tcf03', '9', '0')], [lin(K.id, 'tcf01'), lin(L.id, 'tcf02'), lin(N.id, 'tcf03')]);
+        diario(hoje, [cur('tcf01', '7,9', '3'), cur('tcf02', '7,0', '0'), cur('tcf03', '9', '0')], [lin(K.id, 'tcf01'), lin(L.id, 'tcf02'), lin(N.id, 'tcf03')]);
+        const rK = cfResumoLote(K), rL = cfResumoLote(L), rN = cfResumoLote(N), rL1 = cfResumoLote(L, dI(-1)), rN1 = cfResumoLote(N, dI(-1));
+        /* (m) selo de adaptação */
+        const M15 = lote('CF-VER-2026-34', 'tcf04', dI(-15), 50, 380, 'NAO'), M22 = lote('CF-VER-2026-35', 'tcf04', dI(-22), 50, 380, 'NAO');
+        /* (o) peso estimado pelo alvo e pelo GMD real */
+        const O1 = lote('CF-VER-2026-36', 'tcf05', dI(-20), 50, 380, 'NAO', { gmdAlvo: 1.5 });
+        const O2 = lote('CF-VER-2026-37', 'tcf05', dI(-40), 50, 380, 'SIM');
+        D.cfPesagens.push({ id: 'po2', loteId: O2.id, data: dI(-10), cabecasPesadas: 20, pesoMedioKg: 430, jejum: 'SIM' });
+        /* (p) conversão: entrada → pesagem em 10 dias, GMD 1,5; CMS 9,0 em 8 de 10 dias (P1) e em 5 de 10 (P2) */
+        const P1 = lote('CF-VER-2026-38', 'tcf06', dI(-60), 50, 380, 'SIM'), P2 = lote('CF-VER-2026-39', 'tcf06x', dI(-60), 50, 380, 'SIM');
+        [P1, P2].forEach(p => D.cfPesagens.push({ id: 'pp' + p.id, loteId: p.id, data: dI(-50), cabecasPesadas: 20, pesoMedioKg: 395, jejum: 'SIM' }));
+        for (let k = 1; k <= 10; k++) { const data = dI(-60 + k), cs = [], ls = [];
+          if (k <= 8) { cs.push(cur('tcf06', '9,0', '1')); ls.push(lin(P1.id, 'tcf06')); }
+          if (k <= 5) { cs.push(cur('tcf06x', '9,0', '1')); ls.push(lin(P2.id, 'tcf06x')); }
+          if (ls.length) diario(data, cs, ls); }
+        const rP1 = cfResumoLote(P1), rP2 = cfResumoLote(P2);
+        /* (q) lote sem nada */
+        const Q = lote('CF-VER-2026-40', 'tcf04', hoje, 40, 380, 'NAO');
+        ir('casa');
+        const casa = [...document.querySelectorAll('#app [data-cflote]')].map(b => ({ id: b.dataset.cflote, txt: b.innerText.replace(/\s+/g, ' '), farol: b.querySelector('.farol').className }));
+        const zap = resumoWhatsConf(D.cfDiarios.find(d => d.data === hoje));
+        ir('cflote', Q.id);
+        const telaQ = { critico: document.querySelectorAll('#app .farol.critico, #app .farol.espera').length, atencao: document.querySelectorAll('#app .cf-atencao').length, txt: document.querySelector('#app').innerText.replace(/\s+/g, ' ') };
+        ir('cflote', K.id);
+        const telaK = { txt: document.querySelector('#app').innerText.replace(/\s+/g, ' '), farois: [...document.querySelectorAll('#app .cf-farois .farol')].map(f => f.className.replace(/farol|reto/g, '').trim()),
+          alturaTelas: Math.round(document.documentElement.scrollHeight / innerHeight * 100) / 100 };
+        const r1 = v => v == null ? null : Math.round(v * 100) / 100;
+        return { rK: { queda: rK.queda && r1(rK.queda.pct), media: rK.queda && r1(rK.queda.media), farolConsumo: rK.farolConsumo, farolGanho: rK.farolGanho, farolPior: rK.farolPior, pesoEst: r1(rK.pesoEst), base: rK.pesoEstBase, pv: r1(rK.cmsPctPV), saida: rK.diasAteSaida, sobra: rK.desvioSobra, morb: r1(rK.morb), morbAdapt: r1(rK.morbAdapt), mortesAdapt: rK.mortesAdapt, adapt: rK.adaptacao },
+          rL: { queda: rL.queda, sobra: rL.desvioSobra }, rL1: rL1.desvioSobra, rN: rN.desvioSobra, rN1: rN1.desvioSobra,
+          m15: cfResumoLote(M15).adaptacao, m22: cfResumoLote(M22).adaptacao,
+          o1: [r1(cfResumoLote(O1).pesoEst), cfResumoLote(O1).pesoEstBase], o2: [r1(cfResumoLote(O2).pesoEst), cfResumoLote(O2).pesoEstBase],
+          p1: [r1(rP1.ca), r1(rP1.caCobertura), rP1.caMotivo], p2: [rP2.ca, r1(rP2.caCobertura), rP2.caMotivo],
+          q: { r: (({ farolPior, morb, morbMotivo, pesoEst, ca, caMotivo, queda }) => ({ farolPior, morb, morbMotivo, pesoEst, ca, caMotivo, queda }))(cfResumoLote(Q)), tela: telaQ },
+          casa, zap, telaK, gravado: JSON.stringify(D.cfDiarios).includes('queda') || JSON.stringify(D.cfLotes).includes('pesoEst') };
+      });
+      const linhaCasa = id => (C.casa.find(x => x.id === id) || {}).txt || '';
+      ok('v103 C(k). CMS 9,0 · 9,2 · 9,1 → 7,9 acende a queda de consumo: 7,9 ÷ 9,1 − 1 = −13,2 % ("↓ consumo" na casa, na tela do lote e "consumo −13 %" no Fora do esperado)',
+        C.rK.queda === -13.19 && C.rK.media === 9.1 && /↓ consumo/.test(linhaCasa('CF-VER-2026-31')) && /↓ consumo −13 %/.test(C.telaK.txt) && /CF-VER-2026-31 consumo −13 %/.test(C.zap), `${C.rK.queda} % · média ${C.rK.media}`);
+      ok('v103 C(l). Só 2 diários anteriores com CMS → sem alerta de queda (7,0 depois de 9,0 e 9,2)', C.rL.queda === null && !/↓ consumo/.test(linhaCasa('CF-VER-2026-32')), String(C.rL.queda));
+      ok('v103 C.2. Farol diário de consumo: 7,9 ÷ 9,5 previsto = 83 % → vermelho; ganho 1,50 × alvo 1,50 → verde; na casa a bolinha é o PIOR dos dois; na tela do lote os dois lado a lado',
+        C.rK.farolConsumo === 'vermelho' && C.rK.farolGanho === 'verde' && C.rK.farolPior === 'vermelho' && /critico/.test((C.casa.find(x => x.id === 'CF-VER-2026-31') || {}).farol) && C.telaK.farois.join() === 'critico,ok' && /Consumo CMS 7,9 × previsto 9,5/.test(C.telaK.txt) && /Ganho GMD 1,50 × alvo 1,50/.test(C.telaK.txt),
+        `${C.rK.farolConsumo} · ${C.rK.farolGanho} → ${C.rK.farolPior} · ${C.telaK.farois.join(' | ')}`);
+      ok('v103 C(m). Selo "adaptação · dia N": dia 15 com selo, dia 22 sem (na casa e no cálculo)', C.m15 === true && C.m22 === false && /adaptação · dia 15/.test(linhaCasa('CF-VER-2026-34')) && /· dia 22/.test(linhaCasa('CF-VER-2026-35')) && !/adaptação/.test(linhaCasa('CF-VER-2026-35')), `${linhaCasa('CF-VER-2026-34')} | ${linhaCasa('CF-VER-2026-35')}`);
+      ok('v103 C.3/C.7. Primeiros 21 dias separados na tela do lote (1 morte · 1 % · morbidade 3 %); morbidade = 3 casos novos ÷ 100 de entrada = 3 %',
+        C.rK.adapt === true && C.rK.mortesAdapt === 1 && C.rK.morb === 3 && C.rK.morbAdapt === 3 && /Adaptação \(primeiros 21 dias\): 1 morte · mortalidade 1 % · morbidade 3 %/.test(C.telaK.txt) && /morbidade · 3 casos novos/.test(C.telaK.txt), `morb ${C.rK.morb} · adapt ${C.rK.morbAdapt}`);
+      ok('v103 C(n). Sobra em sequência: 0 e 0 → "sobra 0 em 2 diários seguidos"; 0 e 1 → sem desvio; 3 → "sobra 3" (substitui a regra "0 ou 4 num dia")',
+        C.rN === 'sobra 0 em 2 diários seguidos' && C.rL1 === '' && C.rN1 === '' && C.rK.sobra === 'sobra 3' && /Curral 1 sobra 3/.test(C.zap) && /Curral 3 sobra 0 em 2 diários seguidos/.test(C.zap) && !/Curral 2 sobra/.test(C.zap), `${C.rN} · "${C.rL1}" · ${C.rK.sobra}`);
+      ok('v103 C(o). Peso estimado: pelo alvo 380 + 1,5 × 20 = 410 kg; pelo GMD real 430 + (50 ÷ 30) × 10 = 446,67 kg; CMS 7,9 = 1,93 % de 410 kg; saída prevista em 80 dias',
+        C.o1[0] === 410 && C.o1[1] === 'pelo alvo' && C.o2[0] === 446.67 && C.o2[1] === 'pelo GMD real' && C.rK.pesoEst === 410 && C.rK.base === 'pelo GMD real' && C.rK.pv === 1.93 && C.rK.saida === 80 && /faltam 80 dias/.test(C.telaK.txt),
+        `${C.o1.join(' ')} · ${C.o2.join(' ')} · K ${C.rK.pesoEst} ${C.rK.base} · ${C.rK.pv} % PV`);
+      ok('v103 C(p). Conversão alimentar: CMS em 8 de 10 dias (80 %) → 9,0 ÷ 1,5 = 6,00 kg MS/kg; em 5 de 10 (50 %) → "dados de consumo insuficientes"',
+        C.p1[0] === 6 && C.p1[1] === 0.8 && C.p2[0] === null && C.p2[1] === 0.5 && C.p2[2] === 'dados de consumo insuficientes', `${C.p1.join(' · ')} | ${C.p2.join(' · ')}`);
+      ok('v103 C(q). Lote sem nada (sem diário, pesagem nem projeção): nenhum vermelho nem amarelo, nenhum alerta; os indicadores ficam "—" com o motivo',
+        C.q.r.farolPior === 'cinza' && C.q.r.morb === null && C.q.r.pesoEst === null && C.q.r.ca === null && !C.q.r.queda && C.q.tela.critico === 0 && C.q.tela.atencao === 0
+          && /morbidade: sem diário/.test(C.q.tela.txt) && /conversão: sem pesagem desde a entrada/.test(C.q.tela.txt) && /peso estimado: sem pesagem e sem projeção/.test(C.q.tela.txt) && !PROIBIDO.test(C.q.tela.txt), C.q.r.morbMotivo);
+      ok('v103 C. Nenhum indicador gravado: diários e lotes no aparelho não ganham queda, peso estimado nem conversão', !C.gravado, '');
+      ok('v103 C. Tela do lote com tudo aceso (selo, queda, 8 números, dois faróis, saída prevista, adaptação, entrada, morte, diários) cabe em até 2 telas a 390 × 844', C.telaK.alturaTelas <= 2, C.telaK.alturaTelas + ' telas');
+      R103.alturaLote = C.telaK.alturaTelas;
+      /* (r) largura e contagem de toques: 5 lotes em 4 currais */
+      const T = await P.evaluate(() => {
+        const hoje = hojeBRT();
+        D.cfLotes = []; D.cfDiarios = []; D.cfEventos = []; D.cfPesagens = []; rascunhoConf = null;
+        [['CF-VER-2026-51', 'tcf01'], ['CF-VER-2026-52', 'tcf01'], ['CF-VER-2026-53', 'tcf02'], ['CF-VER-2026-54', 'tcf03'], ['CF-VER-2026-55', 'tcf04']].forEach(([id, c]) =>
+          D.cfLotes.push({ id, unidadeId: 'f22f', ano: 2026, seq: +id.slice(-2), curralId: c, genetica: 'NELORE', entradaData: diaISO(hoje, -5), cabecasEntrada: 100, pesoEntradaKg: 380, pesoEntradaJejum: 'NAO', origem: 'RECRIA', status: 'ATIVO', projecao: null }));
+        ir('casa'); document.querySelector('#bt-preencher-cf').click();
+        /* borda direita VISÍVEL de cada elemento: o que um ancestral com overflow ≠ visible recorta (ex.: reticências da barra do topo) não conta */
+        const largo = () => { let m = 0; document.querySelectorAll('#app *').forEach(el => { const r = el.getBoundingClientRect(); if (!r.width) return; let dir = r.right;
+            for (let a = el.parentElement; a && a.id !== 'app'; a = a.parentElement) { if (getComputedStyle(a).overflowX !== 'visible') dir = Math.min(dir, a.getBoundingClientRect().right); }
+            m = Math.max(m, dir); }); return { maior: Math.round(m), doc: document.documentElement.scrollWidth }; };
+        const vis = s => [...document.querySelectorAll('#app ' + s)].filter(el => el.getClientRects().length);
+        const conta = { numeros: vis('input[inputmode]').length, grupos: vis('[data-cfgrupo]').length, obrig: vis('[data-cfgrupo="sobra"],[data-cfgrupo="curral"],[data-cfgrupo="bebedouro"]').length,
+          currais: vis('[data-cfc]').length, lotes: vis('[data-cfl]').length, altura: Math.round(document.documentElement.scrollHeight / innerHeight * 100) / 100 };
+        const lForm = largo();
+        /* preenche só o obrigatório e envia */
+        rascunhoConf.currais.forEach((c, i) => { document.querySelector(`[data-cfsobra="${i}:2"]`).click(); document.querySelector(`[data-cfcur="${i}:SECO"]`).click(); document.querySelector(`[data-cfbeb="${i}:OK"]`).click(); });
+        conta.ativo = !document.querySelector('#bt-enviar-cf').classList.contains('acao-off');
+        document.querySelector('#bt-enviar-cf').click();
+        ir('cfdetalhe', 'f22f_' + hoje); const lDet = largo();
+        ir('cflote', 'CF-VER-2026-51'); const lLote = largo();
+        ir('casa'); const lCasa = largo();
+        return { conta, lForm, lDet, lLote, lCasa, enviado: !!cfDiarioDoDia(hoje, 'f22f') };
+      });
+      const W = [T.lForm, T.lDet, T.lLote, T.lCasa];
+      ok('v103 (r). Nenhuma fileira passa de 390 px: diário (5 lotes em 4 currais), diário enviado, tela do lote e casa — sem rolagem lateral', W.every(w => w.maior <= 390 && w.doc <= 390), W.map(w => w.maior + '/' + w.doc).join(' · '));
+      ok('v103. Diário com 5 lotes em 4 currais: 4 cartões de curral, 5 sublinhas de lote; só o obrigatório (sobra, condição e bebedouro de cada curral = 12 toques) ativa "Enviar diário" e envia', T.conta.currais === 4 && T.conta.lotes === 5 && T.conta.obrig === 12 && T.conta.ativo && T.enviado,
+        `${T.conta.numeros} campos numéricos · ${T.conta.grupos} grupos de chips · ${T.conta.altura} telas`);
+      R103.toques = T.conta;
       ok('v103. Cenário semeado sem erro de página e sem diálogo nativo', !g.erros.length && (await P.evaluate(() => window.__nativos)) === 0, g.erros[0] || 'sem erro');
       await g.ctx.close();
     }
@@ -361,9 +482,10 @@ const TERMOS_CF = /confinamento|curral|\bCMS\b|lote no cocho|sobra de cocho|GMD/
   const falhas = provas.filter(p => !p.ok);
   if (process.argv.includes('--json')) console.log(JSON.stringify({ provas, falhas: falhas.length }, null, 2));
   else {
-    console.log('# Confinamento (v102) — prova da validação da tarefa\n');
+    console.log('# Confinamento (v102 + v103) — prova da validação da tarefa\n');
     provas.forEach(p => console.log(`- ${p.ok ? '✅' : '❌'} ${p.nome}${p.detalhe ? ' — ' + p.detalhe : ''}`));
     console.log(`\n## Resultado: ${provas.length - falhas.length} ✅ · ${falhas.length} ❌`);
+    if (R103.toques) console.log(`\nMedidas v103: tela do lote com tudo aceso = ${R103.alturaLote} telas; diário com 5 lotes em 4 currais = ${R103.toques.numeros} campos numéricos + ${R103.toques.grupos} grupos de chips (${R103.toques.obrig} obrigatórios), ${R103.toques.altura} telas.`);
   }
   process.exit(falhas.length ? 1 : 0);
 })().catch(e => { console.error('FALHOU: ' + e.stack); process.exit(2); });

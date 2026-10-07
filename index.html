@@ -154,6 +154,11 @@ h3{font-size:.95rem;font-weight:700}
 .cf-grade .v{font-size:1.3rem;font-weight:700;line-height:1.2;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cf-grade .r{font-size:.74rem;color:var(--tinta-2);margin-top:2px}
 .cf-sublote{border-top:1px dashed var(--linha);margin-top:12px;padding-top:10px}   /* v103: lote dentro do cartão do curral */
+.cf-selo{display:inline-block;border:1px solid var(--linha);padding:1px 6px;font-size:.74rem;font-weight:600;color:var(--tinta-2);vertical-align:middle}
+.cf-atencao{color:var(--amarelo);font-weight:700}
+.cf-farois{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cf-farois p{margin:0;align-items:flex-start;min-width:0}
+.cf-farois .farol{margin-top:3px}
 .fechar-sub{position:absolute;top:8px;right:8px;color:var(--cereja);font-weight:800;font-size:.8rem;padding:4px 8px;min-height:32px}
 /* Rodapé fixo */
 .rodape{position:fixed;left:0;right:0;bottom:0;background:var(--cartao);border-top:1px solid var(--linha);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:30}
@@ -12430,6 +12435,16 @@ const CF_BEBEDOURO=[["OK","ok"],["SUJO","sujo"],["FALHA","falha"]];   /* do curr
 /* escore de ofegação do curral (opcional) — substitui o chip "Estresse térmico sim/não" do topo; ≥ 3 é "fora do esperado" */
 const CF_OFEGACAO=[["0","normal"],["1","respiração rápida"],["2","ofegante, boca fechada"],["3","boca aberta"],["4","boca aberta, língua de fora"]];
 const CF_NECROPSIA=[["FEITA","feita"],["NAO_FEITA","não feita"]];   /* no evento de morte; opcional */
+/* v103 (Parte C): indicadores — TODOS calculados em cfResumoLote, nunca gravados. Sem dado, "—" ou cinza com o motivo;
+   NUNCA vermelho por falta de dado (regra dos faróis: "sem registro", nunca "não fez"). O app relata, não manda: nenhum
+   texto sugere dieta, trato ou tratamento. */
+const CF_QUEDA_CMS=0.10;          /* queda de consumo: CMS do dia mais de 10 % abaixo da média dos diários anteriores… */
+const CF_JANELA_CMS=3;            /* …dos 3 diários anteriores QUE TENHAM CMS (menos de 3: sem alerta) */
+const CF_DIAS_ADAPTACAO=21;       /* selo "adaptação · dia N" até o 21º dia de cocho; mortalidade e morbidade separadas */
+const CF_CA_MIN_COBERTURA=0.70;   /* conversão alimentar só com CMS em pelo menos 70 % dos dias do período */
+const CF_FAROL_ORDEM={cinza:0, verde:1, amarelo:2, vermelho:3};   /* o "pior dos dois" faróis do lote */
+const cfPctSinal=v=>(v<0?"−":"+")+Math.abs(Math.round(v));   /* "−13" (sinal de menos tipográfico) */
+const cfCorte=r=>r>=CF_FAROL.verde?"verde":r>=CF_FAROL.amarelo?"amarelo":"vermelho";
 const cfFaixaTxt=k=>CF_FAIXAS[k][0]+" a "+CF_FAIXAS[k][1];
 const cfForaFaixa=(v,k)=>v!==""&&v!=null&&(n0(v)<CF_FAIXAS[k][0]||n0(v)>CF_FAIXAS[k][1]);
 /* farol contra a projeção: verde a partir de 95 % do GMD-alvo, amarelo de 85 a 95 %, vermelho abaixo; cinza sem pesagem */
@@ -12509,8 +12524,58 @@ function cfResumoLote(l, dia){
   const gmdUlt=ult?(ant?gmdDe(ant.pesoMedioKg,ant.jejum,ant.data,ult.pesoMedioKg,ult.jejum,ult.data):gmd):null;
   const proj=l.projecao||null;
   let farol="cinza";
-  if(gmd!=null && proj && n0(proj.gmdAlvo)>0){ const r=gmd/n0(proj.gmdAlvo); farol=r>=CF_FAROL.verde?"verde":r>=CF_FAROL.amarelo?"amarelo":"vermelho"; }
-  return {mortes, saidas, vivas, dias, mort, gmd, gmdUlt, gmdNota, ultPesagem:ult, proj, farol};
+  if(gmd!=null && proj && n0(proj.gmdAlvo)>0) farol=cfCorte(gmd/n0(proj.gmdAlvo));
+  /* ---- v103: indicadores (Parte C) ---- */
+  const serie=cfSerieLote(l,dia), temCms=o=>o.v.cms!==""&&o.v.cms!=null;
+  /* o diário de referência é o do dia; enquanto ele não chega, o de ontem */
+  const ref=[...serie].reverse().find(o=>o.data===dia||o.data===diaISO(dia,-1))||null;
+  const cmsDia=ref&&temCms(ref)?n0(ref.v.cms):null;
+  /* C.1 queda de consumo */
+  let queda=null;
+  if(cmsDia!=null){ const prev=serie.filter(o=>o.data<ref.data && temCms(o)).slice(-CF_JANELA_CMS);
+    if(prev.length>=CF_JANELA_CMS){ const media=prev.reduce((s,o)=>s+n0(o.v.cms),0)/prev.length, v=cmsDia/media-1;
+      if(v<-CF_QUEDA_CMS) queda={pct:v*100, media, cms:cmsDia, data:ref.data}; } }
+  /* C.2 farol diário de consumo (só com projeção) e o pior dos dois */
+  const cmsPrev=proj&&n0(proj.cmsPrevisto)>0?n0(proj.cmsPrevisto):null;
+  const farolConsumo=cmsDia!=null&&cmsPrev?cfCorte(cmsDia/cmsPrev):"cinza";
+  const farolPior=CF_FAROL_ORDEM[farolConsumo]>CF_FAROL_ORDEM[farol]?farolConsumo:farol;
+  /* C.3 adaptação: até CF_DIAS_ADAPTACAO dias de cocho; mortes e casos novos dos primeiros 21 dias, à parte */
+  const fimAdapt=diaISO(l.entradaData,CF_DIAS_ADAPTACAO), adaptacao=dias<=CF_DIAS_ADAPTACAO;
+  const mortesAdapt=evs.filter(e=>e.tipo==="MORTE" && e.data<=fimAdapt).reduce((s,e)=>s+(n0(e.cabecas)||1),0);
+  /* C.7 morbidade: casos novos acumulados ("entraram hoje") ÷ cabeças de entrada; diário da v102 não informa */
+  const inf=serie.filter(o=>o.v.enfEntraram!=null), cab0=n0(l.cabecasEntrada);
+  const casos=inf.reduce((s,o)=>s+n0(o.v.enfEntraram),0), casosAdapt=inf.filter(o=>o.data<=fimAdapt).reduce((s,o)=>s+n0(o.v.enfEntraram),0);
+  const morb=inf.length&&cab0?casos/cab0*100:null, morbAdapt=inf.length&&cab0?casosAdapt/cab0*100:null;
+  const morbMotivo=morb!=null?"":serie.length?"casos novos não informados":"sem diário";
+  /* C.4 sobra em sequência (substitui "sobra 0 ou 4 num dia"): sobra 0 em 2 ou mais diários seguidos, ou 3–4 em qualquer dia */
+  let desvioSobra="";
+  if(ref && ref.data===dia){ const sb=String(ref.v.sobra);
+    if(sb==="3"||sb==="4") desvioSobra="sobra "+sb;
+    else if(sb==="0"){ let k=0; for(let i=serie.indexOf(ref); i>=0 && String(serie[i].v.sobra)==="0"; i--) k++;
+      if(k>=2) desvioSobra="sobra 0 em "+k+" diários seguidos"; } }
+  /* C.5 peso estimado hoje (última pesagem ou entrada + GMD × dias; GMD real com pesagem, senão o alvo) e saída prevista */
+  let pesoEst=null, pesoEstBase="";
+  const pBase=ult?n0(ult.pesoMedioKg):n0(l.pesoEntradaKg), dBase=ult?ult.data:l.entradaData;
+  if(ult && gmdUlt!=null){ pesoEst=pBase+gmdUlt*diasEntreISO(dBase,dia); pesoEstBase="pelo GMD real"; }
+  else if(!ult && proj && n0(proj.gmdAlvo)>0){ pesoEst=pBase+n0(proj.gmdAlvo)*diasEntreISO(dBase,dia); pesoEstBase="pelo alvo"; }
+  const cmsPctPV=cmsDia!=null&&pesoEst>0?cmsDia/pesoEst*100:null;
+  const saidaPrevista=proj&&n0(proj.diasPrevistos)>0?diaISO(l.entradaData,n0(proj.diasPrevistos)):null;
+  const diasAteSaida=saidaPrevista?diasEntreISO(dia,saidaPrevista):null;
+  /* C.6 conversão alimentar: média do CMS entre as duas últimas pesagens (ou entrada e pesagem) ÷ GMD do período */
+  let ca=null, caMotivo="sem pesagem desde a entrada", caCobertura=null;
+  if(ult){ const d0=ant?ant.data:l.entradaData, n=diasEntreISO(d0,ult.data), per=serie.filter(o=>o.data>d0 && o.data<=ult.data && temCms(o));
+    caCobertura=n>0?per.length/n:0;
+    if(caCobertura<CF_CA_MIN_COBERTURA) caMotivo="dados de consumo insuficientes";
+    else if(!(gmdUlt>0)) caMotivo="sem ganho de peso no período";
+    else { ca=per.reduce((s,o)=>s+n0(o.v.cms),0)/per.length/gmdUlt; caMotivo=""; } }
+  return {mortes, saidas, vivas, dias, mort, gmd, gmdUlt, gmdNota, ultPesagem:ult, proj, farol,
+    farolGanho:farol, farolConsumo, farolPior, cmsDia, cmsPrev, queda, adaptacao, mortesAdapt, morb, morbAdapt, morbMotivo, casos,
+    desvioSobra, pesoEst, pesoEstBase, cmsPctPV, saidaPrevista, diasAteSaida, ca, caMotivo, caCobertura};
+}
+/* v103: a série diária do lote pela leitura única — um item por diário da unidade que traz o lote, até `dia` */
+function cfSerieLote(l, dia){
+  return cfDiarios().filter(d=>d.unidadeId===l.unidadeId && d.data<=dia).sort((a,b)=>a.data<b.data?-1:1)
+    .map(d=>({data:d.data, v:cfLinhaDia(cfDiarioNorm(d), l.id)})).filter(o=>o.v);
 }
 /* código do lote: CF-<sigla da fazenda-mãe>-<ano>-<nº>, numeração por unidade e ano */
 function cfProximoCodigo(fz, ano){
@@ -12520,8 +12585,8 @@ function cfProximoCodigo(fz, ano){
 }
 const cfLinhaLote=l=>{ const r=cfResumoLote(l);
   return `<li><button class="linha-flex" style="width:100%;text-align:left" data-cflote="${esc(l.id)}">
-    <span class="farol reto ${CF_FAROL_CSS[r.farol]}"></span>
-    <span class="cresce"><b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${r.vivas}</span> cab · dia <span class="num">${r.dias}</span>${r.gmd!=null?` · GMD <span class="num">${fmtGmd(r.gmd)}</span>`:""}</span></span>
+    <span class="farol reto ${CF_FAROL_CSS[r.farolPior]}"></span>
+    <span class="cresce"><b class="num">${esc(l.id)}</b> <span class="mut">· ${esc(cfRot(CF_GENETICA,l.genetica))} · <span class="num">${r.vivas}</span> cab · ${r.adaptacao?"adaptação · ":""}dia <span class="num">${r.dias}</span>${r.gmd!=null?` · GMD <span class="num">${fmtGmd(r.gmd)}</span>`:""}</span>${r.queda?` <b class="cf-atencao">↓ consumo</b>`:""}</span>
     <span class="mut">›</span></button></li>`; };
 const cfResumo1linha=d=>{ const n=(d.lotes||[]).length, m=(d.lotes||[]).reduce((s,x)=>s+cfMortesDia(x.loteId,d.data).reduce((a,e)=>a+(n0(e.cabecas)||1),0),0);
   return n+" lote"+(n===1?"":"s")+(m?" · "+m+" morte"+(m>1?"s":""):""); };
@@ -12816,18 +12881,27 @@ function vLoteConf(id){
   const tile=(v,rot)=>`<div><div class="v num">${v}</div><div class="r">${rot}</div></div>`;
   return cabecalhoContexto(l.unidadeId,{sub:"Lote "+l.id, voltar:true})+`
     ${fl?`<div class="aviso verde">✔ ${esc(fl)}</div>`:""}
-    <div class="cartao"><h3><span class="num">${esc(l.id)}</span> <span class="tag terra">${esc(CF_STATUS[l.status]||l.status)}</span></h3>
+    <div class="cartao"><h3><span class="num">${esc(l.id)}</span> <span class="tag terra">${esc(CF_STATUS[l.status]||l.status)}</span>${r.adaptacao?` <span class="cf-selo">adaptação · dia <span class="num">${r.dias}</span></span>`:""}</h3>
       <p class="mut">${esc(cfRot(CF_GENETICA,l.genetica))} · ${esc(cfCurralNome(l.curralId))} · entrou em ${fmtData(l.entradaData)}</p>
+      ${r.queda?`<p class="cf-atencao mt">↓ consumo ${cfPctSinal(r.queda.pct)} % — CMS <span class="num">${fmtKg(r.queda.cms)}</span> × média <span class="num">${fmtKg(r.queda.media)}</span> dos ${CF_JANELA_CMS} diários anteriores com CMS</p>`:""}
       <div class="cf-grade">
         ${tile(r.dias,"dias de cocho")}
         ${tile(r.vivas+`<span class="mut" style="font-size:.78rem;font-weight:500"> de ${n0(l.cabecasEntrada)}</span>`,"cabeças vivas")}
         ${tile(r.mortes+(r.mortes?`<span class="mut" style="font-size:.78rem;font-weight:500"> · ${fmtPct(r.mort)} %</span>`:""),"mortes · mortalidade")}
+        ${tile(r.morb!=null?fmtPct(r.morb)+`<span class="mut" style="font-size:.78rem;font-weight:500"> %</span>`:"—", r.morb!=null?"morbidade · "+r.casos+" caso"+(r.casos===1?"":"s")+" novo"+(r.casos===1?"":"s"):"morbidade: "+r.morbMotivo)}
         ${tile(r.gmd!=null?fmtGmd(r.gmd):"—", r.gmd!=null?"GMD kg/dia desde a entrada":"sem pesagem desde a entrada")}
+        ${tile(r.pesoEst!=null?fmtKg(Math.round(r.pesoEst))+`<span class="mut" style="font-size:.78rem;font-weight:500"> kg</span>`:"—", r.pesoEst!=null?"peso estimado hoje, "+r.pesoEstBase:"peso estimado: sem pesagem e sem projeção")}
+        ${tile(r.cmsDia!=null?fmtKg(r.cmsDia):"—", r.cmsDia!=null?"CMS kg MS/cab"+(r.cmsPctPV!=null?" · "+fmtPct(r.cmsPctPV)+" % do peso vivo":""):"sem CMS no diário")}
+        ${tile(r.ca!=null?fmtGmd(r.ca):"—", r.ca!=null?"conversão, kg MS por kg de ganho":"conversão: "+r.caMotivo)}
       </div>
       ${r.gmd!=null&&r.gmdNota?`<p class="mut mt" style="font-size:.8rem">GMD sem desconto de jejum: ${esc(r.gmdNota)}.</p>`:""}
       ${r.gmdUlt!=null&&r.ultPesagem?`<p class="mut mt" style="font-size:.8rem">Última pesagem ${fmtDataCurta(r.ultPesagem.data)}: ${fmtKg(r.ultPesagem.pesoMedioKg)} kg · GMD desde ela <span class="num">${fmtGmd(r.gmdUlt)}</span></p>`:""}
-      ${r.proj?`<p class="mt linha-flex"><span class="farol reto ${CF_FAROL_CSS[r.farol]}"></span><span class="cresce">${r.gmd!=null?`GMD <span class="num">${fmtGmd(r.gmd)}</span> × alvo <span class="num">${fmtGmd(r.proj.gmdAlvo)}</span> kg/dia`:"sem pesagem desde a entrada"}${n0(r.proj.diasPrevistos)?` · previstos <span class="num">${n0(r.proj.diasPrevistos)}</span> dias`:""}</span></p>`
+      ${r.proj?`<div class="cf-farois mt">
+          <p class="linha-flex"><span class="farol reto ${CF_FAROL_CSS[r.farolConsumo]}"></span><span class="cresce"><b>Consumo</b><br><span class="mut">${r.cmsDia!=null&&r.cmsPrev?`CMS <span class="num">${fmtKg(r.cmsDia)}</span> × previsto <span class="num">${fmtKg(r.cmsPrev)}</span>`:r.cmsPrev?"sem CMS no diário":"sem CMS previsto"}</span></span></p>
+          <p class="linha-flex"><span class="farol reto ${CF_FAROL_CSS[r.farolGanho]}"></span><span class="cresce"><b>Ganho</b><br><span class="mut">${r.gmd!=null&&n0(r.proj.gmdAlvo)?`GMD <span class="num">${fmtGmd(r.gmd)}</span> × alvo <span class="num">${fmtGmd(r.proj.gmdAlvo)}</span>`:r.gmd==null?"sem pesagem desde a entrada":"sem GMD-alvo"}</span></span></p></div>
+        ${r.saidaPrevista?`<p class="mut mt" style="font-size:.8rem">Saída prevista em ${fmtData(r.saidaPrevista)} (${n0(r.proj.diasPrevistos)} dias de cocho)${r.diasAteSaida>=0?` · faltam <span class="num">${r.diasAteSaida}</span> dias`:` · data prevista há <span class="num">${-r.diasAteSaida}</span> dias`}</p>`:""}`
         :`<p class="mut mt" style="font-size:.8rem">Sem projeção lançada para este lote.</p>`}
+      <p class="mut mt" style="font-size:.8rem">Adaptação (primeiros ${CF_DIAS_ADAPTACAO} dias): <span class="num">${r.mortesAdapt}</span> morte${r.mortesAdapt===1?"":"s"} · mortalidade <span class="num">${fmtPct(n0(l.cabecasEntrada)?r.mortesAdapt/n0(l.cabecasEntrada)*100:0)}</span> % · morbidade ${r.morbAdapt!=null?`<span class="num">${fmtPct(r.morbAdapt)}</span> %`:"— ("+esc(r.morbMotivo)+")"}</p>
     </div>
     <div class="cartao"><h3>Entrada</h3><dl class="dl mt">
       <dt>Cabeças</dt><dd class="num">${n0(l.cabecasEntrada)}</dd>
@@ -12863,18 +12937,20 @@ function resumoWhatsConf(d){
         +(c.bebedouro?" · bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro):"")+(!vazio(c.ofegacao)?" · ofegação "+c.ofegacao:""));
       if(c.bebedouro==="SUJO"||c.bebedouro==="FALHA") desvios.push(nome+" bebedouro "+cfRot(CF_BEBEDOURO,c.bebedouro));
       if(!vazio(c.ofegacao)&&n0(c.ofegacao)>=3) desvios.push(nome+" ofegação "+c.ofegacao);
-      if(c.sobra==="0"||c.sobra==="4") desvios.push(nome+" sobra "+c.sobra);
+      { const l0=cfLote(ls[0].loteId), r0=l0&&cfResumoLote(l0,d.data); if(r0&&r0.desvioSobra) desvios.push(nome+" "+r0.desvioSobra); }   /* C.4: o cocho é do curral, uma vez */
       if(c.cond==="POEIRA"||c.cond==="LAMA") desvios.push(nome+" "+condTxt(c.cond));
     }
     ls.forEach(v=>{ const l=cfLote(v.loteId), r=cfResumoLote(l,d.data), mortes=cfMortesDia(l.id,d.data), fora=cfForaTxt(v);
       if(dn.legado){
         L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(!vazio(v.cms)?" · CMS "+fmtKg(v.cms)+" kg MS":" · sem CMS")+(!vazio(v.sobra)?" · sobra "+v.sobra:"")
           +(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(v.cond?" · curral "+condTxt(v.cond):"")+(v.obs?" — "+v.obs:""));
-        if(v.sobra==="0"||v.sobra==="4") desvios.push(l.id+" sobra "+v.sobra);
+        if(r.desvioSobra) desvios.push(l.id+" "+r.desvioSobra);
         if(v.cond==="LAMA") desvios.push(l.id+" curral lama");
       } else L.push("🐂 "+l.id+" · "+r.vivas+" cab · dia "+r.dias+(n0(v.enfEntraram)?" · "+n0(v.enfEntraram)+" entraram na enfermaria"+((v.enfMotivos||[]).length?" ("+cfMotivosTxt(v)+")":""):"")
           +(n0(v.enfEstao)?" · "+n0(v.enfEstao)+" na enfermaria":"")+(fora?" · fora do normal: "+fora:""));
       mortes.forEach(e=>{ const nc=n0(e.cabecas)||1; L.push("⚠️ Morte "+l.id+": "+nc+" ("+String(e.causa||"").toLowerCase()+")"+((e.pesoEstimadoKg!==""&&e.pesoEstimadoKg!=null)?" · "+fmtKg(e.pesoEstimadoKg)+" kg est.":"")+(e.necropsia?" · necropsia "+cfRot(CF_NECROPSIA,e.necropsia):"")); });
+      if(r.queda) desvios.push(l.id+" consumo "+cfPctSinal(r.queda.pct)+" %");
+      if(r.farolConsumo==="amarelo"||r.farolConsumo==="vermelho") desvios.push(l.id+" CMS "+fmtKg(r.cmsDia)+" × previsto "+fmtKg(r.cmsPrev));
       if(r.farol==="amarelo"||r.farol==="vermelho") desvios.push(l.id+" GMD "+fmtGmd(r.gmd)+" × alvo "+fmtGmd(r.proj.gmdAlvo));
     });
   });
