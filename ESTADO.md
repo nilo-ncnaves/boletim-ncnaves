@@ -396,6 +396,16 @@ pelo sql/058 (CAFE-OCOR e PEC-OCOR com ativo = false).
   ganha) e de operação (solinftec_operacoes: código → nome; vazio
   mostra "Operação NNN") ajustáveis no SQL Editor. A importação
   manual por arquivo continua como plano B.
+- Solinftec na gestão (out/2026 — `sql/solinftec-gestao/`, sem mudança
+  no app): a `solinftec_pull` passou a gravar também `solinftec_hora`
+  (uma linha por registro da API, trancada), com `solinftec_diario`
+  idêntico ao de antes. Cadastros novos (`maquinas`, `solinftec_nucleo`,
+  `solinftec_operadores`, `faixas_operacao`, `taxa_manutencao`,
+  `parametros`) e 9 visões agregadas `vw_*` lidas pelas tarefas agendadas
+  de relatório. `solinftec_operacoes` ganhou a coluna `tipo` e 20 nomes
+  — o cartão Solinftec do app passou a mostrar esses nomes no lugar de
+  "Operação NNN". Pendências no LEIAME.md da pasta (diesel zerado na API,
+  nomes de paradas e operadores).
 
 - Estado das integrações (v63 — `sql/045-status-integracoes.sql`):
   a visão **vw_status_integracoes** devolve uma linha por fonte (icrop,
