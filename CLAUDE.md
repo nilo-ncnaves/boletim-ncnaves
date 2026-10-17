@@ -122,6 +122,12 @@ por CURRAL (cf_diario.payload.currais[]) e por lote (payload.lotes[], com o
 curral do dia); o sql/060 só recria a visão vw_cf_diario_lote (lê os dois
 formatos, colunas novas no fim, nenhuma removida) e cria a função de leitura
 cf_num. Nenhum diário gravado é reescrito.
+Desde out/2026 (projeto "Solinftec na gestão", sql/solinftec-gestao/; o
+app não lê): solinftec_hora (trancada), maquinas, solinftec_nucleo,
+solinftec_operadores (trancada), faixas_operacao, taxa_manutencao,
+parametros e 9 visões vw_* lidas pelas tarefas agendadas de relatório;
+solinftec_operacoes ganhou a coluna tipo. A solinftec_pull continua
+gravando solinftec_diario igual (o app usa).
 Um robô (pg_cron + pg_net no Supabase) busca dados da API iCrop toda
 madrugada e grava em icrop_manejo. O app apenas LÊ essas tabelas.
 
